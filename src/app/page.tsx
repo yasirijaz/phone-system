@@ -1,16 +1,19 @@
 "use client";
 
 import { useState, useMemo, type ChangeEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Call } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Search } from 'lucide-react';
+import { PlusCircle, Search, LogOut } from 'lucide-react';
 import { Logo } from '@/components/icons';
 import CallStats from '@/components/call-stats';
 import CallLog from '@/components/call-log';
 import LogCallForm from '@/components/log-call-form';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 const INITIAL_CALLS: Call[] = [
   {
@@ -64,6 +67,16 @@ export default function Home() {
   const [calls, setCalls] = useState<Call[]>(INITIAL_CALLS);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout failed', error);
+    }
+  };
 
   const filteredCalls = useMemo(() => {
     return calls
@@ -88,23 +101,28 @@ export default function Home() {
           <Logo className="h-8 w-8 text-primary" />
           <h1 className="text-xl font-bold text-primary">CallSync</h1>
         </div>
-        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-          <SheetTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Log a Call
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>Log a New Call</SheetTitle>
-              <SheetDescription>
-                Enter the details of your call. Use the AI tool to categorize it automatically based on your notes.
-              </SheetDescription>
-            </SheetHeader>
-            <LogCallForm onCallAdded={handleAddCall} />
-          </SheetContent>
-        </Sheet>
+        <div className="flex items-center gap-2">
+          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+            <SheetTrigger asChild>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Log a Call
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>Log a New Call</SheetTitle>
+                <SheetDescription>
+                  Enter the details of your call. Use the AI tool to categorize it automatically based on your notes.
+                </SheetDescription>
+              </SheetHeader>
+              <LogCallForm onCallAdded={handleAddCall} />
+            </SheetContent>
+          </Sheet>
+          <Button variant="outline" onClick={handleLogout} size="icon" aria-label="Log out">
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
       </header>
 
       <main className="flex-1 p-4 md:p-8 space-y-8">
