@@ -39,12 +39,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     try {
       const [deviceTokenRes, workerTokenRes] = await Promise.all([
-        axios.post<{ token: string }>('/api/twilio/token'),
-        axios.post<{ token: string }>('/api/twilio/worker-token')
+        axios.post<{ data: { token: string } }>('/api/twilio/token'),
+        axios.post<{ data: { token: string } }>('/api/twilio/worker-token')
       ]);
 
-      const deviceToken = deviceTokenRes.data.token;
-      const workerToken = workerTokenRes.data.token;
+      const deviceToken = deviceTokenRes.data.data.token;
+      const workerToken = workerTokenRes.data.data.token;
       
       console.log(deviceTokenRes,workerTokenRes);
       if (typeof deviceToken !== 'string' || typeof workerToken !== 'string') {
