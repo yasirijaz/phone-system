@@ -1,14 +1,20 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
-import { auth, isFirebaseInitialized } from '@/lib/firebase';
+import React, { createContext, useContext, useEffect, useState, type ReactNode, useCallback } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePathname, useRouter } from 'next/navigation';
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  login: (token: string, user: User) => void;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,16 +26,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!isFirebaseInitialized()) {
+    try {
+      const token = localStorage.getItem('authToken');
+      const storedUser = localStorage.getItem('user');
+      if (token && storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    } catch (error) {
+      console.error('Failed to parse user from localStorage', error);
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+    } finally {
       setLoading(false);
-      return;
     }
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
+  }, []);
 
-    return () => unsubscribe();
+  const login = useCallback((token: string, userData: User) => {
+    localStorage.setItem('authToken', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
+  }, []);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    setUser(null);
   }, []);
   
   const isProtectedRoute = pathname === '/';
@@ -47,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-  }, [user, loading, router, isProtectedRoute, isAuthRoute]);
+  }, [user, loading, router, isProtectedRoute, isAuthRoute, pathname]);
 
   if (loading || (!user && isProtectedRoute) || (user && isAuthRoute)) {
      return (
@@ -63,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      )
   }
 
-  return <AuthContext.Provider value={{ user, loading: false }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading: false, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

@@ -12,8 +12,8 @@ import { Logo } from '@/components/icons';
 import CallStats from '@/components/call-stats';
 import CallLog from '@/components/call-log';
 import LogCallForm from '@/components/log-call-form';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { useAuth } from '@/context/AuthContext';
+
 
 const INITIAL_CALLS: Call[] = [
   {
@@ -68,14 +68,11 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const router = useRouter();
+  const { logout } = useAuth();
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.push('/login');
-    } catch (error) {
-      console.error('Logout failed', error);
-    }
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
   };
 
   const filteredCalls = useMemo(() => {
