@@ -46,6 +46,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       const deviceToken = deviceTokenRes.data.token;
       const workerToken = workerTokenRes.data.token;
       
+      console.log(deviceTokenRes,workerTokenRes);
       if (typeof deviceToken !== 'string' || typeof workerToken !== 'string') {
         throw new Error('Invalid token format received from server.');
       }
