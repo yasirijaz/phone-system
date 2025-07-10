@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Search } from 'lucide-react';
+import { PlusCircle, Search, Phone, UserCheck } from 'lucide-react';
 import CallStats from '@/components/call-stats';
 import CallLog from '@/components/call-log';
 import LogCallForm from '@/components/log-call-form';
@@ -15,6 +15,8 @@ import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger 
 import { AppSidebar } from '@/components/app-sidebar';
 import IncomingCallModal from '@/components/incoming-call-modal';
 import Dialer from '@/components/dialer';
+import { useTwilio } from '@/context/TwilioContext';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 const INITIAL_CALLS: Call[] = [
@@ -64,6 +66,36 @@ const INITIAL_CALLS: Call[] = [
     category: 'Support',
   },
 ];
+
+function TwilioStatus() {
+  const { device, worker, isReady } = useTwilio();
+  const isDeviceReady = device?.isRegistered ?? false;
+  const isWorkerReady = worker?.ready ?? false;
+
+  return (
+    <TooltipProvider>
+      <div className="flex items-center gap-3">
+        <Tooltip>
+          <TooltipTrigger>
+            <Phone className={`h-5 w-5 ${isDeviceReady ? 'text-green-500' : 'text-destructive'}`} />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Device: {isDeviceReady ? 'Ready' : 'Not Ready'}</p>
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger>
+            <UserCheck className={`h-5 w-5 ${isWorkerReady ? 'text-green-500' : 'text-destructive'}`} />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Worker: {isWorkerReady ? 'Ready' : 'Not Ready'}</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
+  )
+}
+
 
 export default function Home() {
   const [calls, setCalls] = useState<Call[]>(INITIAL_CALLS);
@@ -116,7 +148,8 @@ export default function Home() {
                <SidebarTrigger className="md:hidden" />
                <h1 className="text-xl font-bold text-primary">Dashboard</h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
+              <TwilioStatus />
               <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetTrigger asChild>
                   <Button>
