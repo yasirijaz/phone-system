@@ -12,9 +12,9 @@ interface TwilioContextType {
   worker: Worker | null;
   isDeviceReady: boolean;
   isWorkerReady: boolean;
+  isConnecting: boolean;
   error: string | null;
-  setupDevice: () => void;
-  setupWorker: () => void;
+  connectTwilio: () => void;
 }
 
 const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
@@ -25,6 +25,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [worker, setWorker] = useState<Worker | null>(null);
   const [isDeviceReady, setIsDeviceReady] = useState(false);
   const [isWorkerReady, setIsWorkerReady] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
 
@@ -42,110 +43,98 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     loadTwilio();
   }, []);
 
-  const setupDevice = useCallback(async () => {
-    if (!twilio || !user || device) return;
+  const connectTwilio = useCallback(async () => {
+    if (!twilio || !user || isConnecting) return;
+
+    setIsConnecting(true);
+    setError(null);
 
     try {
-        const deviceTokenRes = await axios.post('/api/twilio/token');
-        const deviceToken = deviceTokenRes.data.data.token;
-        if (typeof deviceToken !== 'string') {
-            throw new Error('Invalid device token format received from server.');
-        }
-
-        const newDevice = new twilio.Device(deviceToken, {
-          closeExistingSessions: true
-        });
-        
-        newDevice.on('registered', () => {
-            console.log('Twilio Device registered');
-            setIsDeviceReady(true);
-            setDevice(newDevice);
-        });
-        newDevice.on('unregistered', () => {
-            console.log('Twilio Device unregistered');
-            setIsDeviceReady(false);
-        });
-        newDevice.on('error', (err: any) => {
-            console.error('Twilio Device Error:', err);
-            setError(`Device Error: ${err.message}`);
-            setIsDeviceReady(false);
-        });
-
-    } catch (err: any) {
-        console.error('Twilio device setup failed:', err);
-        setError('Failed to initialize Twilio device. Please try again later.');
-    }
-  }, [twilio, user, device]);
-
-  const setupWorker = useCallback(async () => {
-    if (!twilio || !user || worker) return;
-    
-    try {
-        const workerTokenRes = await axios.post('/api/twilio/worker-token');
-        const workerToken = workerTokenRes.data.data.token;
-
-        if (typeof workerToken !== 'string') {
-            throw new Error('Invalid worker token format received from server.');
-        }
-
-        if (!user) return;
-        const newWorker = new twilio.Worker(workerToken, {
-            closeExistingSessions: true,
-            websocket_uri: 'wss://event-bridge.us1.twilio.com/v1/wschannels/' + user.id + '/' + user.email
-        });
-
-        newWorker.on('ready', (readyWorker: any) => {
-            console.log('Twilio Worker ready:', readyWorker.sid);
-            setIsWorkerReady(true);
-            setWorker(readyWorker);
-        });
-        newWorker.on('disconnected', () => {
-            console.log('Twilio Worker disconnected');
-            setIsWorkerReady(false);
-        });
-        newWorker.on('error', (err: any) => {
-            console.error('Twilio Worker Error:', err);
-            setError(`Worker Error: ${err.message}`);
-            setIsWorkerReady(false);
-        });
-    } catch (err: any) {
-        console.error('Twilio worker setup failed:', err);
-        setError('Failed to initialize Twilio worker. Please try again later.');
-    }
-  }, [twilio, user, worker]);
-
-  useEffect(() => {
-    if (user && twilio) {
-      setError(null);
+      // Fetch tokens
+      const deviceTokenRes = await axios.post('/api/twilio/token');
+      const deviceToken = deviceTokenRes.data.data.token;
       
-      const cleanupDevice = () => {
-        if(device) {
+      const workerTokenRes = await axios.post('/api/twilio/worker-token');
+      const workerToken = workerTokenRes.data.data.token;
+
+      if (typeof deviceToken !== 'string' || typeof workerToken !== 'string') {
+        throw new Error('Invalid token format received from server.');
+      }
+
+      // Cleanup existing connections before starting new ones
+      if(device) {
           device.disconnectAll();
           device.destroy();
           setDevice(null);
           setIsDeviceReady(false);
-        }
+      }
+      if (worker) {
+          (worker as any).disconnect();
+          setWorker(null);
+          setIsWorkerReady(false);
       }
 
-      const cleanupWorker = () => {
-        if (worker) {
-            (worker as any).disconnect();
-            setWorker(null);
-            setIsWorkerReady(false);
-        }
-      }
+      // Setup Device
+      const newDevice = new twilio.Device(deviceToken, {
+        closeExistingSessions: true
+      });
+      newDevice.on('registered', () => {
+          console.log('Twilio Device registered');
+          setIsDeviceReady(true);
+      });
+      newDevice.on('unregistered', () => {
+          console.log('Twilio Device unregistered');
+          setIsDeviceReady(false);
+      });
+      newDevice.on('error', (err: any) => {
+          console.error('Twilio Device Error:', err);
+          setError(`Device Error: ${err.message}`);
+          setIsDeviceReady(false);
+      });
+      setDevice(newDevice);
+
+      // Setup Worker
+      const newWorker = new twilio.Worker(workerToken, {
+        closeExistingSessions: true,
+        websocket_uri: 'wss://event-bridge.us1.twilio.com/v1/wschannels/' + user.id + '/' + user.email
+      });
+      newWorker.on('ready', (readyWorker: any) => {
+          console.log('Twilio Worker ready:', readyWorker.sid);
+          setIsWorkerReady(true);
+          setWorker(readyWorker);
+      });
+      newWorker.on('disconnected', () => {
+          console.log('Twilio Worker disconnected');
+          setIsWorkerReady(false);
+      });
+      newWorker.on('error', (err: any) => {
+          console.error('Twilio Worker Error:', err);
+          setError(`Worker Error: ${err.message}`);
+          setIsWorkerReady(false);
+      });
       
-      if(!isDeviceReady) setupDevice();
-      if(!isWorkerReady) setupWorker();
-
-      return () => {
-        cleanupDevice();
-        cleanupWorker();
-      };
+    } catch (err: any) {
+        console.error('Twilio setup failed:', err);
+        setError('Failed to initialize Twilio. Please try again later.');
+    } finally {
+      setIsConnecting(false);
     }
-  }, [user, twilio]);
+  }, [twilio, user, isConnecting, device, worker]);
 
-  const value = { device, worker, isDeviceReady, isWorkerReady, error, setupDevice, setupWorker };
+  useEffect(() => {
+    // Cleanup on unmount or user change
+    return () => {
+      if(device) {
+        device.disconnectAll();
+        device.destroy();
+      }
+      if (worker) {
+        (worker as any).disconnect();
+      }
+    };
+  }, [device, worker]);
+
+  const value = { device, worker, isDeviceReady, isWorkerReady, isConnecting, error, connectTwilio };
 
   return <TwilioContext.Provider value={value}>{children}</TwilioContext.Provider>;
 }

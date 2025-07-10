@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Search, Phone, UserCheck } from 'lucide-react';
+import { PlusCircle, Search, Phone, UserCheck, Zap } from 'lucide-react';
 import CallStats from '@/components/call-stats';
 import CallLog from '@/components/call-log';
 import LogCallForm from '@/components/log-call-form';
@@ -68,37 +68,25 @@ const INITIAL_CALLS: Call[] = [
 ];
 
 function TwilioStatus() {
-  const { isDeviceReady, isWorkerReady, setupDevice, setupWorker } = useTwilio();
-
-  const handleDeviceClick = () => {
-    if (!isDeviceReady) {
-        setupDevice();
-    }
-  }
-
-  const handleWorkerClick = () => {
-    if (!isWorkerReady) {
-        setupWorker();
-    }
-  }
+  const { isDeviceReady, isWorkerReady } = useTwilio();
 
   return (
     <TooltipProvider>
       <div className="flex items-center gap-3">
         <Tooltip>
-          <TooltipTrigger onClick={handleDeviceClick} className="cursor-pointer">
+          <TooltipTrigger className="cursor-pointer">
             <Phone className={`h-5 w-5 ${isDeviceReady ? 'text-green-500' : 'text-destructive'}`} />
           </TooltipTrigger>
           <TooltipContent>
-            <p>Device: {isDeviceReady ? 'Ready' : 'Not Ready - Click to reconnect'}</p>
+            <p>Device: {isDeviceReady ? 'Ready' : 'Not Ready'}</p>
           </TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger onClick={handleWorkerClick} className="cursor-pointer">
+          <TooltipTrigger className="cursor-pointer">
             <UserCheck className={`h-5 w-5 ${isWorkerReady ? 'text-green-500' : 'text-destructive'}`} />
           </TooltipTrigger>
           <TooltipContent>
-            <p>Worker: {isWorkerReady ? 'Ready' : 'Not Ready - Click to reconnect'}</p>
+            <p>Worker: {isWorkerReady ? 'Ready' : 'Not Ready'}</p>
           </TooltipContent>
         </Tooltip>
       </div>
@@ -112,6 +100,7 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showIncomingCall, setShowIncomingCall] = useState(false);
+  const { connectTwilio, isConnecting, isDeviceReady, isWorkerReady } = useTwilio();
 
   const filteredCalls = useMemo(() => {
     return calls
@@ -160,6 +149,12 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-4">
               <TwilioStatus />
+               {!(isDeviceReady && isWorkerReady) && (
+                <Button onClick={connectTwilio} disabled={isConnecting}>
+                  <Zap className="mr-2 h-4 w-4" />
+                  {isConnecting ? 'Connecting...' : 'Connect to Twilio'}
+                </Button>
+              )}
               <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetTrigger asChild>
                   <Button>
