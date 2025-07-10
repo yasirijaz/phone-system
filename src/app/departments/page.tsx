@@ -49,13 +49,14 @@ export default function DepartmentsPage() {
     try {
       setLoading(true);
       const data = await getDepartments(user.id);
-      setDepartments(data);
+      setDepartments(Array.isArray(data) ? data : []);
     } catch (error) {
       toast({
         title: "Error fetching departments",
         description: "Could not load your departments. Please try again later.",
         variant: "destructive",
       });
+      setDepartments([]);
     } finally {
       setLoading(false);
     }
@@ -182,7 +183,7 @@ export default function DepartmentsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {departments.map((dept) => (
+                      {Array.isArray(departments) && departments.map((dept) => (
                         <TableRow key={dept.id}>
                           <TableCell className="font-medium">{dept.name}</TableCell>
                           <TableCell className="text-right">
@@ -195,7 +196,7 @@ export default function DepartmentsPage() {
                           </TableCell>
                         </TableRow>
                       ))}
-                       {departments.length === 0 && (
+                       {(!Array.isArray(departments) || departments.length === 0) && (
                           <TableRow>
                             <TableCell colSpan={2} className="text-center">
                               No departments found.
