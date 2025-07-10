@@ -10,7 +10,8 @@ import { useAuth } from './AuthContext';
 interface TwilioContextType {
   device: Device | null;
   worker: Worker | null;
-  isReady: boolean;
+  isDeviceReady: boolean;
+  isWorkerReady: boolean;
   error: string | null;
 }
 
@@ -20,17 +21,21 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [device, setDevice] = useState<Device | null>(null);
   const [worker, setWorker] = useState<Worker | null>(null);
-  const [isReady, setIsReady] = useState(false);
+  const [isDeviceReady, setIsDeviceReady] = useState(false);
+  const [isWorkerReady, setIsWorkerReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
 
 
   useEffect(() => {
-    // Dynamically import Twilio libraries only on the client-side
     const loadTwilio = async () => {
-      const { Device } = await import('@twilio/voice-sdk');
-      const { Worker } = await import('twilio-taskrouter');
-      setTwilio({ Device, Worker });
+      try {
+        const { Device } = await import('@twilio/voice-sdk');
+        const { Worker } = await import('twilio-taskrouter');
+        setTwilio({ Device, Worker });
+      } catch (e) {
+        console.error("Failed to load twilio modules", e)
+      }
     };
     loadTwilio();
   }, []);
@@ -44,7 +49,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         (worker as any).disconnect();
     }
     setWorker(null);
-    setIsReady(false);
+    setIsDeviceReady(false);
+    setIsWorkerReady(false);
   }, [device, worker]);
   
 
@@ -69,31 +75,37 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
           const newDevice = new twilio.Device(deviceToken);
           
-          newDevice.on('ready', () => {
-            console.log('Twilio Device ready');
-            setDevice(newDevice);
+          newDevice.on('registered', () => {
+            console.log('Twilio Device registered');
+            setIsDeviceReady(true);
+          });
+          newDevice.on('unregistered', () => {
+            console.log('Twilio Device unregistered');
+            setIsDeviceReady(false);
           });
           newDevice.on('error', (err: any) => {
             console.error('Twilio Device Error:', err);
             setError(`Device Error: ${err.message}`);
-          });
-          newDevice.on('registered', () => {
-            console.log('Twilio Device registered');
+            setIsDeviceReady(false);
           });
           
-          await newDevice.register();
+          setDevice(newDevice);
 
-          const newWorker = new twilio.Worker(workerToken);
+          const newWorker = new twilio.Worker(workerToken, {}, 'wss://event-bridge.us1.twilio.com/v1/wschannels/' + user.id + '/' + user.email);
 
           newWorker.on('ready', (readyWorker: any) => {
             console.log('Twilio Worker ready:', readyWorker.sid);
             setWorker(readyWorker);
-            setIsReady(true);
+            setIsWorkerReady(true);
           });
-
+           newWorker.on('disconnected', () => {
+            console.log('Twilio Worker disconnected');
+            setIsWorkerReady(false);
+          });
           newWorker.on('error', (err: any) => {
             console.error('Twilio Worker Error:', err);
             setError(`Worker Error: ${err.message}`);
+            setIsWorkerReady(false);
           });
 
         } catch (err: any) {
@@ -108,9 +120,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     return () => {
       cleanup();
     };
-  }, [user, twilio, cleanup]);
+  }, [user, twilio]);
 
-  const value = { device, worker, isReady, error };
+  const value = { device, worker, isDeviceReady, isWorkerReady, error };
 
   return <TwilioContext.Provider value={value}>{children}</TwilioContext.Provider>;
 }

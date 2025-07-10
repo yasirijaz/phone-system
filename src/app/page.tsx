@@ -68,9 +68,7 @@ const INITIAL_CALLS: Call[] = [
 ];
 
 function TwilioStatus() {
-  const { device, worker, isReady } = useTwilio();
-  const isDeviceReady = device?.isRegistered ?? false;
-  const isWorkerReady = worker?.ready ?? false;
+  const { isDeviceReady, isWorkerReady } = useTwilio();
 
   return (
     <TooltipProvider>
