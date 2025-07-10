@@ -67,7 +67,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
             throw new Error('Invalid device token format received from server.');
         }
 
-        const newDevice = new twilio.Device(deviceToken);
+        const newDevice = new twilio.Device(deviceToken, {
+          closeExistingSessions: true
+        });
         
         newDevice.on('registered', () => {
             console.log('Twilio Device registered');
