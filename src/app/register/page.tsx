@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/icons';
-import { useAuth } from '@/context/AuthContext';
+import { useAppDispatch, useAppSelector } from '@/store';
+import { registerUser } from '@/store/slices/authSlice';
 
 
 export default function RegisterPage() {
@@ -17,10 +18,11 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  const { login } = useAuth();
+  const dispatch = useAppDispatch();
+  const { loading, error, user } = useAppSelector((state) => state.auth);
+
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,50 +34,27 @@ export default function RegisterPage() {
       });
       return;
     }
-    setIsLoading(true);
+    
+    dispatch(registerUser({
+      name,
+      email,
+      password,
+      password_confirmation: passwordConfirmation,
+    }));
+  };
 
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-          password_confirmation: passwordConfirmation,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.errors) {
-            const errorMessages = Object.values(data.errors).flat().join(' ');
-            throw new Error(errorMessages);
-        }
-        throw new Error(data.message || 'Registration failed');
-      }
-
-       if (data.token) {
-        login(data.token, data.user);
-        router.push('/');
-      } else {
-        throw new Error('Registration successful, but no token received.');
-      }
-
-    } catch (error: any) {
+  useEffect(() => {
+    if (error) {
       toast({
         title: 'Registration Failed',
-        description: error.message || 'An unknown error occurred.',
+        description: error,
         variant: 'destructive',
       });
-    } finally {
-        setIsLoading(false);
     }
-  };
+    if (user) {
+      router.push('/');
+    }
+  }, [error, user, router, toast]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -96,7 +75,7 @@ export default function RegisterPage() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                disabled={isLoading}
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -108,7 +87,7 @@ export default function RegisterPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -120,7 +99,7 @@ export default function RegisterPage() {
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
+                disabled={loading}
               />
             </div>
              <div className="space-y-2">
@@ -132,11 +111,11 @@ export default function RegisterPage() {
                 minLength={6}
                 value={passwordConfirmation}
                 onChange={(e) => setPasswordConfirmation(e.target.value)}
-                disabled={isLoading}
+                disabled={loading}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Creating Account...' : 'Create Account'}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Creating Account...' : 'Create Account'}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">

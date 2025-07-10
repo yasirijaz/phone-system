@@ -7,3 +7,9 @@ export interface Call {
   notes?: string;
   category?: string;
 }
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+}

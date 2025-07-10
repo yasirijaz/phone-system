@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -9,53 +9,35 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/icons';
-import { useAuth } from '@/context/AuthContext';
+import { useAppDispatch, useAppSelector } from '@/store';
+import { loginUser } from '@/store/slices/authSlice';
 
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  const { login } = useAuth();
+  const dispatch = useAppDispatch();
+  const { loading, error, user } = useAppSelector((state) => state.auth);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+    dispatch(loginUser({ email, password }));
+  };
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      if (data.token) {
-        login(data.token, data.user);
-        router.push('/');
-      } else {
-        throw new Error('Login successful, but no token received.');
-      }
-      
-    } catch (error: any) {
+  useEffect(() => {
+    if (error) {
       toast({
         title: 'Login Failed',
-        description: error.message || 'An unknown error occurred.',
+        description: error,
         variant: 'destructive',
       });
-    } finally {
-        setIsLoading(false);
     }
-  };
+    if (user) {
+      router.push('/');
+    }
+  }, [error, user, router, toast]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -76,7 +58,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -87,11 +69,11 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
+                disabled={loading}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing In...' : 'Sign In'}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Signing In...' : 'Sign In'}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
