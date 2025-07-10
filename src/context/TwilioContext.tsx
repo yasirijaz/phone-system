@@ -42,20 +42,21 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         axios.post<{ data: { token: string } }>('/api/twilio/token'),
         axios.post<{ data: { token: string } }>('/api/twilio/worker-token')
       ]);
-
+      console.log('device',deviceTokenRes, workerTokenRes);
       const deviceToken = deviceTokenRes.data.data.token;
       const workerToken = workerTokenRes.data.data.token;
+      console.log('Twilio Tokens:', { deviceToken, workerToken });
       
-      console.log(deviceTokenRes,workerTokenRes);
       if (typeof deviceToken !== 'string' || typeof workerToken !== 'string') {
         throw new Error('Invalid token format received from server.');
       }
 
-      const newDevice = new Device(deviceToken, {
-        logLevel: process.env.NODE_ENV === 'development' ? 1 : 0,
-        codecPreferences: ['opus', 'pcmu'],
-      });
+      const newDevice = new Device(deviceToken);
 
+      newDevice.on('ready', () => {
+        console.log('Twilio Device ready');
+        // setIsReady(true);
+      });
       newDevice.on('error', (err) => {
         console.error('Twilio Device Error:', err);
         setError(`Device Error: ${err.message}`);
