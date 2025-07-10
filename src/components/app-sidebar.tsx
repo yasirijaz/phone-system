@@ -37,24 +37,20 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarMenu>
         <SidebarMenuItem>
-          <Link href="/" passHref legacyBehavior>
-            <SidebarMenuButton asChild isActive={pathname === '/'} tooltip="Call Log">
-              <a>
-                <Phone />
-                <span>Call Log</span>
-              </a>
-            </SidebarMenuButton>
-          </Link>
+          <SidebarMenuButton asChild isActive={pathname === '/'} tooltip="Call Log">
+            <Link href="/">
+              <Phone />
+              <span>Call Log</span>
+            </Link>
+          </SidebarMenuButton>
         </SidebarMenuItem>
         <SidebarMenuItem>
-          <Link href="/departments" passHref legacyBehavior>
-            <SidebarMenuButton asChild isActive={pathname === '/departments'} tooltip="Departments">
-              <a>
-                <Building2 />
-                <span>Departments</span>
-              </a>
-            </SidebarMenuButton>
-          </Link>
+          <SidebarMenuButton asChild isActive={pathname === '/departments'} tooltip="Departments">
+            <Link href="/departments">
+              <Building2 />
+              <span>Departments</span>
+            </Link>
+          </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
       <SidebarFooter>
