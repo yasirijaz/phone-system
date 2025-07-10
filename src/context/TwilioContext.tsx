@@ -42,24 +42,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     loadTwilio();
   }, []);
 
-  const cleanupDevice = useCallback(() => {
-    device?.disconnectAll();
-    device?.destroy();
-    setDevice(null);
-    setIsDeviceReady(false);
-  }, [device]);
-
-  const cleanupWorker = useCallback(() => {
-    if (worker) {
-        (worker as any).disconnect();
-    }
-    setWorker(null);
-    setIsWorkerReady(false);
-  }, [worker]);
-
   const setupDevice = useCallback(async () => {
-    if (!twilio || !user) return;
-    cleanupDevice();
+    if (!twilio || !user || device) return;
+
     try {
         const deviceTokenRes = await axios.post('/api/twilio/token');
         const deviceToken = deviceTokenRes.data.data.token;
@@ -74,6 +59,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         newDevice.on('registered', () => {
             console.log('Twilio Device registered');
             setIsDeviceReady(true);
+            setDevice(newDevice);
         });
         newDevice.on('unregistered', () => {
             console.log('Twilio Device unregistered');
@@ -84,17 +70,16 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
             setError(`Device Error: ${err.message}`);
             setIsDeviceReady(false);
         });
-        
-        setDevice(newDevice);
+
     } catch (err: any) {
         console.error('Twilio device setup failed:', err);
         setError('Failed to initialize Twilio device. Please try again later.');
     }
-  }, [twilio, user, cleanupDevice]);
+  }, [twilio, user, device]);
 
   const setupWorker = useCallback(async () => {
-    if (!twilio || !user) return;
-    cleanupWorker();
+    if (!twilio || !user || worker) return;
+    
     try {
         const workerTokenRes = await axios.post('/api/twilio/worker-token');
         const workerToken = workerTokenRes.data.data.token;
@@ -111,8 +96,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
         newWorker.on('ready', (readyWorker: any) => {
             console.log('Twilio Worker ready:', readyWorker.sid);
-            setWorker(readyWorker);
             setIsWorkerReady(true);
+            setWorker(readyWorker);
         });
         newWorker.on('disconnected', () => {
             console.log('Twilio Worker disconnected');
@@ -127,20 +112,38 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.error('Twilio worker setup failed:', err);
         setError('Failed to initialize Twilio worker. Please try again later.');
     }
-  }, [twilio, user, cleanupWorker]);
+  }, [twilio, user, worker]);
 
   useEffect(() => {
     if (user && twilio) {
       setError(null);
-      setupDevice();
-      setupWorker();
-    }
+      
+      const cleanupDevice = () => {
+        if(device) {
+          device.disconnectAll();
+          device.destroy();
+          setDevice(null);
+          setIsDeviceReady(false);
+        }
+      }
 
-    return () => {
-      cleanupDevice();
-      cleanupWorker();
-    };
-  }, [user, twilio, setupDevice, setupWorker, cleanupDevice, cleanupWorker]);
+      const cleanupWorker = () => {
+        if (worker) {
+            (worker as any).disconnect();
+            setWorker(null);
+            setIsWorkerReady(false);
+        }
+      }
+      
+      if(!isDeviceReady) setupDevice();
+      if(!isWorkerReady) setupWorker();
+
+      return () => {
+        cleanupDevice();
+        cleanupWorker();
+      };
+    }
+  }, [user, twilio]);
 
   const value = { device, worker, isDeviceReady, isWorkerReady, error, setupDevice, setupWorker };
 
