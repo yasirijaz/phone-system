@@ -1,0 +1,29 @@
+diff --git a/node_modules/twilio-taskrouter/lib/worker.js b/node_modules/twilio-taskrouter/lib/worker.js
+index 92b1a8d..f328a6f 100644
+--- a/node_modules/twilio-taskrouter/lib/worker.js
++++ b/node_modules/twilio-taskrouter/lib/worker.js
+@@ -29,7 +29,10 @@
+  * @property {string} [logLevel='error'] - The level of logging to enable.
+  */
+ class Worker extends EventEmitter {
+-    constructor(token, options) {
++    constructor(token, options, websocket_uri = null) {
++        if (websocket_uri) {
++            options.websocket_uri = websocket_uri;
++        }
+         super();
+         this.token = token;
+         options = options || {};
+@@ -104,7 +107,10 @@
+      * @param {string} token - The new token to use
+      */
+     updateToken(token) {
+-        this._log.info('updateToken() called');
++        const event = {
++            token: token
++        };
++        this._log.info('updateToken() called', event);
+         this.token = token;
+         if (this.transport) {
+             this.transport.updateToken(token);
+
