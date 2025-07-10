@@ -60,9 +60,12 @@ const authSlice = createSlice({
         try {
             const token = localStorage.getItem('authToken');
             const storedUser = localStorage.getItem('user');
-            if (token && storedUser) {
+            if (token && storedUser && storedUser !== 'undefined') {
                 state.user = JSON.parse(storedUser);
                 state.token = token;
+            } else {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('user');
             }
         } catch (error) {
             console.error('Failed to parse user from localStorage', error);
