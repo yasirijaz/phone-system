@@ -39,12 +39,16 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     try {
       const [deviceTokenRes, workerTokenRes] = await Promise.all([
-        axios.post<{ token: string }>('api/twilio/token'),
-        axios.post<{ token: string }>('api/twilio/worker-token')
+        axios.post<{ token: string }>('/api/twilio/token'),
+        axios.post<{ token: string }>('/api/twilio/worker-token')
       ]);
 
       const deviceToken = deviceTokenRes.data.token;
       const workerToken = workerTokenRes.data.token;
+      
+      if (typeof deviceToken !== 'string' || typeof workerToken !== 'string') {
+        throw new Error('Invalid token format received from server.');
+      }
 
       const newDevice = new Device(deviceToken, {
         logLevel: process.env.NODE_ENV === 'development' ? 1 : 0,
