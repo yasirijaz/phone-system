@@ -10,6 +10,14 @@ export interface Call {
 
 export interface User {
   id: number;
-  name: string;
+  name:string;
   email: string;
+}
+
+export interface Department {
+  id: number;
+  name: string;
+  company_id: number;
+  created_at?: string;
+  updated_at?: string;
 }
