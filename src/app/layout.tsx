@@ -4,6 +4,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from '@/context/AuthContext';
 import { StoreProvider } from '@/store/StoreProvider';
+import { TwilioProvider } from '@/context/TwilioContext';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -26,7 +27,9 @@ export default function RootLayout({
       <body className="font-body antialiased h-full" suppressHydrationWarning>
         <StoreProvider>
           <AuthProvider>
-            {children}
+            <TwilioProvider>
+              {children}
+            </TwilioProvider>
           </AuthProvider>
         </StoreProvider>
         <Toaster />
