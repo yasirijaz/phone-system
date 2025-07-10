@@ -42,10 +42,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         axios.post<{ data: { token: string } }>('/api/twilio/token'),
         axios.post<{ data: { token: string } }>('/api/twilio/worker-token')
       ]);
-      console.log('device',deviceTokenRes, workerTokenRes);
+      console.log(deviceTokenRes,workerTokenRes);
       const deviceToken = deviceTokenRes.data.data.token;
       const workerToken = workerTokenRes.data.data.token;
-      console.log('Twilio Tokens:', { deviceToken, workerToken });
       
       if (typeof deviceToken !== 'string' || typeof workerToken !== 'string') {
         throw new Error('Invalid token format received from server.');
@@ -55,7 +54,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       newDevice.on('ready', () => {
         console.log('Twilio Device ready');
-        // setIsReady(true);
       });
       newDevice.on('error', (err) => {
         console.error('Twilio Device Error:', err);
@@ -69,7 +67,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       await newDevice.register();
 
       // @ts-ignore
-      const newWorker = new Worker(workerToken, {}, 'wss://event-bridge.us1.twilio.com/v1/wschannels/' + user.id + '/' + user.email);
+      const newWorker = new Worker(workerToken);
 
       newWorker.on('ready', (readyWorker) => {
         console.log('Twilio Worker ready:', readyWorker.sid);
