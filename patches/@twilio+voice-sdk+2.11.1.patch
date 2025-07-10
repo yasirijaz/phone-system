@@ -1,0 +1,68 @@
+diff --git a/node_modules/@twilio/voice-sdk/es5/twilio/device.js b/node_modules/@twilio/voice-sdk/es5/twilio/device.js
+index 922646c..b510cce 100644
+--- a/node_modules/@twilio/voice-sdk/es5/twilio/device.js
++++ b/node_modules/@twilio/voice-sdk/es5/twilio/device.js
+@@ -107,4 +107,4 @@
+ Object.defineProperty(exports, "Device", {
+   enumerable: true,
+   get: function get() { return _device.Device; }
+-}); //# sourceMappingURL=device.js.map
+\ No newline at end of file
++});
+diff --git a/node_modules/@twilio/voice-sdk/es5/twilio/errors/index.js b/node_modules/@twilio/voice-sdk/es5/twilio/errors/index.js
+index c870a44..f23a9d9 100644
+--- a/node_modules/@twilio/voice-sdk/es5/twilio/errors/index.js
++++ b/node_modules/@twilio/voice-sdk/es5/twilio/errors/index.js
+@@ -156,4 +156,4 @@
+ Object.defineProperty(exports, "TwilioError", {
+   enumerable: true,
+   get: function get() { return _twilioError.TwilioError; }
+-}); //# sourceMappingURL=index.js.map
+\ No newline at end of file
++});
+diff --git a/node_modules/@twilio/voice-sdk/es5/twilio/rtc/sdp.js b/node_modules/@twilio/voice-sdk/es5/twilio/rtc/sdp.js
+index 7277e23..a4a5849 100644
+--- a/node_modules/@twilio/voice-sdk/es5/twilio/rtc/sdp.js
++++ b/node_modules/@twilio/voice-sdk/es5/twilio/rtc/sdp.js
+@@ -23,4 +23,4 @@
+   value: true
+ });
+ exports.default = void 0;
+-var _default = exports.default = (0, _insights.Sdp)(_insights.sdp); //# sourceMappingURL=sdp.js.map
+\ No newline at end of file
++var _default = exports.default = (0, _insights.Sdp)(_insights.sdp);
+diff --git a/node_modules/@twilio/voice-sdk/lib/twilio/device.js b/node_modules/@twilio/voice-sdk/lib/twilio/device.js
+index 47124f5..3932e6d 100644
+--- a/node_modules/@twilio/voice-sdk/lib/twilio/device.js
++++ b/node_modules/@twilio/voice-sdk/lib/twilio/device.js
+@@ -112,4 +112,4 @@
+   enumerable: true,
+   get: () => _device.Device,
+ });
+-//# sourceMappingURL=device.js.map
+\ No newline at end of file
++//# sourceMappingURL=device.js.map
+\ No newline at end of file
+diff --git a/node_modules/@twilio/voice-sdk/lib/twilio/errors/index.js b/node_modules/@twilio/voice-sdk/lib/twilio/errors/index.js
+index 6a05e55..19d0831 100644
+--- a/node_modules/@twilio/voice-sdk/lib/twilio/errors/index.js
++++ b/node_modules/@twilio/voice-sdk/lib/twilio/errors/index.js
+@@ -159,4 +159,4 @@
+   enumerable: true,
+   get: () => _twilioError.TwilioError,
+ });
+-//# sourceMappingURL=index.js.map
+\ No newline at end of file
++//# sourceMappingURL=index.js.map
+\ No newline at end of file
+diff --git a/node_modules/@twilio/voice-sdk/lib/twilio/rtc/sdp.js b/node_modules/@twilio/voice-sdk/lib/twilio/rtc/sdp.js
+index 3254929..7b99c08 100644
+--- a/node_modules/@twilio/voice-sdk/lib/twilio/rtc/sdp.js
++++ b/node_modules/@twilio/voice-sdk/lib/twilio/rtc/sdp.js
+@@ -24,4 +24,4 @@
+   value: true,
+ });
+ exports.default = void 0;
+-var _default = exports.default = (0, _insights.Sdp)(_insights.sdp); //# sourceMappingURL=sdp.js.map
+\ No newline at end of file
++var _default = exports.default = (0, _insights.Sdp)(_insights.sdp);
