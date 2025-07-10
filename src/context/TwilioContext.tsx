@@ -91,7 +91,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           
           setDevice(newDevice);
 
-          const newWorker = new twilio.Worker(workerToken, {}, 'wss://event-bridge.us1.twilio.com/v1/wschannels/' + user.id + '/' + user.email);
+          if (!user) return;
+          const newWorker = new twilio.Worker(workerToken, {
+             closeExistingSessions: true,
+             websocket_uri: 'wss://event-bridge.us1.twilio.com/v1/wschannels/' + user.id + '/' + user.email
+          });
 
           newWorker.on('ready', (readyWorker: any) => {
             console.log('Twilio Worker ready:', readyWorker.sid);
