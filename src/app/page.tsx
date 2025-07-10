@@ -68,25 +68,37 @@ const INITIAL_CALLS: Call[] = [
 ];
 
 function TwilioStatus() {
-  const { isDeviceReady, isWorkerReady } = useTwilio();
+  const { isDeviceReady, isWorkerReady, setupDevice, setupWorker } = useTwilio();
+
+  const handleDeviceClick = () => {
+    if (!isDeviceReady) {
+        setupDevice();
+    }
+  }
+
+  const handleWorkerClick = () => {
+    if (!isWorkerReady) {
+        setupWorker();
+    }
+  }
 
   return (
     <TooltipProvider>
       <div className="flex items-center gap-3">
         <Tooltip>
-          <TooltipTrigger>
+          <TooltipTrigger onClick={handleDeviceClick} className="cursor-pointer">
             <Phone className={`h-5 w-5 ${isDeviceReady ? 'text-green-500' : 'text-destructive'}`} />
           </TooltipTrigger>
           <TooltipContent>
-            <p>Device: {isDeviceReady ? 'Ready' : 'Not Ready'}</p>
+            <p>Device: {isDeviceReady ? 'Ready' : 'Not Ready - Click to reconnect'}</p>
           </TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger>
+          <TooltipTrigger onClick={handleWorkerClick} className="cursor-pointer">
             <UserCheck className={`h-5 w-5 ${isWorkerReady ? 'text-green-500' : 'text-destructive'}`} />
           </TooltipTrigger>
           <TooltipContent>
-            <p>Worker: {isWorkerReady ? 'Ready' : 'Not Ready'}</p>
+            <p>Worker: {isWorkerReady ? 'Ready' : 'Not Ready - Click to reconnect'}</p>
           </TooltipContent>
         </Tooltip>
       </div>
