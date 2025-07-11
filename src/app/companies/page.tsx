@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import type { Company } from "@/types";
+import type { Company, PaginatedResponse } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { getCompanies, createCompany, updateCompany, deleteCompany } from "@/services/companyService";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Edit, Trash2, Users } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Users, Building2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from 'next/navigation';
@@ -31,10 +31,11 @@ const companySchema = z.object({
 export default function CompaniesPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companiesResponse, setCompaniesResponse] = useState<PaginatedResponse<Company> | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof companySchema>>({
@@ -51,21 +52,21 @@ export default function CompaniesPage() {
       router.replace('/');
       return;
     }
-    fetchCompanies();
-  }, [user, router]);
+    fetchCompanies(currentPage);
+  }, [user, router, currentPage]);
 
-  const fetchCompanies = async () => {
+  const fetchCompanies = async (page: number) => {
     try {
       setLoading(true);
-      const data = await getCompanies();
-      setCompanies(Array.isArray(data) ? data : []);
+      const data = await getCompanies(page);
+      setCompaniesResponse(data);
     } catch (error) {
       toast({
         title: "Error fetching companies",
         description: "Could not load companies. Please try again later.",
         variant: "destructive",
       });
-      setCompanies([]);
+      setCompaniesResponse(null);
     } finally {
       setLoading(false);
     }
@@ -100,7 +101,7 @@ export default function CompaniesPage() {
         await createCompany({ name: values.name, email: values.email, subdomain: values.subdomain });
         toast({ title: "Success", description: "Company created successfully." });
       }
-      fetchCompanies();
+      fetchCompanies(currentPage);
       handleDialogClose();
     } catch (error) {
       toast({
@@ -115,7 +116,12 @@ export default function CompaniesPage() {
     try {
       await deleteCompany(id);
       toast({ title: "Success", description: "Company deleted successfully." });
-      fetchCompanies();
+      // Go to previous page if it's the last item on the current page
+      if (companiesResponse?.data.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      } else {
+        fetchCompanies(currentPage);
+      }
     } catch (error) {
        toast({
         title: "Error deleting company",
@@ -132,6 +138,8 @@ export default function CompaniesPage() {
   if (user?.role_id !== 1) {
     return null; // or a loading skeleton
   }
+
+  const companies = companiesResponse?.data || [];
 
   return (
     <SidebarProvider>
@@ -223,6 +231,7 @@ export default function CompaniesPage() {
                 {loading ? (
                   <p>Loading...</p>
                 ) : (
+                  <>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -230,6 +239,7 @@ export default function CompaniesPage() {
                         <TableHead>Subdomain</TableHead>
                         <TableHead>Owner Email</TableHead>
                         <TableHead>Users</TableHead>
+                        <TableHead>Depts</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -241,6 +251,7 @@ export default function CompaniesPage() {
                           <TableCell>{company.subdomain}</TableCell>
                           <TableCell>{company.email || 'N/A'}</TableCell>
                           <TableCell>{company.users?.length || 0}</TableCell>
+                          <TableCell>{company.departments?.length || 0}</TableCell>
                            <TableCell>
                             <Badge variant={company.status === 'active' ? 'default' : 'secondary'}>{company.status}</Badge>
                           </TableCell>
@@ -278,13 +289,34 @@ export default function CompaniesPage() {
                       ))}
                        {(!Array.isArray(companies) || companies.length === 0) && (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center">
+                            <TableCell colSpan={7} className="text-center">
                               No companies found.
                             </TableCell>
                           </TableRow>
                         )}
                     </TableBody>
                   </Table>
+                   <div className="flex items-center justify-end space-x-2 py-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => prev - 1)}
+                        disabled={currentPage === 1}
+                      >
+                         <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => prev + 1)}
+                        disabled={currentPage === companiesResponse?.last_page}
+                      >
+                        Next
+                         <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
