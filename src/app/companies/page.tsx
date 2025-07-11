@@ -125,6 +125,11 @@ export default function CompaniesPage() {
     }
   }
   
+  const handleManageUsers = (companyId: number) => {
+    // router.push(`/companies/${companyId}/users`);
+    toast({ title: "Coming Soon!", description: "User management functionality is under development." });
+  }
+
   if (user?.role_id !== 1) {
     return null; // or a loading skeleton
   }
@@ -225,6 +230,7 @@ export default function CompaniesPage() {
                         <TableHead>Name</TableHead>
                         <TableHead>Subdomain</TableHead>
                         <TableHead>Owner Email</TableHead>
+                        <TableHead>Users</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -235,10 +241,14 @@ export default function CompaniesPage() {
                           <TableCell className="font-medium">{company.name}</TableCell>
                           <TableCell>{company.subdomain}</TableCell>
                           <TableCell>{company.email || 'N/A'}</TableCell>
+                          <TableCell>{company.users?.length || 0}</TableCell>
                            <TableCell>
                             <Badge variant={company.status === 'active' ? 'default' : 'secondary'}>{company.status}</Badge>
                           </TableCell>
                           <TableCell className="text-right">
+                             <Button variant="ghost" size="icon" onClick={() => handleManageUsers(company.id)}>
+                              <Users className="h-4 w-4" />
+                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(company)}>
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -269,7 +279,7 @@ export default function CompaniesPage() {
                       ))}
                        {(!Array.isArray(companies) || companies.length === 0) && (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center">
+                            <TableCell colSpan={6} className="text-center">
                               No companies found.
                             </TableCell>
                           </TableRow>
