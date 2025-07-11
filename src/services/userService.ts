@@ -4,7 +4,7 @@ import type { User } from '@/types';
 
 export const getUsersByCompany = async (companyId: number): Promise<User[]> => {
   const response = await axios.get(`/api/companies/${companyId}/users`);
-  return response.data.users;
+  return response.data.data;
 };
 
 export const addUserToCompany = async (companyId: number, userData: Omit<User, 'id' | 'company_id'>): Promise<User> => {
