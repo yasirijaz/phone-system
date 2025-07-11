@@ -1,12 +1,28 @@
 import type { Call } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Clock, Phone, User, Users } from 'lucide-react';
+import { BarChart, Clock, Phone, User, Users, ArrowUp, ArrowDown } from 'lucide-react';
 import { useMemo } from 'react';
 import CategoryChart from './category-chart';
 
 interface CallStatsProps {
   calls: Call[];
 }
+
+const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: string, value: string, icon: React.ElementType, trend: string, trendType: 'up' | 'down' }) => (
+    <Card className="shadow-md">
+        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium">{title}</CardTitle>
+            <Icon className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+            <div className="text-2xl font-bold">{value}</div>
+            <p className="text-xs text-muted-foreground flex items-center">
+                {trendType === 'up' ? <ArrowUp className="h-4 w-4 text-green-500" /> : <ArrowDown className="h-4 w-4 text-red-500" />}
+                <span className="ml-1">{trend}</span>
+            </p>
+        </CardContent>
+    </Card>
+);
 
 export default function CallStats({ calls }: CallStatsProps) {
   const { totalCalls, totalDuration, mostFrequentContact } = useMemo(() => {
@@ -35,46 +51,10 @@ export default function CallStats({ calls }: CallStatsProps) {
   return (
     <div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Calls</CardTitle>
-            <Phone className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalCalls}</div>
-            <p className="text-xs text-muted-foreground">in the logbook</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Duration</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalDuration} min</div>
-            <p className="text-xs text-muted-foreground">spent on calls</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Top Contact</CardTitle>
-            <User className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold truncate">{mostFrequentContact}</div>
-            <p className="text-xs text-muted-foreground">Most frequently called</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-md">
-           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Categories</CardTitle>
-            <BarChart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-             <div className="text-2xl font-bold">&nbsp;</div>
-            <p className="text-xs text-muted-foreground">Breakdown by category</p>
-          </CardContent>
-        </Card>
+        <StatCard title="Total Calls" value={String(totalCalls)} icon={Phone} trend="+12%" trendType="up" />
+        <StatCard title="Total Duration" value={`${totalDuration} min`} icon={Clock} trend="+25%" trendType="up" />
+        <StatCard title="Top Contact" value={mostFrequentContact} icon={User} trend="-2%" trendType="down" />
+        <StatCard title="Active Users" value="5" icon={Users} trend="+2" trendType="up" />
       </div>
        <div className="mt-4">
         <Card className="shadow-md col-span-1 lg:col-span-2">
