@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, type ChangeEvent, useEffect } from 'react';
@@ -223,12 +224,12 @@ const MonthlyTargetCard = () => (
             <CardDescription>Target you've set for each month</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center">
-             <div className="relative w-48 h-24 mb-4">
+             <div className="relative w-40 h-20 mb-4">
                 <svg viewBox="0 0 100 50" className="w-full h-full">
                     <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="hsl(var(--border))" strokeWidth="10" />
                     <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="hsl(var(--primary))" strokeWidth="10" strokeDasharray="125.6" strokeDashoffset="31.4" />
                 </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className="absolute inset-0 flex flex-col items-center justify-end pb-1">
                     <span className="text-3xl font-bold">75.55%</span>
                     <Badge variant="secondary" className="bg-green-100 text-green-700">+10%</Badge>
                 </div>
