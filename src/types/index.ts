@@ -20,6 +20,7 @@ export interface User {
 export interface Company {
     id: number;
     name: string;
+    sub_domain: string;
     owner_id: number;
     created_at?: string;
     updated_at?: string;
