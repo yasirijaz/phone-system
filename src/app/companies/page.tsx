@@ -126,8 +126,7 @@ export default function CompaniesPage() {
   }
   
   const handleManageUsers = (companyId: number) => {
-    // router.push(`/companies/${companyId}/users`);
-    toast({ title: "Coming Soon!", description: "User management functionality is under development." });
+    router.push(`/companies/${companyId}/users`);
   }
 
   if (user?.role_id !== 1) {
