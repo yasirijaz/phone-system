@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, type ChangeEvent } from 'react';
+import { useState, useMemo, type ChangeEvent, useEffect } from 'react';
 import type { Call } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,8 @@ import IncomingCallModal from '@/components/incoming-call-modal';
 import Dialer from '@/components/dialer';
 import { useTwilio } from '@/context/TwilioContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 
 const INITIAL_CALLS: Call[] = [
@@ -68,7 +70,7 @@ const INITIAL_CALLS: Call[] = [
 ];
 
 function TwilioStatus() {
-  const { isDeviceReady, isWorkerReady } = useTwilio();
+  const { isDeviceReady, isWorkerReady, connectTwilio } = useTwilio();
 
   return (
     <TooltipProvider>
@@ -82,7 +84,7 @@ function TwilioStatus() {
           </TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger className="cursor-pointer">
+          <TooltipTrigger className="cursor-pointer" onClick={connectTwilio}>
             <UserCheck className={`h-5 w-5 ${isWorkerReady ? 'text-green-500' : 'text-destructive'}`} />
           </TooltipTrigger>
           <TooltipContent>
@@ -96,11 +98,19 @@ function TwilioStatus() {
 
 
 export default function Home() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [calls, setCalls] = useState<Call[]>(INITIAL_CALLS);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showIncomingCall, setShowIncomingCall] = useState(false);
   const { connectTwilio, isConnecting, isDeviceReady, isWorkerReady } = useTwilio();
+
+  useEffect(() => {
+    if(user?.role_id === 1) {
+      router.replace('/companies');
+    }
+  }, [user, router]);
 
   const filteredCalls = useMemo(() => {
     return calls
@@ -132,6 +142,9 @@ export default function Home() {
     handleAddCall(newCall);
   };
 
+  if(user?.role_id === 1) {
+    return null; // or a loading spinner, as redirection is happening
+  }
 
   return (
     <SidebarProvider>

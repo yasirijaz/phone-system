@@ -12,6 +12,19 @@ export interface User {
   id: number;
   name:string;
   email: string;
+  role_id?: number;
+  company_id?: number;
+  company?: Company;
+}
+
+export interface Company {
+    id: number;
+    name: string;
+    owner_id: number;
+    created_at?: string;
+    updated_at?: string;
+    owner?: User;
+    users?: User[];
 }
 
 export interface Department {

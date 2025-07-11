@@ -8,7 +8,7 @@ import {
   SidebarMenuButton,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-import { LogOut, Phone, Building2 } from 'lucide-react';
+import { LogOut, Phone, Building, Building2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Logo } from './icons';
 import { usePathname, useRouter } from 'next/navigation';
@@ -18,7 +18,7 @@ import Link from 'next/link';
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -36,22 +36,35 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton asChild isActive={pathname === '/'} tooltip="Call Log">
-            <Link href="/">
-              <Phone />
-              <span>Call Log</span>
-            </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem>
-          <SidebarMenuButton asChild isActive={pathname === '/departments'} tooltip="Departments">
-            <Link href="/departments">
-              <Building2 />
-              <span>Departments</span>
-            </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
+        {user?.role_id === 1 ? (
+           <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={pathname === '/companies'} tooltip="Companies">
+              <Link href="/companies">
+                <Building />
+                <span>Companies</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ) : (
+          <>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname === '/'} tooltip="Call Log">
+                <Link href="/">
+                  <Phone />
+                  <span>Call Log</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname === '/departments'} tooltip="Departments">
+                <Link href="/departments">
+                  <Building2 />
+                  <span>Departments</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </>
+        )}
       </SidebarMenu>
       <SidebarFooter>
         <Button

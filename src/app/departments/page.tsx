@@ -39,16 +39,16 @@ export default function DepartmentsPage() {
   });
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.company_id) {
       fetchDepartments();
     }
   }, [user]);
 
   const fetchDepartments = async () => {
-    if (!user) return;
+    if (!user?.company_id) return;
     try {
       setLoading(true);
-      const data = await getDepartments(user.id);
+      const data = await getDepartments(user.company_id);
       setDepartments(Array.isArray(data) ? data : []);
     } catch (error) {
       toast({
@@ -79,13 +79,13 @@ export default function DepartmentsPage() {
   }
 
   const onSubmit = async (values: z.infer<typeof departmentSchema>) => {
-    if (!user) return;
+    if (!user?.company_id) return;
     try {
       if (editingDepartment) {
-        await updateDepartment(editingDepartment.id, { name: values.name, company_id: user.id });
+        await updateDepartment(editingDepartment.id, { name: values.name, company_id: user.company_id });
         toast({ title: "Success", description: "Department updated successfully." });
       } else {
-        await createDepartment({ ...values, company_id: user.id });
+        await createDepartment({ ...values, company_id: user.company_id });
         toast({ title: "Success", description: "Department created successfully." });
       }
       fetchDepartments();
