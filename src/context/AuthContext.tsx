@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -20,7 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const dispatch = useAppDispatch();
-  const { user, loading } = useAppSelector((state) => state.auth);
+  const { user, loading: authLoading } = useAppSelector((state) => state.auth);
 
   useEffect(() => {
     dispatch(setInitialState());
@@ -29,28 +30,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const logout = () => {
     dispatch(logoutUser());
+    router.push('/login');
   };
   
-  const isProtectedRoute = pathname === '/';
-  const isAuthRoute = pathname === '/login' || pathname === '/register';
-  
-  useEffect(() => {
-    if (!initialLoading && !loading) {
-      if (user) {
-        if (isAuthRoute) {
-          router.replace('/');
-        }
-      } else {
-        if (isProtectedRoute) {
-          router.replace('/login');
-        }
-      }
-    }
-  }, [user, initialLoading, loading, router, isProtectedRoute, isAuthRoute, pathname]);
+  const unprotectedRoutes = ['/login', '/register'];
+  const isProtectedRoute = !unprotectedRoutes.includes(pathname);
+  const isAuthRoute = unprotectedRoutes.includes(pathname);
 
-  if (initialLoading || loading || (!user && isProtectedRoute) || (user && isAuthRoute)) {
+  useEffect(() => {
+    if (initialLoading) {
+      return;
+    }
+
+    if (!user && isProtectedRoute) {
+        router.replace('/login');
+    } else if (user && isAuthRoute) {
+        router.replace('/');
+    }
+  }, [user, initialLoading, pathname, isProtectedRoute, isAuthRoute, router]);
+
+  const isLoading = initialLoading || authLoading;
+
+  if (isLoading || (!user && isProtectedRoute) || (user && isAuthRoute)) {
      return (
-        <div className="flex items-center justify-center h-screen">
+        <div className="flex items-center justify-center h-screen bg-background">
           <div className="flex flex-col items-center space-y-4">
             <Skeleton className="h-12 w-12 rounded-full" />
             <div className="space-y-2">
@@ -62,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      )
   }
 
-  return <AuthContext.Provider value={{ user, loading, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading: isLoading, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

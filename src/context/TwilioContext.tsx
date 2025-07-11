@@ -40,7 +40,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.error("Failed to load twilio modules", e)
       }
     };
-    loadTwilio();
+    if (typeof window !== 'undefined') {
+        loadTwilio();
+    }
   }, []);
 
   const connectTwilio = useCallback(async () => {
@@ -96,7 +98,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       // Setup Worker
       const newWorker = new twilio.Worker(workerToken, {
         closeExistingSessions: true,
-        websocket_uri: 'wss://event-bridge.us1.twilio.com/v1/wschannels/' + user.id + '/' + user.email
       });
       newWorker.on('ready', (readyWorker: any) => {
           console.log('Twilio Worker ready:', readyWorker.sid);
