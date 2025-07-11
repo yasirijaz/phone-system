@@ -260,7 +260,7 @@ export default function EcommerceDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showIncomingCall, setShowIncomingCall] = useState(false);
-  const { connectTwilio, isConnecting } = useTwilio();
+  const { device, connectTwilio, isConnecting, isDeviceReady } = useTwilio();
 
   useEffect(() => {
     if(user?.role_id === 1) {
@@ -304,17 +304,30 @@ export default function EcommerceDashboard() {
     setIsSheetOpen(false);
   };
   
-  const handleMakeCall = (number: string) => {
-    console.log(`Calling ${number}...`);
-    const newCall: Omit<Call, 'id'> = {
-        contact: `Unknown (${number})`,
-        dateTime: new Date().toISOString(),
-        duration: 0,
-        type: 'outgoing',
-        notes: `Dialed ${number}`,
-        category: 'Outgoing'
-    };
-    handleAddCall(newCall);
+  const handleMakeCall = async (number: string) => {
+    if (!device || !isDeviceReady) {
+        alert("Twilio Device not ready. Please connect first.");
+        return;
+    }
+
+    try {
+        console.log(`Calling ${number}...`);
+        await device.connect({ params: { To: number } });
+        
+        const newCall: Omit<Call, 'id'> = {
+            contact: `Unknown (${number})`,
+            dateTime: new Date().toISOString(),
+            duration: 0,
+            type: 'outgoing',
+            notes: `Dialed ${number}`,
+            category: 'Outgoing'
+        };
+        handleAddCall(newCall);
+
+    } catch (error) {
+        console.error("Error making call:", error);
+        alert("Failed to make call. See console for details.");
+    }
   };
 
   if(user?.role_id === 1) {
