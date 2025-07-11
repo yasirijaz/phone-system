@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle, ArrowLeft, Edit, Trash2 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -26,6 +27,7 @@ const userSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email("Invalid email address."),
   password: z.string().min(6, "Password must be at least 6 characters."),
+  role_id: z.coerce.number({ required_error: "Role is required."}).min(1, "Role is required."),
 });
 
 export default function ManageUsersPage() {
@@ -137,6 +139,23 @@ export default function ManageUsersPage() {
                      )}/>
                      <FormField control={form.control} name="password" render={({ field }) => (
                         <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" placeholder="******" {...field} /></FormControl><FormMessage /></FormItem>
+                     )}/>
+                     <FormField control={form.control} name="role_id" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Role</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={String(field.value)}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a role" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="2">Admin</SelectItem>
+                              <SelectItem value="3">User</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
                      )}/>
                     <DialogFooter>
                       <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>

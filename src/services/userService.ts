@@ -7,7 +7,7 @@ export const getUsersByCompany = async (companyId: number): Promise<User[]> => {
   return response.data.users;
 };
 
-export const addUserToCompany = async (companyId: number, userData: Omit<User, 'id' | 'role_id' | 'company_id'>): Promise<User> => {
+export const addUserToCompany = async (companyId: number, userData: Omit<User, 'id' | 'company_id'>): Promise<User> => {
   const response = await axios.post(`/api/companies/${companyId}/users`, userData);
   return response.data;
 };
