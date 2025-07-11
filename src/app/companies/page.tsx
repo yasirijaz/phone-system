@@ -19,6 +19,7 @@ import { PlusCircle, Edit, Trash2, Users } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from 'next/navigation';
+import { Badge } from "@/components/ui/badge";
 
 const companySchema = z.object({
   name: z.string().min(2, "Company name must be at least 2 characters."),
@@ -72,7 +73,7 @@ export default function CompaniesPage() {
   const handleDialogOpen = (company: Company | null = null) => {
     setEditingCompany(company);
     if (company) {
-      form.reset({ name: company.name, subdomain: company.subdomain, email: company.owner?.email });
+      form.reset({ name: company.name, subdomain: company.subdomain, email: company.email });
     } else {
       form.reset({ name: "", subdomain: "", email: "" });
     }
@@ -223,8 +224,8 @@ export default function CompaniesPage() {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>Subdomain</TableHead>
-                        <TableHead>Owner</TableHead>
-                        <TableHead>Users</TableHead>
+                        <TableHead>Owner Email</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -233,8 +234,10 @@ export default function CompaniesPage() {
                         <TableRow key={company.id}>
                           <TableCell className="font-medium">{company.name}</TableCell>
                           <TableCell>{company.subdomain}</TableCell>
-                          <TableCell>{company.owner?.name || 'N/A'}</TableCell>
-                          <TableCell>{company.users?.length || 0}</TableCell>
+                          <TableCell>{company.email || 'N/A'}</TableCell>
+                           <TableCell>
+                            <Badge variant={company.status === 'active' ? 'default' : 'secondary'}>{company.status}</Badge>
+                          </TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(company)}>
                               <Edit className="h-4 w-4" />

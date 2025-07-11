@@ -4,7 +4,7 @@ import type { Company } from '@/types';
 
 export const getCompanies = async (): Promise<Company[]> => {
   const response = await axios.get('/api/companies');
-  return response.data;
+  return response.data.companies;
 };
 
 export const createCompany = async (companyData: { name: string, email: string, subdomain: string }): Promise<Company> => {

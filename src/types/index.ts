@@ -21,7 +21,10 @@ export interface Company {
     id: number;
     name: string;
     subdomain: string;
-    owner_id: number;
+    email?: string;
+    owner_id?: number;
+    workspace_sid?: string | null;
+    status?: string;
     created_at?: string;
     updated_at?: string;
     owner?: User;
