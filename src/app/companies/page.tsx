@@ -22,7 +22,7 @@ import { useRouter } from 'next/navigation';
 
 const companySchema = z.object({
   name: z.string().min(2, "Company name must be at least 2 characters."),
-  sub_domain: z.string().min(2, "Subdomain must be at least 2 characters.").optional(),
+  sub_domain: z.string().min(2, "Subdomain must be at least 2 characters."),
   email: z.string().email("Invalid email address.").optional(),
 });
 
@@ -72,9 +72,9 @@ export default function CompaniesPage() {
   const handleDialogOpen = (company: Company | null = null) => {
     setEditingCompany(company);
     if (company) {
-      form.reset({ name: company.name, email: company.owner?.email, sub_domain: company.sub_domain });
+      form.reset({ name: company.name, sub_domain: company.sub_domain, email: company.owner?.email });
     } else {
-      form.reset({ name: "", email: "", sub_domain: "" });
+      form.reset({ name: "", sub_domain: "", email: "" });
     }
     setIsDialogOpen(true);
   };
@@ -93,10 +93,6 @@ export default function CompaniesPage() {
       } else {
         if(!values.email) {
             toast({ title: "Error", description: "Owner email is required to create a company.", variant: "destructive" });
-            return;
-        }
-        if(!values.sub_domain) {
-            toast({ title: "Error", description: "Subdomain is required to create a company.", variant: "destructive" });
             return;
         }
         await createCompany({ name: values.name, email: values.email, sub_domain: values.sub_domain });
