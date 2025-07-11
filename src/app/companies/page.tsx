@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Edit, Trash2, Users, Building2, ChevronLeft, ChevronRight } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Users, Building2, ChevronLeft, ChevronRight, Briefcase } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from 'next/navigation';
@@ -116,7 +116,6 @@ export default function CompaniesPage() {
     try {
       await deleteCompany(id);
       toast({ title: "Success", description: "Company deleted successfully." });
-      // Go to previous page if it's the last item on the current page
       if (companiesResponse?.data.length === 1 && currentPage > 1) {
         setCurrentPage(currentPage - 1);
       } else {
@@ -136,10 +135,12 @@ export default function CompaniesPage() {
   }
 
   if (user?.role_id !== 1) {
-    return null; // or a loading skeleton
+    return null; 
   }
 
   const companies = companiesResponse?.data || [];
+  const totalCompanies = companiesResponse?.total || 0;
+  const totalUsers = companiesResponse?.data.reduce((acc, company) => acc + (company.users?.length || 0), 0) || 0;
 
   return (
     <SidebarProvider>
@@ -149,15 +150,15 @@ export default function CompaniesPage() {
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <div className="flex flex-col min-h-screen bg-background">
-          <header className="sticky top-0 z-10 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-card shadow-sm">
-            <div className="flex items-center gap-2">
+        <div className="flex flex-col min-h-screen">
+          <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
+            <div className="flex items-center gap-4">
               <SidebarTrigger className="md:hidden" />
-              <h1 className="text-xl font-bold text-primary">Companies</h1>
+              <h1 className="text-xl font-bold">Companies</h1>
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => handleDialogOpen()}>
+                <Button onClick={() => handleDialogOpen()} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Add Company
                 </Button>
@@ -221,7 +222,39 @@ export default function CompaniesPage() {
             </Dialog>
           </header>
 
-          <main className="flex-1 p-4 md:p-8">
+          <main className="flex-1 p-4 md:p-8 space-y-8 bg-muted/40">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Total Companies</CardTitle>
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalCompanies}</div>
+                   <p className="text-xs text-muted-foreground">registered in the system</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalUsers}</div>
+                   <p className="text-xs text-muted-foreground">across all companies</p>
+                </CardContent>
+              </Card>
+               <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Active Subscriptions</CardTitle>
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalCompanies}</div>
+                   <p className="text-xs text-muted-foreground">+0 from last month</p>
+                </CardContent>
+              </Card>
+            </div>
             <Card>
               <CardHeader>
                 <CardTitle>Registered Companies</CardTitle>
@@ -232,70 +265,72 @@ export default function CompaniesPage() {
                   <p>Loading...</p>
                 ) : (
                   <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Subdomain</TableHead>
-                        <TableHead>Owner Email</TableHead>
-                        <TableHead>Users</TableHead>
-                        <TableHead>Depts</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {Array.isArray(companies) && companies.map((company) => (
-                        <TableRow key={company.id}>
-                          <TableCell className="font-medium">{company.name}</TableCell>
-                          <TableCell>{company.subdomain}</TableCell>
-                          <TableCell>{company.email || 'N/A'}</TableCell>
-                          <TableCell>{company.users?.length || 0}</TableCell>
-                          <TableCell>{company.departments?.length || 0}</TableCell>
-                           <TableCell>
-                            <Badge variant={company.status === 'active' ? 'default' : 'secondary'}>{company.status}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                             <Button variant="ghost" size="icon" onClick={() => handleManageUsers(company.id)}>
-                              <Users className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(company)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the
-                                    company and all associated data from our servers.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(company.id)}>
-                                    Continue
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </TableCell>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Subdomain</TableHead>
+                          <TableHead>Owner Email</TableHead>
+                          <TableHead>Users</TableHead>
+                          <TableHead>Depts</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                       {(!Array.isArray(companies) || companies.length === 0) && (
-                          <TableRow>
-                            <TableCell colSpan={7} className="text-center">
-                              No companies found.
+                      </TableHeader>
+                      <TableBody>
+                        {Array.isArray(companies) && companies.map((company) => (
+                          <TableRow key={company.id}>
+                            <TableCell className="font-medium">{company.name}</TableCell>
+                            <TableCell>{company.subdomain}</TableCell>
+                            <TableCell>{company.email || 'N/A'}</TableCell>
+                            <TableCell>{company.users?.length || 0}</TableCell>
+                            <TableCell>{company.departments?.length || 0}</TableCell>
+                            <TableCell>
+                              <Badge variant={company.status === 'active' ? 'default' : 'secondary'}>{company.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="icon" onClick={() => handleManageUsers(company.id)}>
+                                <Users className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(company)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon">
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. This will permanently delete the
+                                      company and all associated data from our servers.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(company.id)}>
+                                      Continue
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </TableCell>
                           </TableRow>
-                        )}
-                    </TableBody>
-                  </Table>
+                        ))}
+                        {(!Array.isArray(companies) || companies.length === 0) && (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center h-24">
+                                No companies found.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                      </TableBody>
+                    </Table>
+                  </div>
                    <div className="flex items-center justify-end space-x-2 py-4">
                       <Button
                         variant="outline"
@@ -303,17 +338,17 @@ export default function CompaniesPage() {
                         onClick={() => setCurrentPage(prev => prev - 1)}
                         disabled={currentPage === 1}
                       >
-                         <ChevronLeft className="h-4 w-4" />
+                         <ChevronLeft className="h-4 w-4 mr-1" />
                         Previous
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setCurrentPage(prev => prev + 1)}
-                        disabled={currentPage === companiesResponse?.last_page}
+                        disabled={!companiesResponse?.next_page_url}
                       >
                         Next
-                         <ChevronRight className="h-4 w-4" />
+                         <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
                     </div>
                   </>

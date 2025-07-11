@@ -17,11 +17,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, ArrowLeft, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, ArrowLeft, Edit, Trash2, Users, Briefcase } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { Badge } from "@/components/ui/badge";
 
 const userSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -58,12 +59,12 @@ export default function ManageUsersPage() {
   const fetchCompanyAndUsers = async () => {
     try {
       setLoading(true);
-      const [companyData, usersData] = await Promise.all([
+      const [companyData, usersResponse] = await Promise.all([
         getCompany(companyId),
         getUsersByCompany(companyId)
       ]);
       setCompany(companyData);
-      setUsers(Array.isArray(usersData) ? usersData : []);
+      setUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
     } catch (error) {
       toast({
         title: "Error fetching data",
@@ -106,22 +107,24 @@ export default function ManageUsersPage() {
         <SidebarContent><AppSidebar /></SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <div className="flex flex-col min-h-screen bg-background">
-           <header className="sticky top-0 z-10 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-card shadow-sm">
-            <div className="flex items-center gap-2">
+        <div className="flex flex-col min-h-screen">
+          <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
+            <div className="flex items-center gap-4">
               <SidebarTrigger className="md:hidden" />
-               <Button variant="ghost" size="icon" asChild>
-                  <Link href="/companies">
-                    <ArrowLeft />
-                  </Link>
-                </Button>
-              <h1 className="text-xl font-bold text-primary">
-                Manage Users for {company?.name || '...'}
-              </h1>
+              <div className="flex items-center gap-2">
+                 <Button variant="ghost" size="icon" asChild>
+                    <Link href="/companies">
+                      <ArrowLeft />
+                    </Link>
+                  </Button>
+                <h1 className="text-xl font-bold">
+                  Manage Users for {company?.name || '...'}
+                </h1>
+              </div>
             </div>
              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => setIsDialogOpen(true)}>
+                <Button onClick={() => setIsDialogOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                   <PlusCircle className="mr-2 h-4 w-4" /> Add User
                 </Button>
               </DialogTrigger>
@@ -167,7 +170,29 @@ export default function ManageUsersPage() {
             </Dialog>
           </header>
 
-          <main className="flex-1 p-4 md:p-8">
+          <main className="flex-1 p-4 md:p-8 space-y-8 bg-muted/40">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{users.length}</div>
+                        <p className="text-xs text-muted-foreground">in this company</p>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium">Departments</CardTitle>
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{company?.departments?.length || 0}</div>
+                        <p className="text-xs text-muted-foreground">configured</p>
+                    </CardContent>
+                </Card>
+            </div>
             <Card>
               <CardHeader>
                 <CardTitle>Company Users</CardTitle>
@@ -175,32 +200,38 @@ export default function ManageUsersPage() {
               </CardHeader>
               <CardContent>
                 {loading ? <p>Loading...</p> : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {Array.isArray(users) && users.map((u) => (
-                        <TableRow key={u.id}>
-                          <TableCell className="font-medium">{u.name}</TableCell>
-                          <TableCell>{u.email}</TableCell>
-                          <TableCell>{u.role_id === 2 ? 'Admin' : 'User'}</TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                          </TableCell>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                      {(!Array.isArray(users) || users.length === 0) && (
-                        <TableRow><TableCell colSpan={4} className="text-center">No users found for this company.</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {Array.isArray(users) && users.map((u) => (
+                          <TableRow key={u.id}>
+                            <TableCell className="font-medium">{u.name}</TableCell>
+                            <TableCell>{u.email}</TableCell>
+                            <TableCell>
+                              <Badge variant={u.role_id === 2 ? 'default' : 'secondary'}>
+                                {u.role_id === 2 ? 'Admin' : 'User'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {(!Array.isArray(users) || users.length === 0) && (
+                          <TableRow><TableCell colSpan={4} className="text-center h-24">No users found for this company.</TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
