@@ -24,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full`} suppressHydrationWarning>
-      <body className="font-body antialiased h-full" suppressHydrationWarning>
+      <body className="font-body antialiased h-full bg-muted/40" suppressHydrationWarning>
         <StoreProvider>
           <AuthProvider>
             <TwilioProvider>
