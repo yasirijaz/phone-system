@@ -22,7 +22,7 @@ import { useRouter } from 'next/navigation';
 
 const companySchema = z.object({
   name: z.string().min(2, "Company name must be at least 2 characters."),
-  sub_domain: z.string().min(2, "Subdomain must be at least 2 characters."),
+  subdomain: z.string().min(2, "Subdomain must be at least 2 characters."),
   email: z.string().email("Invalid email address.").optional(),
 });
 
@@ -39,7 +39,7 @@ export default function CompaniesPage() {
     resolver: zodResolver(companySchema),
     defaultValues: {
       name: "",
-      sub_domain: "",
+      subdomain: "",
       email: "",
     },
   });
@@ -72,9 +72,9 @@ export default function CompaniesPage() {
   const handleDialogOpen = (company: Company | null = null) => {
     setEditingCompany(company);
     if (company) {
-      form.reset({ name: company.name, sub_domain: company.sub_domain, email: company.owner?.email });
+      form.reset({ name: company.name, subdomain: company.subdomain, email: company.owner?.email });
     } else {
-      form.reset({ name: "", sub_domain: "", email: "" });
+      form.reset({ name: "", subdomain: "", email: "" });
     }
     setIsDialogOpen(true);
   };
@@ -88,14 +88,14 @@ export default function CompaniesPage() {
   const onSubmit = async (values: z.infer<typeof companySchema>) => {
     try {
       if (editingCompany) {
-        await updateCompany(editingCompany.id, { name: values.name, sub_domain: values.sub_domain });
+        await updateCompany(editingCompany.id, { name: values.name, subdomain: values.subdomain });
         toast({ title: "Success", description: "Company updated successfully." });
       } else {
         if(!values.email) {
             toast({ title: "Error", description: "Owner email is required to create a company.", variant: "destructive" });
             return;
         }
-        await createCompany({ name: values.name, email: values.email, sub_domain: values.sub_domain });
+        await createCompany({ name: values.name, email: values.email, subdomain: values.subdomain });
         toast({ title: "Success", description: "Company created successfully." });
       }
       fetchCompanies();
@@ -170,7 +170,7 @@ export default function CompaniesPage() {
                     />
                      <FormField
                         control={form.control}
-                        name="sub_domain"
+                        name="subdomain"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Subdomain</FormLabel>
@@ -232,7 +232,7 @@ export default function CompaniesPage() {
                       {Array.isArray(companies) && companies.map((company) => (
                         <TableRow key={company.id}>
                           <TableCell className="font-medium">{company.name}</TableCell>
-                          <TableCell>{company.sub_domain}</TableCell>
+                          <TableCell>{company.subdomain}</TableCell>
                           <TableCell>{company.owner?.name || 'N/A'}</TableCell>
                           <TableCell>{company.users?.length || 0}</TableCell>
                           <TableCell className="text-right">

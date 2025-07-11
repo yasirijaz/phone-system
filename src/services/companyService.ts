@@ -7,7 +7,7 @@ export const getCompanies = async (): Promise<Company[]> => {
   return response.data;
 };
 
-export const createCompany = async (companyData: { name: string, email: string, sub_domain: string }): Promise<Company> => {
+export const createCompany = async (companyData: { name: string, email: string, subdomain: string }): Promise<Company> => {
   const response = await axios.post('/api/companies', companyData);
   return response.data;
 };
@@ -17,7 +17,7 @@ export const getCompany = async (id: number): Promise<Company> => {
   return response.data;
 };
 
-export const updateCompany = async (id: number, companyData: { name: string, sub_domain?: string }): Promise<Company> => {
+export const updateCompany = async (id: number, companyData: { name: string, subdomain?: string }): Promise<Company> => {
   const response = await axios.put(`/api/companies/${id}`, companyData);
   return response.data;
 };
