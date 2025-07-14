@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { useRouter } from "next/navigation";
 
 const businessHoursSchema = z.object({
   day: z.string(),
@@ -50,6 +51,7 @@ const settingsSchema = z.object({
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -75,7 +77,7 @@ export default function SettingsPage() {
     },
   });
   
-  const { fields, replace } = useFieldArray({
+  const { fields } = useFieldArray({
     control: form.control,
     name: "business_hours.days",
   });
@@ -84,10 +86,14 @@ export default function SettingsPage() {
 
 
   useEffect(() => {
+     if (user && ![1, 2].includes(user.role_id ?? 0)) {
+        router.replace('/');
+        return;
+    }
     if (user?.company_id) {
       fetchSettings();
     }
-  }, [user]);
+  }, [user, router]);
 
   useEffect(() => {
     if (settings) {
@@ -136,6 +142,10 @@ export default function SettingsPage() {
       });
     }
   };
+  
+  if (user && ![1, 2].includes(user.role_id ?? 0)) {
+    return null; // or a loading/redirect component
+  }
 
   if (loading) {
     return <p>Loading settings...</p>;
