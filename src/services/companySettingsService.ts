@@ -4,14 +4,19 @@ import type { CompanySettings, CompanySettingsPayload } from '@/types';
 
 export const getCompanySettings = async (companyId: number): Promise<CompanySettings> => {
   const response = await axios.get(`/api/company-settings/${companyId}`);
+  const data = response.data.settings;
+  
+  if (!data) {
+    throw new Error("Settings not found");
+  }
+
   // The API returns settings as JSON strings, so we parse them here.
-  const data = response.data.data;
   return {
     ...data,
-    call_settings: JSON.parse(data.call_settings),
-    voicemail_settings: JSON.parse(data.voicemail_settings),
-    business_hours: JSON.parse(data.business_hours),
-    routing_preferences: JSON.parse(data.routing_preferences),
+    call_settings: typeof data.call_settings === 'string' ? JSON.parse(data.call_settings) : data.call_settings,
+    voicemail_settings: typeof data.voicemail_settings === 'string' ? JSON.parse(data.voicemail_settings) : data.voicemail_settings,
+    business_hours: typeof data.business_hours === 'string' ? JSON.parse(data.business_hours) : data.business_hours,
+    routing_preferences: typeof data.routing_preferences === 'string' ? JSON.parse(data.routing_preferences) : data.routing_preferences,
   };
 };
 
