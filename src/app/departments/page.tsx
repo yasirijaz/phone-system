@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle, Edit, Trash2 } from "lucide-react";
@@ -90,25 +91,26 @@ export default function DepartmentsPage() {
       }
       fetchDepartments();
       handleDialogClose();
-    } catch (error) {
+    } catch (error: any) {
+       const errorMessage = error.response?.data?.message || "An unexpected error occurred.";
       toast({
         title: `Error ${editingDepartment ? 'updating' : 'creating'} department`,
-        description: "An unexpected error occurred.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
   
   const handleDelete = async (id: number) => {
-    if(!confirm('Are you sure you want to delete this department?')) return;
     try {
       await deleteDepartment(id);
       toast({ title: "Success", description: "Department deleted successfully." });
       fetchDepartments();
-    } catch (error) {
+    } catch (error: any) {
+       const errorMessage = error.response?.data?.message || "An unexpected error occurred.";
        toast({
         title: "Error deleting department",
-        description: "An unexpected error occurred.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -122,11 +124,11 @@ export default function DepartmentsPage() {
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <div className="flex flex-col min-h-screen bg-background">
-          <header className="sticky top-0 z-10 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-card shadow-sm">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="md:hidden" />
-              <h1 className="text-xl font-bold text-primary">Departments</h1>
+        <div className="flex flex-col min-h-screen">
+           <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
+            <div className="flex items-center gap-4">
+              <SidebarTrigger />
+              <h1 className="text-xl font-bold">Departments</h1>
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
@@ -166,7 +168,7 @@ export default function DepartmentsPage() {
             </Dialog>
           </header>
 
-          <main className="flex-1 p-4 md:p-8">
+          <main className="flex-1 p-4 md:p-8 bg-muted/40">
             <Card>
               <CardHeader>
                 <CardTitle>Your Departments</CardTitle>
@@ -190,15 +192,34 @@ export default function DepartmentsPage() {
                             <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(dept)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(dept.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon">
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. This will permanently delete the
+                                      department and all associated data from our servers.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(dept.id)}>
+                                      Continue
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                           </TableCell>
                         </TableRow>
                       ))}
                        {(!Array.isArray(departments) || departments.length === 0) && (
                           <TableRow>
-                            <TableCell colSpan={2} className="text-center">
+                            <TableCell colSpan={2} className="text-center h-24">
                               No departments found.
                             </TableCell>
                           </TableRow>
