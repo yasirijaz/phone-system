@@ -80,7 +80,7 @@ export default function AssignDepartmentPage() {
     if (!authUser) return;
     setLoading(true);
     try {
-      const data = await getAssignedDepartmentsForUser(authUser.id);
+      const data = await getAssignedDepartmentsForUser();
       setAssignedDepartments(data.departments);
     } catch (error) {
       toast({ title: "Error", description: "Could not fetch your departments.", variant: "destructive" });

@@ -25,8 +25,9 @@ export const getUserAssignments = async (companyId: number): Promise<{assignment
     return response.data;
 }
 
-export const getAssignedDepartmentsForUser = async (userId: number): Promise<{departments: Department[]}> => {
-    const response = await axios.get(`/api/users/${userId}/departments`);
+export const getAssignedDepartmentsForUser = async (): Promise<{departments: Department[]}> => {
+    const response = await axios.get(`/api/departments/users`);
     return response.data;
 }
+
 
