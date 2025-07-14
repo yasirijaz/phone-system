@@ -4,6 +4,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { Device } from '@twilio/voice-sdk';
 import type { Worker } from 'twilio-taskrouter';
+// const TaskRouter = require("twilio-taskrouter");
+require("./taskrouter.min.js");
+
 import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
 
@@ -53,12 +56,16 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     try {
       // Fetch tokens
+      // const formData = new FormData();
+      // formData.append('user_id', '7');
+      // formData.append('identity', 'Tech');
+      // const deviceTokenRes = await axios.post('/api/phone/getToken', formData);
       const deviceTokenRes = await axios.post('/api/twilio/token');
       const deviceToken = deviceTokenRes.data.data.token;
       
+      // const workerTokenRes = await axios.post('/api/phone/getToken1', formData);
       const workerTokenRes = await axios.post('/api/twilio/worker-token');
       const workerToken = workerTokenRes.data.data.token;
-
       if (typeof deviceToken !== 'string' || typeof workerToken !== 'string') {
         throw new Error('Invalid token format received from server.');
       }
@@ -80,6 +87,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       const newDevice = new twilio.Device(deviceToken, {
         closeExistingSessions: true
       });
+      newDevice.register();
       newDevice.on('registered', () => {
           console.log('Twilio Device registered');
           setIsDeviceReady(true);
@@ -96,7 +104,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       setDevice(newDevice);
 
       // Setup Worker
-      const newWorker = new twilio.Worker(workerToken, {
+      // const newWorker = new twilio.Worker(workerToken, {
+      //   closeExistingSessions: true,
+      // });
+      const newWorker = new Twilio.TaskRouter.Worker(workerToken, {
         closeExistingSessions: true,
       });
       newWorker.on('ready', (readyWorker: any) => {
