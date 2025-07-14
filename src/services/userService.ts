@@ -13,7 +13,7 @@ export const addUserToCompany = async (companyId: number, userData: Omit<User, '
 };
 
 export const assignDepartmentToUser = async (userId: number, departmentId: number): Promise<any> => {
-    const response = await axios.post('/api/users/assign-department', {
+    const response = await axios.post('/api/departments/users', {
         user_id: userId,
         department_id: departmentId,
     });
@@ -29,5 +29,6 @@ export const getAssignedDepartmentsForUser = async (): Promise<{departments: Dep
     const response = await axios.get(`/api/departments/users`);
     return response.data;
 }
+
 
 
