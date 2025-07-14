@@ -16,9 +16,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Settings } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
+import { useRouter } from "next/navigation";
 
 const departmentSchema = z.object({
   name: z.string().min(2, "Department name must be at least 2 characters."),
@@ -26,6 +27,7 @@ const departmentSchema = z.object({
 
 export default function DepartmentsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -116,6 +118,10 @@ export default function DepartmentsPage() {
     }
   }
 
+  const handleManageSettings = (departmentId: number) => {
+    router.push(`/departments/${departmentId}/settings`);
+  }
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -189,6 +195,9 @@ export default function DepartmentsPage() {
                         <TableRow key={dept.id}>
                           <TableCell className="font-medium">{dept.name}</TableCell>
                           <TableCell className="text-right">
+                             <Button variant="ghost" size="icon" onClick={() => handleManageSettings(dept.id)}>
+                                <Settings className="h-4 w-4" />
+                              </Button>
                             <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(dept)}>
                               <Edit className="h-4 w-4" />
                             </Button>
