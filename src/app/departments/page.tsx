@@ -123,8 +123,7 @@ export default function DepartmentsPage() {
   }
   
   const handleManageUsers = (departmentId: number) => {
-    // We can add navigation or a modal here later.
-    console.log("Manage users for department:", departmentId);
+    router.push(`/departments/${departmentId}/users`);
   }
 
   return (

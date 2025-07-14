@@ -1,14 +1,14 @@
 
 import axios from '@/lib/axios';
-import type { Department } from '@/types';
+import type { Department, User } from '@/types';
 
 export const getDepartments = async (companyId: number): Promise<Department[]> => {
-  const response = await axios.get(`/api/departments/${companyId}`);
+  const response = await axios.get(`/api/companies/departments?company_id=${companyId}`);
   return response.data.departments;
 };
 
 export const getDepartmentsByCompany = async (companyId: number): Promise<{departments: Department[]}> => {
-    const response = await axios.get(`/api/companies/${companyId}/departments`);
+    const response = await axios.get(`/api/companies/departments?company_id=${companyId}`);
     return response.data;
 }
 
@@ -24,4 +24,9 @@ export const updateDepartment = async (id: number, departmentData: { name: strin
 
 export const deleteDepartment = async (id: number): Promise<void> => {
   await axios.delete(`/api/departments/${id}`);
+};
+
+export const getDepartmentUsers = async (departmentId: number): Promise<{users: User[]}> => {
+    const response = await axios.get(`/api/department/${departmentId}/users`);
+    return response.data;
 };
