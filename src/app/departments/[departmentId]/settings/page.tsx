@@ -107,8 +107,8 @@ export default function DepartmentSettingsPage() {
   const isIvrEnabled = form.watch("ivr_menu.enabled");
 
   useEffect(() => {
-    if (departmentId) fetchSettings();
-  }, [departmentId]);
+    if (user && departmentId) fetchSettings();
+  }, [departmentId, user]);
 
   useEffect(() => {
     if (settings) {
@@ -200,10 +200,10 @@ export default function DepartmentSettingsPage() {
                           <FormItem><FormLabel>Timezone</FormLabel><FormControl><Input placeholder="e.g. UTC" {...field} /></FormControl><FormMessage /></FormItem>
                         )}/>
                         <FormField control={form.control} name="call_settings.greeting_message" render={({ field }) => (
-                          <FormItem><FormLabel>Greeting Message (Optional)</FormLabel><FormControl><Textarea placeholder="e.g. Welcome to the Sales department." {...field} /></FormControl><FormMessage /></FormItem>
+                          <FormItem><FormLabel>Greeting Message (Optional)</FormLabel><FormControl><Textarea placeholder="e.g. Welcome to the Sales department." {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
                         )}/>
                         <FormField control={form.control} name="call_settings.hold_music_url" render={({ field }) => (
-                          <FormItem><FormLabel>Hold Music URL (Optional)</FormLabel><FormControl><Input type="url" placeholder="e.g. https://example.com/music.mp3" {...field} /></FormControl><FormMessage /></FormItem>
+                          <FormItem><FormLabel>Hold Music URL (Optional)</FormLabel><FormControl><Input type="url" placeholder="e.g. https://example.com/music.mp3" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
                         )}/>
                       </CardContent>
                     </Card>
@@ -252,13 +252,13 @@ export default function DepartmentSettingsPage() {
                         {isIvrEnabled && (
                           <>
                             <FormField control={form.control} name="ivr_menu.greeting" render={({ field }) => (
-                              <FormItem><FormLabel>IVR Greeting</FormLabel><FormControl><Textarea placeholder="e.g. Press 1 for sales, 2 for support..." {...field} /></FormControl><FormMessage /></FormItem>
+                              <FormItem><FormLabel>IVR Greeting</FormLabel><FormControl><Textarea placeholder="e.g. Press 1 for sales, 2 for support..." {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
                             )}/>
                             <div>
                                <FormLabel>IVR Options</FormLabel>
                                {ivrOptions.map((option, index) => (
                                 <div key={option.id} className="flex items-center gap-2 p-2 border rounded-md mt-2">
-                                  <FormField control={form.control} name={`ivr_menu.options.${index}.digit`} render={({ field }) => <Input placeholder="Digit" {...field} className="w-16" />} />
+                                  <FormField control={form.control} name={`ivr_menu.options.${index}.digit`} render={({ field }) => <Input placeholder="Digit" {...field} />} />
                                   <FormField control={form.control} name={`ivr_menu.options.${index}.action`} render={({ field }) => <Input placeholder="Action (e.g., forward)" {...field} />} />
                                   <FormField control={form.control} name={`ivr_menu.options.${index}.destination`} render={({ field }) => <Input placeholder="Destination" {...field} />} />
                                   <Button type="button" variant="ghost" size="icon" onClick={() => removeIvrOption(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
