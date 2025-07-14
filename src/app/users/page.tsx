@@ -67,7 +67,7 @@ export default function AssignDepartmentPage() {
       Promise.all([
         getUsersByCompany(selectedCompanyId).then(res => setUsers(res.data || [])),
         getDepartmentsByCompany(selectedCompanyId).then(res => setDepartments(res.departments || [])),
-        getUserAssignments(selectedCompanyId).then(res => setAssignments(res.assignments || [])),
+        getUserAssignments(selectedCompanyId).then(res => setAssignments(res.data || [])),
       ]).catch(err => {
         toast({ title: "Error", description: "Failed to load company data.", variant: "destructive" });
       }).finally(() => {
@@ -97,16 +97,13 @@ export default function AssignDepartmentPage() {
       // Refetch assignments
       if (selectedCompanyId) {
         const res = await getUserAssignments(selectedCompanyId);
-        setAssignments(res.assignments || []);
+        setAssignments(res.data || []);
       }
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || "An unexpected error occurred.";
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
     }
   };
-
-  const getUserName = (userId: number) => users.find(u => u.id === userId)?.name || '...';
-  const getDepartmentName = (deptId: number) => departments.find(d => d.id === deptId)?.name || '...';
   
   const handleCompanyChange = (companyId: string) => {
     setSelectedCompanyId(Number(companyId));
@@ -203,8 +200,8 @@ export default function AssignDepartmentPage() {
                 {assignments.length > 0 ? (
                   assignments.map(a => (
                     <TableRow key={a.id}>
-                      <TableCell>{getUserName(a.user_id)}</TableCell>
-                      <TableCell>{getDepartmentName(a.department_id)}</TableCell>
+                      <TableCell>{a.user_name}</TableCell>
+                      <TableCell>{a.department_name}</TableCell>
                     </TableRow>
                   ))
                 ) : (
@@ -265,4 +262,3 @@ export default function AssignDepartmentPage() {
     </SidebarProvider>
   );
 }
-

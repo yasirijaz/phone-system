@@ -140,4 +140,6 @@ export interface Assignment {
     id: number;
     user_id: number;
     department_id: number;
+    user_name: string;
+    department_name: string;
 }
