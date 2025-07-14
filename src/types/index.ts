@@ -1,3 +1,4 @@
+
 export interface Call {
   id: string;
   contact: string;
@@ -39,6 +40,36 @@ export interface Department {
   created_at?: string;
   updated_at?: string;
 }
+
+export interface CompanySettings {
+  id: number;
+  company_id: number;
+  call_settings: {
+    record_calls: boolean;
+    greeting_message?: string;
+  };
+  voicemail_settings: {
+    enabled: boolean;
+    greeting?: string;
+    send_transcription: boolean;
+  };
+  business_hours: {
+    is_24_7: boolean;
+    days: {
+      day: string;
+      enabled: boolean;
+      open: string;
+      close: string;
+    }[];
+  };
+  routing_preferences: {
+    default_route: string;
+    timeout: number;
+  };
+}
+
+export type CompanySettingsPayload = Omit<CompanySettings, 'id'>;
+
 
 export interface PaginatedResponse<T> {
   current_page: number;
