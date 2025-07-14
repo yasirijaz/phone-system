@@ -94,6 +94,14 @@ export function AppSidebar() {
               </SidebarMenuItem>
             </>
           )}
+           <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/users')} tooltip="Users">
+                <Link href="/users">
+                  <Users />
+                  <span>Users</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
         </SidebarGroup>
         
         <SidebarGroup>
@@ -130,3 +138,4 @@ export function AppSidebar() {
     </>
   );
 }
+

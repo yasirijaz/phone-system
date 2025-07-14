@@ -37,6 +37,7 @@ export interface Department {
   id: number;
   name: string;
   company_id: number;
+  workflow_sid?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -133,4 +134,10 @@ export interface PaginatedResponse<T> {
   prev_page_url: string | null;
   to: number;
   total: number;
+}
+
+export interface Assignment {
+    id: number;
+    user_id: number;
+    department_id: number;
 }

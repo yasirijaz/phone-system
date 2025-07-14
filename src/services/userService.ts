@@ -1,13 +1,32 @@
 
 import axios from '@/lib/axios';
-import type { User } from '@/types';
+import type { User, Assignment, Department } from '@/types';
 
-export const getUsersByCompany = async (companyId: number): Promise<User[]> => {
+export const getUsersByCompany = async (companyId: number): Promise<{data: User[]}> => {
   const response = await axios.get(`/api/companies/${companyId}/users`);
-  return response.data.data;
+  return response.data;
 };
 
 export const addUserToCompany = async (companyId: number, userData: Omit<User, 'id' | 'company_id'>): Promise<User> => {
   const response = await axios.post(`/api/companies/${companyId}/users`, userData);
   return response.data;
 };
+
+export const assignDepartmentToUser = async (userId: number, departmentId: number): Promise<any> => {
+    const response = await axios.post('/api/users/assign-department', {
+        user_id: userId,
+        department_id: departmentId,
+    });
+    return response.data;
+}
+
+export const getUserAssignments = async (companyId: number): Promise<{assignments: Assignment[]}> => {
+    const response = await axios.get(`/api/assignments/${companyId}`);
+    return response.data;
+}
+
+export const getAssignedDepartmentsForUser = async (userId: number): Promise<{departments: Department[]}> => {
+    const response = await axios.get(`/api/users/${userId}/departments`);
+    return response.data;
+}
+
