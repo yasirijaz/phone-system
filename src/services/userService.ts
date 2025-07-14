@@ -36,3 +36,4 @@ export const getAssignedDepartmentsForUser = async (): Promise<{departments: Dep
 
 
 
+
