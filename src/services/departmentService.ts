@@ -3,7 +3,7 @@ import axios from '@/lib/axios';
 import type { Department, User } from '@/types';
 
 export const getDepartments = async (companyId: number): Promise<Department[]> => {
-  const response = await axios.get(`/api/companies/departments?company_id=${companyId}`);
+  const response = await axios.post(`/api/companies/departments`, { company_id: companyId });
   return response.data.departments;
 };
 
