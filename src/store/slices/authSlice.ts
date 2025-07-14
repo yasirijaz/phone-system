@@ -88,6 +88,8 @@ const authSlice = createSlice({
         state.token = action.payload.token;
         localStorage.setItem('authToken', action.payload.token);
         localStorage.setItem('user', JSON.stringify(action.payload.user));
+        // localStorage.setItem('authToken', action.payload.data.token);  // WS Laravel
+        // localStorage.setItem('user', JSON.stringify(action.payload.data.user));  // WS Laravel
       })
       .addCase(loginUser.rejected, (state, action) => {
         console.error('Login failed:', action.payload);
