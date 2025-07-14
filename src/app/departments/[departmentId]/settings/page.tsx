@@ -45,7 +45,7 @@ const businessHoursSchema = z.object({
 const settingsSchema = z.object({
   timezone: z.string().default("UTC"),
   call_settings: z.object({
-    greeting_message: z.string().optional(),
+    greeting_message: z.string().optional().default(""),
     hold_music_url: z.string().url().optional().or(z.literal('')),
   }),
   business_hours: z.object({
@@ -54,7 +54,7 @@ const settingsSchema = z.object({
   }),
   ivr_menu: z.object({
     enabled: z.boolean().default(false),
-    greeting: z.string().optional(),
+    greeting: z.string().optional().default(""),
     options: z.array(ivrOptionSchema),
   }),
   break_handling: z.object({
@@ -113,12 +113,24 @@ export default function DepartmentSettingsPage() {
   useEffect(() => {
     if (settings) {
       form.reset({
-        timezone: settings.timezone,
-        call_settings: settings.call_settings,
-        business_hours: settings.business_hours,
-        ivr_menu: settings.ivr_menu,
-        break_handling: settings.break_handling,
-        holiday_schedule: settings.holiday_schedule,
+        timezone: settings.timezone || "UTC",
+        call_settings: {
+            greeting_message: settings.call_settings?.greeting_message || "",
+            hold_music_url: settings.call_settings?.hold_music_url || ""
+        },
+        business_hours: settings.business_hours || { is_24_7: false, days: [] },
+        ivr_menu: {
+            enabled: settings.ivr_menu?.enabled || false,
+            greeting: settings.ivr_menu?.greeting || "",
+            options: settings.ivr_menu?.options || []
+        },
+        break_handling: {
+            enabled: settings.break_handling?.enabled || false,
+            max_break_duration: settings.break_handling?.max_break_duration || 15
+        },
+        holiday_schedule: {
+            holidays: settings.holiday_schedule?.holidays || []
+        },
       });
     }
   }, [settings, form]);
