@@ -3,7 +3,7 @@ import axios from '@/lib/axios';
 import type { User, Assignment, Department } from '@/types';
 
 export const getUsersByCompany = async (companyId: number): Promise<{data: User[]}> => {
-  const response = await axios.get(`/api/companies/${companyId}/users`);
+  const response = await axios.get(`/api/companies/users?company_id=${companyId}`);
   return response.data;
 };
 
@@ -29,6 +29,7 @@ export const getAssignedDepartmentsForUser = async (): Promise<{departments: Dep
     const response = await axios.get(`/api/departments/users`);
     return response.data;
 }
+
 
 
 
