@@ -37,15 +37,17 @@ export default function AssignDepartmentPage() {
       setLoading(true);
       setLoadingUsers(true);
       
-      getUserAssignments(selectedCompanyId)
+      const fetchAssignments = getUserAssignments(selectedCompanyId)
         .then(res => setAssignments(res.data || []))
         .catch(err => toast({ title: "Error", description: "Failed to load user assignments.", variant: "destructive" }))
         .finally(() => setLoading(false));
 
-      getUsersByCompany(selectedCompanyId)
+      const fetchUsers = getUsersByCompany(selectedCompanyId)
         .then(res => setUsers(res.data || []))
         .catch(err => toast({ title: "Error", description: "Failed to load company users.", variant: "destructive" }))
         .finally(() => setLoadingUsers(false));
+
+      Promise.all([fetchAssignments, fetchUsers]);
     }
   }, [selectedCompanyId, toast]);
   
