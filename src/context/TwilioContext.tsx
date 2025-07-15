@@ -2,10 +2,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import * as TaskRouter from 'twilio-taskrouter';
 import type { Device } from '@twilio/voice-sdk';
-import type { Worker } from 'twilio-taskrouter';
-// const TaskRouter = require("twilio-taskrouter");
-require("./taskrouter.min.js");
 
 import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
@@ -37,14 +35,15 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     const loadTwilio = async () => {
       try {
         const { Device } = await import('@twilio/voice-sdk');
-        const { Worker } = await import('twilio-taskrouter');
-        setTwilio({ Device, Worker });
+        const { Workspace, Worker } = await import('twilio-taskrouter');
+        setTwilio({ Device, Workspace, Worker });
       } catch (e) {
         console.error("Failed to load twilio modules", e)
       }
     };
     if (typeof window !== 'undefined') {
         loadTwilio();
+        connectTwilio();
     }
   }, []);
 
@@ -63,10 +62,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       const deviceTokenRes = await axios.post('/api/twilio/token');
       const deviceToken = deviceTokenRes.data.data.token;
       
-      // const workerTokenRes = await axios.post('/api/phone/getToken1', formData);
-      const workerTokenRes = await axios.post('/api/twilio/worker-token');
-      const workerToken = workerTokenRes.data.data.token;
-      if (typeof deviceToken !== 'string' || typeof workerToken !== 'string') {
+      if (typeof deviceToken !== 'string') {
         throw new Error('Invalid token format received from server.');
       }
 
@@ -83,9 +79,31 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setIsWorkerReady(false);
       }
 
+      const newWorker = new TaskRouter.Worker(deviceToken, {
+        closeExistingSessions: true,
+        // debug: true, // Uncomment for debugging
+      });
+      console.log('Twilio Worker created:', newWorker);
+      newWorker.on('ready', (readyWorker: any) => {
+          console.log('Twilio Worker ready:', readyWorker.sid);
+          setIsWorkerReady(true);
+          setWorker(readyWorker);
+      });
+      newWorker.on('disconnected', () => {
+          console.log('Twilio Worker disconnected');
+          setIsWorkerReady(false);
+      });
+      newWorker.on('error', (err: any) => {
+          console.error('Twilio Worker Error:', err);
+          setError(`Worker Error: ${err.message}`);
+          setIsWorkerReady(false);
+      });
+
       // Setup Device
       const newDevice = new twilio.Device(deviceToken, {
-        closeExistingSessions: true
+        closeExistingSessions: true,
+        codecPreferences: ['opus', 'pcmu'],
+        debug: true,
       });
       newDevice.register();
       newDevice.on('registered', () => {
@@ -100,29 +118,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           console.error('Twilio Device Error:', err);
           setError(`Device Error: ${err.message}`);
           setIsDeviceReady(false);
-      });
-      setDevice(newDevice);
-
-      // Setup Worker
-      // const newWorker = new twilio.Worker(workerToken, {
-      //   closeExistingSessions: true,
-      // });
-      const newWorker = new Twilio.TaskRouter.Worker(workerToken, {
-        closeExistingSessions: true,
-      });
-      newWorker.on('ready', (readyWorker: any) => {
-          console.log('Twilio Worker ready:', readyWorker.sid);
-          setIsWorkerReady(true);
-          setWorker(readyWorker);
-      });
-      newWorker.on('disconnected', () => {
-          console.log('Twilio Worker disconnected');
-          setIsWorkerReady(false);
-      });
-      newWorker.on('error', (err: any) => {
-          console.error('Twilio Worker Error:', err);
-          setError(`Worker Error: ${err.message}`);
-          setIsWorkerReady(false);
       });
       
     } catch (err: any) {
