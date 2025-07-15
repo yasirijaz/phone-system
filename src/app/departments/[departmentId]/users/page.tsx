@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import type { User } from "@/types";
 import { getDepartmentUsers } from "@/services/departmentService";
-import { getUsersByCompany, assignUserToDepartment } from "@/services/userService";
+import { getUsersByCompany, assignUserToDepartment, removeUserFromDepartment } from "@/services/userService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const assignmentSchema = z.object({
   user_id: z.coerce.number({ required_error: "User is required." }).min(1, "User is required."),
@@ -54,7 +55,7 @@ export default function DepartmentUsersPage() {
     setLoading(true);
     try {
       const [deptUsersResponse, companyUsersResponse] = await Promise.all([
-        getDepartmentUsers(companyId, departmentId),
+        getDepartmentUsers(departmentId),
         getUsersByCompany(companyId)
       ]);
       setDepartmentUsers(Array.isArray(deptUsersResponse.users) ? deptUsersResponse.users : []);
@@ -83,6 +84,17 @@ export default function DepartmentUsersPage() {
             description: error.response?.data?.message || "An unexpected error occurred.",
             variant: "destructive",
         });
+    }
+  };
+
+  const handleRemoveUser = async (userId: number) => {
+    if (!companyId) return;
+    try {
+      await removeUserFromDepartment(companyId, departmentId, userId);
+      toast({ title: "Success", description: "User removed from department." });
+      fetchAllData();
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to remove user from department.", variant: "destructive" });
     }
   };
 
@@ -187,7 +199,27 @@ export default function DepartmentUsersPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon">
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will permanently remove the user from this department.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleRemoveUser(u.id)}>
+                                      Continue
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </TableCell>
                           </TableRow>
                         ))}
