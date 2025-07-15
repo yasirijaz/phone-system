@@ -26,6 +26,11 @@ const assignmentSchema = z.object({
   department_id: z.coerce.number({ required_error: "Department is required." }).min(1, "Department is required."),
 });
 
+const defaultAssignmentValues = {
+    user_id: 0,
+    department_id: 0,
+};
+
 export default function AssignDepartmentPage() {
   const { user: authUser } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -38,6 +43,7 @@ export default function AssignDepartmentPage() {
 
   const form = useForm<z.infer<typeof assignmentSchema>>({
     resolver: zodResolver(assignmentSchema),
+    defaultValues: defaultAssignmentValues,
   });
 
   useEffect(() => {
@@ -111,7 +117,7 @@ export default function AssignDepartmentPage() {
       await assignUserToDepartment(selectedCompanyId, values.department_id, values.user_id);
       toast({ title: "Success", description: "User assigned to department." });
       fetchUserAssignments(selectedCompanyId); // Refresh assignments list
-      form.reset();
+      form.reset(defaultAssignmentValues);
     } catch (error: any) {
       toast({ title: "Error", description: error.response?.data?.message || "Failed to assign user.", variant: "destructive" });
     }
@@ -171,7 +177,7 @@ export default function AssignDepartmentPage() {
                         <FormField control={form.control} name="user_id" render={({ field }) => (
                           <FormItem>
                             <FormLabel>User</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={String(field.value)}>
+                            <Select onValueChange={(value) => field.onChange(Number(value))} value={String(field.value)}>
                               <FormControl><SelectTrigger><SelectValue placeholder="Select a user" /></SelectTrigger></FormControl>
                               <SelectContent>{users.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>)}</SelectContent>
                             </Select>
@@ -181,7 +187,7 @@ export default function AssignDepartmentPage() {
                         <FormField control={form.control} name="department_id" render={({ field }) => (
                           <FormItem>
                             <FormLabel>Department</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={String(field.value)}>
+                            <Select onValueChange={(value) => field.onChange(Number(value))} value={String(field.value)}>
                               <FormControl><SelectTrigger><SelectValue placeholder="Select a department" /></SelectTrigger></FormControl>
                               <SelectContent>{departments.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}</SelectContent>
                             </Select>
