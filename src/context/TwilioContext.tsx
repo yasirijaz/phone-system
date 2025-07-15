@@ -35,15 +35,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     const loadTwilio = async () => {
       try {
         const { Device } = await import('@twilio/voice-sdk');
-        const { Workspace, Worker } = await import('twilio-taskrouter');
-        setTwilio({ Device, Workspace, Worker });
+        setTwilio({ Device});
       } catch (e) {
         console.error("Failed to load twilio modules", e)
       }
     };
     if (typeof window !== 'undefined') {
         loadTwilio();
-        connectTwilio();
     }
   }, []);
 
