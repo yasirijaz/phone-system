@@ -87,7 +87,7 @@ export default function PhoneNumbersPage() {
   const onSubmit = async (values: z.infer<typeof phoneNumberSchema>) => {
     try {
       if (editingNumber) {
-        await updatePhoneNumber(editingNumber.id, { ...values });
+        await updatePhoneNumber(editingNumber.id, { ...values, department_id: departmentId });
         toast({ title: "Success", description: "Phone number updated." });
       } else {
         await createPhoneNumber({ ...values, department_id: departmentId });
