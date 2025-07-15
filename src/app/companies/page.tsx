@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Edit, Trash2, Users, Building2, ChevronLeft, ChevronRight, Briefcase, Settings } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Users, Building2, ChevronLeft, ChevronRight, Briefcase, Settings, UserCog } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from 'next/navigation';
@@ -305,7 +305,7 @@ export default function CompaniesPage() {
                                 <Settings className="h-4 w-4" />
                               </Button>
                               <Button variant="ghost" size="icon" onClick={() => handleManageAssignments(company.id)}>
-                                <Users className="h-4 w-4" />
+                                <UserCog className="h-4 w-4" />
                               </Button>
                               <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(company)}>
                                 <Edit className="h-4 w-4" />

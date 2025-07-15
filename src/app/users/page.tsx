@@ -20,6 +20,7 @@ import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger 
 import { AppSidebar } from '@/components/app-sidebar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 const assignmentSchema = z.object({
   user_id: z.coerce.number({ required_error: "User is required." }).min(1, "User is required."),
@@ -33,6 +34,8 @@ const defaultAssignmentValues = {
 
 export default function AssignDepartmentPage() {
   const { user: authUser } = useAuth();
+  const searchParams = useSearchParams();
+
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -45,6 +48,16 @@ export default function AssignDepartmentPage() {
     resolver: zodResolver(assignmentSchema),
     defaultValues: defaultAssignmentValues,
   });
+  
+  useEffect(() => {
+    const companyIdFromUrl = searchParams.get('companyId');
+    if (companyIdFromUrl) {
+      const id = Number(companyIdFromUrl);
+      if(!isNaN(id)) {
+        setSelectedCompanyId(id);
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!authUser) return;
@@ -54,6 +67,12 @@ export default function AssignDepartmentPage() {
       setSelectedCompanyId(authUser.company_id);
     }
   }, [authUser]);
+
+  useEffect(() => {
+    if (selectedCompanyId) {
+      fetchAllData(selectedCompanyId);
+    }
+  }, [selectedCompanyId]);
 
   const fetchAllData = async (companyId: number) => {
     setLoading(true);
@@ -96,12 +115,6 @@ export default function AssignDepartmentPage() {
       toast({ title: "Error", description: "Failed to load assignments.", variant: "destructive" });
     }
   }
-
-  useEffect(() => {
-    if (selectedCompanyId) {
-      fetchAllData(selectedCompanyId);
-    }
-  }, [selectedCompanyId]);
 
   const handleCompanyChange = (companyId: string) => {
     const id = Number(companyId);
@@ -153,7 +166,7 @@ export default function AssignDepartmentPage() {
               <h1 className="text-xl font-bold">User Assignments</h1>
             </div>
             {authUser?.role_id === 1 && (
-              <Select onValueChange={handleCompanyChange}>
+              <Select onValueChange={handleCompanyChange} value={selectedCompanyId ? String(selectedCompanyId) : ""}>
                 <SelectTrigger className="w-[280px]">
                   <SelectValue placeholder="Select a company to manage assignments" />
                 </SelectTrigger>
@@ -177,7 +190,7 @@ export default function AssignDepartmentPage() {
                         <FormField control={form.control} name="user_id" render={({ field }) => (
                           <FormItem>
                             <FormLabel>User</FormLabel>
-                            <Select onValueChange={(value) => field.onChange(Number(value))} value={String(field.value)}>
+                            <Select onValueChange={(value) => field.onChange(Number(value))} value={field.value === 0 ? "" : String(field.value)}>
                               <FormControl><SelectTrigger><SelectValue placeholder="Select a user" /></SelectTrigger></FormControl>
                               <SelectContent>{users.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>)}</SelectContent>
                             </Select>
@@ -187,7 +200,7 @@ export default function AssignDepartmentPage() {
                         <FormField control={form.control} name="department_id" render={({ field }) => (
                           <FormItem>
                             <FormLabel>Department</FormLabel>
-                            <Select onValueChange={(value) => field.onChange(Number(value))} value={String(field.value)}>
+                            <Select onValueChange={(value) => field.onChange(Number(value))} value={field.value === 0 ? "" : String(field.value)}>
                               <FormControl><SelectTrigger><SelectValue placeholder="Select a department" /></SelectTrigger></FormControl>
                               <SelectContent>{departments.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}</SelectContent>
                             </Select>
