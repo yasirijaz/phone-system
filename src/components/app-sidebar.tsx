@@ -11,8 +11,9 @@ import {
   SidebarGroupLabel,
   SidebarMenuSub,
   SidebarMenuSubButton,
+  SidebarSeparator,
 } from '@/components/ui/sidebar';
-import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown } from 'lucide-react';
+import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog } from 'lucide-react';
 import { Button } from './ui/button';
 import { Logo } from './icons';
 import { usePathname, useRouter } from 'next/navigation';
@@ -20,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -35,6 +37,8 @@ export function AppSidebar() {
   const isSuperAdmin = user?.role_id === 1;
   const isCompanyAdmin = user?.role_id === 2;
   const isRegularUser = user?.role_id === 3;
+
+  const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
 
   return (
     <>
@@ -106,7 +110,7 @@ export function AppSidebar() {
              <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname.startsWith('/users')} tooltip="User Assignments">
                   <Link href="/users">
-                    <Users />
+                    <UserCog />
                     <span>User Assignments</span>
                   </Link>
                 </SidebarMenuButton>
@@ -124,7 +128,7 @@ export function AppSidebar() {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            {isCompanyAdmin && (
+            {(isSuperAdmin || isCompanyAdmin) && (
              <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === '/settings'} tooltip="Settings">
                 <Link href="/settings">
@@ -138,6 +142,19 @@ export function AppSidebar() {
       </SidebarMenu>
       
       <SidebarFooter>
+        <div className="group-data-[collapsible=icon]:hidden">
+          <SidebarSeparator />
+          <div className="p-2 flex items-center gap-2">
+              <Avatar className="h-9 w-9">
+                  <AvatarImage src={`https://placehold.co/100x100.png?text=${userInitial}`} alt={user?.name} />
+                  <AvatarFallback>{userInitial}</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col text-sm">
+                  <span className="font-semibold text-foreground">{user?.name}</span>
+                  <span className="text-muted-foreground">{user?.email}</span>
+              </div>
+          </div>
+        </div>
         <Button
           variant="ghost"
           className="w-full justify-start gap-2"
