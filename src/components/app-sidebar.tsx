@@ -102,7 +102,7 @@ export function AppSidebar() {
             </SidebarMenuItem>
           )}
 
-           {(isSuperAdmin || isCompanyAdmin) && (
+           {isCompanyAdmin && (
              <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname.startsWith('/users')} tooltip="User Assignments">
                   <Link href="/users">
@@ -124,7 +124,7 @@ export function AppSidebar() {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            {!isRegularUser && (
+            {isCompanyAdmin && (
              <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === '/settings'} tooltip="Settings">
                 <Link href="/settings">
@@ -150,5 +150,3 @@ export function AppSidebar() {
     </>
   );
 }
-
-    

@@ -134,6 +134,10 @@ export default function CompaniesPage() {
     router.push(`/companies/${companyId}/users`);
   }
   
+  const handleManageAssignments = (companyId: number) => {
+    router.push(`/users?companyId=${companyId}`);
+  };
+
   const handleManageSettings = (companyId: number) => {
     router.push(`/companies/${companyId}/settings`);
   }
@@ -299,6 +303,9 @@ export default function CompaniesPage() {
                               </Button>
                                <Button variant="ghost" size="icon" onClick={() => handleManageSettings(company.id)}>
                                 <Settings className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleManageAssignments(company.id)}>
+                                <Users className="h-4 w-4" />
                               </Button>
                               <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(company)}>
                                 <Edit className="h-4 w-4" />

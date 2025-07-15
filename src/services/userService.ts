@@ -3,7 +3,7 @@ import axios from '@/lib/axios';
 import type { User, Assignment, Department } from '@/types';
 
 export const getUsersByCompany = async (companyId: number): Promise<{data: User[]}> => {
-  const response = await axios.post(`/api/companies/${companyId}/users`);
+  const response = await axios.get(`/api/companies/${companyId}/users`);
   return response.data;
 };
 
