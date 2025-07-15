@@ -1,4 +1,5 @@
 
+
 export interface Call {
   id: string;
   contact: string;
@@ -40,6 +41,14 @@ export interface Department {
   workflow_sid?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface PhoneNumber {
+  id: number;
+  department_id: number;
+  phone_no: string;
+  type: string;
+  label: string;
 }
 
 export interface CompanySettings {

@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Edit, Trash2, Settings, Users } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Settings, Users, Phone } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from "next/navigation";
@@ -126,6 +126,10 @@ export default function DepartmentsPage() {
     router.push(`/departments/${departmentId}/users`);
   }
 
+  const handleManagePhoneNumbers = (departmentId: number) => {
+    router.push(`/departments/${departmentId}/phone-numbers`);
+  };
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -201,6 +205,9 @@ export default function DepartmentsPage() {
                           <TableCell className="text-right">
                              <Button variant="ghost" size="icon" onClick={() => handleManageUsers(dept.id)}>
                                 <Users className="h-4 w-4" />
+                              </Button>
+                             <Button variant="ghost" size="icon" onClick={() => handleManagePhoneNumbers(dept.id)}>
+                                <Phone className="h-4 w-4" />
                               </Button>
                              <Button variant="ghost" size="icon" onClick={() => handleManageSettings(dept.id)}>
                                 <Settings className="h-4 w-4" />
