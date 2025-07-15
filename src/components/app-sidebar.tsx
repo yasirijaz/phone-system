@@ -95,10 +95,10 @@ export function AppSidebar() {
             </>
           )}
            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname.startsWith('/users')} tooltip="Users">
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/users')} tooltip="User Assignments">
                 <Link href="/users">
                   <Users />
-                  <span>Users</span>
+                  <span>User Assignments</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -138,4 +138,3 @@ export function AppSidebar() {
     </>
   );
 }
-
