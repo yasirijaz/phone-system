@@ -3,7 +3,7 @@ import axios from '@/lib/axios';
 import type { DepartmentSettings, DepartmentSettingsPayload } from '@/types';
 
 export const getDepartmentSettings = async (departmentId: number): Promise<DepartmentSettings> => {
-  const response = await axios.get(`/api/department-settings/${departmentId}`);
+  const response = await axios.get(`/api/settings/department/${departmentId}`);
   const data = response.data.settings;
 
   if (!data) {
@@ -33,14 +33,14 @@ export const createOrUpdateDepartmentSettings = async (id: number | undefined, s
     };
 
     if (id) {
-        const response = await axios.put(`/api/department-settings/${id}`, payload);
+        const response = await axios.put(`/api/settings/department/${id}`, payload);
         return response.data;
     } else {
-        const response = await axios.post('/api/department-settings', payload);
+        const response = await axios.post('/api/settings/department', payload);
         return response.data;
     }
 };
 
 export const deleteDepartmentSettings = async (id: number): Promise<void> => {
-    await axios.delete(`/api/department-settings/${id}`);
+    await axios.delete(`/api/settings/department/${id}`);
 }

@@ -3,7 +3,7 @@ import axios from '@/lib/axios';
 import type { CompanySettings, CompanySettingsPayload } from '@/types';
 
 export const getCompanySettings = async (companyId: number): Promise<CompanySettings> => {
-  const response = await axios.get(`/api/company-settings/${companyId}`);
+  const response = await axios.get(`/api/settings/company/${companyId}`);
   const data = response.data.settings;
   
   if (!data) {
@@ -30,10 +30,10 @@ export const createOrUpdateCompanySettings = async (id: number | undefined, sett
     };
 
     if (id) {
-        const response = await axios.put(`/api/company-settings/${id}`, payload);
+        const response = await axios.put(`/api/settings/company/${id}`, payload);
         return response.data;
     } else {
-        const response = await axios.post('/api/company-settings', payload);
+        const response = await axios.post('/api/settings/company', payload);
         return response.data;
     }
 };

@@ -43,7 +43,7 @@ export default function AssignDepartmentPage() {
         .finally(() => setLoading(false));
 
       const fetchUsers = getUsersByCompany(selectedCompanyId)
-        .then(res => setUsers(res.data || []))
+        .then(res => setUsers(res.data.data || []))
         .catch(err => toast({ title: "Error", description: "Failed to load company users.", variant: "destructive" }))
         .finally(() => setLoadingUsers(false));
 

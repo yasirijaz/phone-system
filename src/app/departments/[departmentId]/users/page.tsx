@@ -8,32 +8,36 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/context/AuthContext";
 
 export default function DepartmentUsersPage() {
   const router = useRouter();
   const params = useParams();
+  const { user: authUser } = useAuth();
   const departmentId = Number(params.departmentId);
+  const companyId = authUser?.company_id;
 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (departmentId) {
+    if (departmentId && companyId) {
       fetchDepartmentUsers();
     }
-  }, [departmentId]);
+  }, [departmentId, companyId]);
 
   const fetchDepartmentUsers = async () => {
+    if (!companyId) return;
     try {
       setLoading(true);
-      const response = await getDepartmentUsers(departmentId);
+      const response = await getDepartmentUsers(companyId, departmentId);
       setUsers(Array.isArray(response.users) ? response.users : []);
     } catch (error) {
       toast({
