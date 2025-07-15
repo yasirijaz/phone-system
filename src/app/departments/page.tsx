@@ -8,6 +8,7 @@ import * as z from "zod";
 import type { Department } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { getDepartments, createDepartment, updateDepartment, deleteDepartment } from "@/services/departmentService";
+import { getUserDepartments } from "@/services/userService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +35,8 @@ export default function DepartmentsPage() {
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const { toast } = useToast();
 
+  const isAdmin = user?.role_id === 1 || user?.role_id === 2;
+
   const form = useForm<z.infer<typeof departmentSchema>>({
     resolver: zodResolver(departmentSchema),
     defaultValues: {
@@ -42,16 +45,21 @@ export default function DepartmentsPage() {
   });
 
   useEffect(() => {
-    if (user?.company_id) {
+    if (user) {
       fetchDepartments();
     }
   }, [user]);
 
   const fetchDepartments = async () => {
-    if (!user?.company_id) return;
+    if (!user) return;
+    setLoading(true);
     try {
-      setLoading(true);
-      const data = await getDepartments(user.company_id);
+      let data: Department[] = [];
+      if (isAdmin && user.company_id) {
+        data = await getDepartments(user.company_id);
+      } else if (user.role_id === 3) {
+        data = await getUserDepartments(user.id);
+      }
       setDepartments(Array.isArray(data) ? data : []);
     } catch (error) {
       toast({
@@ -82,7 +90,7 @@ export default function DepartmentsPage() {
   }
 
   const onSubmit = async (values: z.infer<typeof departmentSchema>) => {
-    if (!user?.company_id) return;
+    if (!user?.company_id || !isAdmin) return;
     try {
       if (editingDepartment) {
         await updateDepartment(editingDepartment.id, { name: values.name, company_id: user.company_id });
@@ -104,6 +112,7 @@ export default function DepartmentsPage() {
   };
   
   const handleDelete = async (id: number) => {
+    if (!isAdmin) return;
     try {
       await deleteDepartment(id);
       toast({ title: "Success", description: "Department deleted successfully." });
@@ -144,42 +153,44 @@ export default function DepartmentsPage() {
               <SidebarTrigger />
               <h1 className="text-xl font-bold">Departments</h1>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => handleDialogOpen()}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Department
-                </Button>
-              </DialogTrigger>
-              <DialogContent onInteractOutside={(e) => e.preventDefault()} className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>{editingDepartment ? "Edit" : "Add"} Department</DialogTitle>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Department Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. Sales" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button type="button" variant="secondary">Cancel</Button>
-                      </DialogClose>
-                      <Button type="submit">Save</Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+            {isAdmin && (
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button onClick={() => handleDialogOpen()}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add Department
+                    </Button>
+                </DialogTrigger>
+                <DialogContent onInteractOutside={(e) => e.preventDefault()} className="sm:max-w-[425px]">
+                    <DialogHeader>
+                    <DialogTitle>{editingDepartment ? "Edit" : "Add"} Department</DialogTitle>
+                    </DialogHeader>
+                    <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Department Name</FormLabel>
+                            <FormControl>
+                                <Input placeholder="e.g. Sales" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <DialogFooter>
+                        <DialogClose asChild>
+                            <Button type="button" variant="secondary">Cancel</Button>
+                        </DialogClose>
+                        <Button type="submit">Save</Button>
+                        </DialogFooter>
+                    </form>
+                    </Form>
+                </DialogContent>
+                </Dialog>
+            )}
           </header>
 
           <main className="flex-1 p-4 md:p-8 bg-muted/40">
@@ -195,54 +206,56 @@ export default function DepartmentsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {Array.isArray(departments) && departments.map((dept) => (
                         <TableRow key={dept.id}>
                           <TableCell className="font-medium">{dept.name}</TableCell>
-                          <TableCell className="text-right">
-                             <Button variant="ghost" size="icon" onClick={() => handleManageUsers(dept.id)}>
-                                <Users className="h-4 w-4" />
-                              </Button>
-                             <Button variant="ghost" size="icon" onClick={() => handleManagePhoneNumbers(dept.id)}>
-                                <Phone className="h-4 w-4" />
-                              </Button>
-                             <Button variant="ghost" size="icon" onClick={() => handleManageSettings(dept.id)}>
-                                <Settings className="h-4 w-4" />
-                              </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(dept)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                             <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This action cannot be undone. This will permanently delete the
-                                      department and all associated data from our servers.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(dept.id)}>
-                                      Continue
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                          </TableCell>
+                          {isAdmin && (
+                            <TableCell className="text-right">
+                                <Button variant="ghost" size="icon" onClick={() => handleManageUsers(dept.id)}>
+                                    <Users className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleManagePhoneNumbers(dept.id)}>
+                                    <Phone className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleManageSettings(dept.id)}>
+                                    <Settings className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(dept)}>
+                                <Edit className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                        This action cannot be undone. This will permanently delete the
+                                        department and all associated data from our servers.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDelete(dept.id)}>
+                                        Continue
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                        {(!Array.isArray(departments) || departments.length === 0) && (
                           <TableRow>
-                            <TableCell colSpan={2} className="text-center h-24">
+                            <TableCell colSpan={isAdmin ? 2 : 1} className="text-center h-24">
                               No departments found.
                             </TableCell>
                           </TableRow>
@@ -258,3 +271,5 @@ export default function DepartmentsPage() {
     </SidebarProvider>
   );
 }
+
+    

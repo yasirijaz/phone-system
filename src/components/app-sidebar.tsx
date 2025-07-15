@@ -32,6 +32,10 @@ export function AppSidebar() {
     router.push('/login');
   };
 
+  const isSuperAdmin = user?.role_id === 1;
+  const isCompanyAdmin = user?.role_id === 2;
+  const isRegularUser = user?.role_id === 3;
+
   return (
     <>
       <SidebarHeader>
@@ -46,16 +50,8 @@ export function AppSidebar() {
       <SidebarMenu>
         <SidebarGroup>
           <SidebarGroupLabel>MENU</SidebarGroupLabel>
-          {user?.role_id === 1 ? (
-             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname.startsWith('/companies')} tooltip="Companies">
-                <Link href="/companies">
-                  <Building />
-                  <span>Companies</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ) : (
+          
+          {(isCompanyAdmin || isRegularUser) && (
             <>
               <Collapsible open={isDashboardOpen} onOpenChange={setIsDashboardOpen}>
                 <SidebarMenuItem>
@@ -94,14 +90,28 @@ export function AppSidebar() {
               </SidebarMenuItem>
             </>
           )}
-           <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname.startsWith('/users')} tooltip="User Assignments">
-                <Link href="/users">
-                  <Users />
-                  <span>User Assignments</span>
+
+          {isSuperAdmin && (
+             <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/companies')} tooltip="Companies">
+                <Link href="/companies">
+                  <Building />
+                  <span>Companies</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+          )}
+
+           {(isSuperAdmin || isCompanyAdmin) && (
+             <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/users')} tooltip="User Assignments">
+                  <Link href="/users">
+                    <Users />
+                    <span>User Assignments</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+           )}
         </SidebarGroup>
         
         <SidebarGroup>
@@ -138,3 +148,5 @@ export function AppSidebar() {
     </>
   );
 }
+
+    
