@@ -2,19 +2,29 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import type { User } from "@/types";
 import { getDepartmentUsers } from "@/services/departmentService";
+import { getUsersByCompany, assignUserToDepartment } from "@/services/userService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, PlusCircle } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const assignmentSchema = z.object({
+  user_id: z.coerce.number({ required_error: "User is required." }).min(1, "User is required."),
+});
 
 export default function DepartmentUsersPage() {
   const router = useRouter();
@@ -23,32 +33,62 @@ export default function DepartmentUsersPage() {
   const departmentId = Number(params.departmentId);
   const companyId = authUser?.company_id;
 
-  const [users, setUsers] = useState<User[]>([]);
+  const [departmentUsers, setDepartmentUsers] = useState<User[]>([]);
+  const [allCompanyUsers, setAllCompanyUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  const form = useForm<z.infer<typeof assignmentSchema>>({
+    resolver: zodResolver(assignmentSchema),
+    defaultValues: { user_id: 0 },
+  });
+
   useEffect(() => {
     if (departmentId && companyId) {
-      fetchDepartmentUsers();
+      fetchAllData();
     }
   }, [departmentId, companyId]);
 
-  const fetchDepartmentUsers = async () => {
+  const fetchAllData = async () => {
     if (!companyId) return;
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await getDepartmentUsers(companyId, departmentId);
-      setUsers(Array.isArray(response.users) ? response.users : []);
+      const [deptUsersResponse, companyUsersResponse] = await Promise.all([
+        getDepartmentUsers(companyId, departmentId),
+        getUsersByCompany(companyId)
+      ]);
+      setDepartmentUsers(Array.isArray(deptUsersResponse.users) ? deptUsersResponse.users : []);
+      setAllCompanyUsers(Array.isArray(companyUsersResponse.data) ? companyUsersResponse.data : []);
     } catch (error) {
       toast({
-        title: "Error fetching users",
-        description: "Could not load department users. Please try again later.",
+        title: "Error fetching data",
+        description: "Could not load user data. Please try again later.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
+  
+  const onSubmit = async (values: z.infer<typeof assignmentSchema>) => {
+    if (!companyId) return;
+    try {
+        await assignUserToDepartment(companyId, departmentId, values.user_id);
+        toast({ title: "Success", description: "User assigned to department successfully." });
+        fetchAllData(); // Refresh both lists
+        form.reset({ user_id: 0 });
+    } catch (error: any) {
+        toast({
+            title: "Error assigning user",
+            description: error.response?.data?.message || "An unexpected error occurred.",
+            variant: "destructive",
+        });
+    }
+  };
+
+  const availableUsers = allCompanyUsers.filter(
+    (companyUser) => !departmentUsers.some((deptUser) => deptUser.id === companyUser.id)
+  );
 
   return (
     <SidebarProvider>
@@ -74,6 +114,51 @@ export default function DepartmentUsersPage() {
           </header>
 
           <main className="flex-1 p-4 md:p-8 space-y-8 bg-muted/40">
+             <Card>
+              <CardHeader>
+                <CardTitle>Add User to Department</CardTitle>
+                <CardDescription>Select a user from your company to add them to this department.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-end gap-4">
+                    <FormField
+                      control={form.control}
+                      name="user_id"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>User</FormLabel>
+                          <Select onValueChange={(value) => field.onChange(Number(value))} value={field.value === 0 ? "" : String(field.value)}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a user to add" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {availableUsers.length > 0 ? (
+                                availableUsers.map((user) => (
+                                  <SelectItem key={user.id} value={String(user.id)}>
+                                    {user.name} ({user.email})
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <SelectItem value="none" disabled>No available users to add</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit">
+                      <PlusCircle className="mr-2 h-4 w-4"/>
+                      Add User
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Users in Department</CardTitle>
@@ -92,7 +177,7 @@ export default function DepartmentUsersPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {Array.isArray(users) && users.map((u) => (
+                        {Array.isArray(departmentUsers) && departmentUsers.map((u) => (
                           <TableRow key={u.id}>
                             <TableCell className="font-medium">{u.name}</TableCell>
                             <TableCell>{u.email}</TableCell>
@@ -106,7 +191,7 @@ export default function DepartmentUsersPage() {
                             </TableCell>
                           </TableRow>
                         ))}
-                        {(!Array.isArray(users) || users.length === 0) && (
+                        {(!Array.isArray(departmentUsers) || departmentUsers.length === 0) && (
                           <TableRow><TableCell colSpan={4} className="text-center h-24">No users found for this department.</TableCell></TableRow>
                         )}
                       </TableBody>
