@@ -45,7 +45,7 @@ export default function DepartmentUsersPage() {
   });
 
   useEffect(() => {
-    if (departmentId && companyId) {
+    if (companyId && !isNaN(departmentId)) {
       fetchAllData();
     }
   }, [departmentId, companyId]);
@@ -55,7 +55,7 @@ export default function DepartmentUsersPage() {
     setLoading(true);
     try {
       const [deptUsersResponse, companyUsersResponse] = await Promise.all([
-        getDepartmentUsers(departmentId),
+        getDepartmentUsers(companyId, departmentId),
         getUsersByCompany(companyId)
       ]);
       setDepartmentUsers(Array.isArray(deptUsersResponse.users) ? deptUsersResponse.users : []);
