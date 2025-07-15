@@ -260,7 +260,7 @@ export default function EcommerceDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showIncomingCall, setShowIncomingCall] = useState(false);
-  const { device, connectTwilio, isConnecting, isDeviceReady } = useTwilio();
+  const { device, connectTwilio, isConnecting, isDeviceReady, isWorkerReady } = useTwilio();
 
   useEffect(() => {
     if(user?.role_id === 1) {
@@ -356,7 +356,7 @@ export default function EcommerceDashboard() {
             </div>
             <div className="flex items-center gap-4">
               <TwilioStatus />
-               {!(useTwilio().isDeviceReady && useTwilio().isWorkerReady) && (
+               {!(isDeviceReady && isWorkerReady) && (
                 <Button onClick={connectTwilio} disabled={isConnecting}>
                   <Zap className="mr-2 h-4 w-4" />
                   {isConnecting ? 'Connecting...' : 'Connect to Twilio'}
@@ -426,3 +426,4 @@ export default function EcommerceDashboard() {
     </SidebarProvider>
   );
 }
+
