@@ -131,7 +131,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       newDevice.on('registered', () => {
           console.log('Twilio Device registered');
-          setDevice(newDevice);
           setIsDeviceReady(true);
       });
       newDevice.on('unregistered', () => {
