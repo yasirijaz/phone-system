@@ -19,6 +19,13 @@ export interface User {
   company?: Company;
 }
 
+export interface ProfilePayload {
+  name: string;
+  email: string;
+  password?: string;
+  password_confirmation?: string;
+}
+
 export interface Company {
     id: number;
     name: string;
