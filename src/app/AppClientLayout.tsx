@@ -6,25 +6,24 @@ import IncomingCallModal from '@/components/incoming-call-modal';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const { 
-    incomingReservation, 
-    acceptReservation, 
-    rejectReservation, 
+    incomingCall, 
+    acceptCall, 
+    rejectCall,
   } = useTwilio();
 
-  const taskAttributes = incomingReservation?.task.attributes;
-  const callerName = taskAttributes?.from_name || "Unknown Caller";
-  const callerNumber = taskAttributes?.from || "";
+  const callerName = incomingCall?.parameters?.FriendlyName || "Unknown Caller";
+  const callerNumber = incomingCall?.parameters?.From || "";
 
   return (
     <>
       {children}
       <IncomingCallModal
-        isOpen={!!incomingReservation}
-        onClose={rejectReservation}
+        isOpen={!!incomingCall}
+        onClose={rejectCall}
         callerName={callerName}
         callerNumber={callerNumber}
-        onAccept={acceptReservation}
-        onReject={rejectReservation}
+        onAccept={acceptCall}
+        onReject={rejectCall}
       />
     </>
   );

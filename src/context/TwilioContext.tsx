@@ -2,8 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import * as TaskRouter from 'twilio-taskrouter';
-import type { Device } from '@twilio/voice-sdk';
+import type { Device, Connection } from '@twilio/voice-sdk';
 
 import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
@@ -11,15 +10,14 @@ import { useToast } from '@/hooks/use-toast';
 
 interface TwilioContextType {
   device: Device | null;
-  worker: TaskRouter.Worker | null;
+  connection: Connection | null;
   isDeviceReady: boolean;
-  isWorkerReady: boolean;
   isConnecting: boolean;
   error: string | null;
   connectTwilio: () => void;
-  incomingReservation: TaskRouter.Reservation | null;
-  acceptReservation: () => void;
-  rejectReservation: () => void;
+  incomingCall: Connection | null;
+  acceptCall: () => void;
+  rejectCall: () => void;
   clearIncomingCall: () => void;
 }
 
@@ -29,13 +27,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [device, setDevice] = useState<Device | null>(null);
-  const [worker, setWorker] = useState<TaskRouter.Worker | null>(null);
+  const [connection, setConnection] = useState<Connection | null>(null);
   const [isDeviceReady, setIsDeviceReady] = useState(false);
-  const [isWorkerReady, setIsWorkerReady] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
-  const [incomingReservation, setIncomingReservation] = useState<TaskRouter.Reservation | null>(null);
+  const [incomingCall, setIncomingCall] = useState<Connection | null>(null);
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -64,118 +61,95 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       if (typeof deviceToken !== 'string') {
         throw new Error('Invalid token format received from server.');
       }
-
-      if (device) {
-        device.disconnectAll();
-        device.destroy();
-        setDevice(null);
-        setIsDeviceReady(false);
-      }
-      if (worker) {
-        worker.disconnect();
-        setWorker(null);
-        setIsWorkerReady(false);
-      }
-
-      const newWorker = new TaskRouter.Worker(deviceToken, {
-        closeExistingSessions: true,
-      });
-      console.log('Twilio Worker created:', newWorker);
-      newWorker.on('ready', (readyWorker: TaskRouter.Worker) => {
-        console.log('Twilio Worker ready:', readyWorker.sid);
-        setIsWorkerReady(true);
-        setWorker(readyWorker);
-      });
-      newWorker.on('disconnected', () => {
-        console.log('Twilio Worker disconnected');
-        setIsWorkerReady(false);
-      });
-      newWorker.on('error', (err: any) => {
-        console.error('Twilio Worker Error:', err);
-        setError(`Worker Error: ${err.message}`);
-        setIsWorkerReady(false);
-      });
-      newWorker.on('activityUpdated', (activity: any) => {
-        console.log('Worker activity updated:', activity);
-      });
-      newWorker.on('reservation.created', (reservation: TaskRouter.Reservation) => {
-        console.log('New reservation created:', reservation.sid, reservation.task.attributes);
-        setIncomingReservation(reservation);
-      });
       
       const newDevice = new twilio.Device(deviceToken, {
         closeExistingSessions: true,
         codecPreferences: ['opus', 'pcmu'],
         debug: true,
       });
-      
-      setDevice(newDevice);
 
       newDevice.on('registered', () => {
           console.log('Twilio Device registered');
+          setDevice(newDevice);
           setIsDeviceReady(true);
       });
+
       newDevice.on('unregistered', () => {
         console.log('Twilio Device unregistered');
         setIsDeviceReady(false);
+        setDevice(null);
       });
+
       newDevice.on('error', (err: any) => {
         console.error('Twilio Device Error:', err);
         setError(`Device Error: ${err.message}`);
         setIsDeviceReady(false);
       });
 
+      newDevice.on('incoming', (conn: Connection) => {
+        console.log('Incoming connection from ' + conn.parameters.From);
+        setIncomingCall(conn);
+      });
+      
+      newDevice.on('connect', (conn: Connection) => {
+        console.log('Successfully established call!');
+        setConnection(conn);
+        setIncomingCall(null);
+      });
+
+      newDevice.on('disconnect', () => {
+        console.log('Call disconnected.');
+        setConnection(null);
+      });
+
       newDevice.register();
+
     } catch (err: any) {
       console.error('Twilio setup failed:', err);
       setError('Failed to initialize Twilio. Please try again later.');
     } finally {
       setIsConnecting(false);
     }
-  }, [twilio, user, isConnecting, device, worker]);
+  }, [twilio, user, isConnecting]);
   
-  const acceptReservation = () => {
-    if (!incomingReservation) return;
-    console.log(`Accepting reservation: ${incomingReservation.sid}`);
-    incomingReservation.accept();
+  const acceptCall = () => {
+    if (!incomingCall) return;
+    console.log(`Accepting incoming call`);
+    incomingCall.accept();
     toast({ title: "Call Accepted" });
-    setIncomingReservation(null);
+    setConnection(incomingCall);
+    setIncomingCall(null);
   }
-  const rejectReservation = () => {
-    if (!incomingReservation) return;
-    console.log(`Rejecting reservation: ${incomingReservation.sid}`);
-    incomingReservation.reject();
+
+  const rejectCall = () => {
+    if (!incomingCall) return;
+    console.log(`Rejecting incoming call`);
+    incomingCall.reject();
     toast({ title: "Call Rejected" });
-    setIncomingReservation(null);
+    setIncomingCall(null);
   };
 
   const clearIncomingCall = () => {
-    setIncomingReservation(null);
+    setIncomingCall(null);
   };
 
   useEffect(() => {
     return () => {
-      if (device) {
-        device.disconnectAll();
-        device.destroy();
-      }
-      if (worker) {
-        worker.disconnect();
-      }
+      device?.disconnectAll();
+      device?.destroy();
     };
-  }, [device, worker]);
+  }, [device]);
 
   const value = {
     device,
-    worker,
+    connection,
     isDeviceReady,
-    isWorkerReady,
     isConnecting,
     error,
     connectTwilio,
-    incomingReservation,
-    acceptReservation,
-    rejectReservation,
+    incomingCall,
+    acceptCall,
+    rejectCall,
     clearIncomingCall,
   };
   return <TwilioContext.Provider value={value}>{children}</TwilioContext.Provider>;
