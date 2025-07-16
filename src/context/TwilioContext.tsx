@@ -1,8 +1,9 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode, useRef } from 'react';
 import type { Device, Connection } from '@twilio/voice-sdk';
+import type { Worker as TwilioWorker } from 'twilio-taskrouter';
 
 import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
@@ -11,7 +12,9 @@ import { useToast } from '@/hooks/use-toast';
 interface TwilioContextType {
   device: Device | null;
   connection: Connection | null;
+  worker: TwilioWorker | null;
   isDeviceReady: boolean;
+  isWorkerReady: boolean;
   isConnecting: boolean;
   error: string | null;
   connectTwilio: () => void;
@@ -19,6 +22,9 @@ interface TwilioContextType {
   acceptCall: () => void;
   rejectCall: () => void;
   clearIncomingCall: () => void;
+  incomingReservation: any | null;
+  acceptReservation: () => void;
+  rejectReservation: () => void;
 }
 
 const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
@@ -26,19 +32,24 @@ const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
 export function TwilioProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [device, setDevice] = useState<Device | null>(null);
+  const deviceRef = useRef<Device | null>(null);
   const [connection, setConnection] = useState<Connection | null>(null);
+  const [worker, setWorker] = useState<TwilioWorker | null>(null);
   const [isDeviceReady, setIsDeviceReady] = useState(false);
+  const [isWorkerReady, setIsWorkerReady] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
+
   const [incomingCall, setIncomingCall] = useState<Connection | null>(null);
+  const [incomingReservation, setIncomingReservation] = useState<any | null>(null);
 
   useEffect(() => {
     const loadTwilio = async () => {
       try {
-        const { Device } = await import('@twilio/voice-sdk');
-        setTwilio({ Device });
+        const voice = await import('@twilio/voice-sdk');
+        const taskrouter = await import('twilio-taskrouter');
+        setTwilio({ Device: voice.Device, Worker: taskrouter.Worker });
       } catch (e) {
         console.error("Failed to load twilio modules", e)
       }
@@ -55,12 +66,15 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      const deviceTokenRes = await axios.post('/api/twilio/token');
+      const [deviceTokenRes, workerTokenRes] = await Promise.all([
+          axios.post('/api/twilio/token'),
+          axios.post('/api/twilio/worker-token')
+      ]);
       const deviceToken = deviceTokenRes.data.data.token;
+      const workerToken = workerTokenRes.data.token;
 
-      if (typeof deviceToken !== 'string') {
-        throw new Error('Invalid token format received from server.');
-      }
+      if (typeof deviceToken !== 'string') throw new Error('Invalid device token format received from server.');
+      if (typeof workerToken !== 'string') throw new Error('Invalid worker token format received from server.');
       
       const newDevice = new twilio.Device(deviceToken, {
         closeExistingSessions: true,
@@ -68,16 +82,17 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         debug: true,
       });
 
+      deviceRef.current = newDevice;
+
       newDevice.on('registered', () => {
           console.log('Twilio Device registered');
-          setDevice(newDevice);
           setIsDeviceReady(true);
       });
 
       newDevice.on('unregistered', () => {
         console.log('Twilio Device unregistered');
         setIsDeviceReady(false);
-        setDevice(null);
+        deviceRef.current = null;
       });
 
       newDevice.on('error', (err: any) => {
@@ -95,6 +110,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.log('Successfully established call!');
         setConnection(conn);
         setIncomingCall(null);
+        setIncomingReservation(null);
       });
 
       newDevice.on('disconnect', () => {
@@ -103,6 +119,19 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       });
 
       newDevice.register();
+
+      const newWorker = new twilio.Worker(workerToken);
+
+      newWorker.on('ready', (worker: TwilioWorker) => {
+          console.log(`Worker ${worker.sid} is ready`);
+          setWorker(worker);
+          setIsWorkerReady(true);
+      });
+
+      newWorker.on('reservation.created', (reservation: any) => {
+          console.log(`Reservation ${reservation.sid} created`);
+          setIncomingReservation(reservation);
+      });
 
     } catch (err: any) {
       console.error('Twilio setup failed:', err);
@@ -128,22 +157,44 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     toast({ title: "Call Rejected" });
     setIncomingCall(null);
   };
+  
+  const acceptReservation = () => {
+      if (!incomingReservation) return;
+      console.log(`Accepting reservation ${incomingReservation.sid}`);
+      // This is a simplified accept. A real-world scenario might involve TwiML to connect the call.
+      // For now, we'll just dequeue, which accepts the task.
+      incomingReservation.dequeue();
+      toast({ title: "Reservation Accepted" });
+      setIncomingReservation(null);
+  };
+  
+  const rejectReservation = () => {
+      if (!incomingReservation) return;
+      console.log(`Rejecting reservation ${incomingReservation.sid}`);
+      incomingReservation.reject();
+      toast({ title: "Reservation Rejected" });
+      setIncomingReservation(null);
+  };
 
   const clearIncomingCall = () => {
     setIncomingCall(null);
   };
 
   useEffect(() => {
+    const currentDevice = deviceRef.current;
     return () => {
-      device?.disconnectAll();
-      device?.destroy();
+      currentDevice?.disconnectAll();
+      currentDevice?.destroy();
+      worker?.disconnect();
     };
-  }, [device]);
+  }, [worker]);
 
   const value = {
-    device,
+    device: deviceRef.current,
     connection,
+    worker,
     isDeviceReady,
+    isWorkerReady,
     isConnecting,
     error,
     connectTwilio,
@@ -151,7 +202,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     acceptCall,
     rejectCall,
     clearIncomingCall,
+    incomingReservation,
+    acceptReservation,
+    rejectReservation
   };
+
   return <TwilioContext.Provider value={value}>{children}</TwilioContext.Provider>;
 }
 
