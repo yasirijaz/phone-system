@@ -25,3 +25,8 @@ export const updateCompany = async (id: number, companyData: { name: string, sub
 export const deleteCompany = async (id: number): Promise<void> => {
   await axios.delete(`/api/companies/${id}`);
 };
+
+export const approveCompany = async (id: number): Promise<Company> => {
+  const response = await axios.post(`/api/companies/${id}/approve`);
+  return response.data;
+};

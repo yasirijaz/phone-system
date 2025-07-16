@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import type { Company, PaginatedResponse } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { getCompanies, createCompany, updateCompany, deleteCompany } from "@/services/companyService";
+import { getCompanies, createCompany, updateCompany, deleteCompany, approveCompany } from "@/services/companyService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Edit, Trash2, Users, Building2, ChevronLeft, ChevronRight, Briefcase, Settings, UserCog } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Users, Building2, ChevronLeft, ChevronRight, Briefcase, Settings, UserCog, CheckCircle } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from 'next/navigation';
@@ -129,6 +129,20 @@ export default function CompaniesPage() {
       });
     }
   }
+
+  const handleApprove = async (id: number) => {
+    try {
+      await approveCompany(id);
+      toast({ title: "Success", description: "Company approved successfully." });
+      fetchCompanies(currentPage);
+    } catch (error) {
+      toast({
+        title: "Error approving company",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
+  };
   
   const handleManageUsers = (companyId: number) => {
     router.push(`/companies/${companyId}/users`);
@@ -298,6 +312,11 @@ export default function CompaniesPage() {
                               <Badge variant={company.status === 'active' ? 'default' : 'secondary'}>{company.status}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
+                              {company.status === 'pending' && (
+                                <Button variant="ghost" size="icon" onClick={() => handleApprove(company.id)}>
+                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                </Button>
+                              )}
                               <Button variant="ghost" size="icon" onClick={() => handleManageUsers(company.id)}>
                                 <Users className="h-4 w-4" />
                               </Button>
