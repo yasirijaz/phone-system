@@ -11,14 +11,13 @@ import { useToast } from '@/hooks/use-toast';
 
 interface TwilioContextType {
   device: Device | null;
-  worker: Worker | null;
+  worker: TaskRouter.Worker | null;
   isDeviceReady: boolean;
   isWorkerReady: boolean;
   isConnecting: boolean;
   error: string | null;
   connectTwilio: () => void;
   incomingReservation: TaskRouter.Reservation | null;
-  incomingCall: any; // Adjust type as needed
   acceptReservation: () => void;
   rejectReservation: () => void;
   clearIncomingCall: () => void;
@@ -30,16 +29,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [device, setDevice] = useState<Device | null>(null);
-  const [worker, setWorker] = useState<Worker | null>(null);
+  const [worker, setWorker] = useState<TaskRouter.Worker | null>(null);
   const [isDeviceReady, setIsDeviceReady] = useState(false);
   const [isWorkerReady, setIsWorkerReady] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
   const [incomingReservation, setIncomingReservation] = useState<TaskRouter.Reservation | null>(null);
-  const [incomingCall, setIncomingCall] = useState<any>(null);
-
-
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -62,11 +58,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      // Fetch tokens
-      // const formData = new FormData();
-      // formData.append('user_id', '7');
-      // formData.append('identity', 'Tech');
-      // const deviceTokenRes = await axios.post('/api/phone/getToken', formData);
       const deviceTokenRes = await axios.post('/api/twilio/token');
       const deviceToken = deviceTokenRes.data.data.token;
 
@@ -74,7 +65,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         throw new Error('Invalid token format received from server.');
       }
 
-      // Cleanup existing connections before starting new ones
       if (device) {
         device.disconnectAll();
         device.destroy();
@@ -82,17 +72,16 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         setIsDeviceReady(false);
       }
       if (worker) {
-        (worker as any).disconnect();
+        worker.disconnect();
         setWorker(null);
         setIsWorkerReady(false);
       }
 
       const newWorker = new TaskRouter.Worker(deviceToken, {
         closeExistingSessions: true,
-        // debug: true, // Uncomment for debugging
       });
       console.log('Twilio Worker created:', newWorker);
-      newWorker.on('ready', (readyWorker: any) => {
+      newWorker.on('ready', (readyWorker: TaskRouter.Worker) => {
         console.log('Twilio Worker ready:', readyWorker.sid);
         setIsWorkerReady(true);
         setWorker(readyWorker);
@@ -109,34 +98,20 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       newWorker.on('activityUpdated', (activity: any) => {
         console.log('Worker activity updated:', activity);
       });
-      newWorker.on('reservationCreated', (reservation: TaskRouter.Reservation) => {
+      newWorker.on('reservation.created', (reservation: TaskRouter.Reservation) => {
         console.log('New reservation created:', reservation.sid, reservation.task.attributes);
         setIncomingReservation(reservation);
       });
-      // newWorker.on("reservation.accepted", function(reservation: TaskRouter.Reservation) {
-      //     console.log(reservation.task.attributes)      // {foo: 'bar', baz: 'bang' }
-      //     console.log(reservation.task.priority)        // 1
-      //     console.log(reservation.task.age)             // 300
-      //     console.log(reservation.task.sid)             // WTxxx
-      //     console.log(reservation.sid)                  // WRxxx
-      // });
-      // newWorker.on("reservationAccepted", function(reservation: TaskRouter.Reservation) {
-      //     console.log(reservation.task.attributes)      // {foo: 'bar', baz: 'bang' }
-      //     console.log(reservation.task.priority)        // 1
-      //     console.log(reservation.task.age)             // 300
-      //     console.log(reservation.task.sid)             // WTxxx
-      //     console.log(reservation.sid)                  // WRxxx
-      // });
-
-      // Setup Device
+      
       const newDevice = new twilio.Device(deviceToken, {
         closeExistingSessions: true,
         codecPreferences: ['opus', 'pcmu'],
         debug: true,
       });
-      newDevice.register();
+
       newDevice.on('registered', () => {
           console.log('Twilio Device registered');
+          setDevice(newDevice);
           setIsDeviceReady(true);
       });
       newDevice.on('unregistered', () => {
@@ -149,10 +124,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         setIsDeviceReady(false);
       });
 
-      newDevice.on('incoming', (connection: any) => {
-        setIncomingCall(connection);
-      });
-
+      newDevice.register();
     } catch (err: any) {
       console.error('Twilio setup failed:', err);
       setError('Failed to initialize Twilio. Please try again later.');
@@ -160,34 +132,34 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       setIsConnecting(false);
     }
   }, [twilio, user, isConnecting, device, worker]);
+  
   const acceptReservation = () => {
-    if (!incomingCall) return;
-    console.log(`Accepting reservation: ${incomingCall.sid}`);
-    incomingCall.accept();
+    if (!incomingReservation) return;
+    console.log(`Accepting reservation: ${incomingReservation.sid}`);
+    incomingReservation.accept();
     toast({ title: "Call Accepted" });
-    setIncomingCall(null);
+    setIncomingReservation(null);
   }
   const rejectReservation = () => {
-    if (!incomingCall) return;
-    console.log(`Rejecting reservation: ${incomingCall.sid}`);
-    incomingCall.reject();
+    if (!incomingReservation) return;
+    console.log(`Rejecting reservation: ${incomingReservation.sid}`);
+    incomingReservation.reject();
     toast({ title: "Call Rejected" });
-    setIncomingCall(null);
+    setIncomingReservation(null);
   };
 
   const clearIncomingCall = () => {
-    setIncomingCall(null);
+    setIncomingReservation(null);
   };
 
   useEffect(() => {
-    // Cleanup on unmount or user change
     return () => {
       if (device) {
         device.disconnectAll();
         device.destroy();
       }
       if (worker) {
-        (worker as any).disconnect();
+        worker.disconnect();
       }
     };
   }, [device, worker]);
@@ -201,7 +173,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     error,
     connectTwilio,
     incomingReservation,
-    incomingCall,
     acceptReservation,
     rejectReservation,
     clearIncomingCall,
