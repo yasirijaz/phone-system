@@ -5,10 +5,11 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import type { User, Company } from "@/types";
+import type { User, Company, Department, Assignment } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { getCompany } from "@/services/companyService";
-import { getUsersByCompany, addUserToCompany } from "@/services/userService";
+import { getDepartments } from "@/services/departmentService";
+import { getUsersByCompany, addUserToCompany, assignUserToDepartment, removeUserFromDepartment } from "@/services/userService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,12 +24,18 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
 
 const userSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email("Invalid email address."),
   password: z.string().min(6, "Password must be at least 6 characters."),
   role_id: z.coerce.number({ required_error: "Role is required."}).min(1, "Role is required."),
+});
+
+const assignmentSchema = z.object({
+  department_id: z.coerce.number().min(1, "Please select a department."),
 });
 
 export default function ManageUsersPage() {
@@ -39,36 +46,46 @@ export default function ManageUsersPage() {
 
   const [company, setCompany] = useState<Company | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const { toast } = useToast();
 
-  const form = useForm<z.infer<typeof userSchema>>({
+  const userForm = useForm<z.infer<typeof userSchema>>({
     resolver: zodResolver(userSchema),
     defaultValues: { name: "", email: "", password: "" },
   });
 
+  const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({
+    resolver: zodResolver(assignmentSchema),
+  });
+
   useEffect(() => {
-    if (authUser?.role_id !== 1 || !companyId) {
+    if ((authUser?.role_id !== 1 && authUser?.role_id !== 2) || !companyId) {
       router.replace('/');
       return;
     }
-    fetchCompanyAndUsers();
+    fetchData();
   }, [authUser, companyId, router]);
 
-  const fetchCompanyAndUsers = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const [companyData, usersResponse] = await Promise.all([
+      const [companyData, usersResponse, departmentsResponse] = await Promise.all([
         getCompany(companyId),
-        getUsersByCompany(companyId)
+        getUsersByCompany(companyId),
+        getDepartments(companyId)
       ]);
       setCompany(companyData);
       setUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
+      setDepartments(Array.isArray(departmentsResponse) ? departmentsResponse : []);
     } catch (error) {
       toast({
         title: "Error fetching data",
-        description: "Could not load company and user data. Please try again later.",
+        description: "Could not load company and user data.",
         variant: "destructive",
       });
     } finally {
@@ -76,17 +93,29 @@ export default function ManageUsersPage() {
     }
   };
   
-  const handleDialogClose = () => {
-    setIsDialogOpen(false);
-    form.reset();
+  const handleUserDialogClose = () => {
+    setIsUserDialogOpen(false);
+    userForm.reset();
   }
+  
+  const handleAssignmentDialogClose = () => {
+    setIsAssignmentDialogOpen(false);
+    assignmentForm.reset();
+    setSelectedUser(null);
+  };
+  
+  const handleOpenAssignmentDialog = (user: User) => {
+    setSelectedUser(user);
+    setIsAssignmentDialogOpen(true);
+  };
 
-  const onSubmit = async (values: z.infer<typeof userSchema>) => {
+
+  const onUserSubmit = async (values: z.infer<typeof userSchema>) => {
     try {
       await addUserToCompany(companyId, values);
       toast({ title: "Success", description: "User added successfully." });
-      fetchCompanyAndUsers();
-      handleDialogClose();
+      fetchData();
+      handleUserDialogClose();
     } catch (error: any) {
         const errorMessage = error.response?.data?.message || "An unexpected error occurred.";
         toast({
@@ -96,8 +125,20 @@ export default function ManageUsersPage() {
         });
     }
   };
+  
+  const onAssignmentSubmit = async (values: z.infer<typeof assignmentSchema>) => {
+    if (!selectedUser) return;
+    try {
+      await assignUserToDepartment(companyId, values.department_id, selectedUser.id);
+      toast({ title: "Success", description: "User assigned to department." });
+      handleAssignmentDialogClose();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.response?.data?.message || "Failed to assign user.", variant: "destructive" });
+    }
+  };
+  
 
-  if (authUser?.role_id !== 1) {
+  if (authUser?.role_id !== 1 && authUser?.role_id !== 2) {
     return null;
   }
   
@@ -122,28 +163,28 @@ export default function ManageUsersPage() {
                 </h1>
               </div>
             </div>
-             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+             <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => setIsDialogOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Button onClick={() => setIsUserDialogOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                   <PlusCircle className="mr-2 h-4 w-4" /> Add User
                 </Button>
               </DialogTrigger>
-              <DialogContent onInteractOutside={(e) => e.preventDefault()} className="sm:max-w-[425px]">
+              <DialogContent onInteractOutside={handleUserDialogClose} className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>Add New User</DialogTitle>
                 </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                     <FormField control={form.control} name="name" render={({ field }) => (
+                <Form {...userForm}>
+                  <form onSubmit={userForm.handleSubmit(onUserSubmit)} className="space-y-4">
+                     <FormField control={userForm.control} name="name" render={({ field }) => (
                         <FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="e.g. John Doe" {...field} /></FormControl><FormMessage /></FormItem>
                      )}/>
-                     <FormField control={form.control} name="email" render={({ field }) => (
+                     <FormField control={userForm.control} name="email" render={({ field }) => (
                         <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="e.g. john@acme.com" {...field} /></FormControl><FormMessage /></FormItem>
                      )}/>
-                     <FormField control={form.control} name="password" render={({ field }) => (
+                     <FormField control={userForm.control} name="password" render={({ field }) => (
                         <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" placeholder="******" {...field} /></FormControl><FormMessage /></FormItem>
                      )}/>
-                     <FormField control={form.control} name="role_id" render={({ field }) => (
+                     <FormField control={userForm.control} name="role_id" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Role</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={String(field.value)}>
@@ -188,7 +229,7 @@ export default function ManageUsersPage() {
                         <Briefcase className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{company?.departments?.length || 0}</div>
+                        <div className="text-2xl font-bold">{departments?.length || 0}</div>
                         <p className="text-xs text-muted-foreground">configured</p>
                     </CardContent>
                 </Card>
@@ -221,6 +262,7 @@ export default function ManageUsersPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
+                              <Button variant="ghost" size="icon" onClick={() => handleOpenAssignmentDialog(u)}><Briefcase className="h-4 w-4" /></Button>
                               <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
                               <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
                             </TableCell>
@@ -237,7 +279,49 @@ export default function ManageUsersPage() {
             </Card>
           </main>
         </div>
+        
+        <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+          <DialogContent onInteractOutside={handleAssignmentDialogClose}>
+            <DialogHeader>
+              <DialogTitle>Assign Department for {selectedUser?.name}</DialogTitle>
+              <DialogDescription>Select a department to assign this user to.</DialogDescription>
+            </DialogHeader>
+            <Form {...assignmentForm}>
+              <form onSubmit={assignmentForm.handleSubmit(onAssignmentSubmit)} className="space-y-4">
+                <FormField
+                  control={assignmentForm.control}
+                  name="department_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue="">
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a department" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept.id} value={String(dept.id)}>{dept.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="secondary" onClick={handleAssignmentDialogClose}>Cancel</Button>
+                  <Button type="submit">Assign</Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
       </SidebarInset>
     </SidebarProvider>
   );
 }
+
+    
