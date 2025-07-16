@@ -3,24 +3,26 @@
 
 import { useTwilio } from '@/context/TwilioContext';
 import IncomingCallModal from '@/components/incoming-call-modal';
+import { clear } from 'console';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const { 
     incomingReservation, 
+    incomingCall,
     acceptReservation, 
     rejectReservation, 
-    clearIncomingReservation 
+    clearIncomingCall 
   } = useTwilio();
 
-  const callerName = incomingReservation?.task?.attributes?.from_name || "Unknown Caller";
-  const callerNumber = incomingReservation?.task?.attributes?.from || "";
+  const callerName = incomingCall?.from_name || "Unknown Caller";
+  const callerNumber = incomingCall?.from || incomingCall?.From || "";
 
   return (
     <>
       {children}
       <IncomingCallModal
-        isOpen={!!incomingReservation}
-        onClose={clearIncomingReservation}
+        isOpen={!!incomingCall}
+        onClose={clearIncomingCall}
         callerName={callerName}
         callerNumber={callerNumber}
         onAccept={acceptReservation}
