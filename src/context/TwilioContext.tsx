@@ -144,6 +144,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setIsDeviceReady(false);
       });
       
+      newDevice.register();
+      
     } catch (err: any) {
         console.error('Twilio setup failed:', err);
         setError('Failed to initialize Twilio. Please try again later.');
