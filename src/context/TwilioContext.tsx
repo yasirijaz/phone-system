@@ -66,17 +66,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      const [deviceTokenRes, workerTokenRes] = await Promise.all([
-          axios.post('/api/twilio/token'),
-          axios.post('/api/twilio/worker-token')
-      ]);
-      const deviceToken = deviceTokenRes.data.data.token;
-      const workerToken = workerTokenRes.data.token;
-
-      if (typeof deviceToken !== 'string') throw new Error('Invalid device token format received from server.');
-      if (typeof workerToken !== 'string') throw new Error('Invalid worker token format received from server.');
+      const tokenRes = await axios.post('/api/twilio/token');
+      const token = tokenRes.data.data.token;
       
-      const newDevice = new twilio.Device(deviceToken, {
+      if (typeof token !== 'string') throw new Error('Invalid token format received from server.');
+      
+      const newDevice = new twilio.Device(token, {
         closeExistingSessions: true,
         codecPreferences: ['opus', 'pcmu'],
         debug: true,
@@ -120,7 +115,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       newDevice.register();
 
-      const newWorker = new twilio.Worker(workerToken);
+      const newWorker = new twilio.Worker(token);
 
       newWorker.on('ready', (worker: TwilioWorker) => {
           console.log(`Worker ${worker.sid} is ready`);
