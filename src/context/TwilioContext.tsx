@@ -108,7 +108,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         codecPreferences: ['opus', 'pcmu'],
         debug: true,
       });
-
+      
+      setDevice(newDevice);
 
       newDevice.on('registered', () => {
           console.log('Twilio Device registered');
