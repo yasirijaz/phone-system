@@ -96,6 +96,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setError(`Worker Error: ${err.message}`);
           setIsWorkerReady(false);
       });
+      newWorker.on('activityUpdated', (activity: any) => {
+          console.log('Worker activity updated:', activity);  
+      });
+      newWorker.on('reservationCreated', (reservation: any) => {
+          console.log('New reservation created:', reservation.sid);
+      });
 
       // Setup Device
       const newDevice = new twilio.Device(deviceToken, {
