@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [subdomain, setSubdomain] = useState('');
   const router = useRouter();
   const { toast } = useToast();
   const dispatch = useAppDispatch();
@@ -40,6 +41,7 @@ export default function RegisterPage() {
       email,
       password,
       password_confirmation: passwordConfirmation,
+      subdomain: subdomain
     }));
   };
 
@@ -89,6 +91,24 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
               />
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="subdomain">Domain</Label>
+                <div className="flex items-center">
+                  <Input
+                    id="subdomain"
+                    type="text"
+                    placeholder="your-company"
+                    required
+                    value={subdomain}
+                    onChange={(e) => setSubdomain(e.target.value)}
+                    disabled={loading}
+                    className="rounded-r-none focus:z-10"
+                  />
+                  <span className="inline-flex items-center px-3 text-sm text-gray-500 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400 h-10">
+                    .wsh.com
+                  </span>
+                </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
