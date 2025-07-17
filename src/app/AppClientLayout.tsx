@@ -7,15 +7,17 @@ import ActiveCallModal from '@/components/active-call-modal';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const { 
-    incomingReservation,
+    connection,
     acceptCall, 
     rejectCall,
-    connection,
     hangUp
   } = useTwilio();
 
-  const callerName = incomingReservation?.task.attributes.from_name || "Unknown Caller";
-  const callerNumber = incomingReservation?.task.attributes.from || "";
+  const isIncomingCall = connection && (connection.status() === 'pending' || connection.status() === 'ringing');
+  const isActiveCall = connection && connection.status() === 'open';
+
+  const callerName = connection?.parameters?.FriendlyName || "Unknown Caller";
+  const callerNumber = connection?.parameters?.From || "";
   
   const activeCallContact = connection?.parameters?.FriendlyName || connection?.parameters?.To || "Unknown";
 
@@ -23,7 +25,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     <>
       {children}
       <IncomingCallModal
-        isOpen={!!incomingReservation}
+        isOpen={!!isIncomingCall}
         onClose={rejectCall}
         callerName={callerName}
         callerNumber={callerNumber}
@@ -31,7 +33,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         onReject={rejectCall}
       />
        <ActiveCallModal
-        isOpen={!!connection}
+        isOpen={!!isActiveCall}
         contactName={activeCallContact}
         onHangUp={hangUp}
       />

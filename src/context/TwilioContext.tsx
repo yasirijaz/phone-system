@@ -18,10 +18,8 @@ interface TwilioContextType {
   isConnecting: boolean;
   error: string | null;
   connectTwilio: () => void;
-  incomingReservation: any | null;
   acceptCall: () => void;
   rejectCall: () => void;
-  clearIncomingCall: () => void;
   hangUp: () => void;
 }
 
@@ -38,10 +36,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
-
-  const [incomingReservation, setIncomingReservation] = useState<any | null>(null);
-  const [activeTaskSid, setActiveTaskSid] = useState<string | null>(null);
-
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -95,26 +89,26 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         setIsDeviceReady(false);
       });
       
-      newDevice.on('connect', (conn: Connection) => {
-        console.log('Successfully established call!');
+      const handleIncomingCall = (conn: Connection) => {
+        console.log('Incoming call received:', conn);
         setConnection(conn);
-        setIncomingReservation(null);
 
-         conn.on('disconnect', () => {
-            console.log('Call disconnected.');
-            setConnection(null);
-            
-            if (workerRef.current && activeTaskSid) {
-                workerRef.current.completeTask(activeTaskSid, (error, completedTask) => {
-                    if (error) {
-                        console.error("Error completing task:", error);
-                        return;
-                    }
-                    console.log("Task completed:", completedTask.assignmentStatus);
-                    setActiveTaskSid(null);
-                });
-            }
+        conn.on('disconnect', () => {
+          console.log('Call disconnected.');
+          setConnection(null);
         });
+
+        conn.on('reject', () => {
+          console.log('Call rejected.');
+          setConnection(null);
+        });
+      };
+      
+      newDevice.on('incoming', handleIncomingCall);
+
+      newDevice.on('connect', (conn: Connection) => {
+        console.log('Successfully established call!', conn);
+        setConnection(conn);
       });
 
       newDevice.on('disconnect', () => {
@@ -122,7 +116,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         setConnection(null);
       });
       
-      newDevice.register();
+      await newDevice.register();
 
       const newWorker = new twilio.Worker(token);
       workerRef.current = newWorker;
@@ -132,52 +126,36 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setIsWorkerReady(true);
       });
 
-      newWorker.on('reservation.created', (reservation: any) => {
-          console.log(`Reservation ${reservation.sid} created`, reservation);
-          setIncomingReservation(reservation);
-      });
-
     } catch (err: any) {
       console.error('Twilio setup failed:', err);
       setError('Failed to initialize Twilio. Please try again later.');
     } finally {
       setIsConnecting(false);
     }
-  }, [twilio, user, isConnecting, activeTaskSid]);
+  }, [twilio, user, isConnecting]);
   
   const acceptCall = () => {
-    if (incomingReservation) {
-        console.log(`Accepting call via reservation: ${incomingReservation.sid}`);
-        
-        setActiveTaskSid(incomingReservation.task.sid);
-
-        incomingReservation.conference({
-            endConferenceOnExit: true,
-        });
-
+    if (connection) {
+        console.log(`Accepting call`);
+        connection.accept();
         toast({ title: "Call Accepted" });
     }
   }
 
   const rejectCall = () => {
-    if (incomingReservation) {
-        console.log(`Rejecting reservation: ${incomingReservation.sid}`);
-        incomingReservation.reject();
+    if (connection) {
+        console.log(`Rejecting call`);
+        connection.reject();
         toast({ title: "Call Rejected" });
-        setIncomingReservation(null);
+        setConnection(null);
     }
-  };
-  
-
-  const clearIncomingCall = () => {
-    setIncomingReservation(null);
   };
 
   const hangUp = () => {
     if (connection) {
       connection.disconnect();
+      setConnection(null); // Close modal immediately for better UX
       toast({ title: "Call Ended" });
-      setConnection(null);
     }
   };
 
@@ -200,10 +178,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     isConnecting,
     error,
     connectTwilio,
-    incomingReservation,
     acceptCall,
     rejectCall,
-    clearIncomingCall,
     hangUp
   };
 
