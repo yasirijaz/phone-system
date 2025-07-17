@@ -50,7 +50,6 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp }: Activ
             </div>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold truncate">{contactName}</p>
             <p className="text-muted-foreground text-lg">{formatTime(duration)}</p>
           </div>
         </div>
