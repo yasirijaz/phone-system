@@ -25,6 +25,7 @@ interface TwilioContextType {
   incomingReservation: any | null;
   acceptReservation: () => void;
   rejectReservation: () => void;
+  hangUp: () => void;
 }
 
 const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
@@ -125,7 +126,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       newWorker.on('reservation.created', (reservation: any) => {
           console.log(`Reservation ${reservation.sid} created`);
-          setIncomingReservation(reservation);
+          // setIncomingReservation(reservation); // We use device 'incoming' event instead
       });
 
     } catch (err: any) {
@@ -175,6 +176,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setIncomingCall(null);
   };
 
+  const hangUp = () => {
+    if (connection) {
+      connection.disconnect();
+      toast({ title: "Call Ended" });
+    }
+  };
+
   useEffect(() => {
     const currentDevice = deviceRef.current;
     return () => {
@@ -199,7 +207,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     clearIncomingCall,
     incomingReservation,
     acceptReservation,
-    rejectReservation
+    rejectReservation,
+    hangUp
   };
 
   return <TwilioContext.Provider value={value}>{children}</TwilioContext.Provider>;
