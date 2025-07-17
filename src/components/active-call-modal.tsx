@@ -50,12 +50,12 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp }: Activ
             </div>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold">{contactName}</p>
+            <p className="text-2xl font-bold truncate">{contactName}</p>
             <p className="text-muted-foreground text-lg">{formatTime(duration)}</p>
           </div>
         </div>
-        <DialogFooter className="grid grid-cols-1 gap-4">
-          <Button variant="destructive" size="lg" onClick={onHangUp}>
+        <DialogFooter>
+          <Button variant="destructive" size="lg" onClick={onHangUp} className="w-full">
             <PhoneOff className="mr-2 h-5 w-5" />
             Hang Up
           </Button>

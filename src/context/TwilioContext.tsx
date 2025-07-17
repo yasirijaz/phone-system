@@ -22,9 +22,6 @@ interface TwilioContextType {
   acceptCall: () => void;
   rejectCall: () => void;
   clearIncomingCall: () => void;
-  incomingReservation: any | null;
-  acceptReservation: () => void;
-  rejectReservation: () => void;
   hangUp: () => void;
 }
 
@@ -43,7 +40,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [twilio, setTwilio] = useState<any>(null);
 
   const [incomingCall, setIncomingCall] = useState<Connection | null>(null);
-  const [incomingReservation, setIncomingReservation] = useState<any | null>(null);
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -106,7 +102,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.log('Successfully established call!');
         setConnection(conn);
         setIncomingCall(null);
-        setIncomingReservation(null);
       });
 
       newDevice.on('disconnect', () => {
@@ -126,7 +121,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       newWorker.on('reservation.created', (reservation: any) => {
           console.log(`Reservation ${reservation.sid} created`);
-          // setIncomingReservation(reservation); // We use device 'incoming' event instead
       });
 
     } catch (err: any) {
@@ -154,23 +148,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setIncomingCall(null);
   };
   
-  const acceptReservation = () => {
-      if (!incomingReservation) return;
-      console.log(`Accepting reservation ${incomingReservation.sid}`);
-      // This is a simplified accept. A real-world scenario might involve TwiML to connect the call.
-      // For now, we'll just dequeue, which accepts the task.
-      incomingReservation.dequeue();
-      toast({ title: "Reservation Accepted" });
-      setIncomingReservation(null);
-  };
-  
-  const rejectReservation = () => {
-      if (!incomingReservation) return;
-      console.log(`Rejecting reservation ${incomingReservation.sid}`);
-      incomingReservation.reject();
-      toast({ title: "Reservation Rejected" });
-      setIncomingReservation(null);
-  };
 
   const clearIncomingCall = () => {
     setIncomingCall(null);
@@ -179,7 +156,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const hangUp = () => {
     if (connection) {
       connection.disconnect();
-      setConnection(null);
       toast({ title: "Call Ended" });
     }
   };
@@ -206,9 +182,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     acceptCall,
     rejectCall,
     clearIncomingCall,
-    incomingReservation,
-    acceptReservation,
-    rejectReservation,
     hangUp
   };
 
