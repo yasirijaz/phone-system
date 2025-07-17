@@ -179,6 +179,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const hangUp = () => {
     if (connection) {
       connection.disconnect();
+      setConnection(null);
       toast({ title: "Call Ended" });
     }
   };
