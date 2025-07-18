@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode, useRef } from 'react';
 import type { Device, Connection } from '@twilio/voice-sdk';
-import type { Worker as TwilioWorker } from 'twilio-taskrouter';
+import type { Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
 
 import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
@@ -13,6 +13,7 @@ interface TwilioContextType {
   device: Device | null;
   connection: Connection | null;
   worker: TwilioWorker | null;
+  incomingReservation: Reservation | null;
   isDeviceReady: boolean;
   isWorkerReady: boolean;
   isConnecting: boolean;
@@ -31,6 +32,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const deviceRef = useRef<Device | null>(null);
   const workerRef = useRef<TwilioWorker | null>(null);
   const [connection, setConnection] = useState<Connection | null>(null);
+  const [incomingReservation, setIncomingReservation] = useState<Reservation | null>(null);
   const [isDeviceReady, setIsDeviceReady] = useState(false);
   const [isWorkerReady, setIsWorkerReady] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -126,6 +128,26 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setIsWorkerReady(true);
       });
 
+      newWorker.on('reservationCreated', (reservation: Reservation) => {
+        console.log('Reservation created:', reservation);
+        setIncomingReservation(reservation);
+
+        reservation.on('accepted', () => {
+          console.log('Reservation accepted.');
+          setIncomingReservation(null);
+        });
+        
+        reservation.on('timeout', () => {
+            console.log('Reservation timed out.');
+            setIncomingReservation(null);
+        });
+
+        reservation.on('rejected', () => {
+          console.log('Reservation rejected.');
+          setIncomingReservation(null);
+        });
+      });
+
     } catch (err: any) {
       console.error('Twilio setup failed:', err);
       setError('Failed to initialize Twilio. Please try again later.');
@@ -135,6 +157,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   }, [twilio, user, isConnecting]);
   
   const acceptCall = () => {
+    if (incomingReservation) {
+        console.log(`Accepting reservation: ${incomingReservation.sid}`);
+    }
     if (connection) {
         console.log(`Accepting call`);
         connection.accept();
@@ -173,6 +198,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     device: deviceRef.current,
     connection,
     worker: workerRef.current,
+    incomingReservation,
     isDeviceReady,
     isWorkerReady,
     isConnecting,
