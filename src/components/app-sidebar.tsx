@@ -13,7 +13,7 @@ import {
   SidebarMenuSubButton,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
-import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog } from 'lucide-react';
+import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog, Package } from 'lucide-react';
 import { Button } from './ui/button';
 import { Logo } from './icons';
 import { usePathname, useRouter } from 'next/navigation';
@@ -98,6 +98,7 @@ export function AppSidebar() {
           )}
 
           {isSuperAdmin && (
+            <>
              <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname.startsWith('/companies')} tooltip="Companies">
                 <Link href="/companies">
@@ -106,6 +107,15 @@ export function AppSidebar() {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/packages')} tooltip="Packages">
+                <Link href="/packages">
+                  <Package />
+                  <span>Packages</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            </>
           )}
 
            {isCompanyAdmin && (
@@ -169,5 +179,3 @@ export function AppSidebar() {
     </>
   );
 }
-
-    

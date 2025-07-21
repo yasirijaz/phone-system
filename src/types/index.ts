@@ -1,5 +1,6 @@
 
 
+
 export interface Call {
   id: string;
   contact: string;
@@ -158,4 +159,12 @@ export interface Assignment {
     department_id: number;
     user_name: string;
     department_name: string;
+}
+
+export interface Package {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  status: 0 | 1;
 }
