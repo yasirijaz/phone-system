@@ -1,6 +1,5 @@
 
 
-
 export interface Call {
   id: string;
   contact: string;
@@ -163,7 +162,7 @@ export interface Assignment {
 
 export interface Package {
   id: number;
-  name: string;
+  title: string;
   description: string;
   price: number;
   status: 0 | 1;

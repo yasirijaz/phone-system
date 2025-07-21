@@ -13,7 +13,7 @@ import { Logo } from '@/components/icons';
 const PricingCard = ({ pkg, isFeatured }: { pkg: Package; isFeatured?: boolean }) => (
   <Card className={isFeatured ? 'border-primary ring-2 ring-primary' : ''}>
     <CardHeader className="text-center">
-      <CardTitle className="text-2xl">{pkg.name}</CardTitle>
+      <CardTitle className="text-2xl">{pkg.title}</CardTitle>
       <CardDescription>{pkg.description}</CardDescription>
     </CardHeader>
     <CardContent>
@@ -92,7 +92,7 @@ export default function PricingPage() {
             ) : (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-4xl mx-auto">
                 {packages.map(pkg => (
-                  <PricingCard key={pkg.id} pkg={pkg} isFeatured={pkg.name.toLowerCase() === 'pro'} />
+                  <PricingCard key={pkg.id} pkg={pkg} isFeatured={pkg.title.toLowerCase() === 'pro'} />
                 ))}
               </div>
             )}

@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 
 const packageSchema = z.object({
-  name: z.string().min(2, "Package name must be at least 2 characters."),
+  title: z.string().min(2, "Package name must be at least 2 characters."),
   description: z.string().min(10, "Description must be at least 10 characters."),
   price: z.coerce.number().min(0, "Price must be a positive number."),
   status: z.boolean().default(true),
@@ -43,7 +43,7 @@ export default function PackagesPage() {
   const form = useForm<z.infer<typeof packageSchema>>({
     resolver: zodResolver(packageSchema),
     defaultValues: {
-      name: "",
+      title: "",
       description: "",
       price: 0,
       status: true,
@@ -77,9 +77,9 @@ export default function PackagesPage() {
   const handleDialogOpen = (pkg: Package | null = null) => {
     setEditingPackage(pkg);
     if (pkg) {
-      form.reset({ name: pkg.name, description: pkg.description, price: pkg.price, status: pkg.status === 1 });
+      form.reset({ title: pkg.title, description: pkg.description, price: pkg.price, status: pkg.status === 1 });
     } else {
-      form.reset({ name: "", description: "", price: 0, status: true });
+      form.reset({ title: "", description: "", price: 0, status: true });
     }
     setIsDialogOpen(true);
   };
@@ -154,7 +154,7 @@ export default function PackagesPage() {
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField control={form.control} name="name" render={({ field }) => (
+                    <FormField control={form.control} name="title" render={({ field }) => (
                       <FormItem><FormLabel>Package Name</FormLabel><FormControl><Input placeholder="e.g. Basic Plan" {...field} /></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={form.control} name="description" render={({ field }) => (
@@ -199,7 +199,7 @@ export default function PackagesPage() {
                     <TableBody>
                       {packages.map((pkg) => (
                         <TableRow key={pkg.id}>
-                          <TableCell className="font-medium">{pkg.name}</TableCell>
+                          <TableCell className="font-medium">{pkg.title}</TableCell>
                           <TableCell>${pkg.price}/mo</TableCell>
                           <TableCell>
                             <Badge variant={pkg.status === 1 ? 'default' : 'secondary'}>
