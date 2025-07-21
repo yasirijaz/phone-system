@@ -81,7 +81,9 @@ export default function PricingPage() {
     const fetchPackages = async () => {
       try {
         const data = await getPackages();
-        setPackages(data.filter(p => p.status === 1));
+        if (Array.isArray(data)) {
+          setPackages(data.filter(p => p.status === 1));
+        }
       } catch (error) {
         console.error("Failed to fetch packages:", error);
       } finally {
@@ -181,5 +183,3 @@ export default function PricingPage() {
     </div>
   );
 }
-
-    
