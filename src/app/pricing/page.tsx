@@ -48,7 +48,9 @@ const PricingCard = ({ pkg, isFeatured }: { pkg: Package; isFeatured?: boolean }
             )}
             <CardHeader className="text-center pt-10">
                 <CardTitle className="text-3xl font-bold">{pkg.title}</CardTitle>
-                 <div className="text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: pkg.description }} />
+                <CardDescription>
+                  <div dangerouslySetInnerHTML={{ __html: pkg.description }} />
+                </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col flex-1">
                 <div className="text-center my-4">
