@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/login');
   };
   
-  const unprotectedRoutes = ['/login', '/register'];
+  const unprotectedRoutes = ['/login', '/register','/pricing'];
   const isProtectedRoute = !unprotectedRoutes.includes(pathname);
   const isAuthRoute = unprotectedRoutes.includes(pathname);
 
