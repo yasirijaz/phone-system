@@ -5,73 +5,55 @@ import { useState, useEffect } from 'react';
 import type { Package } from '@/types';
 import { getPackages } from '@/services/packageService';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { CheckCircle2, ShieldCheck, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/icons';
 
-const features = [
-  "Unlimited call logging",
-  "AI-powered call categorization",
-  "Voicemail transcription",
-  "Basic analytics",
-  "Email support"
+const featureList = [
+    "Unlimited call logging",
+    "AI-powered call categorization",
+    "Voicemail transcription",
+    "Basic analytics",
+    "Email support"
 ];
 
-const proFeatures = [
-    ...features,
-    "Advanced call routing",
-    "Call recording",
-    "Real-time analytics dashboard",
-    "Priority support"
-];
-
-const enterpriseFeatures = [
-    ...proFeatures,
-    "Dedicated account manager",
-    "Custom integrations (API access)",
-    "Skills-based routing",
-    "99.9% uptime SLA"
-]
+const CheckIcon = () => (
+    <svg className="flex-shrink-0 w-6 h-6 text-indigo-600" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 14.7875L13.0959 17.8834C13.3399 18.1274 13.7353 18.1275 13.9794 17.8838L20.625 11.25M15 27.5C8.09644 27.5 2.5 21.9036 2.5 15C2.5 8.09644 8.09644 2.5 15 2.5C21.9036 2.5 27.5 8.09644 27.5 15C27.5 21.9036 21.9036 27.5 15 27.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
 
 
 const PricingCard = ({ pkg, isFeatured }: { pkg: Package; isFeatured?: boolean }) => {
-    const featureList = pkg.title.toLowerCase() === 'enterprise' ? enterpriseFeatures : pkg.title.toLowerCase() === 'pro' ? proFeatures : features;
-
     return (
-        <Card className={`relative flex flex-col ${isFeatured ? 'border-primary ring-2 ring-primary' : ''}`}>
-             {isFeatured && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 text-sm font-semibold tracking-wider text-primary-foreground bg-primary rounded-full">
-                Most Popular
+       <div className={`flex flex-col mx-auto max-w-sm text-gray-900 rounded-2xl transition-all duration-500 ${isFeatured ? 'bg-indigo-50 hover:bg-indigo-100' : 'bg-gray-50 hover:bg-gray-100'}`}>
+            {isFeatured && (
+                 <div className="uppercase bg-gradient-to-r from-indigo-600 to-violet-600 rounded-t-2xl p-3 text-center text-white">
+                    MOST POPULAR
                 </div>
             )}
-            <CardHeader className="text-center pt-10">
-                <CardTitle className="text-3xl font-bold">{pkg.title}</CardTitle>
-                <CardDescription>
-                  <div dangerouslySetInnerHTML={{ __html: pkg.description }} />
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col flex-1">
-                <div className="text-center my-4">
-                    <span className="text-5xl font-bold tracking-tight">${pkg.price}</span>
-                    <span className="text-muted-foreground">/month</span>
+            <div className="p-6 xl:py-9 xl:px-12">
+                <h3 className="font-manrope text-2xl font-bold mb-3">{pkg.title}</h3>
+                <div className="flex items-center mb-6">
+                    <span className={`font-manrope mr-2 text-6xl font-semibold ${isFeatured ? 'text-indigo-600' : ''}`}>${pkg.price}</span>
+                    <span className="text-xl text-gray-500">/ month</span>
                 </div>
-                <ul className="space-y-3 mb-8 text-left">
-                    {featureList.slice(0, 5).map((feature, i) => (
-                    <li key={i} className="flex items-center gap-3">
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        <span>{feature}</span>
-                    </li>
+                <div className="mb-8" dangerouslySetInnerHTML={{ __html: pkg.description }}></div>
+                <ul className="mb-12 space-y-6 text-left text-lg text-gray-500">
+                   {featureList.map((feature, i) => (
+                        <li key={i} className="flex items-center space-x-4">
+                            <CheckIcon />
+                            <span>{feature}</span>
+                        </li>
                     ))}
                 </ul>
-                <Button asChild className={`w-full mt-auto ${isFeatured ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/90'}`}>
-                    <Link href="/register">Get Started</Link>
-                </Button>
-            </CardContent>
-        </Card>
+                 <Link href="/register" className="py-2.5 px-5 bg-indigo-600 shadow-sm rounded-full transition-all duration-500 text-base text-white font-semibold text-center w-fit block mx-auto hover:bg-indigo-700">
+                    Purchase Plan
+                </Link>
+            </div>
+        </div>
     );
 };
+
 
 export default function PricingPage() {
   const [packages, setPackages] = useState<Package[]>([]);
@@ -110,62 +92,31 @@ export default function PricingPage() {
         </nav>
       </header>
       <main className="flex-1">
-        <section className="w-full py-20 md:py-28 lg:py-32 bg-muted/20">
-          <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center space-y-4 text-center">
-              <div className="space-y-3">
-                <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">
-                  Simple, Transparent Pricing
-                </h1>
-                <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
-                  Choose the plan that's right for your business. No hidden fees, no surprises.
-                </p>
-              </div>
+        <section className="py-24">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div className="mb-12">
+                    <h2 className="font-manrope text-5xl text-center font-bold text-gray-900 dark:text-white mb-4">Choose your plan</h2>
+                    <p className="text-gray-500 dark:text-gray-400 text-center leading-6 mb-9">7 Days free trial. No credit card required.</p>
+                    <div className="flex justify-center items-center">
+                        <label htmlFor="billing-cycle" className="min-w-[3.5rem] text-xl relative text-gray-900 dark:text-white mr-4 font-medium">Bill Monthly</label>
+                        <input type="checkbox" id="billing-cycle" className="relative shrink-0 w-11 h-6 p-0.5 bg-indigo-100 checked:bg-none checked:bg-indigo-100 rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:border-blue-600 appearance-none before:inline-block before:w-5 before:h-5 before:bg-indigo-600 checked:before:bg-indigo-600 before:translate-x-0 checked:before:translate-x-full before:shadow before:rounded-full before:transform before:transition before:ease-in-out before:duration-200" />
+                        <label htmlFor="billing-cycle" className="relative min-w-[3.5rem] font-medium text-xl text-gray-500 dark:text-gray-400 ml-4">Bill Yearly</label>
+                    </div>
+                </div>
+
+                {loading ? (
+                  <p className="text-center">Loading packages...</p>
+                ) : (
+                    <div className="space-y-8 lg:grid lg:grid-cols-3 sm:gap-6 xl:gap-8 lg:space-y-0 lg:items-center">
+                        {packages.map(pkg => (
+                            <PricingCard key={pkg.id} pkg={pkg} isFeatured={pkg.title.toLowerCase() === 'pro'} />
+                        ))}
+                    </div>
+                )}
+                 {packages.length === 0 && !loading && (
+                    <p className="text-center text-muted-foreground">No active pricing plans available at the moment. Please check back later.</p>
+                 )}
             </div>
-          </div>
-        </section>
-
-        <section className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container px-4 md:px-6">
-            {loading ? (
-              <p className="text-center">Loading packages...</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto items-start">
-                {packages.map(pkg => (
-                  <PricingCard key={pkg.id} pkg={pkg} isFeatured={pkg.title.toLowerCase() === 'pro'} />
-                ))}
-              </div>
-            )}
-             {packages.length === 0 && !loading && (
-                <p className="text-center text-muted-foreground">No active pricing plans available at the moment. Please check back later.</p>
-             )}
-          </div>
-        </section>
-
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/20">
-          <div className="container px-4 md:px-6 max-w-4xl mx-auto">
-            <h2 className="text-3xl font-bold text-center mb-8">Frequently Asked Questions</h2>
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="item-1">
-                <AccordionTrigger>Can I change my plan later?</AccordionTrigger>
-                <AccordionContent>
-                  Yes, you can upgrade or downgrade your plan at any time from your account settings. Prorated charges or credits will be applied automatically.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="item-2">
-                <AccordionTrigger>Is there a free trial available?</AccordionTrigger>
-                <AccordionContent>
-                  We don't offer a free trial, but we do have a 14-day money-back guarantee. If you're not satisfied for any reason, just let us know and we'll refund your payment.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="item-3">
-                <AccordionTrigger>What kind of support do you offer?</AccordionTrigger>
-                <AccordionContent>
-                  All our plans come with email support. The Pro plan includes priority email support, and the Enterprise plan includes a dedicated account manager and phone support.
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </div>
         </section>
       </main>
 
@@ -183,3 +134,4 @@ export default function PricingPage() {
     </div>
   );
 }
+ 
