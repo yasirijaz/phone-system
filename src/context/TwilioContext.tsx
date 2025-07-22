@@ -14,6 +14,7 @@ interface TwilioContextType {
   connection: Call | null;
   worker: TwilioWorker | null;
   incomingReservation: Reservation | null;
+  showReservationModal: boolean | null;
   isDeviceReady: boolean;
   isWorkerReady: boolean;
   isConnecting: boolean;
@@ -36,6 +37,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const workerRef = useRef<TwilioWorker | null>(null);
   const [connection, setConnection] = useState<Call | null>(null);
   const [incomingReservation, setIncomingReservation] = useState<Reservation | null>(null);
+  const [showReservationModal, setShowReservationModal] = useState<boolean | null>(null);
   const [isDeviceReady, setIsDeviceReady] = useState(false);
   const [isWorkerReady, setIsWorkerReady] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -99,9 +101,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.log('Incoming call received:', conn);
         setConnection(conn);
 
-        if (acceptedReservationSidRef.current && conn.parameters.TaskSid === acceptedReservationSidRef.current) {
+        if (conn.customParameters.get('autoAcceptCall') === '1') {
           conn.accept();
-          acceptedReservationSidRef.current = null;
           toast({ title: "Call Accepted" });
         }
 
@@ -141,20 +142,36 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       newWorker.on('reservationCreated', (reservation: Reservation) => {
         console.log('Reservation created:', reservation);
         setIncomingReservation(reservation);
+        setShowReservationModal(true);
         
         reservation.on('accepted', () => {
           console.log('Reservation accepted.');
-          setIncomingReservation(null);
+          setIncomingReservation(reservation);
+          setShowReservationModal(false);
         });
         
         reservation.on('timeout', () => {
             console.log('Reservation timed out.');
-            setIncomingReservation(null);
+            setIncomingReservation(reservation);
+            setShowReservationModal(false);
         });
 
         reservation.on('rejected', () => {
           console.log('Reservation rejected.');
           setIncomingReservation(null);
+          setShowReservationModal(false);
+        });
+
+        reservation.on('canceled', () => {
+          console.log('Reservation canceled.');
+          setIncomingReservation(null);
+          setShowReservationModal(false);
+        });
+
+        reservation.on('completed', () => {
+          console.log('Reservation completed.');
+          setIncomingReservation(null);
+          setShowReservationModal(false);
         });
       });
 
@@ -199,7 +216,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     acceptedReservationSidRef.current = reservation.sid;
     reservation.conference({
       endConferenceOnExit: true,
-      customParameters: reservation.task.attributes
+      customParameters: {
+        ...reservation.task.attributes,
+        autoAcceptCall: 1
+      }
     } as any);
   };
 
@@ -228,6 +248,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     connection,
     worker: workerRef.current,
     incomingReservation,
+    showReservationModal,
     isDeviceReady,
     isWorkerReady,
     isConnecting,

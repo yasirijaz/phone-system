@@ -13,6 +13,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     rejectCall,
     hangUp,
     incomingReservation,
+    showReservationModal,
     acceptReservation,
     rejectReservation,
   } = useTwilio();
@@ -42,7 +43,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         onHangUp={hangUp}
       />
       <ReservationModal
-        isOpen={!!incomingReservation}
+        isOpen={!!showReservationModal}
         onClose={() => rejectReservation(incomingReservation!)}
         reservation={incomingReservation}
         onAccept={acceptReservation}
