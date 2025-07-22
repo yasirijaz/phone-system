@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isLoading = initialLoading || authLoading;
 
-  if (isLoading || (!user && isProtectedRoute) || (user && isAuthRoute)) {
+  if (isLoading || (!user && isProtectedRoute)) {
      return (
         <div className="flex items-center justify-center h-screen bg-background">
           <div className="flex flex-col items-center space-y-4">
@@ -63,6 +63,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           </div>
         </div>
      )
+  }
+
+  // This check has to be outside the main loading block to avoid redirect loops
+  if (user && isAuthRoute) {
+      // While loading, this component will return null or a skeleton,
+      // but after loading, if the user is on an auth route, we show a loader while redirecting.
+      return (
+        <div className="flex items-center justify-center h-screen bg-background">
+            <p>Redirecting...</p>
+        </div>
+      );
   }
 
   return <AuthContext.Provider value={{ user, loading: isLoading, logout }}>{children}</AuthContext.Provider>;
