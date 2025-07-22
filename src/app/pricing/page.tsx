@@ -4,76 +4,79 @@
 import { useState, useEffect } from 'react';
 import type { Package } from '@/types';
 import { getPackages } from '@/services/packageService';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { CheckCircle2, ShieldCheck, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/icons';
+import { useAuth } from '@/context/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import SubscriptionForm from '@/components/subscription-form';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
+import { getSetupIntent } from '@/services/stripeService';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Check } from 'lucide-react';
 
-const features = [
-  "Unlimited call logging",
-  "AI-powered call categorization",
-  "Voicemail transcription",
-  "Basic analytics",
-  "Email support"
+const featureList = [
+    "Unlimited call logging",
+    "AI-powered call categorization",
+    "Voicemail transcription",
+    "Basic analytics",
+    "Email support"
 ];
 
-const proFeatures = [
-    ...features,
-    "Advanced call routing",
-    "Call recording",
-    "Real-time analytics dashboard",
-    "Priority support"
-];
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
+    ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+    : null;
 
-const enterpriseFeatures = [
-    ...proFeatures,
-    "Dedicated account manager",
-    "Custom integrations (API access)",
-    "Skills-based routing",
-    "99.9% uptime SLA"
-]
-
-
-const PricingCard = ({ pkg, isFeatured }: { pkg: Package; isFeatured?: boolean }) => {
-    const featureList = pkg.title.toLowerCase() === 'enterprise' ? enterpriseFeatures : pkg.title.toLowerCase() === 'pro' ? proFeatures : features;
+const PricingCard = ({ pkg, onPurchase, isFeatured }: { pkg: Package; onPurchase: (pkg: Package) => void; isFeatured?: boolean }) => {
+    const { user } = useAuth();
 
     return (
-        <Card className={`relative flex flex-col ${isFeatured ? 'border-primary ring-2 ring-primary' : ''}`}>
-             {isFeatured && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 text-sm font-semibold tracking-wider text-primary-foreground bg-primary rounded-full">
-                Most Popular
-                </div>
-            )}
-            <CardHeader className="text-center pt-10">
-                <CardTitle className="text-3xl font-bold">{pkg.title}</CardTitle>
-                 <div className="text-sm text-muted-foreground">{pkg.description}  </div>
-            </CardHeader>
-            <CardContent className="flex flex-col flex-1">
-                <div className="text-center my-4">
-                    <span className="text-5xl font-bold tracking-tight">${pkg.price}</span>
-                    <span className="text-muted-foreground">/month</span>
-                </div>
-                <ul className="space-y-3 mb-8 text-left">
-                    {featureList.slice(0, 5).map((feature, i) => (
-                    <li key={i} className="flex items-center gap-3">
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+       <Card className={isFeatured ? "border-primary" : ""}>
+          <CardHeader>
+            <CardTitle>{pkg.title}</CardTitle>
+            <CardDescription>
+                <div dangerouslySetInnerHTML={{ __html: pkg.description }} />
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-baseline">
+                <span className="text-4xl font-bold">${pkg.price}</span>
+                <span className="ml-2 text-muted-foreground">/ month</span>
+            </div>
+            <ul className="space-y-4 text-sm text-muted-foreground">
+                {featureList.map((feature, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-primary" />
                         <span>{feature}</span>
                     </li>
-                    ))}
-                </ul>
-                <Button asChild className={`w-full mt-auto ${isFeatured ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/90'}`}>
+                ))}
+            </ul>
+          </CardContent>
+          <CardFooter>
+             {user ? (
+                 <Button onClick={() => onPurchase(pkg)} className="w-full">
+                    Purchase Plan
+                </Button>
+             ) : (
+                <Button asChild className="w-full">
                     <Link href="/register">Get Started</Link>
                 </Button>
-            </CardContent>
+             )}
+          </CardFooter>
         </Card>
     );
 };
 
+
 export default function PricingPage() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchPackages = async () => {
@@ -90,78 +93,71 @@ export default function PricingPage() {
     };
     fetchPackages();
   }, []);
+  
+  const handlePurchase = async (pkg: Package) => {
+      setSelectedPackage(pkg);
+      setIsSubscribing(true);
+      try {
+        const { client_secret } = await getSetupIntent();
+        setClientSecret(client_secret);
+      } catch (error) {
+        toast({ title: 'Error', description: 'Could not prepare payment form. Please try again.', variant: 'destructive' });
+        setSelectedPackage(null);
+      } finally {
+          setIsSubscribing(false);
+      }
+  };
+  
+  const handleDialogClose = () => {
+    if (!isSubscribing) {
+        setSelectedPackage(null);
+        setClientSecret(null);
+    }
+  }
+
+  if (!stripePromise) {
+    return (
+        <div className="flex h-screen items-center justify-center">
+            <p className="text-center text-red-500">Stripe is not configured. Please add your Stripe publishable key to the environment variables.</p>
+        </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen bg-background dark:bg-gray-900">
       <header className="px-4 lg:px-6 h-14 flex items-center border-b sticky top-0 bg-background/95 z-50">
          <Link href="/" className="flex items-center justify-center gap-2">
            <Logo className="h-6 w-6 text-primary" />
            <span className="font-bold text-lg">CallSync</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
-          <Button variant="ghost" asChild>
-            <Link href="/login">Login</Link>
-          </Button>
-          <Button asChild>
-            <Link href="/register">Sign Up</Link>
-          </Button>
+          <Link href="/login" className="text-sm font-medium hover:underline underline-offset-4">Login</Link>
+          <Link href="/register" className="text-sm font-medium hover:underline underline-offset-4">Sign Up</Link>
         </nav>
       </header>
       <main className="flex-1">
-        <section className="w-full py-20 md:py-28 lg:py-32 bg-muted/20">
-          <div className="w-full px-4">
-            <div className="mx-auto mb-[60px] max-w-[510px] text-center">
-              <h1 className="mb-3 text-3xl font-bold leading-[1.208] text-dark sm:text-4xl md:text-[40px] dark:text-white">
-                Simple, Transparent Pricing
-              </h1>
-              <p className="text-base text-body-color dark:text-dark-6">
-                Choose the plan that's right for your business. No hidden fees, no surprises.
-              </p>
+        <section className="py-12 md:py-24">
+            <div className="container px-4 md:px-6">
+                 <div className="mb-12 text-center">
+                    <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl">Simple, Transparent Pricing</h1>
+                    <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl mt-4">
+                        Choose the plan that's right for your business. No hidden fees, no surprises.
+                    </p>
+                </div>
+
+                {loading ? (
+                  <p className="text-center">Loading packages...</p>
+                ) : (
+                    <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                        {packages.map(pkg => (
+                            <PricingCard key={pkg.id} pkg={pkg} onPurchase={handlePurchase} isFeatured={pkg.title.toLowerCase() === 'pro'} />
+                        ))}
+                    </div>
+                )}
+                 {packages.length === 0 && !loading && (
+                    <p className="text-center text-muted-foreground">No active pricing plans available at the moment. Please check back later.</p>
+                 )}
             </div>
-          </div>
-        </section>
-
-        <section className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container px-4 md:px-6">
-            {loading ? (
-              <p className="text-center">Loading packages...</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto items-start">
-                {packages.map(pkg => (
-                  <PricingCard key={pkg.id} pkg={pkg} isFeatured={pkg.title.toLowerCase() === 'pro'} />
-                ))}
-              </div>
-            )}
-             {packages.length === 0 && !loading && (
-                <p className="text-center text-muted-foreground">No active pricing plans available at the moment. Please check back later.</p>
-             )}
-          </div>
-        </section>
-
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/20">
-          <div className="container px-4 md:px-6 max-w-4xl mx-auto">
-            <h2 className="text-3xl font-bold text-center mb-8">Frequently Asked Questions</h2>
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="item-1">
-                <AccordionTrigger>Can I change my plan later?</AccordionTrigger>
-                <AccordionContent>
-                  Yes, you can upgrade or downgrade your plan at any time from your account settings. Prorated charges or credits will be applied automatically.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="item-2">
-                <AccordionTrigger>Is there a free trial available?</AccordionTrigger>
-                <AccordionContent>
-                  We don't offer a free trial, but we do have a 14-day money-back guarantee. If you're not satisfied for any reason, just let us know and we'll refund your payment.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="item-3">
-                <AccordionTrigger>What kind of support do you offer?</AccordionTrigger>
-                <AccordionContent>
-                  All our plans come with email support. The Pro plan includes priority email support, and the Enterprise plan includes a dedicated account manager and phone support.
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </div>
         </section>
       </main>
 
@@ -176,6 +172,31 @@ export default function PricingPage() {
           </Link>
         </nav>
       </footer>
+       
+      {selectedPackage && clientSecret && (
+        <Dialog open={!!(selectedPackage && clientSecret)} onOpenChange={handleDialogClose}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Subscribe to {selectedPackage.title}</DialogTitle>
+                    <DialogDescription>
+                        Complete your subscription by providing your payment details below.
+                    </DialogDescription>
+                </DialogHeader>
+                 <Elements stripe={stripePromise} options={{ clientSecret }}>
+                    <SubscriptionForm 
+                        selectedPackage={selectedPackage}
+                        isSubscribing={isSubscribing}
+                        setIsSubscribing={setIsSubscribing}
+                        onSuccess={() => {
+                            setSelectedPackage(null);
+                            setClientSecret(null);
+                        }}
+                    />
+                </Elements>
+            </DialogContent>
+        </Dialog>
+      )}
+
     </div>
   );
 }

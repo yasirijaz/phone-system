@@ -150,6 +150,16 @@ export function AppSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
             )}
+            {(isCompanyAdmin) && (
+             <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname === '/billing'} tooltip="Billing">
+                <Link href="/settings/billing">
+                  <Settings />
+                  <span>Billing</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            )}
         </SidebarGroup>
       </SidebarMenu>
       

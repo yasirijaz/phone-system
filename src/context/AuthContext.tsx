@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const unprotectedRoutes = ['/login', '/register','/pricing'];
   const isProtectedRoute = !unprotectedRoutes.includes(pathname);
-  const isAuthRoute = unprotectedRoutes.includes(pathname);
+  const isAuthRoute = ['/login', '/register'].includes(pathname);
 
   useEffect(() => {
     if (initialLoading) {
@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isLoading = initialLoading || authLoading;
 
-  if (isLoading || (!user && isProtectedRoute) || (user && isAuthRoute)) {
+  if (isLoading || (!user && isProtectedRoute)) { // || (user && isAuthRoute)
      return (
         <div className="flex items-center justify-center h-screen bg-background">
           <div className="flex flex-col items-center space-y-4">
@@ -63,6 +63,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           </div>
         </div>
      )
+  }
+
+   if (user && isAuthRoute) {
+      return (
+        <div className="flex items-center justify-center h-screen bg-background">
+            <p>Redirecting...</p>
+        </div>
+      );
   }
 
   return <AuthContext.Provider value={{ user, loading: isLoading, logout }}>{children}</AuthContext.Provider>;
