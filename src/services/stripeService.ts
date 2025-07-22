@@ -18,3 +18,13 @@ export const getSubscriptionStatus = async (): Promise<any> => {
     const response = await axios.get('/api/stripe/subscription');
     return response.data;
 };
+
+export const swapPlan = async (price_id: string): Promise<any> => {
+    const response = await axios.post('/api/stripe/subscription/swap', { price_id });
+    return response.data;
+};
+
+export const cancelSubscription = async (): Promise<any> => {
+    const response = await axios.post('/api/stripe/subscription/cancel');
+    return response.data;
+};
