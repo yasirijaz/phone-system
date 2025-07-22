@@ -60,7 +60,8 @@ export default function BillingPage() {
 
   const currentPlan = useMemo(() => {
     if (!subscription || packages.length === 0) return null;
-    return packages.find(pkg => pkg.price_id === subscription.stripe_price) || null;
+    const currentPriceId = subscription.items?.[0]?.stripe_price || subscription.stripe_price;
+    return packages.find(pkg => pkg.price_id === currentPriceId) || null;
   }, [subscription, packages]);
 
   const handleSwapPlan = async (priceId: string) => {
