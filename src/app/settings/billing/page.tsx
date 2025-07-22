@@ -75,7 +75,7 @@ export default function BillingPage() {
                         <div>
                             <h3 className="font-semibold">{subscription.plan?.nickname || 'Active Plan'}</h3>
                             <p className="text-sm text-muted-foreground">
-                                You are currently on the {subscription.plan?.nickname} plan.
+                                You are currently on the {subscription.plan?.nickname || 'current'} plan.
                             </p>
                         </div>
                          <Badge variant={subscription.status === 'active' ? 'default' : 'destructive'} className="capitalize">
@@ -87,12 +87,14 @@ export default function BillingPage() {
                          <ul className="space-y-2 text-sm text-muted-foreground">
                             <li className="flex items-center gap-2">
                                 <CheckCircle className="h-4 w-4 text-green-500" />
-                                <span>${(subscription.plan?.amount / 100).toFixed(2)} / {subscription.plan?.interval}</span>
+                                <span>${((subscription.plan?.amount || 0) / 100).toFixed(2)} / {subscription.plan?.interval}</span>
                             </li>
-                             <li className="flex items-center gap-2">
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                                <span>Next invoice on {formatDate(subscription.current_period_end)}</span>
-                            </li>
+                             {subscription.current_period_end && (
+                                <li className="flex items-center gap-2">
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                    <span>Next invoice on {formatDate(subscription.current_period_end)}</span>
+                                </li>
+                             )}
                          </ul>
                      </div>
                      <div className="flex justify-end">
