@@ -4,7 +4,7 @@ import axios from '@/lib/axios';
 
 export const getPackages = async (): Promise<Package[]> => {
   const response = await axios.get('/api/pricing');
-  return response.data.data; 
+  return response.data.packages; 
 };
 
 export const createPackage = async (packageData: Omit<Package, 'id'>): Promise<Package> => {

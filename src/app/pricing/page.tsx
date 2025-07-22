@@ -7,10 +7,12 @@ import { getPackages } from '@/services/packageService';
 import Link from 'next/link';
 import { Logo } from '@/components/icons';
 import { useAuth } from '@/context/AuthContext';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import SubscriptionForm from '@/components/subscription-form';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
+import { getSetupIntent } from '@/services/stripeService';
+import { useToast } from '@/hooks/use-toast';
 
 const featureList = [
     "Unlimited call logging",
@@ -76,6 +78,8 @@ export default function PricingPage() {
   const [loading, setLoading] = useState(true);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [isSubscribing, setIsSubscribing] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchPackages = async () => {
@@ -93,13 +97,24 @@ export default function PricingPage() {
     fetchPackages();
   }, []);
   
-  const handlePurchase = (pkg: Package) => {
+  const handlePurchase = async (pkg: Package) => {
       setSelectedPackage(pkg);
+      setIsSubscribing(true); // Show loading state on button
+      try {
+        const { client_secret } = await getSetupIntent();
+        setClientSecret(client_secret);
+      } catch (error) {
+        toast({ title: 'Error', description: 'Could not prepare payment form. Please try again.', variant: 'destructive' });
+        setSelectedPackage(null);
+      } finally {
+          setIsSubscribing(false);
+      }
   };
   
   const handleDialogClose = () => {
     if (!isSubscribing) {
         setSelectedPackage(null);
+        setClientSecret(null);
     }
   }
 
@@ -164,8 +179,8 @@ export default function PricingPage() {
         </nav>
       </footer>
        
-      {selectedPackage && (
-        <Dialog open={!!selectedPackage} onOpenChange={handleDialogClose}>
+      {selectedPackage && clientSecret && (
+        <Dialog open={!!(selectedPackage && clientSecret)} onOpenChange={handleDialogClose}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Subscribe to {selectedPackage.title}</DialogTitle>
@@ -173,12 +188,15 @@ export default function PricingPage() {
                         Complete your subscription by providing your payment details below.
                     </DialogDescription>
                 </DialogHeader>
-                 <Elements stripe={stripePromise}>
+                 <Elements stripe={stripePromise} options={{ clientSecret }}>
                     <SubscriptionForm 
                         selectedPackage={selectedPackage}
                         isSubscribing={isSubscribing}
                         setIsSubscribing={setIsSubscribing}
-                        onSuccess={() => setSelectedPackage(null)}
+                        onSuccess={() => {
+                            setSelectedPackage(null);
+                            setClientSecret(null);
+                        }}
                     />
                 </Elements>
             </DialogContent>

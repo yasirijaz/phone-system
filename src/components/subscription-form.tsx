@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { getSetupIntent, subscribeToPlan } from '@/services/stripeService';
+import { subscribeToPlan } from '@/services/stripeService';
 import type { Package } from '@/types';
 import { useRouter } from 'next/navigation';
 
@@ -33,8 +33,6 @@ export default function SubscriptionForm({ selectedPackage, isSubscribing, setIs
         }
 
         try {
-            const { client_secret } = await getSetupIntent();
-
             const { error: submitError } = await elements.submit();
             if (submitError) {
                 toast({ title: 'Payment Error', description: submitError.message, variant: 'destructive' });
@@ -42,9 +40,8 @@ export default function SubscriptionForm({ selectedPackage, isSubscribing, setIs
                 return;
             }
             
-            const { setupIntent, error: confirmError } = await stripe.confirmSetup({
+            const { error: confirmError, setupIntent } = await stripe.confirmSetup({
                 elements,
-                clientSecret: client_secret,
                 redirect: 'if_required',
             });
 
@@ -55,7 +52,7 @@ export default function SubscriptionForm({ selectedPackage, isSubscribing, setIs
             }
 
             if (setupIntent?.status === 'succeeded') {
-                const paymentMethodId = setupIntent.payment_method;
+                const paymentMethodId = setupIntent.payment_method as string;
                 await subscribeToPlan(paymentMethodId, selectedPackage.price_id);
                 
                 toast({ title: 'Success!', description: `You've subscribed to the ${selectedPackage.title} plan.` });
