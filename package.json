@@ -38,6 +38,8 @@
     "@radix-ui/react-toast": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.1.8",
     "@reduxjs/toolkit": "^2.2.8",
+    "@stripe/react-stripe-js": "^2.7.3",
+    "@stripe/stripe-js": "^4.1.0",
     "@twilio/voice-sdk": "^2.11.1",
     "axios": "^1.7.2",
     "class-variance-authority": "^0.7.1",

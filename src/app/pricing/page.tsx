@@ -4,9 +4,13 @@
 import { useState, useEffect } from 'react';
 import type { Package } from '@/types';
 import { getPackages } from '@/services/packageService';
-import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Logo } from '@/components/icons';
+import { useAuth } from '@/context/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import SubscriptionForm from '@/components/subscription-form';
+import { loadStripe, type Stripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
 
 const featureList = [
     "Unlimited call logging",
@@ -22,8 +26,14 @@ const CheckIcon = () => (
     </svg>
 );
 
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
+    ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+    : null;
 
-const PricingCard = ({ pkg, isFeatured }: { pkg: Package; isFeatured?: boolean }) => {
+
+const PricingCard = ({ pkg, onPurchase, isFeatured }: { pkg: Package; onPurchase: (pkg: Package) => void; isFeatured?: boolean }) => {
+    const { user } = useAuth();
+
     return (
        <div className={`flex flex-col mx-auto max-w-sm text-gray-900 rounded-2xl transition-all duration-500 ${isFeatured ? 'bg-indigo-50 hover:bg-indigo-100' : 'bg-gray-50 hover:bg-gray-100'}`}>
             {isFeatured && (
@@ -46,9 +56,15 @@ const PricingCard = ({ pkg, isFeatured }: { pkg: Package; isFeatured?: boolean }
                         </li>
                     ))}
                 </ul>
-                 <Link href="/register" className="py-2.5 px-5 bg-indigo-600 shadow-sm rounded-full transition-all duration-500 text-base text-white font-semibold text-center w-fit block mx-auto hover:bg-indigo-700">
-                    Purchase Plan
-                </Link>
+                 {user ? (
+                     <button onClick={() => onPurchase(pkg)} className="py-2.5 px-5 bg-indigo-600 shadow-sm rounded-full transition-all duration-500 text-base text-white font-semibold text-center w-fit block mx-auto hover:bg-indigo-700">
+                        Purchase Plan
+                    </button>
+                 ) : (
+                    <Link href="/register" className="py-2.5 px-5 bg-indigo-600 shadow-sm rounded-full transition-all duration-500 text-base text-white font-semibold text-center w-fit block mx-auto hover:bg-indigo-700">
+                        Get Started
+                    </Link>
+                 )}
             </div>
         </div>
     );
@@ -58,6 +74,8 @@ const PricingCard = ({ pkg, isFeatured }: { pkg: Package; isFeatured?: boolean }
 export default function PricingPage() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [isSubscribing, setIsSubscribing] = useState(false);
 
   useEffect(() => {
     const fetchPackages = async () => {
@@ -74,21 +92,35 @@ export default function PricingPage() {
     };
     fetchPackages();
   }, []);
+  
+  const handlePurchase = (pkg: Package) => {
+      setSelectedPackage(pkg);
+  };
+  
+  const handleDialogClose = () => {
+    if (!isSubscribing) {
+        setSelectedPackage(null);
+    }
+  }
+
+  if (!stripePromise) {
+    return (
+        <div className="flex h-screen items-center justify-center">
+            <p className="text-center text-red-500">Stripe is not configured. Please add your Stripe publishable key to the environment variables.</p>
+        </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen bg-background dark:bg-gray-900">
       <header className="px-4 lg:px-6 h-14 flex items-center border-b sticky top-0 bg-background/95 z-50">
          <Link href="/" className="flex items-center justify-center gap-2">
            <Logo className="h-6 w-6 text-primary" />
            <span className="font-bold text-lg">CallSync</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
-          <Button variant="ghost" asChild>
-            <Link href="/login">Login</Link>
-          </Button>
-          <Button asChild>
-            <Link href="/register">Sign Up</Link>
-          </Button>
+          <Link href="/login" className="text-sm font-medium hover:underline underline-offset-4">Login</Link>
+          <Link href="/register" className="text-sm font-medium hover:underline underline-offset-4">Sign Up</Link>
         </nav>
       </header>
       <main className="flex-1">
@@ -109,7 +141,7 @@ export default function PricingPage() {
                 ) : (
                     <div className="space-y-8 lg:grid lg:grid-cols-3 sm:gap-6 xl:gap-8 lg:space-y-0 lg:items-center">
                         {packages.map(pkg => (
-                            <PricingCard key={pkg.id} pkg={pkg} isFeatured={pkg.title.toLowerCase() === 'pro'} />
+                            <PricingCard key={pkg.id} pkg={pkg} onPurchase={handlePurchase} isFeatured={pkg.title.toLowerCase() === 'pro'} />
                         ))}
                     </div>
                 )}
@@ -131,7 +163,28 @@ export default function PricingPage() {
           </Link>
         </nav>
       </footer>
+       
+      {selectedPackage && (
+        <Dialog open={!!selectedPackage} onOpenChange={handleDialogClose}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Subscribe to {selectedPackage.title}</DialogTitle>
+                    <DialogDescription>
+                        Complete your subscription by providing your payment details below.
+                    </DialogDescription>
+                </DialogHeader>
+                 <Elements stripe={stripePromise}>
+                    <SubscriptionForm 
+                        selectedPackage={selectedPackage}
+                        isSubscribing={isSubscribing}
+                        setIsSubscribing={setIsSubscribing}
+                        onSuccess={() => setSelectedPackage(null)}
+                    />
+                </Elements>
+            </DialogContent>
+        </Dialog>
+      )}
+
     </div>
   );
 }
- 
