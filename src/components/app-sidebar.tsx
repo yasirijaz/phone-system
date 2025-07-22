@@ -13,7 +13,7 @@ import {
   SidebarMenuSubButton,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
-import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog, Package } from 'lucide-react';
+import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog, Package, CreditCard } from 'lucide-react';
 import { Button } from './ui/button';
 import { Logo } from './icons';
 import { usePathname, useRouter } from 'next/navigation';
@@ -28,6 +28,7 @@ export function AppSidebar() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [isDashboardOpen, setIsDashboardOpen] = useState(pathname.startsWith('/dashboard'));
+  const [isSettingsOpen, setIsSettingsOpen] = useState(pathname.startsWith('/settings'));
 
   const handleLogout = () => {
     logout();
@@ -132,24 +133,42 @@ export function AppSidebar() {
         
         <SidebarGroup>
             <SidebarGroupLabel>Settings</SidebarGroupLabel>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/profile'} tooltip="Profile">
-                <Link href="/profile">
-                  <Users />
-                  <span>Profile</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            {(isSuperAdmin || isCompanyAdmin) && (
-             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/settings'} tooltip="Settings">
-                <Link href="/settings">
-                  <Settings />
-                  <span>Settings</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            )}
+             <Collapsible open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                         <SidebarMenuButton tooltip="Settings" className="justify-between">
+                            <div className="flex items-center gap-2">
+                                <Settings />
+                                <span>Settings</span>
+                            </div>
+                            <ChevronDown className={`h-4 w-4 transition-transform group-data-[collapsible=icon]:hidden ${isSettingsOpen ? 'rotate-180' : ''}`} />
+                        </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                </SidebarMenuItem>
+                 <CollapsibleContent>
+                    <SidebarMenuSub>
+                       <SidebarMenuItem>
+                            <SidebarMenuSubButton asChild isActive={pathname === '/profile'}>
+                               <Link href="/profile">Profile</Link>
+                            </SidebarMenuSubButton>
+                        </SidebarMenuItem>
+                         {(isSuperAdmin || isCompanyAdmin) && (
+                            <SidebarMenuItem>
+                                <SidebarMenuSubButton asChild isActive={pathname === '/settings'}>
+                                  <Link href="/settings">Company</Link>
+                                </SidebarMenuSubButton>
+                            </SidebarMenuItem>
+                         )}
+                         {(isCompanyAdmin || isRegularUser) && (
+                            <SidebarMenuItem>
+                                <SidebarMenuSubButton asChild isActive={pathname === '/settings/billing'}>
+                                  <Link href="/settings/billing">Billing</Link>
+                                </SidebarMenuSubButton>
+                            </SidebarMenuItem>
+                         )}
+                    </SidebarMenuSub>
+                 </CollapsibleContent>
+              </Collapsible>
         </SidebarGroup>
       </SidebarMenu>
       
@@ -179,3 +198,4 @@ export function AppSidebar() {
     </>
   );
 }
+
