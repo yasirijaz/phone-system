@@ -73,9 +73,9 @@ export default function BillingPage() {
                   <div className="space-y-4">
                     <div className="p-4 border rounded-lg flex items-center justify-between">
                         <div>
-                            <h3 className="font-semibold">{subscription.plan.nickname || 'Active Plan'}</h3>
+                            <h3 className="font-semibold">{subscription.plan?.nickname || 'Active Plan'}</h3>
                             <p className="text-sm text-muted-foreground">
-                                You are currently on the {subscription.plan.nickname} plan.
+                                You are currently on the {subscription.plan?.nickname} plan.
                             </p>
                         </div>
                          <Badge variant={subscription.status === 'active' ? 'default' : 'destructive'} className="capitalize">
@@ -87,7 +87,7 @@ export default function BillingPage() {
                          <ul className="space-y-2 text-sm text-muted-foreground">
                             <li className="flex items-center gap-2">
                                 <CheckCircle className="h-4 w-4 text-green-500" />
-                                <span>${(subscription.plan.amount / 100).toFixed(2)} / {subscription.plan.interval}</span>
+                                <span>${(subscription.plan?.amount / 100).toFixed(2)} / {subscription.plan?.interval}</span>
                             </li>
                              <li className="flex items-center gap-2">
                                 <CheckCircle className="h-4 w-4 text-green-500" />
