@@ -43,7 +43,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
-  const acceptedReservationSidRef = useRef<string | null>(null);
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -213,7 +212,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const acceptReservation = (reservation: Reservation) => {
     console.log('accepting reservation', reservation)
-    acceptedReservationSidRef.current = reservation.sid;
+    reservation.task.attributes.autoAccept = reservation.sid;
     reservation.conference({
       endConferenceOnExit: true,
       customParameters: {
