@@ -23,6 +23,7 @@ import {
   Video,
   Voicemail,
 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 
 const recentContacts = [
   { name: "(321) 799-6096", initial: "A" },
