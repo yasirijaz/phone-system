@@ -74,7 +74,7 @@ export default function Dialer({
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                          <Select onValueChange={handleDepartmentSelection} value={departmentId} disabled={loadingDepartments}>
-                            <SelectTrigger>
+                            <SelectTrigger variant="ghost">
                                 <SelectValue placeholder={loadingDepartments ? "Loading..." : "Select Dept."} />
                             </SelectTrigger>
                             <SelectContent>
@@ -84,7 +84,7 @@ export default function Dialer({
                             </SelectContent>
                         </Select>
                          <Select onValueChange={setFromNumber} value={fromNumber} disabled={loadingNumbers || !departmentId}>
-                            <SelectTrigger>
+                            <SelectTrigger variant="ghost">
                                 <SelectValue placeholder={loadingNumbers ? "Loading..." : "From Number"} />
                             </SelectTrigger>
                             <SelectContent>
