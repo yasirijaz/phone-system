@@ -20,7 +20,7 @@ import {
   Video,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Call, Department, PhoneNumber } from "@/types";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger, SidebarFooter } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -176,7 +176,7 @@ export default function AppUIPage() {
     fetchInitialData();
   }, [user, toast]);
   
-  const handleDepartmentChange = async (departmentId: string) => {
+  const handleDepartmentChange = useCallback(async (departmentId: string) => {
     if (!departmentId) {
         setPhoneNumbers([]);
         return;
@@ -191,7 +191,7 @@ export default function AppUIPage() {
     } finally {
         setLoadingNumbers(false);
     }
-  };
+  }, [toast]);
 
 
   const handleMakeCall = async (number: string, fromNumber?: string) => {
@@ -296,7 +296,7 @@ export default function AppUIPage() {
                   <Card><CardContent className="p-6">Call logs will appear here.</CardContent></Card>
               </TabsContent>
                 <TabsContent value="missed" className="mt-6">
-                  <Card><CardContent className="p-6">Missed calls will appear here.</CardContent></Card>
+                   {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls.filter(c => ["no-answer", "busy", "canceled"].includes(c.call_status || ''))} />}
               </TabsContent>
                 <TabsContent value="meetings" className="mt-6">
                   <Card><CardContent className="p-6">Meeting recordings will appear here.</CardContent></Card>
