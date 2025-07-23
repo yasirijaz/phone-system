@@ -1,15 +1,21 @@
 
 
 export interface Call {
-  id: string;
-  contact: string;
-  dateTime: string;
-  duration: number; // in minutes
-  type: 'incoming' | 'outgoing';
-  notes?: string;
-  category?: string;
+  id: string | number;
+  call_sid?: string;
+  to: string;
+  from: string;
+  call_status?: string;
+  direction: 'inbound' | 'outbound';
+  duration: string;
+  call_duration?: string;
+  meta_data?: any;
   is_read?: boolean;
   is_starred?: boolean;
+  recording_url?: string | null;
+  created_at: string;
+  notes?: string;
+  category?: string;
 }
 
 export interface User {
@@ -179,5 +185,3 @@ export interface Contact {
   phone_no: string;
   phone_type: string;
 }
-
-    

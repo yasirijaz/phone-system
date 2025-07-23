@@ -20,63 +20,68 @@ import { useRouter } from 'next/navigation';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, ComposedChart } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 
-const INITIAL_CALLS: Call[] = [
+const INITIAL_CALLS: Partial<Call>[] = [
   {
     id: '1',
-    contact: 'John Doe',
-    dateTime: '2024-07-23T10:00:00',
-    duration: 15,
-    type: 'incoming',
+    from: 'John Doe',
+    to: 'Me',
+    created_at: '2024-07-23T10:00:00',
+    duration: "15",
+    direction: 'inbound',
     notes: 'Discussed Q3 sales targets and performance. Client is happy with the progress but wants to see more detailed reporting.',
     category: 'Sales',
   },
   {
     id: '2',
-    contact: 'Jane Smith',
-    dateTime: '2024-07-23T11:30:00',
-    duration: 5,
-    type: 'outgoing',
+    from: 'Me',
+    to: 'Jane Smith',
+    created_at: '2024-07-23T11:30:00',
+    duration: "5",
+    direction: 'outbound',
     notes: 'Followed up on support ticket #12345. Issue resolved by clearing browser cache.',
     category: 'Support',
   },
     {
     id: '3',
-    contact: 'Alice Johnson',
-    dateTime: '2024-06-15T14:00:00',
-    duration: 30,
-    type: 'incoming',
+    from: 'Alice Johnson',
+    to: 'Me',
+    created_at: '2024-06-15T14:00:00',
+    duration: "30",
+    direction: 'inbound',
     notes: 'Initial discovery call. Potential for a large enterprise deal. Scheduled a follow-up demo for next week.',
     category: 'Sales',
   },
   {
     id: '4',
-    contact: 'Mom',
-    dateTime: '2024-05-22T18:45:00',
-    duration: 25,
-    type: 'incoming',
+    from: 'Mom',
+    to: 'Me',
+    created_at: '2024-05-22T18:45:00',
+    duration: "25",
+    direction: 'inbound',
     notes: 'Called to see how I was doing and talked about weekend plans.',
     category: 'Personal',
   },
     {
     id: '5',
-    contact: 'Tech Support',
-    dateTime: '2024-07-21T09:15:00',
-    duration: 45,
-    type: 'outgoing',
+    from: 'Me',
+    to: 'Tech Support',
+    created_at: '2024-07-21T09:15:00',
+    duration: "45",
+    direction: 'outbound',
     notes: 'Called about the internet outage. They are working on it, ETA 2 hours.',
     category: 'Support',
   },
-  { id: '6', contact: 'Bob Brown', dateTime: '2024-01-10T10:00:00', duration: 20, type: 'incoming', category: 'Sales' },
-  { id: '7', contact: 'Charlie Green', dateTime: '2024-02-12T11:30:00', duration: 10, type: 'outgoing', category: 'Support' },
-  { id: '8', contact: 'David Black', dateTime: '2024-03-14T14:00:00', duration: 40, type: 'incoming', category: 'Sales' },
-  { id: '9', contact: 'Eve White', dateTime: '2024-04-16T18:45:00', duration: 5, type: 'incoming', category: 'Personal' },
-  { id: '10', contact: 'Frank Blue', dateTime: '2024-05-18T09:15:00', duration: 50, type: 'outgoing', category: 'Support' },
-  { id: '11', contact: 'Grace Pink', dateTime: '2024-06-20T10:00:00', duration: 12, type: 'incoming', category: 'Sales' },
-  { id: '12', contact: 'Harry Yellow', dateTime: '2024-08-24T11:30:00', duration: 8, type: 'outgoing', category: 'Support' },
-  { id: '13', contact: 'Ivy Orange', dateTime: '2024-09-26T14:00:00', duration: 35, type: 'incoming', category: 'Sales' },
-  { id: '14', contact: 'Jack Purple', dateTime: '2024-10-28T18:45:00', duration: 18, type: 'incoming', category: 'Personal' },
-  { id: '15', contact: 'Kate Silver', dateTime: '2024-11-30T09:15:00', duration: 60, type: 'outgoing', category: 'Support' },
-  { id: '16', contact: 'Leo Gold', dateTime: '2024-12-01T10:00:00', duration: 22, type: 'incoming', category: 'Sales' },
+  { id: '6', from: 'Bob Brown', to: 'Me', created_at: '2024-01-10T10:00:00', duration: "20", direction: 'inbound', category: 'Sales' },
+  { id: '7', from: 'Me', to: 'Charlie Green', created_at: '2024-02-12T11:30:00', duration: "10", direction: 'outbound', category: 'Support' },
+  { id: '8', from: 'David Black', to: 'Me', created_at: '2024-03-14T14:00:00', duration: "40", direction: 'inbound', category: 'Sales' },
+  { id: '9', from: 'Eve White', to: 'Me', created_at: '2024-04-16T18:45:00', duration: "5", direction: 'inbound', category: 'Personal' },
+  { id: '10', from: 'Me', to: 'Frank Blue', created_at: '2024-05-18T09:15:00', duration: "50", direction: 'outbound', category: 'Support' },
+  { id: '11', from: 'Grace Pink', to: 'Me', created_at: '2024-06-20T10:00:00', duration: "12", direction: 'inbound', category: 'Sales' },
+  { id: '12', from: 'Me', to: 'Harry Yellow', created_at: '2024-08-24T11:30:00', duration: "8", direction: 'outbound', category: 'Support' },
+  { id: '13', from: 'Ivy Orange', to: 'Me', created_at: '2024-09-26T14:00:00', duration: "35", direction: 'inbound', category: 'Sales' },
+  { id: '14', from: 'Jack Purple', to: 'Me', created_at: '2024-10-28T18:45:00', duration: "18", direction: 'inbound', category: 'Personal' },
+  { id: '15', from: 'Me', to: 'Kate Silver', created_at: '2024-11-30T09:15:00', duration: "60", direction: 'outbound', category: 'Support' },
+  { id: '16', from: 'Leo Gold', to: 'Me', created_at: '2024-12-01T10:00:00', duration: "22", direction: 'inbound', category: 'Sales' },
 ];
 
 const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: string, value: string, icon: React.ElementType, trend: string, trendType: 'up' | 'down' }) => (
@@ -96,7 +101,7 @@ const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: strin
 );
 
 
-const MonthlySalesChart = ({ calls }: { calls: Call[] }) => {
+const MonthlySalesChart = ({ calls }: { calls: Partial<Call>[] }) => {
     const data = useMemo(() => {
         const salesByMonth: { [key: string]: number } = {};
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -104,9 +109,11 @@ const MonthlySalesChart = ({ calls }: { calls: Call[] }) => {
         monthNames.forEach(name => salesByMonth[name] = 0);
 
         calls.forEach(call => {
-            const month = new Date(call.dateTime).getMonth();
-            const monthName = monthNames[month];
-            salesByMonth[monthName] += 1;
+            if (call.created_at) {
+                const month = new Date(call.created_at).getMonth();
+                const monthName = monthNames[month];
+                salesByMonth[monthName] += 1;
+            }
         });
 
         return monthNames.map(name => ({ name, sales: salesByMonth[name] }));
@@ -131,7 +138,7 @@ const MonthlySalesChart = ({ calls }: { calls: Call[] }) => {
     );
 };
 
-const StatisticsChart = ({ calls }: { calls: Call[] }) => {
+const StatisticsChart = ({ calls }: { calls: Partial<Call>[] }) => {
   const data = useMemo(() => {
     const statsByMonth: { [key: string]: { calls: number, duration: number } } = {};
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -139,10 +146,12 @@ const StatisticsChart = ({ calls }: { calls: Call[] }) => {
     monthNames.forEach(name => statsByMonth[name] = { calls: 0, duration: 0 });
 
     calls.forEach(call => {
-      const month = new Date(call.dateTime).getMonth();
-      const monthName = monthNames[month];
-      statsByMonth[monthName].calls += 1;
-      statsByMonth[monthName].duration += call.duration;
+      if(call.created_at && call.duration) {
+        const month = new Date(call.created_at).getMonth();
+        const monthName = monthNames[month];
+        statsByMonth[monthName].calls += 1;
+        statsByMonth[monthName].duration += parseInt(call.duration, 10);
+      }
     });
 
     return monthNames.map(name => ({ name, ...statsByMonth[name] }));
@@ -228,7 +237,7 @@ const MonthlyTargetCard = () => (
 export default function EcommerceDashboard() {
   const { user } = useAuth();
   const router = useRouter();
-  const [calls, setCalls] = useState<Call[]>(INITIAL_CALLS);
+  const [calls, setCalls] = useState<Call[]>(INITIAL_CALLS as Call[]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showIncomingCall, setShowIncomingCall] = useState(false);
@@ -241,8 +250,11 @@ export default function EcommerceDashboard() {
 
   const filteredCalls = useMemo(() => {
     return calls
-      .filter(call => call.contact.toLowerCase().includes(searchTerm.toLowerCase()))
-      .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+      .filter(call => {
+          const contact = call.direction === 'inbound' ? call.from : call.to;
+          return contact.toLowerCase().includes(searchTerm.toLowerCase())
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [calls, searchTerm]);
 
   const { totalCalls, totalDuration, mostFrequentContact } = useMemo(() => {
@@ -250,10 +262,11 @@ export default function EcommerceDashboard() {
       return { totalCalls: 0, totalDuration: 0, mostFrequentContact: 'N/A' };
     }
 
-    const totalDuration = calls.reduce((acc, call) => acc + call.duration, 0);
+    const totalDuration = calls.reduce((acc, call) => acc + (parseInt(call.duration, 10) || 0), 0);
 
     const contactCounts = calls.reduce((acc, call) => {
-      acc[call.contact] = (acc[call.contact] || 0) + 1;
+      const contact = call.direction === 'inbound' ? call.from : call.to;
+      acc[contact] = (acc[contact] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
@@ -269,9 +282,8 @@ export default function EcommerceDashboard() {
   }, [calls]);
 
 
-  const handleAddCall = (newCall: Omit<Call, 'id'>) => {
-    const callWithId: Call = { ...newCall, id: crypto.randomUUID() };
-    setCalls(prevCalls => [callWithId, ...prevCalls]);
+  const handleAddCall = (newCall: Partial<Call>) => {
+    setCalls(prevCalls => [newCall as Call, ...prevCalls]);
     setIsSheetOpen(false);
   };
   

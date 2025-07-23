@@ -15,13 +15,13 @@ import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import Image from 'next/image';
 
-const INITIAL_CALLS: Call[] = [
-  { id: '1', contact: 'John Doe', dateTime: '2024-07-23T10:00:00', duration: 15, type: 'incoming', category: 'Sales' },
-  { id: '2', contact: 'Jane Smith', dateTime: '2024-07-23T11:30:00', duration: 5, type: 'outgoing', category: 'Support' },
-  { id: '3', contact: 'Alice Johnson', dateTime: '2024-06-15T14:00:00', duration: 30, type: 'incoming', category: 'Sales' },
-  { id: '4', contact: 'Mom', dateTime: '2024-05-22T18:45:00', duration: 25, type: 'incoming', category: 'Personal' },
-  { id: '5', contact: 'Tech Support', dateTime: '2024-07-21T09:15:00', duration: 45, type: 'outgoing', category: 'Support' },
-  ...Array.from({ length: 25 }, (_, i) => ({ id: `${i + 6}`, contact: `Contact ${i + 1}`, dateTime: `2024-07-${String(i + 1).padStart(2, '0')}T10:00:00`, duration: Math.floor(Math.random() * 60), type: i % 2 === 0 ? 'incoming' : 'outgoing', category: ['Sales', 'Support', 'Personal'][i % 3] })),
+const INITIAL_CALLS: Partial<Call>[] = [
+  { id: '1', from: 'John Doe', to: 'Me', created_at: '2024-07-23T10:00:00', duration: "15", direction: 'inbound', category: 'Sales' },
+  { id: '2', from: 'Me', to: 'Jane Smith', created_at: '2024-07-23T11:30:00', duration: "5", direction: 'outbound', category: 'Support' },
+  { id: '3', from: 'Alice Johnson', to: 'Me', created_at: '2024-06-15T14:00:00', duration: "30", direction: 'inbound', category: 'Sales' },
+  { id: '4', from: 'Mom', to: 'Me', created_at: '2024-05-22T18:45:00', duration: "25", direction: 'inbound', category: 'Personal' },
+  { id: '5', from: 'Me', to: 'Tech Support', created_at: '2024-07-21T09:15:00', duration: "45", direction: 'outbound', category: 'Support' },
+  ...Array.from({ length: 25 }, (_, i) => ({ id: `${i + 6}`, from: i % 2 === 0 ? `Contact ${i + 1}` : 'Me', to: i % 2 === 0 ? 'Me' : `Contact ${i + 1}`, created_at: `2024-07-${String(i + 1).padStart(2, '0')}T10:00:00`, duration: String(Math.floor(Math.random() * 60)), direction: i % 2 === 0 ? 'inbound' : 'outbound', category: ['Sales', 'Support', 'Personal'][i % 3] })),
 ];
 
 
@@ -41,7 +41,7 @@ const StatCard = ({ title, value, percentage, change, icon: Icon, changeType }: 
     </Card>
 );
 
-const AnalyticsChart = ({ calls }: { calls: Call[] }) => {
+const AnalyticsChart = ({ calls }: { calls: Partial<Call>[] }) => {
     const data = useMemo(() => {
         const callsByDay: { [key: string]: number } = {};
         for(let i=1; i<=30; i++) {
@@ -49,9 +49,11 @@ const AnalyticsChart = ({ calls }: { calls: Call[] }) => {
         }
 
         calls.forEach(call => {
-            const day = new Date(call.dateTime).getDate();
-            if(day >= 1 && day <= 30){
-                callsByDay[day] = (callsByDay[day] || 0) + 1;
+            if (call.created_at) {
+                const day = new Date(call.created_at).getDate();
+                if(day >= 1 && day <= 30){
+                    callsByDay[day] = (callsByDay[day] || 0) + 1;
+                }
             }
         });
 
@@ -202,7 +204,7 @@ const DonutChartCard = ({ title, data, legendItems }: { title: string, data: { n
     </Card>
 );
 
-const RecentCallsTable = ({ calls }: { calls: Call[] }) => (
+const RecentCallsTable = ({ calls }: { calls: Partial<Call>[] }) => (
   <Card className="col-span-12">
     <CardHeader>
       <div className="flex justify-between items-center">
@@ -227,13 +229,13 @@ const RecentCallsTable = ({ calls }: { calls: Call[] }) => (
         <TableBody>
           {calls.slice(0, 5).map((call) => (
             <TableRow key={call.id}>
-              <TableCell className="font-medium">{call.contact}</TableCell>
+              <TableCell className="font-medium">{call.direction === 'inbound' ? call.from : call.to}</TableCell>
               <TableCell>
                 <Badge variant="secondary">{call.category}</Badge>
               </TableCell>
-              <TableCell>{call.type}</TableCell>
+              <TableCell>{call.direction}</TableCell>
               <TableCell>{call.duration} min</TableCell>
-              <TableCell className="text-right">{new Date(call.dateTime).toLocaleDateString()}</TableCell>
+              <TableCell className="text-right">{call.created_at ? new Date(call.created_at).toLocaleDateString() : ''}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -286,7 +288,8 @@ export default function CallsDashboard() {
   const topContacts = useMemo(() => {
     const counts: Record<string, number> = {};
     INITIAL_CALLS.forEach(call => {
-        counts[call.contact] = (counts[call.contact] || 0) + 1;
+        const contact = call.direction === 'inbound' ? call.from : call.to;
+        if(contact) counts[contact] = (counts[contact] || 0) + 1;
     });
     return Object.entries(counts)
         .sort((a, b) => b[1] - a[1])
@@ -321,6 +324,15 @@ export default function CallsDashboard() {
 
   const legendItems = callsByCategoryData.map(d => d.name);
 
+  const totalDuration = useMemo(() => {
+    return INITIAL_CALLS.reduce((acc, c) => acc + (parseInt(c.duration || '0', 10)), 0);
+  }, []);
+
+  const avgDuration = useMemo(() => {
+    if (INITIAL_CALLS.length === 0) return 0;
+    return totalDuration / INITIAL_CALLS.length;
+  }, [totalDuration]);
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -346,8 +358,8 @@ export default function CallsDashboard() {
             <main className="flex-1 p-4 md:p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                     <StatCard title="Total Calls" value={INITIAL_CALLS.length.toString()} percentage="+20%" change="vs last month" icon={Phone} changeType="up" />
-                    <StatCard title="Total Duration" value={`${INITIAL_CALLS.reduce((acc, c) => acc + c.duration, 0)} min`} percentage="+4%" change="vs last month" icon={Clock} changeType="up" />
-                    <StatCard title="Avg. Duration" value={`${(INITIAL_CALLS.reduce((acc, c) => acc + c.duration, 0) / INITIAL_CALLS.length).toFixed(1)} min`} percentage="-1.59%" change="vs last month" icon={TrendingDown} changeType="down" />
+                    <StatCard title="Total Duration" value={`${totalDuration} min`} percentage="+4%" change="vs last month" icon={Clock} changeType="up" />
+                    <StatCard title="Avg. Duration" value={`${avgDuration.toFixed(1)} min`} percentage="-1.59%" change="vs last month" icon={TrendingDown} changeType="down" />
                     <StatCard title="Answer Rate" value="92%" percentage="+7%" change="vs last month" icon={TrendingUp} changeType="up" />
                 </div>
                 <AnalyticsChart calls={INITIAL_CALLS} />

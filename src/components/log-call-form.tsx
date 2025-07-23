@@ -15,14 +15,14 @@ import { Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 interface LogCallFormProps {
-  onCallAdded: (call: Omit<Call, 'id'>) => void
+  onCallAdded: (call: Partial<Call>) => void
 }
 
 const formSchema = z.object({
   contact: z.string().min(2, { message: 'Contact name must be at least 2 characters.' }),
   dateTime: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Please select a valid date and time" }),
   duration: z.coerce.number().min(1, { message: 'Duration must be at least 1 minute.' }),
-  type: z.enum(['incoming', 'outgoing'], { required_error: "You must select a call type." }),
+  direction: z.enum(['inbound', 'outbound'], { required_error: "You must select a call type." }),
   notes: z.string().optional(),
   category: z.string().optional(),
 });
@@ -37,7 +37,7 @@ export default function LogCallForm({ onCallAdded }: LogCallFormProps) {
       contact: "",
       dateTime: new Date().toISOString().substring(0, 16),
       duration: 10,
-      type: "incoming",
+      direction: "inbound",
       notes: "",
       category: "",
     },
@@ -72,7 +72,17 @@ export default function LogCallForm({ onCallAdded }: LogCallFormProps) {
   };
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    onCallAdded(values);
+    const callData: Partial<Call> = {
+        id: crypto.randomUUID(),
+        from: values.direction === 'inbound' ? values.contact : 'Me',
+        to: values.direction === 'outbound' ? values.contact : 'Me',
+        created_at: values.dateTime,
+        duration: String(values.duration),
+        direction: values.direction,
+        notes: values.notes,
+        category: values.category
+    }
+    onCallAdded(callData);
     form.reset();
   }
 
@@ -84,9 +94,9 @@ export default function LogCallForm({ onCallAdded }: LogCallFormProps) {
           name="contact"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Contact Name</FormLabel>
+              <FormLabel>Contact Name/Number</FormLabel>
               <FormControl>
-                <Input placeholder="e.g. Jane Doe" {...field} />
+                <Input placeholder="e.g. Jane Doe or +1..." {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -124,7 +134,7 @@ export default function LogCallForm({ onCallAdded }: LogCallFormProps) {
         
         <FormField
           control={form.control}
-          name="type"
+          name="direction"
           render={({ field }) => (
             <FormItem className="space-y-3">
               <FormLabel>Call Type</FormLabel>
@@ -136,13 +146,13 @@ export default function LogCallForm({ onCallAdded }: LogCallFormProps) {
                 >
                   <FormItem className="flex items-center space-x-2 space-y-0">
                     <FormControl>
-                      <RadioGroupItem value="incoming" />
+                      <RadioGroupItem value="inbound" />
                     </FormControl>
                     <FormLabel className="font-normal">Incoming</FormLabel>
                   </FormItem>
                   <FormItem className="flex items-center space-x-2 space-y-0">
                     <FormControl>
-                      <RadioGroupItem value="outgoing" />
+                      <RadioGroupItem value="outbound" />
                     </FormControl>
                     <FormLabel className="font-normal">Outgoing</FormLabel>
                   </FormItem>

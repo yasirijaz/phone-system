@@ -9,24 +9,27 @@ interface CallLogProps {
 }
 
 function CallCard({ call }: { call: Call }) {
+  const contact = call.direction === 'inbound' ? call.from : call.to;
+  const type = call.direction === 'inbound' ? 'incoming' : 'outgoing';
+
   return (
     <Card className="mb-4 transition-all hover:shadow-lg">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {call.type === 'incoming' ? 
+            {type === 'incoming' ? 
               <PhoneIncoming className="h-6 w-6 text-green-500" /> : 
               <PhoneOutgoing className="h-6 w-6 text-blue-500" />
             }
-            <CardTitle className="text-lg">{call.contact}</CardTitle>
+            <CardTitle className="text-lg">{contact}</CardTitle>
           </div>
           {call.category && <Badge variant="secondary">{call.category}</Badge>}
         </div>
         <CardDescription className="flex items-center gap-4 pt-2 text-xs">
-          {call.dateTime && (
+          {call.created_at && (
             <>
-              <span className="flex items-center gap-1.5"><CalendarDays className="h-3 w-3" /> {format(parseISO(call.dateTime), 'PP')}</span>
-              <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {format(parseISO(call.dateTime), 'p')}</span>
+              <span className="flex items-center gap-1.5"><CalendarDays className="h-3 w-3" /> {format(parseISO(call.created_at), 'PP')}</span>
+              <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {format(parseISO(call.created_at), 'p')}</span>
             </>
           )}
           <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {call.duration} min</span>
