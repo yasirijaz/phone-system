@@ -24,6 +24,8 @@ import {
   Voicemail,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import Link from "next/link";
+import { Logo } from "@/components/icons";
 
 const recentContacts = [
   { name: "(321) 799-6096", initial: "A" },
@@ -99,39 +101,11 @@ export default function AppUIPage() {
       <div className="flex flex-1 flex-col">
         {/* Header */}
         <header className="flex h-16 items-center border-b px-6 justify-between">
-          <div className="flex items-center gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Phone className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Calls</p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MessageSquare className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Messages</p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Video className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Meetings</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <div className="flex items-center gap-4">
+             <Link href="/dashboard/ecommerce" className="flex items-center gap-2 text-foreground">
+                <Logo className="h-6 w-6" />
+                <span className="font-semibold text-lg">CallSync</span>
+            </Link>
           </div>
           <div className="w-full max-w-md">
             <div className="relative">
