@@ -1,6 +1,6 @@
 import type { Call } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PhoneIncoming, PhoneOutgoing, User, Clock, CalendarDays, Tag, NotebookText } from 'lucide-react';
+import { PhoneIncoming, PhoneOutgoing, User, Clock, CalendarDays } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
 
