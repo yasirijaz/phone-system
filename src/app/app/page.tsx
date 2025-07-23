@@ -16,7 +16,7 @@ import {
   Search,
   Users,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useState } from "react";
 import LogCallForm from "@/components/log-call-form";
@@ -144,23 +144,6 @@ export default function AppUIPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
-                    <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                        <SheetTrigger asChild>
-                        <Button>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Log a Call
-                        </Button>
-                        </SheetTrigger>
-                        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-                        <SheetHeader>
-                            <SheetTitle>Log a New Call</SheetTitle>
-                            <SheetDescription>
-                            Enter the details of your call. Use the AI tool to categorize it automatically based on your notes.
-                            </SheetDescription>
-                        </SheetHeader>
-                        <LogCallForm onCallAdded={handleAddCall} />
-                        </SheetContent>
-                    </Sheet>
                     <Dialer onMakeCall={handleMakeCall} />
                 </div>
             </header>
