@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,6 +11,39 @@ import { Settings, MoreHorizontal } from 'lucide-react';
 
 export default function HardwareSettings() {
     const [isOpen, setIsOpen] = useState(false);
+    const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
+    const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
+    const [selectedMicrophone, setSelectedMicrophone] = useState<string>('');
+    const [selectedSpeaker, setSelectedSpeaker] = useState<string>('');
+
+    useEffect(() => {
+        const getDevices = async () => {
+            try {
+                // Request permission to access media devices
+                await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputs = devices.filter(device => device.kind === 'audioinput');
+                const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+                
+                setAudioInputDevices(audioInputs);
+                setAudioOutputDevices(audioOutputs);
+
+                if (audioInputs.length > 0) {
+                    setSelectedMicrophone(audioInputs[0].deviceId);
+                }
+                if (audioOutputs.length > 0) {
+                    setSelectedSpeaker(audioOutputs[0].deviceId);
+                }
+
+            } catch (err) {
+                console.error("Error enumerating devices:", err);
+            }
+        };
+
+        if (isOpen) {
+            getDevices();
+        }
+    }, [isOpen]);
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -29,13 +62,16 @@ export default function HardwareSettings() {
                             <Label htmlFor="mic-select">Microphone</Label>
                              <Button variant="ghost" size="icon" className="h-6 w-6"><MoreHorizontal className="h-4 w-4" /></Button>
                         </div>
-                        <Select defaultValue="default-mic">
+                        <Select value={selectedMicrophone} onValueChange={setSelectedMicrophone}>
                             <SelectTrigger id="mic-select">
                                 <SelectValue placeholder="Select Microphone" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="default-mic">Default - Microphone (USB Audio Device)</SelectItem>
-                                <SelectItem value="mic-2">Built-in Microphone</SelectItem>
+                                {audioInputDevices.map(device => (
+                                    <SelectItem key={device.deviceId} value={device.deviceId}>
+                                        {device.label || `Microphone ${audioInputDevices.indexOf(device) + 1}`}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                         <div className="flex items-center space-x-2 mt-2">
@@ -48,13 +84,16 @@ export default function HardwareSettings() {
                             <Label htmlFor="speaker-select">Speaker / Headset</Label>
                             <Button variant="link" size="sm" className="p-0 h-auto">Test</Button>
                         </div>
-                        <Select defaultValue="default-speaker">
+                         <Select value={selectedSpeaker} onValueChange={setSelectedSpeaker}>
                             <SelectTrigger id="speaker-select">
                                 <SelectValue placeholder="Select Speaker" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="default-speaker">Default - Speakers (USB Audio Device)</SelectItem>
-                                <SelectItem value="speaker-2">Headphones</SelectItem>
+                               {audioOutputDevices.map(device => (
+                                    <SelectItem key={device.deviceId} value={device.deviceId}>
+                                        {device.label || `Speaker ${audioOutputDevices.indexOf(device) + 1}`}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
