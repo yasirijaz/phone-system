@@ -9,7 +9,14 @@ interface CallLogProps {
 }
 
 function CallCard({ call }: { call: Call }) {
-  const contact = call.direction === 'inbound' ? call.from : call.to;
+  const getContactName = () => {
+    if (call.direction === 'inbound') {
+      return call.meta_data?.from_name || call.from;
+    }
+    return call.meta_data?.to_name || call.to;
+  };
+  
+  const contact = getContactName();
   const type = call.direction === 'inbound' ? 'incoming' : 'outgoing';
 
   return (
