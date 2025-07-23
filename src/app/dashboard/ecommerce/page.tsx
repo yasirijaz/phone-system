@@ -80,33 +80,6 @@ const INITIAL_CALLS: Call[] = [
   { id: '16', contact: 'Leo Gold', dateTime: '2024-12-01T10:00:00', duration: 22, type: 'incoming', category: 'Sales' },
 ];
 
-function TwilioStatus() {
-  const { isDeviceReady, isWorkerReady, connectTwilio } = useTwilio();
-
-  return (
-    <TooltipProvider>
-      <div className="flex items-center gap-3">
-        <Tooltip>
-          <TooltipTrigger className="cursor-pointer">
-            <Phone className={`h-5 w-5 ${isDeviceReady ? 'text-green-500' : 'text-destructive'}`} />
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Device: {isDeviceReady ? 'Ready' : 'Not Ready'}</p>
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger className="cursor-pointer" onClick={connectTwilio}>
-            <UserCheck className={`h-5 w-5 ${isWorkerReady ? 'text-green-500' : 'text-destructive'}`} />
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Worker: {isWorkerReady ? 'Ready' : 'Not Ready'}</p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
-    </TooltipProvider>
-  )
-}
-
 const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: string, value: string, icon: React.ElementType, trend: string, trendType: 'up' | 'down' }) => (
     <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -260,7 +233,7 @@ export default function EcommerceDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showIncomingCall, setShowIncomingCall] = useState(false);
-  const { device, connectTwilio, isConnecting, isDeviceReady, isWorkerReady } = useTwilio();
+  const { device, isDeviceReady } = useTwilio();
 
   useEffect(() => {
     if(user?.role_id === 1) {
@@ -355,13 +328,6 @@ export default function EcommerceDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <TwilioStatus />
-               {!(isDeviceReady && isWorkerReady) && (
-                <Button onClick={connectTwilio} disabled={isConnecting}>
-                  <Zap className="mr-2 h-4 w-4" />
-                  {isConnecting ? 'Connecting...' : 'Connect to Twilio'}
-                </Button>
-              )}
               <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetTrigger asChild>
                   <Button>
@@ -426,4 +392,3 @@ export default function EcommerceDashboard() {
     </SidebarProvider>
   );
 }
-
