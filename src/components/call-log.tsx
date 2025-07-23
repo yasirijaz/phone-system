@@ -35,7 +35,7 @@ function CallCard({ call }: { call: Call }) {
             {call.category && <Badge variant="secondary">{call.category}</Badge>}
           </div>
         </div>
-        <CardDescription className="flex items-center gap-4 pt-2 text-xs">
+        <CardDescription className="flex items-center flex-wrap gap-x-4 gap-y-1 pt-2 text-xs">
           {call.created_at && (
             <>
               <span className="flex items-center gap-1.5"><CalendarDays className="h-3 w-3" /> {format(parseISO(call.created_at), 'PP')}</span>
@@ -47,6 +47,7 @@ function CallCard({ call }: { call: Call }) {
             {type === 'incoming' ? <PhoneIncoming className="h-3 w-3" /> : <PhoneOutgoing className="h-3 w-3" />}
             {call.direction}
           </span>
+           <span className="flex items-center gap-1.5"><User className="h-3 w-3" /> From: {call.from}</span>
         </CardDescription>
       </CardHeader>
       {call.notes && (
