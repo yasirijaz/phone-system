@@ -1,19 +1,36 @@
 
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Phone, PhoneOutgoing, Delete } from "lucide-react";
+import { Phone, Delete } from "lucide-react";
+import type { Department, PhoneNumber } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface DialerProps {
-    onMakeCall: (number: string) => void;
+    onMakeCall: (number: string, fromNumber?: string) => void;
     children: ReactNode;
+    departments: Department[];
+    phoneNumbers: PhoneNumber[];
+    onDepartmentChange: (departmentId: string) => void;
+    loadingDepartments: boolean;
+    loadingNumbers: boolean;
 }
 
-export default function Dialer({ onMakeCall, children }: DialerProps) {
+export default function Dialer({ 
+    onMakeCall, 
+    children, 
+    departments,
+    phoneNumbers,
+    onDepartmentChange,
+    loadingDepartments,
+    loadingNumbers,
+}: DialerProps) {
     const [number, setNumber] = useState('');
+    const [fromNumber, setFromNumber] = useState('');
+    const [departmentId, setDepartmentId] = useState('');
 
     const handleDigitClick = (digit: string) => {
         setNumber(prev => prev + digit);
@@ -25,9 +42,15 @@ export default function Dialer({ onMakeCall, children }: DialerProps) {
 
     const handleCall = () => {
         if (number) {
-            onMakeCall(number);
+            onMakeCall(number, fromNumber);
         }
     };
+
+    const handleDepartmentSelection = (id: string) => {
+        setDepartmentId(id);
+        setFromNumber('');
+        onDepartmentChange(id);
+    }
     
     const dialpadKeys = [
         '1', '2', '3',
@@ -49,6 +72,29 @@ export default function Dialer({ onMakeCall, children }: DialerProps) {
                             Enter a number to make an outgoing call.
                         </p>
                     </div>
+                    <div className="grid grid-cols-2 gap-2">
+                         <Select onValueChange={handleDepartmentSelection} value={departmentId} disabled={loadingDepartments}>
+                            <SelectTrigger>
+                                <SelectValue placeholder={loadingDepartments ? "Loading..." : "Select Dept."} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {departments.map(dept => (
+                                    <SelectItem key={dept.id} value={String(dept.id)}>{dept.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                         <Select onValueChange={setFromNumber} value={fromNumber} disabled={loadingNumbers || !departmentId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder={loadingNumbers ? "Loading..." : "From Number"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {phoneNumbers.map(num => (
+                                    <SelectItem key={num.id} value={num.phone_no}>{num.phone_no}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
                     <div className="relative">
                         <Input 
                             value={number} 
@@ -69,7 +115,7 @@ export default function Dialer({ onMakeCall, children }: DialerProps) {
                              </Button>
                         ))}
                     </div>
-                    <Button onClick={handleCall} disabled={!number} className="bg-green-600 hover:bg-green-700">
+                    <Button onClick={handleCall} disabled={!number || !fromNumber} className="bg-green-600 hover:bg-green-700">
                         <Phone className="mr-2 h-4 w-4" />
                         Call
                     </Button>

@@ -20,8 +20,8 @@ import {
   Video,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useState } from "react";
-import type { Call } from "@/types";
+import { useState, useEffect } from "react";
+import type { Call, Department, PhoneNumber } from "@/types";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/AuthContext";
@@ -29,6 +29,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import Dialer from "@/components/dialer";
 import { useTwilio } from '@/context/TwilioContext';
 import NewMessageForm from "@/components/new-message-form";
+import { getDepartments } from "@/services/departmentService";
+import { getUserDepartments } from "@/services/userService";
+import { getPhoneNumbers } from "@/services/phoneNumberService";
+import { useToast } from "@/hooks/use-toast";
 
 
 const recentContacts = [
@@ -125,17 +129,65 @@ export default function AppUIPage() {
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
 
   const { device, isDeviceReady } = useTwilio();
+  const { toast } = useToast();
 
-  const handleMakeCall = async (number: string) => {
+  // State for departments and phone numbers
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(true);
+  const [loadingNumbers, setLoadingNumbers] = useState(false);
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+        if (!user) return;
+        setLoadingDepartments(true);
+        try {
+            const isAdmin = user.role_id === 1 || user.role_id === 2;
+            const fetchedDepts = isAdmin && user.company_id
+                ? await getDepartments(user.company_id)
+                : await getUserDepartments(user.id);
+            setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
+        } catch (error) {
+            toast({ title: "Error", description: "Failed to load departments.", variant: "destructive" });
+        } finally {
+            setLoadingDepartments(false);
+        }
+    };
+    fetchDepartments();
+  }, [user, toast]);
+  
+  const handleDepartmentChange = async (departmentId: string) => {
+    if (!departmentId) {
+        setPhoneNumbers([]);
+        return;
+    };
+    setLoadingNumbers(true);
+    try {
+        const numbers = await getPhoneNumbers(Number(departmentId));
+        setPhoneNumbers(numbers);
+    } catch (error) {
+        toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
+        setPhoneNumbers([]);
+    } finally {
+        setLoadingNumbers(false);
+    }
+  };
+
+
+  const handleMakeCall = async (number: string, fromNumber?: string) => {
     if (!device || !isDeviceReady) {
-        alert("Twilio Device not ready. Please connect first.");
+        toast({ title: "Twilio Error", description: "Twilio Device not ready. Please connect first.", variant: 'destructive'});
         return;
     }
     try {
-        await device.connect({ params: { To: number } });
+        const params: { To: string, From?: string } = { To: number };
+        if (fromNumber) {
+            params.From = fromNumber;
+        }
+        await device.connect({ params });
     } catch (error) {
         console.error("Error making call:", error);
-        alert("Failed to make call. See console for details.");
+        toast({ title: "Call Error", description: "Failed to make call. See console for details.", variant: 'destructive'});
     }
   };
 
@@ -158,7 +210,14 @@ export default function AppUIPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                     <Dialer onMakeCall={handleMakeCall}>
+                     <Dialer
+                        onMakeCall={handleMakeCall}
+                        departments={departments}
+                        phoneNumbers={phoneNumbers}
+                        onDepartmentChange={handleDepartmentChange}
+                        loadingDepartments={loadingDepartments}
+                        loadingNumbers={loadingNumbers}
+                     >
                        <Button variant="ghost" size="icon"><Phone className="h-5 w-5" /></Button>
                      </Dialer>
                      <Button variant="ghost" size="icon" onClick={() => setIsSmsOpen(true)}><MessageSquare className="h-5 w-5" /></Button>
@@ -264,7 +323,14 @@ export default function AppUIPage() {
               Select a department and number to send a message from.
             </DialogDescription>
           </DialogHeader>
-          <NewMessageForm onClose={() => setIsSmsOpen(false)} />
+          <NewMessageForm 
+            onClose={() => setIsSmsOpen(false)}
+            departments={departments}
+            phoneNumbers={phoneNumbers}
+            onDepartmentChange={handleDepartmentChange}
+            loadingDepartments={loadingDepartments}
+            loadingNumbers={loadingNumbers}
+          />
         </DialogContent>
       </Dialog>
       

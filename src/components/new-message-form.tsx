@@ -5,10 +5,6 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useAuth } from '@/context/AuthContext';
-import { getDepartments } from '@/services/departmentService';
-import { getUserDepartments } from '@/services/userService';
-import { getPhoneNumbers } from '@/services/phoneNumberService';
 import type { Department, PhoneNumber } from '@/types';
 import { Button } from './ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
@@ -16,10 +12,14 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
 
 interface NewMessageFormProps {
     onClose: () => void;
+    departments: Department[];
+    phoneNumbers: PhoneNumber[];
+    onDepartmentChange: (departmentId: string) => void;
+    loadingDepartments: boolean;
+    loadingNumbers: boolean;
 }
 
 const messageSchema = z.object({
@@ -30,14 +30,16 @@ const messageSchema = z.object({
 });
 
 
-export default function NewMessageForm({ onClose }: NewMessageFormProps) {
-    const { user } = useAuth();
+export default function NewMessageForm({ 
+    onClose, 
+    departments, 
+    phoneNumbers, 
+    onDepartmentChange,
+    loadingDepartments,
+    loadingNumbers,
+}: NewMessageFormProps) {
     const { toast } = useToast();
-    const [departments, setDepartments] = useState<Department[]>([]);
-    const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
-    const [loadingDepartments, setLoadingDepartments] = useState(true);
-    const [loadingNumbers, setLoadingNumbers] = useState(false);
-
+    
     const form = useForm<z.infer<typeof messageSchema>>({
         resolver: zodResolver(messageSchema),
         defaultValues: { recipient: "", departmentId: "", fromNumber: "", message: "" }
@@ -46,44 +48,16 @@ export default function NewMessageForm({ onClose }: NewMessageFormProps) {
     const selectedDepartmentId = form.watch("departmentId");
 
     useEffect(() => {
-        const fetchDepartments = async () => {
-            if (!user) return;
-            setLoadingDepartments(true);
-            try {
-                const isAdmin = user.role_id === 1 || user.role_id === 2;
-                const fetchedDepts = isAdmin && user.company_id
-                    ? await getDepartments(user.company_id)
-                    : await getUserDepartments(user.id);
-                setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
-            } catch (error) {
-                toast({ title: "Error", description: "Failed to load departments.", variant: "destructive" });
-            } finally {
-                setLoadingDepartments(false);
-            }
-        };
-        fetchDepartments();
-    }, [user, toast]);
+        if (selectedDepartmentId) {
+            onDepartmentChange(selectedDepartmentId);
+        }
+    }, [selectedDepartmentId, onDepartmentChange]);
     
+    // Reset fromNumber when department changes
     useEffect(() => {
-        const fetchNumbers = async () => {
-            if (!selectedDepartmentId) {
-                setPhoneNumbers([]);
-                return;
-            };
-            setLoadingNumbers(true);
-            try {
-                const numbers = await getPhoneNumbers(Number(selectedDepartmentId));
-                setPhoneNumbers(numbers);
-                form.setValue('fromNumber', '');
-            } catch (error) {
-                toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
-                setPhoneNumbers([]);
-            } finally {
-                setLoadingNumbers(false);
-            }
-        };
-        fetchNumbers();
-    }, [selectedDepartmentId, toast, form]);
+      form.setValue('fromNumber', '');
+    }, [phoneNumbers, form]);
+
     
     const onSubmit = (values: z.infer<typeof messageSchema>) => {
         console.log(values);
@@ -124,7 +98,7 @@ export default function NewMessageForm({ onClose }: NewMessageFormProps) {
                      <FormField control={form.control} name="fromNumber" render={({ field }) => (
                         <FormItem>
                             <FormLabel>From Number</FormLabel>
-                             <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingNumbers || !selectedDepartmentId}>
+                             <Select onValueChange={field.onChange} value={field.value} disabled={loadingNumbers || !selectedDepartmentId}>
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder={loadingNumbers ? "Loading..." : "Select Number"} />
