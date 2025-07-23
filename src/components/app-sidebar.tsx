@@ -13,7 +13,7 @@ import {
   SidebarMenuSubButton,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
-import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog, Package, Package, CreditCard, AppWindow } from 'lucide-react';
+import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog, Package } from 'lucide-react';
 import { Button } from './ui/button';
 import { Logo } from './icons';
 import { usePathname, useRouter } from 'next/navigation';
@@ -28,7 +28,6 @@ export function AppSidebar() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [isDashboardOpen, setIsDashboardOpen] = useState(pathname.startsWith('/dashboard'));
-  const [isSettingsOpen, setIsSettingsOpen] = useState(pathname.startsWith('/settings'));
 
   const handleLogout = () => {
     logout();
@@ -60,14 +59,6 @@ export function AppSidebar() {
           
           {(isCompanyAdmin || isRegularUser) && (
             <>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/app')} tooltip="Go to App">
-                  <Link href="/app">
-                    <AppWindow />
-                    <span>Go to App</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
               <Collapsible open={isDashboardOpen} onOpenChange={setIsDashboardOpen}>
                 <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
@@ -159,6 +150,16 @@ export function AppSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
             )}
+            {(isCompanyAdmin) && (
+             <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname === '/billing'} tooltip="Billing">
+                <Link href="/settings/billing">
+                  <Settings />
+                  <span>Billing</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            )}
         </SidebarGroup>
       </SidebarMenu>
       
@@ -188,3 +189,5 @@ export function AppSidebar() {
     </>
   );
 }
+
+    
