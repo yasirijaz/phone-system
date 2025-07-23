@@ -56,14 +56,14 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                            </span>
                        </Link>
                     </div>
-                    <aside className="w-full flex flex-col">
+                    <div className="w-full flex flex-col h-full">
                         <div className="p-4">
                           <Button variant="ghost" className="w-full justify-start text-lg h-12 bg-primary/10 text-primary">
                             <Inbox className="mr-3 h-5 w-5" />
                             Inbox
                           </Button>
                         </div>
-                        <nav className="flex-1 space-y-2 px-4 py-4">
+                        <nav className="space-y-2 px-4 py-4">
                           <Button variant="ghost" className="w-full justify-start h-10">
                             <Users className="mr-3 h-5 w-5" />
                             Contacts
@@ -102,7 +102,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                             ))}
                           </div>
                         </div>
-                    </aside>
+                    </div>
                 </SidebarContent>
             </Sidebar>
             <SidebarInset>
