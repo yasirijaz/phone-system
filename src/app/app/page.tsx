@@ -11,18 +11,18 @@ import {
   Contact,
   Hash,
   Inbox,
+  LogOut,
   MessageSquare,
-  PlusCircle,
   Search,
+  Settings,
   Users,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useState } from "react";
-import LogCallForm from "@/components/log-call-form";
-import Dialer from "@/components/dialer";
 import type { Call } from "@/types";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/context/AuthContext";
 
 
 const recentContacts = [
@@ -77,11 +77,11 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                             Threads
                           </Button>
                         </nav>
-                        <div className="flex-1 flex flex-col min-h-0">
+                        <div className="flex flex-col min-h-0">
                           <h3 className="px-4 text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
                             Recents
                           </h3>
-                          <div className="overflow-y-auto px-2">
+                          <div className="flex-1 overflow-y-auto px-2">
                             {recentContacts.map((contact, index) => (
                               <div
                                 key={index}
@@ -114,17 +114,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
 export default function AppUIPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-
-  const handleAddCall = (newCall: Omit<Call, 'id'>) => {
-    // This is a placeholder. In a real app, you'd update a state with the new call.
-    console.log("New call logged:", newCall);
-    setIsSheetOpen(false);
-  };
-
-  const handleMakeCall = (number: string) => {
-     // This is a placeholder. In a real app, you'd connect this to the Twilio context.
-    console.log("Making call to:", number);
-  }
+  const { user, logout } = useAuth();
+  const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
 
   return (
     <AppLayout>
@@ -144,7 +135,29 @@ export default function AppUIPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
-                    <Dialer onMakeCall={handleMakeCall} />
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                                <Avatar className="h-9 w-9">
+                                    <AvatarImage src={`https://placehold.co/100x100.png?text=${userInitial}`} alt={user?.name} />
+                                    <AvatarFallback>{userInitial}</AvatarFallback>
+                                </Avatar>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                                <Link href="/profile">
+                                    <Settings className="mr-2" />
+                                    <span>Profile</span>
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={logout}>
+                                <LogOut className="mr-2" />
+                                <span>Logout</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </header>
 
