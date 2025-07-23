@@ -23,7 +23,10 @@ function CallCard({ call }: { call: Call }) {
             }
             <CardTitle className="text-lg">{contact}</CardTitle>
           </div>
-          {call.category && <Badge variant="secondary">{call.category}</Badge>}
+          <div className='flex items-center gap-2'>
+            {call.call_status && <Badge variant="outline">{call.call_status}</Badge>}
+            {call.category && <Badge variant="secondary">{call.category}</Badge>}
+          </div>
         </div>
         <CardDescription className="flex items-center gap-4 pt-2 text-xs">
           {call.created_at && (
@@ -33,6 +36,10 @@ function CallCard({ call }: { call: Call }) {
             </>
           )}
           <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {call.duration} min</span>
+           <span className="capitalize flex items-center gap-1.5">
+            {type === 'incoming' ? <PhoneIncoming className="h-3 w-3" /> : <PhoneOutgoing className="h-3 w-3" />}
+            {call.direction}
+          </span>
         </CardDescription>
       </CardHeader>
       {call.notes && (
