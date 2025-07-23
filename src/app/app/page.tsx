@@ -28,6 +28,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import Dialer from "@/components/dialer";
 import { useTwilio } from '@/context/TwilioContext';
+import NewMessageForm from "@/components/new-message-form";
 
 
 const recentContacts = [
@@ -255,14 +256,15 @@ export default function AppUIPage() {
         </div>
       </div>
 
-       <Dialog open={isSmsOpen} onOpenChange={setIsSmsOpen}>
+      <Dialog open={isSmsOpen} onOpenChange={setIsSmsOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New Message</DialogTitle>
-            <DialogDescription>
-              This feature is coming soon.
+             <DialogDescription>
+              Select a department and number to send a message from.
             </DialogDescription>
           </DialogHeader>
+          <NewMessageForm onClose={() => setIsSmsOpen(false)} />
         </DialogContent>
       </Dialog>
       
