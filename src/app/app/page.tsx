@@ -22,7 +22,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect } from "react";
 import type { Call, Department, PhoneNumber } from "@/types";
-import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger, SidebarFooter } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -33,6 +33,7 @@ import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import { useToast } from "@/hooks/use-toast";
+import HardwareSettings from "@/components/hardware-settings";
 
 
 const recentContacts = [
@@ -54,6 +55,9 @@ const recentContacts = [
 ];
 
 function AppLayout({ children }: { children: React.ReactNode }) {
+    const { user, logout } = useAuth();
+    const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
+
     return (
         <SidebarProvider>
             <Sidebar>
@@ -114,6 +118,11 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                         </div>
                     </div>
                 </SidebarContent>
+                 <SidebarFooter>
+                    <div className="p-4 flex items-center justify-between">
+                         <HardwareSettings />
+                    </div>
+                </SidebarFooter>
             </Sidebar>
             <SidebarInset>
                 {children}
