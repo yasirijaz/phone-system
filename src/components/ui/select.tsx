@@ -13,7 +13,7 @@ const selectTriggerVariants = cva(
     variants: {
       variant: {
         default: "",
-        ghost: "border-none bg-transparent shadow-none px-1",
+        ghost: "border-none bg-transparent shadow-none px-1 h-auto py-0",
       },
     },
     defaultVariants: {
