@@ -55,13 +55,10 @@ const recentContacts = [
 ];
 
 function AppLayout({ children }: { children: React.ReactNode }) {
-    const { user, logout } = useAuth();
-    const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
-
     return (
         <SidebarProvider>
             <Sidebar>
-                <SidebarContent>
+                <SidebarContent className="p-0">
                     <div className="p-4 flex items-center justify-between h-16 border-b">
                        <Link href="/dashboard/ecommerce" className="flex items-center gap-2">
                            <Logo className="h-8 w-8 text-primary" />
@@ -70,7 +67,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                            </span>
                        </Link>
                     </div>
-                    <div className="w-full flex flex-col h-full">
+                    <div className="flex-1 overflow-y-auto">
                         <div className="p-4">
                           <Button variant="ghost" className="w-full justify-start text-lg h-12 bg-primary/10 text-primary">
                             <Inbox className="mr-3 h-5 w-5" />
