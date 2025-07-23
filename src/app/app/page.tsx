@@ -119,10 +119,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                 </SidebarContent>
                  <SidebarFooter>
-                    <div className="p-4 flex items-center justify-between">
-                         <HardwareSettings />
-                    </div>
-                </SidebarFooter>
+                 </SidebarFooter>
             </Sidebar>
             <SidebarInset>
                 {children}
@@ -231,6 +228,7 @@ export default function AppUIPage() {
                      </Dialer>
                      <Button variant="ghost" size="icon" onClick={() => setIsSmsOpen(true)}><MessageSquare className="h-5 w-5" /></Button>
                      <Button variant="ghost" size="icon" onClick={() => setIsVideoOpen(true)}><Video className="h-5 w-5" /></Button>
+                     <HardwareSettings />
 
                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -356,3 +354,5 @@ export default function AppUIPage() {
     </AppLayout>
   );
 }
+
+    
