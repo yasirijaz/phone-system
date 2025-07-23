@@ -36,9 +36,7 @@ const PricingCard = ({ pkg, onPurchase, isFeatured }: { pkg: Package; onPurchase
        <Card className={isFeatured ? "border-primary" : ""}>
           <CardHeader>
             <CardTitle>{pkg.title}</CardTitle>
-            <CardDescription>
-                <div dangerouslySetInnerHTML={{ __html: pkg.description }} />
-            </CardDescription>
+            <p className='text-muted'>{pkg.description}</p>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-baseline">
@@ -136,10 +134,10 @@ export default function PricingPage() {
         </nav>
       </header>
       <main className="flex-1">
-        <section className="py-12 md:py-24">
+        <section className="py-24 md:py-24">
             <div className="container px-4 md:px-6">
-                 <div className="mb-12 text-center">
-                    <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl">Simple, Transparent Pricing</h1>
+                <div className="mb-12 text-center">
+                    <h1 className="text-2xl font-bold tracking-tighter sm:text-4xl">Simple, Transparent Pricing</h1>
                     <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl mt-4">
                         Choose the plan that's right for your business. No hidden fees, no surprises.
                     </p>
