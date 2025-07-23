@@ -8,6 +8,8 @@ export interface Call {
   type: 'incoming' | 'outgoing';
   notes?: string;
   category?: string;
+  is_read?: boolean;
+  is_starred?: boolean;
 }
 
 export interface User {
@@ -177,3 +179,5 @@ export interface Contact {
   phone_no: string;
   phone_type: string;
 }
+
+    

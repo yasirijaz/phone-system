@@ -34,6 +34,8 @@ import { getUserDepartments } from "@/services/userService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import { useToast } from "@/hooks/use-toast";
 import HardwareSettings from "@/components/hardware-settings";
+import { getCallLogs, getUnreadCallLogs } from "@/services/callLogService";
+import CallLog from "@/components/call-log";
 
 
 const recentContacts = [
@@ -58,8 +60,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
     return (
         <SidebarProvider>
             <Sidebar>
-                <SidebarContent className="p-0">
-                    <div className="p-4 flex items-center justify-between h-16 border-b">
+                <SidebarContent className="p-0 flex flex-col">
+                    <div className="p-4 flex items-center justify-between h-16 border-b shrink-0">
                        <Link href="/dashboard/ecommerce" className="flex items-center gap-2">
                            <Logo className="h-8 w-8 text-primary" />
                            <span className="text-xl font-bold text-foreground">
@@ -136,29 +138,42 @@ export default function AppUIPage() {
   const { device, isDeviceReady } = useTwilio();
   const { toast } = useToast();
 
-  // State for departments and phone numbers
   const [departments, setDepartments] = useState<Department[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
   const [loadingNumbers, setLoadingNumbers] = useState(false);
 
+  const [allCalls, setAllCalls] = useState<Call[]>([]);
+  const [unreadCalls, setUnreadCalls] = useState<Call[]>([]);
+  const [loadingCalls, setLoadingCalls] = useState(true);
+
   useEffect(() => {
-    const fetchDepartments = async () => {
+    const fetchInitialData = async () => {
         if (!user) return;
         setLoadingDepartments(true);
+        setLoadingCalls(true);
         try {
             const isAdmin = user.role_id === 1 || user.role_id === 2;
-            const fetchedDepts = isAdmin && user.company_id
-                ? await getDepartments(user.company_id)
-                : await getUserDepartments(user.id);
+            const [fetchedDepts, allCallLogs, unreadCallLogs] = await Promise.all([
+                isAdmin && user.company_id
+                    ? getDepartments(user.company_id)
+                    : getUserDepartments(user.id),
+                getCallLogs(),
+                getUnreadCallLogs(),
+            ]);
+
             setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
+            setAllCalls(Array.isArray(allCallLogs) ? allCallLogs : []);
+            setUnreadCalls(Array.isArray(unreadCallLogs) ? unreadCallLogs : []);
+
         } catch (error) {
-            toast({ title: "Error", description: "Failed to load departments.", variant: "destructive" });
+            toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
         } finally {
             setLoadingDepartments(false);
+            setLoadingCalls(false);
         }
     };
-    fetchDepartments();
+    fetchInitialData();
   }, [user, toast]);
   
   const handleDepartmentChange = async (departmentId: string) => {
@@ -272,22 +287,10 @@ export default function AppUIPage() {
                 <TabsTrigger value="unlogged">Unlogged</TabsTrigger>
               </TabsList>
               <TabsContent value="unread" className="mt-6">
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center p-12 text-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-                      <Contact className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-xl font-semibold">
-                      No unread conversations
-                    </h3>
-                    <p className="text-muted-foreground mt-1">
-                      You're all caught up!
-                    </p>
-                  </CardContent>
-                </Card>
+                {loadingCalls ? <p>Loading...</p> : <CallLog calls={unreadCalls} />}
               </TabsContent>
                 <TabsContent value="all" className="mt-6">
-                  <Card><CardContent className="p-6">All conversations will appear here.</CardContent></Card>
+                 {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls} />}
               </TabsContent>
               <TabsContent value="calls" className="mt-6">
                   <Card><CardContent className="p-6">Call logs will appear here.</CardContent></Card>
@@ -308,7 +311,7 @@ export default function AppUIPage() {
                   <Card><CardContent className="p-6">Messages will appear here.</CardContent></Card>
               </TabsContent>
               <TabsContent value="starred" className="mt-6">
-                  <Card><CardContent className="p-6">Starred items will appear here.</CardContent></Card>
+                  {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls.filter(c => c.is_starred)} />}
               </TabsContent>
               <TabsContent value="spam" className="mt-6">
                   <Card><CardContent className="p-6">Spam will appear here.</CardContent></Card>
@@ -353,3 +356,5 @@ export default function AppUIPage() {
     </AppLayout>
   );
 }
+
+    
