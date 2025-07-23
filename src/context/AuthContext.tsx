@@ -65,10 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      )
   }
 
-  // This check has to be outside the main loading block to avoid redirect loops
-  if (user && isAuthRoute) {
-      // While loading, this component will return null or a skeleton,
-      // but after loading, if the user is on an auth route, we show a loader while redirecting.
+   if (user && isAuthRoute) {
       return (
         <div className="flex items-center justify-center h-screen bg-background">
             <p>Redirecting...</p>

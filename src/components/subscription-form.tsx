@@ -53,7 +53,11 @@ export default function SubscriptionForm({ selectedPackage, isSubscribing, setIs
 
             if (setupIntent?.status === 'succeeded') {
                 const paymentMethodId = setupIntent.payment_method as string;
+<<<<<<< HEAD
                 await subscribeToPlan(paymentMethodId, selectedPackage.price_id);
+=======
+                await subscribeToPlan(paymentMethodId, selectedPackage.stripe_price_id);
+>>>>>>> 71e1f4c612c33c0021fc1fe8cc47709a6078d906
                 
                 toast({ title: 'Success!', description: `You've subscribed to the ${selectedPackage.title} plan.` });
                 onSuccess();
@@ -77,4 +81,8 @@ export default function SubscriptionForm({ selectedPackage, isSubscribing, setIs
             </Button>
         </form>
     );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 71e1f4c612c33c0021fc1fe8cc47709a6078d906

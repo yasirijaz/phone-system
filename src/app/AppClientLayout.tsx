@@ -51,13 +51,18 @@ function TwilioStatus() {
   );
 }
 
+import ReservationModal from '@/components/reservation-modal';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
-  const { 
+  const {
     connection,
-    acceptCall, 
+    acceptCall,
     rejectCall,
-    hangUp
+    hangUp,
+    incomingReservation,
+    showReservationModal,
+    acceptReservation,
+    rejectReservation,
   } = useTwilio();
 
   const isIncomingCall = connection && (connection.status() === 'pending' || connection.status() === 'ringing');
@@ -84,6 +89,13 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         isOpen={!!isActiveCall}
         contactName={activeCallContact}
         onHangUp={hangUp}
+      />
+      <ReservationModal
+        isOpen={!!showReservationModal}
+        onClose={() => rejectReservation(incomingReservation!)}
+        reservation={incomingReservation}
+        onAccept={acceptReservation}
+        onReject={rejectReservation}
       />
     </>
   );

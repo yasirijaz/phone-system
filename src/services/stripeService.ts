@@ -27,4 +27,8 @@ export const swapPlan = async (price_id: string): Promise<any> => {
 export const cancelSubscription = async (): Promise<any> => {
     const response = await axios.post('/api/stripe/subscription/cancel');
     return response.data;
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 71e1f4c612c33c0021fc1fe8cc47709a6078d906
