@@ -48,8 +48,16 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarProvider>
             <Sidebar>
                 <SidebarContent>
+                    <div className="p-4 flex items-center justify-between h-16 border-b">
+                       <Link href="/dashboard/ecommerce" className="flex items-center gap-2">
+                           <Logo className="h-8 w-8 text-primary" />
+                           <span className="text-xl font-bold text-foreground">
+                                CallSync
+                           </span>
+                       </Link>
+                    </div>
                     <aside className="w-full flex flex-col">
-                        <div className="p-4 flex items-center gap-2 h-16 border-b">
+                        <div className="p-4">
                           <Button variant="ghost" className="w-full justify-start text-lg h-12 bg-primary/10 text-primary">
                             <Inbox className="mr-3 h-5 w-5" />
                             Inbox
