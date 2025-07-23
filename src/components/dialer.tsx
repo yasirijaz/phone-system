@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,10 @@ import { Phone, PhoneOutgoing, Delete } from "lucide-react";
 
 interface DialerProps {
     onMakeCall: (number: string) => void;
+    children: ReactNode;
 }
 
-export default function Dialer({ onMakeCall }: DialerProps) {
+export default function Dialer({ onMakeCall, children }: DialerProps) {
     const [number, setNumber] = useState('');
 
     const handleDigitClick = (digit: string) => {
@@ -38,9 +39,7 @@ export default function Dialer({ onMakeCall }: DialerProps) {
     return (
         <Popover>
             <PopoverTrigger asChild>
-                <Button variant="outline" size="icon">
-                    <PhoneOutgoing className="h-4 w-4" />
-                </Button>
+                {children}
             </PopoverTrigger>
             <PopoverContent className="w-80">
                 <div className="grid gap-4">

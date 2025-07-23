@@ -13,7 +13,6 @@ import LogCallForm from '@/components/log-call-form';
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import IncomingCallModal from '@/components/incoming-call-modal';
-import Dialer from '@/components/dialer';
 import { useTwilio } from '@/context/TwilioContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/context/AuthContext';
@@ -233,7 +232,6 @@ export default function EcommerceDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showIncomingCall, setShowIncomingCall] = useState(false);
-  const { device, isDeviceReady } = useTwilio();
 
   useEffect(() => {
     if(user?.role_id === 1) {
@@ -277,31 +275,6 @@ export default function EcommerceDashboard() {
     setIsSheetOpen(false);
   };
   
-  const handleMakeCall = async (number: string) => {
-    if (!device || !isDeviceReady) {
-        alert("Twilio Device not ready. Please connect first.");
-        return;
-    }
-
-    try {
-        console.log(`Calling ${number}...`);
-        await device.connect({ params: { To: number } });
-        
-        const newCall: Omit<Call, 'id'> = {
-            contact: `Unknown (${number})`,
-            dateTime: new Date().toISOString(),
-            duration: 0,
-            type: 'outgoing',
-            notes: `Dialed ${number}`,
-            category: 'Outgoing'
-        };
-        handleAddCall(newCall);
-
-    } catch (error) {
-        console.error("Error making call:", error);
-        alert("Failed to make call. See console for details.");
-    }
-  };
 
   if(user?.role_id === 1) {
     return null; // or a loading spinner, as redirection is happening
@@ -345,7 +318,6 @@ export default function EcommerceDashboard() {
                   <LogCallForm onCallAdded={handleAddCall} />
                 </SheetContent>
               </Sheet>
-               <Dialer onMakeCall={handleMakeCall} />
             </div>
           </header>
 

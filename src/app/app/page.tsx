@@ -25,6 +25,9 @@ import type { Call } from "@/types";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/AuthContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import Dialer from "@/components/dialer";
+import { useTwilio } from '@/context/TwilioContext';
 
 
 const recentContacts = [
@@ -115,9 +118,26 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppUIPage() {
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isSmsOpen, setIsSmsOpen] = useState(false);
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
   const { user, logout } = useAuth();
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
+
+  const { device, isDeviceReady } = useTwilio();
+
+  const handleMakeCall = async (number: string) => {
+    if (!device || !isDeviceReady) {
+        alert("Twilio Device not ready. Please connect first.");
+        return;
+    }
+    try {
+        await device.connect({ params: { To: number } });
+    } catch (error) {
+        console.error("Error making call:", error);
+        alert("Failed to make call. See console for details.");
+    }
+  };
+
 
   return (
     <AppLayout>
@@ -137,9 +157,11 @@ export default function AppUIPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                     <Button variant="ghost" size="icon"><Phone className="h-5 w-5" /></Button>
-                     <Button variant="ghost" size="icon"><MessageSquare className="h-5 w-5" /></Button>
-                     <Button variant="ghost" size="icon"><Video className="h-5 w-5" /></Button>
+                     <Dialer onMakeCall={handleMakeCall}>
+                       <Button variant="ghost" size="icon"><Phone className="h-5 w-5" /></Button>
+                     </Dialer>
+                     <Button variant="ghost" size="icon" onClick={() => setIsSmsOpen(true)}><MessageSquare className="h-5 w-5" /></Button>
+                     <Button variant="ghost" size="icon" onClick={() => setIsVideoOpen(true)}><Video className="h-5 w-5" /></Button>
 
                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -232,6 +254,28 @@ export default function AppUIPage() {
           </main>
         </div>
       </div>
+
+       <Dialog open={isSmsOpen} onOpenChange={setIsSmsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Message</DialogTitle>
+            <DialogDescription>
+              This feature is coming soon.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isVideoOpen} onOpenChange={setIsVideoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Video Call</DialogTitle>
+            <DialogDescription>
+              This feature is coming soon.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
