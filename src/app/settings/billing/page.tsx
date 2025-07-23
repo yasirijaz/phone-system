@@ -61,7 +61,7 @@ export default function BillingPage() {
   const currentPlan = useMemo(() => {
     if (!subscription || packages.length === 0) return null;
     const currentPriceId = subscription.items?.[0]?.stripe_price || subscription.stripe_price;
-    return packages.find(pkg => pkg.price_id === currentPriceId) || null;
+    return packages.find(pkg => pkg.stripe_price_id === currentPriceId) || null;
   }, [subscription, packages]);
 
   const handleSwapPlan = async (priceId: string) => {
@@ -119,7 +119,7 @@ export default function BillingPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => handleSwapPlan(pkg.price_id)}>
+              <AlertDialogAction onClick={() => handleSwapPlan(pkg.stripe_price_id)}>
                 Confirm
               </AlertDialogAction>
             </AlertDialogFooter>

@@ -13,7 +13,7 @@ import {
   SidebarMenuSubButton,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
-import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog, Package, CreditCard } from 'lucide-react';
+import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog, Package, CreditCard, AppWindow } from 'lucide-react';
 import { Button } from './ui/button';
 import { Logo } from './icons';
 import { usePathname, useRouter } from 'next/navigation';
@@ -60,6 +60,14 @@ export function AppSidebar() {
           
           {(isCompanyAdmin || isRegularUser) && (
             <>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/app')} tooltip="Go to App">
+                  <Link href="/app">
+                    <AppWindow />
+                    <span>Go to App</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <Collapsible open={isDashboardOpen} onOpenChange={setIsDashboardOpen}>
                 <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
@@ -198,4 +206,3 @@ export function AppSidebar() {
     </>
   );
 }
-

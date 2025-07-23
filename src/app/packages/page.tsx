@@ -28,7 +28,7 @@ const packageSchema = z.object({
   title: z.string().min(2, "Package name must be at least 2 characters."),
   description: z.string().min(10, "Description must be at least 10 characters."),
   price: z.coerce.number().min(0, "Price must be a positive number."),
-  price_id: z.string().min(1, "Stripe Price ID is required."),
+  stripe_price_id: z.string().min(1, "Stripe Price ID is required."),
   status: z.boolean().default(true),
 });
 
@@ -47,7 +47,7 @@ export default function PackagesPage() {
       title: "",
       description: "",
       price: 0,
-      price_id: "",
+      stripe_price_id: "",
       status: true,
     },
   });
@@ -79,9 +79,9 @@ export default function PackagesPage() {
   const handleDialogOpen = (pkg: Package | null = null) => {
     setEditingPackage(pkg);
     if (pkg) {
-      form.reset({ title: pkg.title, description: pkg.description, price: pkg.price, price_id: pkg.price_id, status: pkg.status === 1 });
+      form.reset({ title: pkg.title, description: pkg.description, price: pkg.price, stripe_price_id: pkg.price_id, status: pkg.status === 1 });
     } else {
-      form.reset({ title: "", description: "", price: 0, price_id: "", status: true });
+      form.reset({ title: "", description: "", price: 0, stripe_price_id: "", status: true });
     }
     setIsDialogOpen(true);
   };
@@ -166,7 +166,7 @@ export default function PackagesPage() {
                         <FormField control={form.control} name="price" render={({ field }) => (
                         <FormItem><FormLabel>Price ($ / month)</FormLabel><FormControl><Input type="number" placeholder="e.g. 29" {...field} /></FormControl><FormMessage /></FormItem>
                         )}/>
-                        <FormField control={form.control} name="price_id" render={({ field }) => (
+                        <FormField control={form.control} name="stripe_price_id" render={({ field }) => (
                         <FormItem><FormLabel>Stripe Price ID</FormLabel><FormControl><Input placeholder="price_..." {...field} /></FormControl><FormMessage /></FormItem>
                         )}/>
                     </div>
@@ -209,7 +209,7 @@ export default function PackagesPage() {
                         <TableRow key={pkg.id}>
                           <TableCell className="font-medium">{pkg.title}</TableCell>
                           <TableCell>${pkg.price}/mo</TableCell>
-                          <TableCell>{pkg.price_id}</TableCell>
+                          <TableCell>{pkg.stripe_price_id}</TableCell>
                           <TableCell>
                             <Badge variant={pkg.status === 1 ? 'default' : 'secondary'}>
                               {pkg.status === 1 ? 'Active' : 'Inactive'}

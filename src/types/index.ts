@@ -165,6 +165,6 @@ export interface Package {
   title: string;
   description: string;
   price: number;
-  price_id: string;
+  stripe_price_id: string;
   status: 0 | 1;
 }
