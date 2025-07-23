@@ -59,6 +59,14 @@ export function AppSidebar() {
           
           {(isCompanyAdmin || isRegularUser) && (
             <>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/app')} tooltip="Go To App">
+                  <Link href="/app">
+                    <AppWindow />
+                    <span>Go To App</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <Collapsible open={isDashboardOpen} onOpenChange={setIsDashboardOpen}>
                 <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
@@ -189,5 +197,3 @@ export function AppSidebar() {
     </>
   );
 }
-
-    
