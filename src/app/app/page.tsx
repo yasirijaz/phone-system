@@ -121,55 +121,6 @@ export default function AppUIPage() {
   return (
     <AppLayout>
       <div className="flex h-screen w-full bg-background text-foreground">
-        {/* Left Sidebar is now handled by AppLayout, but we define a placeholder here for the desktop view */}
-        <aside className="w-72 flex-shrink-0 border-r bg-muted/40 hidden md:flex flex-col">
-            <div className="p-4 flex items-center gap-2 h-16 border-b">
-              <Button variant="ghost" className="w-full justify-start text-lg h-12 bg-primary/10 text-primary">
-                <Inbox className="mr-3 h-5 w-5" />
-                Inbox
-              </Button>
-            </div>
-            <nav className="flex-1 space-y-2 px-4 py-4">
-              <Button variant="ghost" className="w-full justify-start h-10">
-                <Users className="mr-3 h-5 w-5" />
-                Contacts
-              </Button>
-              <Button variant="ghost" className="w-full justify-start h-10">
-                <Hash className="mr-3 h-5 w-5" />
-                All Channels
-              </Button>
-              <Button variant="ghost" className="w-full justify-start h-10">
-                <MessageSquare className="mr-3 h-5 w-5" />
-                Threads
-              </Button>
-            </nav>
-            <div className="flex-1 flex flex-col min-h-0">
-              <h3 className="px-4 text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
-                Recents
-              </h3>
-              <div className="overflow-y-auto px-2">
-                {recentContacts.map((contact, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3 p-2 rounded-md hover:bg-muted"
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className={contact.color}>
-                        {contact.initial}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 truncate">
-                      <p className="text-sm font-medium">{contact.name}</p>
-                      {contact.status && (
-                        <p className="text-xs text-destructive">{contact.status}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-        </aside>
-
         {/* Main Content */}
         <div className="flex flex-1 flex-col">
           {/* Header */}
