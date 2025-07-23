@@ -22,10 +22,18 @@ import {
   Users,
   Video,
   Voicemail,
+  PlusCircle,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Logo } from "@/components/icons";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { useState } from "react";
+import LogCallForm from "@/components/log-call-form";
+import Dialer from "@/components/dialer";
+import type { Call } from "@/types";
+
 
 const recentContacts = [
   { name: "(321) 799-6096", initial: "A" },
@@ -46,10 +54,27 @@ const recentContacts = [
 ];
 
 export default function AppUIPage() {
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+  const handleAddCall = (newCall: Omit<Call, 'id'>) => {
+    // This is a placeholder. In a real app, you'd update a state with the new call.
+    console.log("New call logged:", newCall);
+    setIsSheetOpen(false);
+  };
+
+  const handleMakeCall = (number: string) => {
+     // This is a placeholder. In a real app, you'd connect this to the Twilio context.
+    console.log("Making call to:", number);
+  }
+
   return (
     <div className="flex h-screen w-full bg-background text-foreground">
       {/* Left Sidebar */}
       <aside className="w-72 flex-shrink-0 border-r bg-muted/40 flex flex-col">
+        <div className="p-4 flex items-center gap-2 h-16 border-b">
+           <Logo className="h-8 w-8 text-primary" />
+           <span className="text-xl font-bold">CallSync</span>
+        </div>
         <div className="p-4">
           <Button variant="ghost" className="w-full justify-start text-lg h-12 bg-primary/10 text-primary">
             <Inbox className="mr-3 h-5 w-5" />
@@ -100,52 +125,38 @@ export default function AppUIPage() {
       {/* Main Content */}
       <div className="flex flex-1 flex-col">
         {/* Header */}
-        <header className="flex h-16 items-center border-b px-6 justify-between">
-          <div className="flex items-center gap-4">
-             <Link href="/dashboard/ecommerce" className="flex items-center gap-2 text-foreground">
-                <Logo className="h-6 w-6" />
-                <span className="font-semibold text-lg">CallSync</span>
-            </Link>
-          </div>
-          <div className="w-full max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search Dialpad"
-                className="pl-9 bg-muted border-none"
-              />
+         <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
+            <div className="flex items-center gap-4">
+              <SidebarTrigger className="md:hidden" />
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search or type command..." className="pl-9 w-full md:w-96" />
+                 <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 md:flex">
+                    <span className="text-xs">⌘</span>K
+                </kbd>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Settings className="h-5 w-5" />
+            <div className="flex items-center gap-4">
+              <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Log a Call
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Settings</p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Calendar className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Calendar</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <Avatar>
-              <AvatarFallback className="bg-yellow-500 text-white">
-                Y
-              </AvatarFallback>
-            </Avatar>
-          </div>
-        </header>
+                </SheetTrigger>
+                <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle>Log a New Call</SheetTitle>
+                    <SheetDescription>
+                      Enter the details of your call. Use the AI tool to categorize it automatically based on your notes.
+                    </SheetDescription>
+                  </SheetHeader>
+                  <LogCallForm onCallAdded={handleAddCall} />
+                </SheetContent>
+              </Sheet>
+               <Dialer onMakeCall={handleMakeCall} />
+            </div>
+          </header>
 
         {/* Content Area */}
         <main className="flex-1 p-6">
@@ -214,3 +225,5 @@ export default function AppUIPage() {
     </div>
   );
 }
+
+    
