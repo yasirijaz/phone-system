@@ -16,9 +16,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Hash, Inbox, MessageSquare, Users } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { AppSidebar } from '@/components/app-sidebar';
+import Link from "next/link";
+import { Logo } from "@/components/icons";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name is required."),
@@ -26,6 +28,98 @@ const contactSchema = z.object({
   phone_no: z.string().min(10, "Phone number is required."),
   phone_type: z.string().min(1, "Phone type is required."),
 });
+
+const recentContacts = [
+  { name: "(321) 799-6096", initial: "A" },
+  { name: "Ideal GA", initial: "I", color: "bg-green-500" },
+  { name: "Susan Buser", initial: "S", color: "bg-green-500" },
+  { name: "(407) 269-8808", initial: "A" },
+  { name: "(205) 916-8373", initial: "A" },
+  { name: "(407) 410-4734", initial: "A" },
+  { name: "Orlando FL", initial: "O", color: "bg-blue-500" },
+  { name: "(813) 544-4201", initial: "M" },
+  { name: "Metuchen NJ", initial: "M", color: "bg-yellow-500" },
+  { name: "WindshieldHUB", initial: "W", color: "bg-orange-500" },
+  { name: "(737) 204-9493", initial: "A" },
+  { name: "(713) 804-8089", initial: "A" },
+  { name: "Kashif Raza", initial: "K", color: "bg-yellow-500", status: "DND" },
+  { name: "WindshieldHUB SMS", initial: "W", color: "bg-orange-500" },
+  { name: "(407) 250-1607", initial: "A" },
+];
+
+
+function AppLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <SidebarProvider>
+            <Sidebar>
+                <SidebarContent className="p-0">
+                    <div className="p-4 flex items-center justify-between h-16 border-b">
+                       <Link href="/dashboard/ecommerce" className="flex items-center gap-2">
+                           <Logo className="h-8 w-8 text-primary" />
+                           <span className="text-xl font-bold text-foreground">
+                                CallSync
+                           </span>
+                       </Link>
+                    </div>
+                    <div className="flex-1 overflow-y-auto">
+                        <div className="p-4">
+                          <Button variant="ghost" className="w-full justify-start text-lg h-12" asChild>
+                             <Link href="/app">
+                                <Inbox className="mr-3 h-5 w-5" />
+                                Inbox
+                            </Link>
+                          </Button>
+                        </div>
+                        <nav className="space-y-2 px-4 py-4">
+                          <Button variant="ghost" className="w-full justify-start h-10 bg-primary/10 text-primary" asChild>
+                            <Link href="/contacts">
+                                <Users className="mr-3 h-5 w-5" />
+                                Contacts
+                            </Link>
+                          </Button>
+                          <Button variant="ghost" className="w-full justify-start h-10">
+                            <Hash className="mr-3 h-5 w-5" />
+                            All Channels
+                          </Button>
+                          <Button variant="ghost" className="w-full justify-start h-10">
+                            <MessageSquare className="mr-3 h-5 w-5" />
+                            Threads
+                          </Button>
+                        </nav>
+                        <div className="flex flex-col min-h-0">
+                          <h3 className="px-4 text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
+                            Recents
+                          </h3>
+                          <div className="flex-1 overflow-y-auto px-2">
+                            {recentContacts.map((contact, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center gap-3 p-2 rounded-md hover:bg-muted"
+                              >
+                                <Avatar className="h-8 w-8">
+                                  <AvatarFallback className={contact.color}>
+                                    {contact.initial}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 truncate">
+                                  <p className="text-sm font-medium">{contact.name}</p>
+                                  {contact.status && (
+                                    <p className="text-xs text-destructive">{contact.status}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                    </div>
+                </SidebarContent>
+            </Sidebar>
+            <SidebarInset>
+                {children}
+            </SidebarInset>
+        </SidebarProvider>
+    )
+}
 
 export default function ContactsPage() {
   const { user } = useAuth();
@@ -76,15 +170,11 @@ export default function ContactsPage() {
   };
 
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarContent><AppSidebar /></SidebarContent>
-      </Sidebar>
-      <SidebarInset>
+    <AppLayout>
         <div className="flex flex-col min-h-screen">
           <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
             <div className="flex items-center gap-4">
-              <SidebarTrigger />
+              <SidebarTrigger className="md:hidden" />
               <h1 className="text-xl font-bold">Contacts</h1>
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -167,7 +257,6 @@ export default function ContactsPage() {
             </Card>
           </main>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+    </AppLayout>
   );
 }
