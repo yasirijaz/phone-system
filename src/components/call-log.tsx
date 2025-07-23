@@ -23,8 +23,12 @@ function CallCard({ call }: { call: Call }) {
           {call.category && <Badge variant="secondary">{call.category}</Badge>}
         </div>
         <CardDescription className="flex items-center gap-4 pt-2 text-xs">
-          <span className="flex items-center gap-1.5"><CalendarDays className="h-3 w-3" /> {format(parseISO(call.dateTime), 'PP')}</span>
-          <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {format(parseISO(call.dateTime), 'p')}</span>
+          {call.dateTime && (
+            <>
+              <span className="flex items-center gap-1.5"><CalendarDays className="h-3 w-3" /> {format(parseISO(call.dateTime), 'PP')}</span>
+              <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {format(parseISO(call.dateTime), 'p')}</span>
+            </>
+          )}
           <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {call.duration} min</span>
         </CardDescription>
       </CardHeader>
