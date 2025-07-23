@@ -74,10 +74,6 @@ export default function HardwareSettings() {
                                 ))}
                             </SelectContent>
                         </Select>
-                        <div className="flex items-center space-x-2 mt-2">
-                            <Checkbox id="ai-voice-isolation" />
-                            <Label htmlFor="ai-voice-isolation">AI Voice Isolation</Label>
-                        </div>
                     </div>
                     <div className="grid gap-2">
                         <div className="flex justify-between items-center">
