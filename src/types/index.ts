@@ -174,7 +174,7 @@ export interface Package {
   description: string;
   price: number;
   stripe_price_id: string;
-<<<<<<< HEAD
+  stripe_product_id: string;
   status: 0 | 1;
 }
 
@@ -186,8 +186,3 @@ export interface Contact {
   phone_no: string;
   phone_type: string;
 }
-=======
-  stripe_product_id: string;
-  status: 0 | 1;
-}
->>>>>>> 71e1f4c612c33c0021fc1fe8cc47709a6078d906
