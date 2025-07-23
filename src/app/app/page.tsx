@@ -296,7 +296,7 @@ export default function AppUIPage() {
                   <Card><CardContent className="p-6">Call logs will appear here.</CardContent></Card>
               </TabsContent>
                 <TabsContent value="missed" className="mt-6">
-                   {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls.filter(c => ["no-answer", "busy", "canceled"].includes(c.call_status || ''))} />}
+                   {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls.filter(c => c.call_status === 'missed')} />}
               </TabsContent>
                 <TabsContent value="meetings" className="mt-6">
                   <Card><CardContent className="p-6">Meeting recordings will appear here.</CardContent></Card>
