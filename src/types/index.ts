@@ -168,3 +168,12 @@ export interface Package {
   stripe_price_id: string;
   status: 0 | 1;
 }
+
+export interface Contact {
+  id: number;
+  company_id: number;
+  name: string;
+  email?: string;
+  phone_no: string;
+  phone_type: string;
+}

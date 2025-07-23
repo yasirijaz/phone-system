@@ -78,9 +78,11 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                           </Button>
                         </div>
                         <nav className="space-y-2 px-4 py-4">
-                          <Button variant="ghost" className="w-full justify-start h-10">
-                            <Users className="mr-3 h-5 w-5" />
-                            Contacts
+                          <Button variant="ghost" className="w-full justify-start h-10" asChild>
+                            <Link href="/contacts">
+                                <Users className="mr-3 h-5 w-5" />
+                                Contacts
+                            </Link>
                           </Button>
                           <Button variant="ghost" className="w-full justify-start h-10">
                             <Hash className="mr-3 h-5 w-5" />
@@ -354,5 +356,3 @@ export default function AppUIPage() {
     </AppLayout>
   );
 }
-
-    
