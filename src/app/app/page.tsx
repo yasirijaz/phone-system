@@ -16,6 +16,8 @@ import {
   Search,
   Settings,
   Users,
+  Phone,
+  Video,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState } from "react";
@@ -134,7 +136,11 @@ export default function AppUIPage() {
                         </kbd>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                     <Button variant="ghost" size="icon"><Phone className="h-5 w-5" /></Button>
+                     <Button variant="ghost" size="icon"><MessageSquare className="h-5 w-5" /></Button>
+                     <Button variant="ghost" size="icon"><Video className="h-5 w-5" /></Button>
+
                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
