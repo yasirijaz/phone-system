@@ -12,20 +12,26 @@ interface CallLogProps {
 }
 
 function CallCard({ call }: { call: Call }) {
-  const getContactName = () => {
-    if (call.direction === 'inbound') {
-      return call.meta_data?.from_name || call.from;
-    }
-    return call.meta_data?.to_name || call.to;
-  };
+  let fromName: string;
+  let fromNumber: string;
+  let receivedByName: string;
   
-  const getContactNumber = () => {
-    return call.direction === 'inbound' ? call.from : call.to;
+  if (call.client_name) {
+      fromName = call.user?.name ?? 'Unknown User';
+      fromNumber = call.from;
+      receivedByName = call.to_name?.name ?? 'Unknown Receiver';
+  } else {
+      if (call.direction === 'inbound') {
+          fromName = call.from_name?.name ?? call.from;
+          fromNumber = call.from;
+      } else {
+          fromName = call.user?.name ?? "Me";
+          fromNumber = call.to_name?.phone_no ?? call.to;
+      }
+      receivedByName = call.user?.name ?? 'Unassigned';
   }
-  
-  const contactName = getContactName();
-  const receivedBy = call.meta_data?.received_by || "Melissa Pesantez"; // Placeholder
-  const contactInitial = contactName ? contactName.charAt(0).toUpperCase() : '?';
+
+  const contactInitial = fromName ? fromName.charAt(0).toUpperCase() : '?';
 
   const isMissed = call.call_status === 'missed' || call.call_status === 'no-answer' || call.call_status === 'busy' || call.call_status === 'canceled';
   const hasRecording = !!call.recording_url;
@@ -35,19 +41,19 @@ function CallCard({ call }: { call: Call }) {
   return (
     <div className="flex items-start gap-4">
         <Avatar>
-            <AvatarImage src={`https://placehold.co/100x100.png?text=${contactInitial}`} alt={contactName} />
+            <AvatarImage src={`https://placehold.co/100x100.png?text=${contactInitial}`} alt={fromName} />
             <AvatarFallback>{contactInitial}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
             <div className={`p-4 rounded-lg border ${cardBg}`}>
                 <div className="flex items-center gap-2 text-sm font-medium">
                      {call.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />}
-                     <span>Inbound / {call.call_status} ({call.duration} min)</span>
+                     <span>{call.direction.charAt(0).toUpperCase() + call.direction.slice(1)} / {call.call_status} ({call.duration} min)</span>
                 </div>
                 <div className="text-sm mt-2">
-                    <p><strong>Received By:</strong> {receivedBy}</p>
+                    <p><strong>Received By:</strong> {receivedByName}</p>
                     <div className="flex items-center gap-4 text-muted-foreground">
-                        <span>({getContactNumber()})</span>
+                        <span>({fromNumber})</span>
                         <PhoneIncoming className="h-4 w-4" />
                         <span>({call.from})</span>
                     </div>
@@ -94,7 +100,9 @@ export default function CallLog({ calls }: CallLogProps) {
             </div>
              <div className="space-y-4">
                 {callsForDay.map((call) => (
-                    <CallCard key={call.id} call={call} />
+                  <Link href={`/conversations/${call.direction === 'inbound' ? call.from : call.to}`} key={call.id}>
+                    <CallCard call={call} />
+                  </Link>
                 ))}
              </div>
         </div>
