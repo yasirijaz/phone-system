@@ -26,7 +26,7 @@ function CallCard({ call }: { call: Call }) {
           fromNumber = call.from;
       } else {
           fromName = call.user?.name ?? "Me";
-          fromNumber = call.to_name?.phone_no ?? call.to;
+          fromNumber = call.to_name?.name ?? call.to;
       }
       receivedByName = call.user?.name ?? 'Unassigned';
   }
@@ -38,35 +38,37 @@ function CallCard({ call }: { call: Call }) {
   
   const cardBg = isMissed ? 'bg-red-50' : hasRecording ? 'bg-green-50' : 'bg-background';
 
+  const contactDisplayNumber = call.direction === 'inbound' ? call.from : call.to;
+
   return (
-    <div className="flex items-start gap-4">
-        <Avatar>
-            <AvatarImage src={`https://placehold.co/100x100.png?text=${contactInitial}`} alt={fromName} />
-            <AvatarFallback>{contactInitial}</AvatarFallback>
-        </Avatar>
-        <div className="flex-1">
-            <div className={`p-4 rounded-lg border ${cardBg}`}>
-                <div className="flex items-center gap-2 text-sm font-medium">
-                     {call.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />}
-                     <span>{call.direction.charAt(0).toUpperCase() + call.direction.slice(1)} / {call.call_status} ({call.duration} min)</span>
-                </div>
-                <div className="text-sm mt-2">
-                    <p><strong>Received By:</strong> {receivedByName}</p>
-                    <div className="flex items-center gap-4 text-muted-foreground">
-                        <span>({fromNumber})</span>
-                        <PhoneIncoming className="h-4 w-4" />
-                        <span>({call.from})</span>
+    <Link href={`/conversations/${contactDisplayNumber}`} key={call.id}>
+        <div className="flex items-start gap-4">
+            <Avatar>
+                <AvatarImage src={`https://placehold.co/100x100.png?text=${contactInitial}`} alt={fromName} />
+                <AvatarFallback>{contactInitial}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+                <div className={`p-4 rounded-lg border ${cardBg}`}>
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                         {call.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />}
+                         <span>{call.direction.charAt(0).toUpperCase() + call.direction.slice(1)} / {call.call_status} ({call.duration} min)</span>
                     </div>
-                </div>
-                 {hasRecording && (
-                    <div className="mt-2">
-                        <audio controls src={call.recording_url} className="w-full h-8" onClick={(e) => e.preventDefault()}></audio>
+                    <div className="text-sm mt-2">
+                        <p><strong>Received By:</strong> {receivedByName}</p>
+                        <div className="flex items-center gap-4 text-muted-foreground">
+                            <span>From: {fromName} ({call.from})</span>
+                        </div>
                     </div>
-                )}
+                     {hasRecording && (
+                        <div className="mt-2">
+                            <audio controls src={call.recording_url} className="w-full h-8" onClick={(e) => e.preventDefault()}></audio>
+                        </div>
+                    )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{format(parseISO(call.created_at), 'p')}</p>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{format(parseISO(call.created_at), 'p')}</p>
         </div>
-    </div>
+    </Link>
   )
 }
 
@@ -100,9 +102,7 @@ export default function CallLog({ calls }: CallLogProps) {
             </div>
              <div className="space-y-4">
                 {callsForDay.map((call) => (
-                  <Link href={`/conversations/${call.direction === 'inbound' ? call.from : call.to}`} key={call.id}>
-                    <CallCard call={call} />
-                  </Link>
+                    <CallCard call={call} key={call.id} />
                 ))}
              </div>
         </div>
