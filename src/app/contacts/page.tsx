@@ -17,10 +17,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Hash, Inbox, MessageSquare, Users, Edit, Trash2, Search, Phone, Video, Settings, LogOut } from "lucide-react";
-import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { PlusCircle, Edit, Trash2, Search, Phone, Video, Settings, LogOut, MessageSquare } from "lucide-react";
+import { Sidebar, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import Link from "next/link";
-import { Logo } from "@/components/icons";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
@@ -30,7 +29,7 @@ import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
 import HardwareSettings from "@/components/hardware-settings";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getCallLogs } from "@/services/callLogService";
+import { InAppSidebar } from "@/components/in-app-sidebar";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name is required."),
@@ -38,100 +37,6 @@ const contactSchema = z.object({
   phone_no: z.string().min(10, "Phone number is required."),
   phone_type: z.string().min(1, "Phone type is required."),
 });
-
-function AppLayout({ children, calls }: { children: React.ReactNode, calls: Call[] }) {
-    const getContactName = (call: Call) => {
-        if (call.direction === 'inbound') {
-            return call.meta_data?.from_name || call.from;
-        }
-        return call.meta_data?.to_name || call.to;
-    };
-
-    const getUniqueRecentCalls = (calls: Call[]) => {
-        const uniqueContacts: { [key: string]: Call } = {};
-        calls.forEach(call => {
-            const contactIdentifier = getContactName(call);
-            if (!uniqueContacts[contactIdentifier]) {
-                uniqueContacts[contactIdentifier] = call;
-            }
-        });
-        return Object.values(uniqueContacts);
-    };
-
-    const recentCalls = getUniqueRecentCalls(calls);
-
-    return (
-        <SidebarProvider>
-            <Sidebar>
-                <SidebarContent className="p-0 flex flex-col">
-                    <div className="p-4 flex items-center justify-between h-16 border-b shrink-0">
-                       <Link href="/dashboard/ecommerce" className="flex items-center gap-2">
-                           <Logo className="h-8 w-8 text-primary" />
-                           <span className="text-xl font-bold text-foreground">
-                                CallSync
-                           </span>
-                       </Link>
-                    </div>
-                    <div className="flex-1 overflow-y-auto">
-                        <div className="p-4">
-                          <Button variant="ghost" className="w-full justify-start text-lg h-12" asChild>
-                             <Link href="/app">
-                                <Inbox className="mr-3 h-5 w-5" />
-                                Inbox
-                            </Link>
-                          </Button>
-                        </div>
-                        <nav className="space-y-2 px-4 py-4">
-                          <Button variant="ghost" className="w-full justify-start h-10 bg-primary/10 text-primary" asChild>
-                            <Link href="/contacts">
-                                <Users className="mr-3 h-5 w-5" />
-                                Contacts
-                            </Link>
-                          </Button>
-                          <Button variant="ghost" className="w-full justify-start h-10">
-                            <Hash className="mr-3 h-5 w-5" />
-                            All Channels
-                          </Button>
-                          <Button variant="ghost" className="w-full justify-start h-10">
-                            <MessageSquare className="mr-3 h-5 w-5" />
-                            Threads
-                          </Button>
-                        </nav>
-                        <div className="flex flex-col min-h-0">
-                          <h3 className="px-4 text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
-                            Recents
-                          </h3>
-                           <div className="flex-1 overflow-y-auto px-2">
-                                {recentCalls.slice(0, 15).map((call) => {
-                                    const contactName = getContactName(call);
-                                    const initial = contactName ? contactName.charAt(0).toUpperCase() : '?';
-                                    return (
-                                        <div
-                                            key={call.id}
-                                            className="flex items-center gap-3 p-2 rounded-md hover:bg-muted"
-                                        >
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarFallback>
-                                                    {initial}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <div className="flex-1 truncate">
-                                                <p className="text-sm font-medium">{contactName}</p>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-                </SidebarContent>
-            </Sidebar>
-            <SidebarInset>
-                {children}
-            </SidebarInset>
-        </SidebarProvider>
-    )
-}
 
 export default function ContactsPage() {
   const { user, logout } = useAuth();
@@ -150,8 +55,6 @@ export default function ContactsPage() {
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
   const [loadingNumbers, setLoadingNumbers] = useState(false);
-  const [callLogs, setCallLogs] = useState<Call[]>([]);
-
 
   const form = useForm<z.infer<typeof contactSchema>>({
     resolver: zodResolver(contactSchema),
@@ -183,15 +86,11 @@ export default function ContactsPage() {
         setLoadingDepartments(true);
         try {
             const isAdmin = user.role_id === 1 || user.role_id === 2;
-            const [fetchedDepts, fetchedCallLogs] = await Promise.all([
-                 (isAdmin && user.company_id
-                    ? getDepartments(user.company_id)
-                    : getUserDepartments(user.id)),
-                getCallLogs()
-            ]);
+            const fetchedDepts = await (isAdmin && user.company_id
+                ? getDepartments(user.company_id)
+                : getUserDepartments(user.id));
 
             setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
-            setCallLogs(Array.isArray(fetchedCallLogs) ? fetchedCallLogs : []);
 
         } catch (error) {
             toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
@@ -281,8 +180,12 @@ export default function ContactsPage() {
   }
 
   return (
-    <AppLayout calls={callLogs}>
-        <div className="flex flex-col min-h-screen">
+    <SidebarProvider>
+      <Sidebar>
+          <InAppSidebar />
+      </Sidebar>
+      <SidebarInset>
+          <div className="flex flex-col min-h-screen">
             <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
                 <div className="flex items-center gap-4">
                     <SidebarTrigger className="md:hidden" />
@@ -470,7 +373,7 @@ export default function ContactsPage() {
             </DialogHeader>
             </DialogContent>
         </Dialog>
-
-    </AppLayout>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

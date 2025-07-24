@@ -7,13 +7,13 @@ import { getCallLogs } from "@/services/callLogService";
 import type { Call } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Phone, Video, MessageSquare } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
 import CallLog from "@/components/call-log";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { InAppSidebar } from "@/components/in-app-sidebar";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -60,9 +60,7 @@ export default function ConversationDetailPage() {
     return (
         <SidebarProvider>
             <Sidebar>
-                <SidebarContent>
-                    <AppSidebar />
-                </SidebarContent>
+                <InAppSidebar />
             </Sidebar>
             <SidebarInset>
                 <div className="flex h-screen w-full bg-background text-foreground">
