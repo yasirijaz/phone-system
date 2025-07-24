@@ -8,9 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings, Mic, Volume2 } from 'lucide-react';
 import { Progress } from './ui/progress';
+import { Input } from './ui/input';
 
 export default function HardwareSettings() {
     const [isOpen, setIsOpen] = useState(false);
+    const [devicesLoading, setDevicesLoading] = useState(true);
     const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
     const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
     const [videoInputDevices, setVideoInputDevices] = useState<MediaDeviceInfo[]>([]);
@@ -29,8 +31,10 @@ export default function HardwareSettings() {
     const getDevices = async () => {
         if (!navigator.mediaDevices?.enumerateDevices) {
             console.warn("Media Devices API not supported.");
+            setDevicesLoading(false);
             return;
         }
+        setDevicesLoading(true);
         try {
             // Request permissions separately to avoid errors if one device is missing
             try {
@@ -58,6 +62,8 @@ export default function HardwareSettings() {
             if (videoInputs.length > 0 && !selectedCamera) setSelectedCamera(videoInputs[0].deviceId);
         } catch(err) {
             console.error("Error enumerating devices", err);
+        } finally {
+            setDevicesLoading(false);
         }
     };
 
@@ -168,18 +174,24 @@ export default function HardwareSettings() {
                     </div>
                     <div className="grid gap-2">
                          <Label htmlFor="camera-select">Camera</Label>
-                         <Select value={selectedCamera} onValueChange={setSelectedCamera}>
-                            <SelectTrigger id="camera-select">
-                                <SelectValue placeholder="Select Camera" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {videoInputDevices.map(device => (
-                                    <SelectItem key={device.deviceId} value={device.deviceId}>
-                                        {device.label || `Camera ${videoInputDevices.indexOf(device) + 1}`}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                         {devicesLoading ? (
+                             <Input disabled placeholder="Detecting cameras..." />
+                         ) : videoInputDevices.length > 0 ? (
+                            <Select value={selectedCamera} onValueChange={setSelectedCamera}>
+                                <SelectTrigger id="camera-select">
+                                    <SelectValue placeholder="Select Camera" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {videoInputDevices.map(device => (
+                                        <SelectItem key={device.deviceId} value={device.deviceId}>
+                                            {device.label || `Camera ${videoInputDevices.indexOf(device) + 1}`}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                         ) : (
+                            <Input disabled value="No camera devices found." />
+                         )}
                     </div>
                      <div className="grid gap-2 mt-2">
                         <Button variant="link" className="justify-start p-0 h-auto text-primary">Advanced hardware settings</Button>
