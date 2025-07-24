@@ -61,8 +61,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
     return (
         <SidebarProvider>
             <Sidebar>
-                <SidebarContent className="p-0">
-                    <div className="p-4 flex items-center justify-between h-16 border-b">
+                <SidebarContent className="p-0 flex flex-col">
+                    <div className="p-4 flex items-center justify-between h-16 border-b shrink-0">
                        <Link href="/dashboard/ecommerce" className="flex items-center gap-2">
                            <Logo className="h-8 w-8 text-primary" />
                            <span className="text-xl font-bold text-foreground">
@@ -300,50 +300,6 @@ export default function ContactsPage() {
                      <Button variant="ghost" size="icon" onClick={() => setIsVideoOpen(true)}><Video className="h-5 w-5" /></Button>
                      <HardwareSettings />
                      
-                      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogTrigger asChild>
-                           <Button onClick={() => handleDialogOpen()}>
-                            <PlusCircle className="mr-2 h-4 w-4" /> Add Contact
-                           </Button>
-                        </DialogTrigger>
-                        <DialogContent onInteractOutside={handleDialogClose}>
-                            <DialogHeader>
-                            <DialogTitle>{editingContact ? 'Edit' : 'Add New'} Contact</DialogTitle>
-                            </DialogHeader>
-                            <Form {...form}>
-                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                                <FormField control={form.control} name="name" render={({ field }) => (
-                                <FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="e.g. John Doe" {...field} /></FormControl><FormMessage /></FormItem>
-                                )}/>
-                                <FormField control={form.control} name="email" render={({ field }) => (
-                                <FormItem><FormLabel>Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="e.g. john@example.com" {...field} /></FormControl><FormMessage /></FormItem>
-                                )}/>
-                                <FormField control={form.control} name="phone_no" render={({ field }) => (
-                                <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+1234567890" {...field} /></FormControl><FormMessage /></FormItem>
-                                )}/>
-                                <FormField control={form.control} name="phone_type" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Phone Type</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="mobile">Mobile</SelectItem>
-                                        <SelectItem value="work">Work</SelectItem>
-                                        <SelectItem value="home">Home</SelectItem>
-                                    </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                                )}/>
-                                <DialogFooter>
-                                <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
-                                <Button type="submit">Save Contact</Button>
-                                </DialogFooter>
-                            </form>
-                            </Form>
-                        </DialogContent>
-                      </Dialog>
-
                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -372,9 +328,54 @@ export default function ContactsPage() {
 
           <main className="flex-1 p-4 md:p-8 bg-muted/40">
             <Card>
-              <CardHeader>
-                <CardTitle>Company Contacts</CardTitle>
-                <CardDescription>A list of all contacts for your company.</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Company Contacts</CardTitle>
+                  <CardDescription>A list of all contacts for your company.</CardDescription>
+                </div>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                     <Button onClick={() => handleDialogOpen()}>
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add Contact
+                     </Button>
+                  </DialogTrigger>
+                  <DialogContent onInteractOutside={handleDialogClose}>
+                      <DialogHeader>
+                      <DialogTitle>{editingContact ? 'Edit' : 'Add New'} Contact</DialogTitle>
+                      </DialogHeader>
+                      <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                          <FormField control={form.control} name="name" render={({ field }) => (
+                          <FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="e.g. John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                          )}/>
+                          <FormField control={form.control} name="email" render={({ field }) => (
+                          <FormItem><FormLabel>Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="e.g. john@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                          )}/>
+                          <FormField control={form.control} name="phone_no" render={({ field }) => (
+                          <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+1234567890" {...field} /></FormControl><FormMessage /></FormItem>
+                          )}/>
+                          <FormField control={form.control} name="phone_type" render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Phone Type</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                              <SelectContent>
+                                  <SelectItem value="mobile">Mobile</SelectItem>
+                                  <SelectItem value="work">Work</SelectItem>
+                                  <SelectItem value="home">Home</SelectItem>
+                              </SelectContent>
+                              </Select>
+                              <FormMessage />
+                          </FormItem>
+                          )}/>
+                          <DialogFooter>
+                          <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
+                          <Button type="submit">Save Contact</Button>
+                          </DialogFooter>
+                      </form>
+                      </Form>
+                  </DialogContent>
+                </Dialog>
               </CardHeader>
               <CardContent>
                 {loading ? <p>Loading...</p> : (
