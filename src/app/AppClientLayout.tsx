@@ -91,6 +91,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         isOpen={!!isActiveCall}
         contactName={activeCallContact}
         onHangUp={hangUp}
+        connection={connection}
       />
       <ReservationModal
         isOpen={!!showReservationModal}
