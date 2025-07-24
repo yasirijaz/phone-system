@@ -59,7 +59,11 @@ export default function ConversationDetailPage() {
 
     return (
         <SidebarProvider>
-            <Sidebar><SidebarContent><AppSidebar /></SidebarContent></Sidebar>
+            <Sidebar>
+                <SidebarContent>
+                    <AppSidebar />
+                </SidebarContent>
+            </Sidebar>
             <SidebarInset>
                 <div className="flex h-screen w-full bg-background text-foreground">
                     <div className="flex flex-1 flex-col">
