@@ -1,5 +1,6 @@
 
 
+
 export interface Call {
   id: string | number;
   call_sid?: string;
@@ -182,7 +183,7 @@ export interface Contact {
   id: number;
   company_id: number;
   name: string;
-  email?: string;
+  email: string | null;
   phone_no: string;
   phone_type: string;
 }

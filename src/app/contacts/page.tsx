@@ -7,16 +7,17 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import type { Contact } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { getContacts, createContact } from "@/services/contactService";
+import { getContacts, createContact, updateContact, deleteContact } from "@/services/contactService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Hash, Inbox, MessageSquare, Users } from "lucide-react";
+import { PlusCircle, Hash, Inbox, MessageSquare, Users, Edit, Trash2 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import Link from "next/link";
 import { Logo } from "@/components/icons";
@@ -126,6 +127,7 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof contactSchema>>({
@@ -152,22 +154,48 @@ export default function ContactsPage() {
     }
   };
 
+  const handleDialogOpen = (contact: Contact | null = null) => {
+    setEditingContact(contact);
+    if (contact) {
+      form.reset(contact);
+    } else {
+      form.reset({ name: "", email: "", phone_no: "", phone_type: "mobile" });
+    }
+    setIsDialogOpen(true);
+  };
+
   const handleDialogClose = () => {
     setIsDialogOpen(false);
+    setEditingContact(null);
     form.reset();
-  }
+  };
 
   const onSubmit = async (values: z.infer<typeof contactSchema>) => {
     if (!user?.company_id) return;
     try {
-      await createContact({ ...values, company_id: user.company_id });
-      toast({ title: "Success", description: "Contact created successfully." });
+      if (editingContact) {
+        await updateContact(editingContact.id, { ...values, company_id: user.company_id });
+        toast({ title: "Success", description: "Contact updated successfully." });
+      } else {
+        await createContact({ ...values, company_id: user.company_id });
+        toast({ title: "Success", description: "Contact created successfully." });
+      }
       fetchContacts();
       handleDialogClose();
     } catch (error: any) {
-      toast({ title: "Error", description: error.response?.data?.message || "Failed to create contact.", variant: "destructive" });
+      toast({ title: "Error", description: error.response?.data?.message || "Failed to save contact.", variant: "destructive" });
     }
   };
+  
+  const handleDelete = async (contactId: number) => {
+    try {
+        await deleteContact(contactId);
+        toast({ title: "Success", description: "Contact deleted successfully." });
+        fetchContacts();
+    } catch (error) {
+        toast({ title: "Error", description: "Failed to delete contact.", variant: "destructive" });
+    }
+  }
 
   return (
     <AppLayout>
@@ -179,13 +207,13 @@ export default function ContactsPage() {
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => setIsDialogOpen(true)}>
+                <Button onClick={() => handleDialogOpen()}>
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Contact
                 </Button>
               </DialogTrigger>
               <DialogContent onInteractOutside={handleDialogClose}>
                 <DialogHeader>
-                  <DialogTitle>Add New Contact</DialogTitle>
+                  <DialogTitle>{editingContact ? 'Edit' : 'Add New'} Contact</DialogTitle>
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -214,7 +242,7 @@ export default function ContactsPage() {
                     )}/>
                     <DialogFooter>
                       <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
-                      <Button type="submit">Add Contact</Button>
+                      <Button type="submit">Save Contact</Button>
                     </DialogFooter>
                   </form>
                 </Form>
@@ -237,6 +265,7 @@ export default function ContactsPage() {
                         <TableHead>Email</TableHead>
                         <TableHead>Phone Number</TableHead>
                         <TableHead>Type</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -246,9 +275,33 @@ export default function ContactsPage() {
                           <TableCell>{contact.email || 'N/A'}</TableCell>
                           <TableCell>{contact.phone_no}</TableCell>
                           <TableCell>{contact.phone_type}</TableCell>
+                          <TableCell className="text-right">
+                              <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(contact)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="icon">
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                              This will permanently delete the contact. This action cannot be undone.
+                                          </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => handleDelete(contact.id)}>Delete</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                  </AlertDialogContent>
+                              </AlertDialog>
+                          </TableCell>
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={4} className="text-center h-24">No contacts found.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center h-24">No contacts found.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
