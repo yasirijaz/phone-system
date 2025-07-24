@@ -12,26 +12,22 @@ interface CallLogProps {
 }
 
 function CallCard({ call }: { call: Call }) {
-  let fromName: string;
-  let fromNumber: string;
-  let receivedByName: string;
-  
-  if (call.client_name) {
-      fromName = call.user?.name ?? 'Unknown User';
-      fromNumber = call.from;
-      receivedByName = call.to_name?.name ?? 'Unknown Receiver';
-  } else {
-      if (call.direction === 'inbound') {
-          fromName = call.from_name?.name ?? call.from;
-          fromNumber = call.from;
-      } else {
-          fromName = call.user?.name ?? "Me";
-          fromNumber = call.to_name?.name ?? call.to;
-      }
-      receivedByName = call.user?.name ?? 'Unassigned';
-  }
+  const fromName = call.direction === 'outbound' 
+    ? (call.user?.name || "Me")
+    : (call.from_name?.name || call.from);
 
-  const contactInitial = fromName ? fromName.charAt(0).toUpperCase() : '?';
+  const fromNumber = call.from;
+
+  const toName = call.direction === 'inbound'
+    ? (call.department?.name || "Me")
+    : (call.to_name?.name || call.to);
+  
+  const toNumber = call.to;
+
+  const receivedByName = call.user?.name ?? 'Unassigned';
+  
+  const contactName = call.direction === 'inbound' ? fromName : toName;
+  const contactInitial = contactName ? contactName.charAt(0).toUpperCase() : '?';
 
   const isMissed = call.call_status === 'missed' || call.call_status === 'no-answer' || call.call_status === 'busy' || call.call_status === 'canceled';
   const hasRecording = !!call.recording_url;
@@ -41,10 +37,10 @@ function CallCard({ call }: { call: Call }) {
   const contactDisplayNumber = call.direction === 'inbound' ? call.from : call.to;
 
   return (
-    <Link href={`/conversations/${contactDisplayNumber}`} key={call.id}>
+    <Link href={`/conversations/${contactDisplayNumber}`} key={call.id} className="block">
         <div className="flex items-start gap-4">
             <Avatar>
-                <AvatarImage src={`https://placehold.co/100x100.png?text=${contactInitial}`} alt={fromName} />
+                <AvatarImage src={`https://placehold.co/100x100.png?text=${contactInitial}`} alt={contactName} />
                 <AvatarFallback>{contactInitial}</AvatarFallback>
             </Avatar>
             <div className="flex-1">
@@ -56,7 +52,7 @@ function CallCard({ call }: { call: Call }) {
                     <div className="text-sm mt-2">
                         <p><strong>Received By:</strong> {receivedByName}</p>
                         <div className="flex items-center gap-4 text-muted-foreground">
-                            <span>From: {fromName} ({call.from})</span>
+                            <span>From: {fromName} ({fromNumber})</span>
                         </div>
                     </div>
                      {hasRecording && (

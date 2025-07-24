@@ -38,8 +38,8 @@ export default function ConversationDetailPage() {
                 if(filteredLogs.length > 0) {
                     const latestCall = filteredLogs[0];
                     const name = latestCall.direction === 'inbound' 
-                        ? latestCall.meta_data?.from_name || latestCall.from 
-                        : latestCall.meta_data?.to_name || latestCall.to;
+                        ? (latestCall.from_name?.name || latestCall.from) 
+                        : (latestCall.to_name?.name || latestCall.to);
                     setContactName(name);
                 } else {
                     setContactName(contactNumber);
@@ -71,7 +71,7 @@ export default function ConversationDetailPage() {
                                 </Button>
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <h1 className="text-xl font-bold">Warranty Dept (New)</h1>
+                                        <h1 className="text-xl font-bold">{contactName}</h1>
                                         <Badge variant="outline">All</Badge>
                                         <Badge>Department</Badge>
                                     </div>

@@ -54,7 +54,7 @@ export default function AppUIPage() {
   const getLatestUniqueCallsByContact = (calls: Call[]): Call[] => {
     const latestCalls = new Map<string, Call>();
 
-    // Sort calls by date to easily find the latest
+    // Sort calls by date descending to easily find the latest
     const sortedCalls = [...calls].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     sortedCalls.forEach(call => {
@@ -219,7 +219,7 @@ export default function AppUIPage() {
                           <Card><CardContent className="p-6">Call logs will appear here.</CardContent></Card>
                       </TabsContent>
                         <TabsContent value="missed" className="mt-6">
-                           {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls.filter(c => c.call_status === 'missed' || c.call_status === 'no-answer' || c.call_status === 'busy' || c.call_status === 'canceled' )} />}
+                           {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.call_status === 'missed' || c.call_status === 'no-answer' || c.call_status === 'busy' || c.call_status === 'canceled'))} />}
                       </TabsContent>
                         <TabsContent value="meetings" className="mt-6">
                           <Card><CardContent className="p-6">Meeting recordings will appear here.</CardContent></Card>
@@ -234,7 +234,7 @@ export default function AppUIPage() {
                           <Card><CardContent className="p-6">Messages will appear here.</CardContent></Card>
                       </TabsContent>
                       <TabsContent value="starred" className="mt-6">
-                          {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls.filter(c => c.is_starred)} />}
+                          {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.is_starred))} />}
                       </TabsContent>
                       <TabsContent value="spam" className="mt-6">
                           <Card><CardContent className="p-6">Spam will appear here.</CardContent></Card>
