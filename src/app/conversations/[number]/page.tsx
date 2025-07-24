@@ -72,8 +72,6 @@ export default function ConversationDetailPage() {
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h1 className="text-xl font-bold">{contactName}</h1>
-                                        <Badge variant="outline">All</Badge>
-                                        <Badge>Department</Badge>
                                     </div>
                                     <p className="text-sm text-muted-foreground">{contactNumber}</p>
                                 </div>
