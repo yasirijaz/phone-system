@@ -1,12 +1,18 @@
 
 
 export interface Call {
-  id: string | number;
+  id: number;
+  department_id?: number;
+  client_name?: string | null;
+  user_id?: number | null;
   call_sid?: string;
+  account_sid?: string;
   to: string;
   from: string;
   call_status?: string;
   direction: 'inbound' | 'outbound';
+  task_sid?: string;
+  worker_sid?: string;
   duration: string;
   call_duration?: string;
   meta_data?: any;
@@ -14,6 +20,11 @@ export interface Call {
   is_starred?: boolean;
   recording_url?: string | null;
   created_at: string;
+  updated_at?: string;
+  to_name?: Partial<Contact> | null;
+  from_name?: Partial<Contact> | null;
+  department?: Department;
+  user?: User | null;
   notes?: string;
   category?: string;
 }
@@ -182,7 +193,7 @@ export interface Contact {
   id: number;
   company_id: number;
   name: string;
-  email?: string;
+  email: string | null;
   phone_no: string;
   phone_type: string;
 }

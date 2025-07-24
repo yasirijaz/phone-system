@@ -3,7 +3,7 @@ import axios from '@/lib/axios';
 import type { Call } from '@/types';
 
 export const getCallLogs = async (): Promise<Call[]> => {
-  const response = await axios.get('/api/call-logs');
+  const response = await axios.get('/api/call-logs/');
   return response.data.call_logs;
 };
 

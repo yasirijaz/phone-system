@@ -11,3 +11,12 @@ export const createContact = async (contactData: Omit<Contact, 'id'>): Promise<C
   const response = await axios.post('/api/contacts', contactData);
   return response.data.contact;
 };
+
+export const updateContact = async (id: number, contactData: Partial<Omit<Contact, 'id'>>): Promise<Contact> => {
+    const response = await axios.put(`/api/contacts/${id}`, contactData);
+    return response.data.contact;
+};
+
+export const deleteContact = async (id: number): Promise<void> => {
+    await axios.delete(`/api/contacts/${id}`);
+};

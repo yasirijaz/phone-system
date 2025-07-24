@@ -1,64 +1,60 @@
+
 import type { Call } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PhoneIncoming, PhoneOutgoing, User, Clock, CalendarDays } from 'lucide-react';
+import { PhoneIncoming, PhoneOutgoing, User, Clock, CalendarDays, NotebookText, Voicemail } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isSameDay } from 'date-fns';
+import Link from 'next/link';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 interface CallLogProps {
   calls: Call[];
 }
 
 function CallCard({ call }: { call: Call }) {
-  const getContactName = () => {
-    if (call.direction === 'inbound') {
-      return call.meta_data?.from_name || call.from;
-    }
-    return call.meta_data?.to_name || call.to;
-  };
+  const fromName = call.from_name?.name || call.from;
+  const toName = call.to_name?.name || call.to;
+
+  const receivedByName = call.user?.name ?? 'Unassigned';
   
-  const contact = getContactName();
-  const type = call.direction === 'inbound' ? 'incoming' : 'outgoing';
+  const contactName = call.direction === 'inbound' ? fromName : toName;
+  const contactInitial = contactName ? contactName.charAt(0).toUpperCase() : '?';
+
+  const isMissed = call.call_status === 'missed' || call.call_status === 'no-answer' || call.call_status === 'busy' || call.call_status === 'canceled';
+  const hasRecording = !!call.recording_url;
+  
+  const cardBg = isMissed ? 'bg-red-50' : hasRecording ? 'bg-green-50' : 'bg-background';
+
+  const contactDisplayNumber = call.direction === 'inbound' ? call.from : call.to;
 
   return (
-    <Card className="mb-4 transition-all hover:shadow-lg">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {type === 'incoming' ? 
-              <PhoneIncoming className="h-6 w-6 text-green-500" /> : 
-              <PhoneOutgoing className="h-6 w-6 text-blue-500" />
-            }
-            <CardTitle className="text-lg">{contact}</CardTitle>
-          </div>
-          <div className='flex items-center gap-2'>
-            {call.call_status && <Badge variant="outline">{call.call_status}</Badge>}
-            {call.category && <Badge variant="secondary">{call.category}</Badge>}
-          </div>
+    <Link href={`/conversations/${contactDisplayNumber}`} key={call.id} className="block">
+        <div className="flex items-start gap-4">
+            <Avatar>
+                <AvatarImage src={`https://placehold.co/100x100.png?text=${contactInitial}`} alt={contactName} />
+                <AvatarFallback>{contactInitial}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+                <div className={`p-4 rounded-lg border ${cardBg}`}>
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                         {call.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />}
+                         <span>{call.direction.charAt(0).toUpperCase() + call.direction.slice(1)} / {call.call_status} ({call.duration} min)</span>
+                    </div>
+                    <div className="text-sm mt-2 space-y-1 text-muted-foreground">
+                        <p className="text-foreground"><strong>Received By:</strong> {receivedByName}</p>
+                        <p><strong>From:</strong> {fromName} ({call.from})</p>
+                        <p><strong>To:</strong> {toName} ({call.to})</p>
+                    </div>
+                     {hasRecording && (
+                        <div className="mt-2">
+                            <audio controls src={call.recording_url} className="w-full h-8" onClick={(e) => e.preventDefault()}></audio>
+                        </div>
+                    )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{format(parseISO(call.created_at), 'p')}</p>
+            </div>
         </div>
-        <CardDescription className="flex items-center flex-wrap gap-x-4 gap-y-1 pt-2 text-xs">
-          {call.created_at && (
-            <>
-              <span className="flex items-center gap-1.5"><CalendarDays className="h-3 w-3" /> {format(parseISO(call.created_at), 'PP')}</span>
-              <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {format(parseISO(call.created_at), 'p')}</span>
-            </>
-          )}
-          <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {call.duration} min</span>
-           <span className="capitalize flex items-center gap-1.5">
-            {type === 'incoming' ? <PhoneIncoming className="h-3 w-3" /> : <PhoneOutgoing className="h-3 w-3" />}
-            {call.direction}
-          </span>
-           <span className="flex items-center gap-1.5"><User className="h-3 w-3" /> From: {call.from}</span>
-        </CardDescription>
-      </CardHeader>
-      {call.notes && (
-        <CardContent>
-          <div className="flex items-start gap-3 text-sm text-muted-foreground">
-            <NotebookText className="h-4 w-4 mt-1 shrink-0" />
-            <p className="whitespace-pre-wrap">{call.notes}</p>
-          </div>
-        </CardContent>
-      )}
-    </Card>
+    </Link>
   )
 }
 
@@ -66,16 +62,36 @@ export default function CallLog({ calls }: CallLogProps) {
   if (calls.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 border-2 border-dashed rounded-lg">
-        <p className="text-lg font-medium">No calls found</p>
-        <p>Your call history is empty. Try clearing your filters or logging a new call.</p>
+        <p className="text-lg font-medium">No activity yet</p>
+        <p>Your history with this contact will appear here.</p>
       </div>
     );
   }
+  
+  const groupedCalls = calls.reduce((acc, call) => {
+    const date = format(parseISO(call.created_at), 'yyyy-MM-dd');
+    if (!acc[date]) {
+        acc[date] = [];
+    }
+    acc[date].push(call);
+    return acc;
+  }, {} as Record<string, Call[]>);
 
   return (
-    <div className="space-y-4">
-      {calls.map((call) => (
-        <CallCard key={call.id} call={call} />
+    <div className="space-y-6">
+      {Object.entries(groupedCalls).map(([date, callsForDay]) => (
+        <div key={date}>
+            <div className="flex items-center justify-center my-4">
+                <div className="text-xs text-muted-foreground bg-secondary px-3 py-1 rounded-full">
+                    {format(parseISO(date), 'EEEE, d MMM yyyy')}
+                </div>
+            </div>
+             <div className="space-y-4">
+                {callsForDay.map((call) => (
+                    <CallCard call={call} key={call.id} />
+                ))}
+             </div>
+        </div>
       ))}
     </div>
   );

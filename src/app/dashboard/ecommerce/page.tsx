@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useState, useMemo, type ChangeEvent, useEffect } from 'react';
-import type { Call } from '@/types';
+import { useState, useMemo, type ChangeEvent, useEffect, useCallback } from 'react';
+import type { Call, Department, PhoneNumber } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PlusCircle, Search, Phone, UserCheck, Zap, ArrowUp, ArrowDown, Users, Clock, MoreHorizontal, Calendar, AreaChart, BarChart as BarChartIcon } from 'lucide-react';
+import { PlusCircle, Search, Phone, UserCheck, Zap, ArrowUp, ArrowDown, Users, Clock, MoreHorizontal, Calendar, AreaChart, BarChart as BarChartIcon, MessageSquare, Video } from 'lucide-react';
 import CallLog from '@/components/call-log';
 import LogCallForm from '@/components/log-call-form';
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -19,6 +19,14 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, ComposedChart } from 'recharts';
 import { Badge } from '@/components/ui/badge';
+import Dialer from '@/components/dialer';
+import { useToast } from '@/hooks/use-toast';
+import { getDepartments } from '@/services/departmentService';
+import { getUserDepartments } from '@/services/userService';
+import { getPhoneNumbers } from '@/services/phoneNumberService';
+import NewMessageForm from '@/components/new-message-form';
+import HardwareSettings from '@/components/hardware-settings';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const INITIAL_CALLS: Partial<Call>[] = [
   {
@@ -239,14 +247,80 @@ export default function EcommerceDashboard() {
   const router = useRouter();
   const [calls, setCalls] = useState<Call[]>(INITIAL_CALLS as Call[]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showIncomingCall, setShowIncomingCall] = useState(false);
+  
+  const [isSmsOpen, setIsSmsOpen] = useState(false);
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+  
+  const { device, isDeviceReady } = useTwilio();
+  const { toast } = useToast();
+
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(true);
+  const [loadingNumbers, setLoadingNumbers] = useState(false);
 
   useEffect(() => {
     if(user?.role_id === 1) {
       router.replace('/companies');
     }
   }, [user, router]);
+  
+  useEffect(() => {
+    const fetchDepartmentsData = async () => {
+        if (!user) return;
+        setLoadingDepartments(true);
+        try {
+            const isAdmin = user.role_id === 1 || user.role_id === 2;
+            const fetchedDepts = isAdmin && user.company_id
+                ? await getDepartments(user.company_id)
+                : await getUserDepartments(user.id);
+            
+            setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
+        } catch (error) {
+            toast({ title: "Error", description: "Failed to load departments.", variant: "destructive" });
+        } finally {
+            setLoadingDepartments(false);
+        }
+    };
+    fetchDepartmentsData();
+  }, [user, toast]);
+  
+  const handleDepartmentChange = useCallback(async (departmentId: string) => {
+    if (!departmentId) {
+        setPhoneNumbers([]);
+        return;
+    };
+    setLoadingNumbers(true);
+    try {
+        const numbers = await getPhoneNumbers(Number(departmentId));
+        setPhoneNumbers(numbers);
+    } catch (error) {
+        toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
+        setPhoneNumbers([]);
+    } finally {
+        setLoadingNumbers(false);
+    }
+  }, [toast]);
+
+
+  const handleMakeCall = async (number: string, fromNumber?: string) => {
+    if (!device || !isDeviceReady) {
+        toast({ title: "Twilio Error", description: "Twilio Device not ready. Please connect first.", variant: 'destructive'});
+        return;
+    }
+    try {
+        const params: { To: string, From?: string } = { To: number };
+        if (fromNumber) {
+            params.From = fromNumber;
+        }
+        await device.connect({ params });
+    } catch (error) {
+        console.error("Error making call:", error);
+        toast({ title: "Call Error", description: "Failed to make call. See console for details.", variant: 'destructive'});
+    }
+  };
+
 
   const filteredCalls = useMemo(() => {
     return calls
@@ -281,13 +355,6 @@ export default function EcommerceDashboard() {
     };
   }, [calls]);
 
-
-  const handleAddCall = (newCall: Partial<Call>) => {
-    setCalls(prevCalls => [newCall as Call, ...prevCalls]);
-    setIsSheetOpen(false);
-  };
-  
-
   if(user?.role_id === 1) {
     return null; // or a loading spinner, as redirection is happening
   }
@@ -312,24 +379,20 @@ export default function EcommerceDashboard() {
                 </kbd>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetTrigger asChild>
-                  <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Log a Call
-                  </Button>
-                </SheetTrigger>
-                <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-                  <SheetHeader>
-                    <SheetTitle>Log a New Call</SheetTitle>
-                    <SheetDescription>
-                      Enter the details of your call. Use the AI tool to categorize it automatically based on your notes.
-                    </SheetDescription>
-                  </SheetHeader>
-                  <LogCallForm onCallAdded={handleAddCall} />
-                </SheetContent>
-              </Sheet>
+            <div className="flex items-center gap-2">
+                 <Dialer
+                    onMakeCall={handleMakeCall}
+                    departments={departments}
+                    phoneNumbers={phoneNumbers}
+                    onDepartmentChange={handleDepartmentChange}
+                    loadingDepartments={loadingDepartments}
+                    loadingNumbers={loadingNumbers}
+                 >
+                   <Button variant="ghost" size="icon"><Phone className="h-5 w-5" /></Button>
+                 </Dialer>
+                 <Button variant="ghost" size="icon" onClick={() => setIsSmsOpen(true)}><MessageSquare className="h-5 w-5" /></Button>
+                 <Button variant="ghost" size="icon" onClick={() => setIsVideoOpen(true)}><Video className="h-5 w-5" /></Button>
+                 <HardwareSettings />
             </div>
           </header>
 
@@ -372,7 +435,39 @@ export default function EcommerceDashboard() {
               onReject={() => { console.log('Call rejected'); setShowIncomingCall(false); }}
             />
         </div>
+        
+        <Dialog open={isSmsOpen} onOpenChange={setIsSmsOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>New Message</DialogTitle>
+               <DialogDescription>
+                Select a department and number to send a message from.
+              </DialogDescription>
+            </DialogHeader>
+            <NewMessageForm 
+              onClose={() => setIsSmsOpen(false)}
+              departments={departments}
+              phoneNumbers={phoneNumbers}
+              onDepartmentChange={handleDepartmentChange}
+              loadingDepartments={loadingDepartments}
+              loadingNumbers={loadingNumbers}
+            />
+          </DialogContent>
+        </Dialog>
+        
+        <Dialog open={isVideoOpen} onOpenChange={setIsVideoOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>New Video Call</DialogTitle>
+              <DialogDescription>
+                This feature is coming soon.
+              </DialogDescription>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
+
       </SidebarInset>
     </SidebarProvider>
   );
 }
+
