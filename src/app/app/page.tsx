@@ -18,6 +18,7 @@ import {
   Users,
   Phone,
   Video,
+  NotebookText,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
@@ -37,26 +38,14 @@ import HardwareSettings from "@/components/hardware-settings";
 import { getCallLogs, getUnreadCallLogs } from "@/services/callLogService";
 import CallLog from "@/components/call-log";
 
-
-const recentContacts = [
-  { name: "(321) 799-6096", initial: "A" },
-  { name: "Ideal GA", initial: "I", color: "bg-green-500" },
-  { name: "Susan Buser", initial: "S", color: "bg-green-500" },
-  { name: "(407) 269-8808", initial: "A" },
-  { name: "(205) 916-8373", initial: "A" },
-  { name: "(407) 410-4734", initial: "A" },
-  { name: "Orlando FL", initial: "O", color: "bg-blue-500" },
-  { name: "(813) 544-4201", initial: "M" },
-  { name: "Metuchen NJ", initial: "M", color: "bg-yellow-500" },
-  { name: "WindshieldHUB", initial: "W", color: "bg-orange-500" },
-  { name: "(737) 204-9493", initial: "A" },
-  { name: "(713) 804-8089", initial: "A" },
-  { name: "Kashif Raza", initial: "K", color: "bg-yellow-500", status: "DND" },
-  { name: "WindshieldHUB SMS", initial: "W", color: "bg-orange-500" },
-  { name: "(407) 250-1607", initial: "A" },
-];
-
-function AppLayout({ children }: { children: React.ReactNode }) {
+function AppLayout({ children, calls }: { children: React.ReactNode, calls: Call[] }) {
+    const getContactName = (call: Call) => {
+        if (call.direction === 'inbound') {
+            return call.meta_data?.from_name || call.from;
+        }
+        return call.meta_data?.to_name || call.to;
+    };
+    
     return (
         <SidebarProvider>
             <Sidebar>
@@ -96,26 +85,27 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                           <h3 className="px-4 text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
                             Recents
                           </h3>
-                          <div className="flex-1 overflow-y-auto px-2">
-                            {recentContacts.map((contact, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center gap-3 p-2 rounded-md hover:bg-muted"
-                              >
-                                <Avatar className="h-8 w-8">
-                                  <AvatarFallback className={contact.color}>
-                                    {contact.initial}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 truncate">
-                                  <p className="text-sm font-medium">{contact.name}</p>
-                                  {contact.status && (
-                                    <p className="text-xs text-destructive">{contact.status}</p>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                           <div className="flex-1 overflow-y-auto px-2">
+                                {calls.slice(0, 15).map((call) => {
+                                    const contactName = getContactName(call);
+                                    const initial = contactName ? contactName.charAt(0).toUpperCase() : '?';
+                                    return (
+                                        <div
+                                            key={call.id}
+                                            className="flex items-center gap-3 p-2 rounded-md hover:bg-muted"
+                                        >
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarFallback>
+                                                    {initial}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div className="flex-1 truncate">
+                                                <p className="text-sm font-medium">{contactName}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </SidebarContent>
@@ -213,7 +203,7 @@ export default function AppUIPage() {
 
 
   return (
-    <AppLayout>
+    <AppLayout calls={allCalls}>
       <div className="flex h-screen w-full bg-background text-foreground">
         {/* Main Content */}
         <div className="flex flex-1 flex-col">
@@ -356,5 +346,3 @@ export default function AppUIPage() {
     </AppLayout>
   );
 }
-
-    

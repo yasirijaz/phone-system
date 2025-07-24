@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import type { Contact, Department, PhoneNumber } from "@/types";
+import type { Contact, Department, PhoneNumber, Call } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { getContacts, createContact, updateContact, deleteContact } from "@/services/contactService";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
 import HardwareSettings from "@/components/hardware-settings";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { getCallLogs } from "@/services/callLogService";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name is required."),
@@ -38,26 +39,13 @@ const contactSchema = z.object({
   phone_type: z.string().min(1, "Phone type is required."),
 });
 
-const recentContacts = [
-  { name: "(321) 799-6096", initial: "A" },
-  { name: "Ideal GA", initial: "I", color: "bg-green-500" },
-  { name: "Susan Buser", initial: "S", color: "bg-green-500" },
-  { name: "(407) 269-8808", initial: "A" },
-  { name: "(205) 916-8373", initial: "A" },
-  { name: "(407) 410-4734", initial: "A" },
-  { name: "Orlando FL", initial: "O", color: "bg-blue-500" },
-  { name: "(813) 544-4201", initial: "M" },
-  { name: "Metuchen NJ", initial: "M", color: "bg-yellow-500" },
-  { name: "WindshieldHUB", initial: "W", color: "bg-orange-500" },
-  { name: "(737) 204-9493", initial: "A" },
-  { name: "(713) 804-8089", initial: "A" },
-  { name: "Kashif Raza", initial: "K", color: "bg-yellow-500", status: "DND" },
-  { name: "WindshieldHUB SMS", initial: "W", color: "bg-orange-500" },
-  { name: "(407) 250-1607", initial: "A" },
-];
-
-
-function AppLayout({ children }: { children: React.ReactNode }) {
+function AppLayout({ children, calls }: { children: React.ReactNode, calls: Call[] }) {
+    const getContactName = (call: Call) => {
+        if (call.direction === 'inbound') {
+            return call.meta_data?.from_name || call.from;
+        }
+        return call.meta_data?.to_name || call.to;
+    };
     return (
         <SidebarProvider>
             <Sidebar>
@@ -99,26 +87,27 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                           <h3 className="px-4 text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
                             Recents
                           </h3>
-                          <div className="flex-1 overflow-y-auto px-2">
-                            {recentContacts.map((contact, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center gap-3 p-2 rounded-md hover:bg-muted"
-                              >
-                                <Avatar className="h-8 w-8">
-                                  <AvatarFallback className={contact.color}>
-                                    {contact.initial}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 truncate">
-                                  <p className="text-sm font-medium">{contact.name}</p>
-                                  {contact.status && (
-                                    <p className="text-xs text-destructive">{contact.status}</p>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                           <div className="flex-1 overflow-y-auto px-2">
+                                {calls.slice(0, 15).map((call) => {
+                                    const contactName = getContactName(call);
+                                    const initial = contactName ? contactName.charAt(0).toUpperCase() : '?';
+                                    return (
+                                        <div
+                                            key={call.id}
+                                            className="flex items-center gap-3 p-2 rounded-md hover:bg-muted"
+                                        >
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarFallback>
+                                                    {initial}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div className="flex-1 truncate">
+                                                <p className="text-sm font-medium">{contactName}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </SidebarContent>
@@ -147,6 +136,8 @@ export default function ContactsPage() {
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
   const [loadingNumbers, setLoadingNumbers] = useState(false);
+  const [callLogs, setCallLogs] = useState<Call[]>([]);
+
 
   const form = useForm<z.infer<typeof contactSchema>>({
     resolver: zodResolver(contactSchema),
@@ -178,11 +169,15 @@ export default function ContactsPage() {
         setLoadingDepartments(true);
         try {
             const isAdmin = user.role_id === 1 || user.role_id === 2;
-            const fetchedDepts = await (isAdmin && user.company_id
-                ? getDepartments(user.company_id)
-                : getUserDepartments(user.id));
+            const [fetchedDepts, fetchedCallLogs] = await Promise.all([
+                 (isAdmin && user.company_id
+                    ? getDepartments(user.company_id)
+                    : getUserDepartments(user.id)),
+                getCallLogs()
+            ]);
 
             setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
+            setCallLogs(Array.isArray(fetchedCallLogs) ? fetchedCallLogs : []);
 
         } catch (error) {
             toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
@@ -272,7 +267,7 @@ export default function ContactsPage() {
   }
 
   return (
-    <AppLayout>
+    <AppLayout calls={callLogs}>
         <div className="flex flex-col min-h-screen">
             <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
                 <div className="flex items-center gap-4">
