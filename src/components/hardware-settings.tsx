@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings, MoreHorizontal } from 'lucide-react';
@@ -13,26 +12,48 @@ export default function HardwareSettings() {
     const [isOpen, setIsOpen] = useState(false);
     const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
     const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
+    const [videoInputDevices, setVideoInputDevices] = useState<MediaDeviceInfo[]>([]);
+    
     const [selectedMicrophone, setSelectedMicrophone] = useState<string>('');
     const [selectedSpeaker, setSelectedSpeaker] = useState<string>('');
+    const [selectedCamera, setSelectedCamera] = useState<string>('');
 
     useEffect(() => {
         const getDevices = async () => {
+            if (!navigator.mediaDevices?.enumerateDevices) {
+                console.warn("Media Devices API not supported.");
+                return;
+            }
             try {
-                // Request permission to access media devices
-                await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                // Request permissions one by one to avoid errors if a device is missing
+                try {
+                    await navigator.mediaDevices.getUserMedia({ audio: true });
+                } catch (err) {
+                    console.warn("Could not get audio permission:", err);
+                }
+                 try {
+                    await navigator.mediaDevices.getUserMedia({ video: true });
+                } catch (err) {
+                    console.warn("Could not get video permission:", err);
+                }
+
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const audioInputs = devices.filter(device => device.kind === 'audioinput');
                 const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+                const videoInputs = devices.filter(device => device.kind === 'videoinput');
                 
                 setAudioInputDevices(audioInputs);
                 setAudioOutputDevices(audioOutputs);
+                setVideoInputDevices(videoInputs);
 
-                if (audioInputs.length > 0) {
+                if (audioInputs.length > 0 && !selectedMicrophone) {
                     setSelectedMicrophone(audioInputs[0].deviceId);
                 }
-                if (audioOutputs.length > 0) {
+                if (audioOutputs.length > 0 && !selectedSpeaker) {
                     setSelectedSpeaker(audioOutputs[0].deviceId);
+                }
+                 if (videoInputs.length > 0 && !selectedCamera) {
+                    setSelectedCamera(videoInputs[0].deviceId);
                 }
 
             } catch (err) {
@@ -95,13 +116,16 @@ export default function HardwareSettings() {
                     </div>
                     <div className="grid gap-2">
                          <Label htmlFor="camera-select">Camera</Label>
-                         <Select defaultValue="default-camera">
+                         <Select value={selectedCamera} onValueChange={setSelectedCamera}>
                             <SelectTrigger id="camera-select">
                                 <SelectValue placeholder="Select Camera" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="default-camera">Default</SelectItem>
-                                <SelectItem value="camera-2">Integrated Webcam</SelectItem>
+                                {videoInputDevices.map(device => (
+                                    <SelectItem key={device.deviceId} value={device.deviceId}>
+                                        {device.label || `Camera ${videoInputDevices.indexOf(device) + 1}`}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
