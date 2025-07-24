@@ -1,8 +1,9 @@
 import type { Call } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PhoneIncoming, PhoneOutgoing, User, Clock, CalendarDays } from 'lucide-react';
+import { PhoneIncoming, PhoneOutgoing, User, Clock, CalendarDays, NotebookText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
+import Link from 'next/link';
 
 interface CallLogProps {
   calls: Call[];
@@ -16,49 +17,56 @@ function CallCard({ call }: { call: Call }) {
     return call.meta_data?.to_name || call.to;
   };
   
+  const getContactNumber = () => {
+    return call.direction === 'inbound' ? call.from : call.to;
+  }
+
   const contact = getContactName();
+  const contactNumber = getContactNumber();
   const type = call.direction === 'inbound' ? 'incoming' : 'outgoing';
 
   return (
-    <Card className="mb-4 transition-all hover:shadow-lg">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {type === 'incoming' ? 
-              <PhoneIncoming className="h-6 w-6 text-green-500" /> : 
-              <PhoneOutgoing className="h-6 w-6 text-blue-500" />
-            }
-            <CardTitle className="text-lg">{contact}</CardTitle>
-          </div>
-          <div className='flex items-center gap-2'>
-            {call.call_status && <Badge variant="outline">{call.call_status}</Badge>}
-            {call.category && <Badge variant="secondary">{call.category}</Badge>}
-          </div>
-        </div>
-        <CardDescription className="flex items-center flex-wrap gap-x-4 gap-y-1 pt-2 text-xs">
-          {call.created_at && (
-            <>
-              <span className="flex items-center gap-1.5"><CalendarDays className="h-3 w-3" /> {format(parseISO(call.created_at), 'PP')}</span>
-              <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {format(parseISO(call.created_at), 'p')}</span>
-            </>
-          )}
-          <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {call.duration} min</span>
-           <span className="capitalize flex items-center gap-1.5">
-            {type === 'incoming' ? <PhoneIncoming className="h-3 w-3" /> : <PhoneOutgoing className="h-3 w-3" />}
-            {call.direction}
-          </span>
-           <span className="flex items-center gap-1.5"><User className="h-3 w-3" /> From: {call.from}</span>
-        </CardDescription>
-      </CardHeader>
-      {call.notes && (
-        <CardContent>
-          <div className="flex items-start gap-3 text-sm text-muted-foreground">
-            <NotebookText className="h-4 w-4 mt-1 shrink-0" />
-            <p className="whitespace-pre-wrap">{call.notes}</p>
-          </div>
-        </CardContent>
-      )}
-    </Card>
+    <Link href={`/conversations/${encodeURIComponent(contactNumber)}`}>
+        <Card className="mb-4 transition-all hover:shadow-lg cursor-pointer">
+        <CardHeader>
+            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+                {type === 'incoming' ? 
+                <PhoneIncoming className="h-6 w-6 text-green-500" /> : 
+                <PhoneOutgoing className="h-6 w-6 text-blue-500" />
+                }
+                <CardTitle className="text-lg">{contact}</CardTitle>
+            </div>
+            <div className='flex items-center gap-2'>
+                {call.call_status && <Badge variant="outline">{call.call_status}</Badge>}
+                {call.category && <Badge variant="secondary">{call.category}</Badge>}
+            </div>
+            </div>
+            <CardDescription className="flex items-center flex-wrap gap-x-4 gap-y-1 pt-2 text-xs">
+            {call.created_at && (
+                <>
+                <span className="flex items-center gap-1.5"><CalendarDays className="h-3 w-3" /> {format(parseISO(call.created_at), 'PP')}</span>
+                <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {format(parseISO(call.created_at), 'p')}</span>
+                </>
+            )}
+            <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {call.duration} min</span>
+            <span className="capitalize flex items-center gap-1.5">
+                {type === 'incoming' ? <PhoneIncoming className="h-3 w-3" /> : <PhoneOutgoing className="h-3 w-3" />}
+                {call.direction}
+            </span>
+            <span className="flex items-center gap-1.5"><User className="h-3 w-3" /> From: {call.from}</span>
+            </CardDescription>
+        </CardHeader>
+        {call.notes && (
+            <CardContent>
+            <div className="flex items-start gap-3 text-sm text-muted-foreground">
+                <NotebookText className="h-4 w-4 mt-1 shrink-0" />
+                <p className="whitespace-pre-wrap">{call.notes}</p>
+            </div>
+            </CardContent>
+        )}
+        </Card>
+    </Link>
   )
 }
 

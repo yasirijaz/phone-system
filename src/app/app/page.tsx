@@ -149,6 +149,22 @@ export default function AppUIPage() {
   const [unreadCalls, setUnreadCalls] = useState<Call[]>([]);
   const [loadingCalls, setLoadingCalls] = useState(true);
 
+  const getUniqueCalls = (calls: Call[]): Call[] => {
+    const uniqueCalls = new Map<string, Call>();
+    calls.forEach(call => {
+        if (call.call_sid && !uniqueCalls.has(call.call_sid)) {
+            uniqueCalls.set(call.call_sid, call);
+        } else if (!call.call_sid) {
+            // For calls without a call_sid, use a composite key to attempt unique identification
+            const key = `${call.from}-${call.to}-${call.created_at}`;
+            if (!uniqueCalls.has(key)) {
+                uniqueCalls.set(key, call);
+            }
+        }
+    });
+    return Array.from(uniqueCalls.values());
+  };
+
   useEffect(() => {
     const fetchInitialData = async () => {
         if (!user) return;
@@ -165,8 +181,8 @@ export default function AppUIPage() {
             ]);
 
             setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
-            setAllCalls(Array.isArray(allCallLogs) ? allCallLogs : []);
-            setUnreadCalls(Array.isArray(unreadCallLogs) ? unreadCallLogs : []);
+            setAllCalls(Array.isArray(allCallLogs) ? getUniqueCalls(allCallLogs) : []);
+            setUnreadCalls(Array.isArray(unreadCallLogs) ? getUniqueCalls(unreadCallLogs) : []);
 
         } catch (error) {
             toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
@@ -298,7 +314,7 @@ export default function AppUIPage() {
                   <Card><CardContent className="p-6">Call logs will appear here.</CardContent></Card>
               </TabsContent>
                 <TabsContent value="missed" className="mt-6">
-                   {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls.filter(c => c.call_status === 'missed')} />}
+                   {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls.filter(c => c.call_status === 'missed' || c.call_status === 'no-answer' || c.call_status === 'busy' || c.call_status === 'canceled' )} />}
               </TabsContent>
                 <TabsContent value="meetings" className="mt-6">
                   <Card><CardContent className="p-6">Meeting recordings will appear here.</CardContent></Card>
