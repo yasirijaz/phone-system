@@ -16,7 +16,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
 import type { Call, Department, PhoneNumber } from "@/types";
-import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger, SidebarFooter } from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -51,20 +51,22 @@ export default function AppUIPage() {
   const [unreadCalls, setUnreadCalls] = useState<Call[]>([]);
   const [loadingCalls, setLoadingCalls] = useState(true);
 
-  const getUniqueCalls = (calls: Call[]): Call[] => {
-    const uniqueCalls = new Map<string, Call>();
-    calls.forEach(call => {
-        if (call.call_sid && !uniqueCalls.has(call.call_sid)) {
-            uniqueCalls.set(call.call_sid, call);
-        } else if (!call.call_sid) {
-            // For calls without a call_sid, use a composite key to attempt unique identification
-            const key = `${call.from}-${call.to}-${call.created_at}`;
-            if (!uniqueCalls.has(key)) {
-                uniqueCalls.set(key, call);
-            }
+  const getLatestUniqueCallsByContact = (calls: Call[]): Call[] => {
+    const latestCalls = new Map<string, Call>();
+
+    // Sort calls by date to easily find the latest
+    const sortedCalls = [...calls].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    sortedCalls.forEach(call => {
+        // Determine the other party's number to use as a unique key
+        const otherPartyNumber = call.direction === 'inbound' ? call.from : call.to;
+
+        if (otherPartyNumber && !latestCalls.has(otherPartyNumber)) {
+            latestCalls.set(otherPartyNumber, call);
         }
     });
-    return Array.from(uniqueCalls.values());
+
+    return Array.from(latestCalls.values());
   };
 
   useEffect(() => {
@@ -83,8 +85,8 @@ export default function AppUIPage() {
             ]);
 
             setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
-            setAllCalls(Array.isArray(allCallLogs) ? getUniqueCalls(allCallLogs) : []);
-            setUnreadCalls(Array.isArray(unreadCallLogs) ? getUniqueCalls(unreadCallLogs) : []);
+            setAllCalls(Array.isArray(allCallLogs) ? getLatestUniqueCallsByContact(allCallLogs) : []);
+            setUnreadCalls(Array.isArray(unreadCallLogs) ? getLatestUniqueCallsByContact(unreadCallLogs) : []);
 
         } catch (error) {
             toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
