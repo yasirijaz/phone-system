@@ -46,6 +46,20 @@ function AppLayout({ children, calls }: { children: React.ReactNode, calls: Call
         }
         return call.meta_data?.to_name || call.to;
     };
+
+    const getUniqueRecentCalls = (calls: Call[]) => {
+        const uniqueContacts: { [key: string]: Call } = {};
+        calls.forEach(call => {
+            const contactIdentifier = getContactName(call);
+            if (!uniqueContacts[contactIdentifier]) {
+                uniqueContacts[contactIdentifier] = call;
+            }
+        });
+        return Object.values(uniqueContacts);
+    };
+
+    const recentCalls = getUniqueRecentCalls(calls);
+
     return (
         <SidebarProvider>
             <Sidebar>
@@ -88,7 +102,7 @@ function AppLayout({ children, calls }: { children: React.ReactNode, calls: Call
                             Recents
                           </h3>
                            <div className="flex-1 overflow-y-auto px-2">
-                                {calls.slice(0, 15).map((call) => {
+                                {recentCalls.slice(0, 15).map((call) => {
                                     const contactName = getContactName(call);
                                     const initial = contactName ? contactName.charAt(0).toUpperCase() : '?';
                                     return (
