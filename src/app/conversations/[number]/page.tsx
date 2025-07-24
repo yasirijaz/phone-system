@@ -7,13 +7,12 @@ import { getCallLogs } from "@/services/callLogService";
 import type { Call } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Paperclip, Send } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import CallLog from "@/components/call-log";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { InAppSidebar } from "@/components/in-app-sidebar";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -32,7 +31,8 @@ export default function ConversationDetailPage() {
             setLoading(true);
             try {
                 const logs = await getCallLogs();
-                const filteredLogs = logs.filter(call => call.from === contactNumber || call.to === contactNumber);
+                const filteredLogs = logs.filter(call => call.from === contactNumber || call.to === contactNumber)
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
                 setAllCalls(filteredLogs);
                 
                 if(filteredLogs.length > 0) {
@@ -82,30 +82,25 @@ export default function ConversationDetailPage() {
                                 </div>
                             </div>
                         </header>
-                         <main className="flex-1 overflow-y-auto">
-                            <div className="p-6">
-                                <Tabs defaultValue="all">
-                                    <TabsList>
-                                        <TabsTrigger value="all">All</TabsTrigger>
-                                        <TabsTrigger value="calls">Calls</TabsTrigger>
-                                        <TabsTrigger value="messages">Messages</TabsTrigger>
-                                        <TabsTrigger value="voicemails">Voicemails</TabsTrigger>
-                                    </TabsList>
-                                     <TabsContent value="all" className="mt-6">
-                                        {loading ? <p>Loading...</p> : <CallLog calls={allCalls} />}
-                                    </TabsContent>
-                                    <TabsContent value="calls" className="mt-6">
-                                        {loading ? <p>Loading...</p> : <CallLog calls={allCalls.filter(c => !c.recording_url)} />}
-                                    </TabsContent>
-                                     <TabsContent value="messages" className="mt-6">
-                                        <Card><CardContent className="p-6 text-center text-muted-foreground">No messages with this contact yet.</CardContent></Card>
-                                    </TabsContent>
-                                     <TabsContent value="voicemails" className="mt-6">
-                                       {loading ? <p>Loading...</p> : <CallLog calls={allCalls.filter(c => c.recording_url)} />}
-                                    </TabsContent>
-                                </Tabs>
-                            </div>
+                         <main className="flex-1 overflow-y-auto p-6">
+                           {loading ? <p>Loading...</p> : <CallLog calls={allCalls} />}
                         </main>
+                        <footer className="p-4 border-t bg-background">
+                            <div className="relative">
+                                <Textarea 
+                                    placeholder="Type your message..."
+                                    className="pr-20"
+                                />
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                    <Button variant="ghost" size="icon">
+                                        <Paperclip className="h-5 w-5"/>
+                                    </Button>
+                                    <Button size="icon">
+                                        <Send className="h-5 w-5"/>
+                                    </Button>
+                                </div>
+                            </div>
+                        </footer>
                     </div>
                 </div>
             </SidebarInset>
