@@ -12,17 +12,8 @@ interface CallLogProps {
 }
 
 function CallCard({ call }: { call: Call }) {
-  const fromName = call.direction === 'outbound' 
-    ? (call.user?.name || "Me")
-    : (call.from_name?.name || call.from);
-
-  const fromNumber = call.from;
-
-  const toName = call.direction === 'inbound'
-    ? (call.department?.name || "Me")
-    : (call.to_name?.name || call.to);
-  
-  const toNumber = call.to;
+  const fromName = call.from_name?.name || call.from;
+  const toName = call.to_name?.name || call.to;
 
   const receivedByName = call.user?.name ?? 'Unassigned';
   
@@ -49,11 +40,10 @@ function CallCard({ call }: { call: Call }) {
                          {call.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />}
                          <span>{call.direction.charAt(0).toUpperCase() + call.direction.slice(1)} / {call.call_status} ({call.duration} min)</span>
                     </div>
-                    <div className="text-sm mt-2">
-                        <p><strong>Received By:</strong> {receivedByName}</p>
-                        <div className="flex items-center gap-4 text-muted-foreground">
-                            <span>From: {fromName} ({fromNumber})</span>
-                        </div>
+                    <div className="text-sm mt-2 space-y-1 text-muted-foreground">
+                        <p className="text-foreground"><strong>Received By:</strong> {receivedByName}</p>
+                        <p><strong>From:</strong> {fromName} ({call.from})</p>
+                        <p><strong>To:</strong> {toName} ({call.to})</p>
                     </div>
                      {hasRecording && (
                         <div className="mt-2">
