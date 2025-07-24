@@ -25,6 +25,8 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
   const { toast } = useToast();
 
   const conferenceSid = connection?.customParameters.get('conferenceSid');
+  const fromNumber = connection?.customParameters.get('From');
+
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -39,8 +41,8 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
       if (conferenceSid) {
         // Mock participants for demonstration
         setParticipants([
-            { call_sid: 'CA123...', muted: false, on_hold: false, status: 'connected' },
-            { call_sid: 'CA456...', muted: true, on_hold: false, status: 'connected' },
+            { call_sid: 'CA123456789012345678901234567890ab', muted: false, on_hold: false, status: 'connected' },
+            { call_sid: 'CAabcdef12345678901234567890123456', muted: true, on_hold: false, status: 'connected' },
         ]);
       }
 
@@ -54,13 +56,16 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
   }, [isOpen, conferenceSid]);
 
   const handleAddParticipant = async () => {
-    if (!participantNumber || !conferenceSid) return;
+    if (!participantNumber || !conferenceSid || !fromNumber) {
+        toast({ title: "Error", description: "Missing required information to add participant.", variant: 'destructive'});
+        return;
+    }
     setIsAdding(true);
     try {
-        await addParticipant(conferenceSid, participantNumber, participantNumber); // Assuming from/to is the same for simplicity
+        await addParticipant(conferenceSid, String(fromNumber), participantNumber);
         toast({ title: "Success", description: "Participant added to the conference."});
         setParticipantNumber('');
-        // Here you would refresh the participant list
+        // Here you would refresh the participant list in a real app, e.g., via websockets
     } catch(error) {
         toast({ title: "Error", description: "Failed to add participant.", variant: 'destructive' });
     } finally {
