@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings, MoreHorizontal, Mic, Volume2 } from 'lucide-react';
+import { Settings, Mic, Volume2 } from 'lucide-react';
 import { Progress } from './ui/progress';
 
 export default function HardwareSettings() {
@@ -32,28 +32,41 @@ export default function HardwareSettings() {
             return;
         }
         try {
-            await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-        } catch (err) {
-            console.warn("Could not get media permissions:", err);
+            // Request permissions separately to avoid errors if one device is missing
+            try {
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (err) {
+                 console.warn("Could not get audio permissions:", err);
+            }
+             try {
+                await navigator.mediaDevices.getUserMedia({ video: true });
+            } catch (err) {
+                 console.warn("Could not get video permissions:", err);
+            }
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioInputs = devices.filter(device => device.kind === 'audioinput');
+            const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+            const videoInputs = devices.filter(device => device.kind === 'videoinput');
+            
+            setAudioInputDevices(audioInputs);
+            setAudioOutputDevices(audioOutputs);
+            setVideoInputDevices(videoInputs);
+
+            if (audioInputs.length > 0 && !selectedMicrophone) setSelectedMicrophone(audioInputs[0].deviceId);
+            if (audioOutputs.length > 0 && !selectedSpeaker) setSelectedSpeaker(audioOutputs[0].deviceId);
+            if (videoInputs.length > 0 && !selectedCamera) setSelectedCamera(videoInputs[0].deviceId);
+        } catch(err) {
+            console.error("Error enumerating devices", err);
         }
-
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const audioInputs = devices.filter(device => device.kind === 'audioinput');
-        const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
-        const videoInputs = devices.filter(device => device.kind === 'videoinput');
-        
-        setAudioInputDevices(audioInputs);
-        setAudioOutputDevices(audioOutputs);
-        setVideoInputDevices(videoInputs);
-
-        if (audioInputs.length > 0 && !selectedMicrophone) setSelectedMicrophone(audioInputs[0].deviceId);
-        if (audioOutputs.length > 0 && !selectedSpeaker) setSelectedSpeaker(audioOutputs[0].deviceId);
-        if (videoInputs.length > 0 && !selectedCamera) setSelectedCamera(videoInputs[0].deviceId);
     };
 
     useEffect(() => {
-        if (isOpen) getDevices();
-        else stopMicTest();
+        if (isOpen) {
+            getDevices();
+        } else {
+            stopMicTest();
+        }
     }, [isOpen]);
 
     const startMicTest = async () => {
@@ -88,10 +101,15 @@ export default function HardwareSettings() {
     };
 
     const stopMicTest = () => {
-        if (!isTestingMic) return;
-        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+        if (!isTestingMic && !animationFrameRef.current) return;
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
         streamRef.current?.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
         audioContextRef.current?.close();
+        audioContextRef.current = null;
         setMicVolume(0);
         setIsTestingMic(false);
     };
@@ -100,21 +118,6 @@ export default function HardwareSettings() {
         isTestingMic ? stopMicTest() : startMicTest();
     };
     
-    const playSpeakerTest = async () => {
-        const audio = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU'//AA"); // Simple beep
-        try {
-            // @ts-ignore - setSinkId is not in all TS libs yet
-            if (selectedSpeaker && typeof audio.setSinkId === 'function') {
-                // @ts-ignore
-                await audio.setSinkId(selectedSpeaker);
-            }
-            audio.play();
-        } catch (err) {
-            console.error("Error playing speaker test:", err);
-        }
-    };
-
-
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
@@ -149,7 +152,6 @@ export default function HardwareSettings() {
                      <div className="grid gap-2">
                         <div className="flex justify-between items-center">
                              <Label htmlFor="speaker-select" className="flex items-center gap-2"><Volume2 className="h-4 w-4"/>Speaker / Headset</Label>
-                            <Button variant="link" size="sm" className="p-0 h-auto" onClick={playSpeakerTest}>Test</Button>
                         </div>
                          <Select value={selectedSpeaker} onValueChange={setSelectedSpeaker}>
                             <SelectTrigger id="speaker-select">
