@@ -140,6 +140,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       newWorker.on('reservationCreated', (reservation: Reservation) => {
         console.log('Reservation created:', reservation);
+        if(reservation.task.attributes.do_nothing){
+          reservation.accept();
+          return;
+        }
         setIncomingReservation(reservation);
         setShowReservationModal(true);
         
@@ -220,10 +224,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       endConferenceOnCustomerExit: false,
       endConferenceOnExit: false,
       startConferenceOnEnter: true,
-      customParameters: {
-        ...reservation.task.attributes,
-        autoAcceptCall: 1
-      }
+      beep: 'onEnter',
+      ...reservation.task.attributes
     } as any);
   };
 

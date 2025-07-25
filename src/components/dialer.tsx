@@ -17,6 +17,12 @@ interface DialerProps {
     onDepartmentChange: (departmentId: string) => void;
     loadingDepartments: boolean;
     loadingNumbers: boolean;
+    initialValue?: string;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    selectedDepartmentId: string;
+    selectedFromNumber: string;
+    onSetSelectedFromNumber: (fromNumber: string) => void;
 }
 
 export default function Dialer({ 
@@ -27,28 +33,79 @@ export default function Dialer({
     onDepartmentChange,
     loadingDepartments,
     loadingNumbers,
+    initialValue = '',
+    open,
+    onOpenChange,
+    selectedDepartmentId,
+    selectedFromNumber,
+    onSetSelectedFromNumber,
 }: DialerProps) {
     const [number, setNumber] = useState('');
-    const [fromNumber, setFromNumber] = useState('');
-    const [departmentId, setDepartmentId] = useState('');
+    
+    useEffect(() => {
+        if (initialValue) {
+            handleNumberChange(initialValue);
+        } else {
+            setNumber('');
+        }
+    }, [initialValue, open]);
+
+    const formatPhoneNumber = (value: string): string => {
+        const cleaned = value.replace(/\D/g, '');
+        if (cleaned.length > 10) {
+            return number;
+        }
+
+        const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
+        if (!match) return cleaned;
+        
+        const [_, area, exchange, subscriber] = match;
+
+        let formatted = '';
+        if (area) {
+            formatted += `(${area}`;
+            if (area.length === 3 && exchange) {
+                formatted += `) ${exchange}`;
+            }
+        }
+        if (exchange && exchange.length === 3 && subscriber) {
+            formatted += `-${subscriber}`;
+        }
+        if(!exchange && !subscriber) {
+            return formatted
+        }
+        if(exchange && !subscriber) {
+            return `(${area}) ${exchange}`
+        }
+
+        return formatted;
+    };
+    
+    const handleNumberChange = (value: string) => {
+        setNumber(formatPhoneNumber(value));
+    };
+
 
     const handleDigitClick = (digit: string) => {
-        setNumber(prev => prev + digit);
+        const currentCleaned = number.replace(/\D/g, '');
+        if (currentCleaned.length < 10) {
+           handleNumberChange(currentCleaned + digit);
+        }
     };
 
     const handleBackspace = () => {
-        setNumber(prev => prev.slice(0, -1));
+        const cleaned = number.replace(/\D/g, '');
+        handleNumberChange(cleaned.slice(0, -1));
     };
 
     const handleCall = () => {
-        if (number) {
-            onMakeCall(number, fromNumber);
+        const cleanedNumber = number.replace(/\D/g, '');
+        if (cleanedNumber) {
+            onMakeCall(`+1${cleanedNumber}`, selectedFromNumber);
         }
     };
 
     const handleDepartmentSelection = (id: string) => {
-        setDepartmentId(id);
-        setFromNumber('');
         onDepartmentChange(id);
     }
     
@@ -60,7 +117,7 @@ export default function Dialer({
     ];
 
     return (
-        <Popover>
+        <Popover open={open} onOpenChange={onOpenChange}>
             <PopoverTrigger asChild>
                 {children}
             </PopoverTrigger>
@@ -73,7 +130,7 @@ export default function Dialer({
                         </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                         <Select onValueChange={handleDepartmentSelection} value={departmentId} disabled={loadingDepartments}>
+                         <Select onValueChange={handleDepartmentSelection} value={selectedDepartmentId} disabled={loadingDepartments}>
                             <SelectTrigger variant="ghost">
                                 <SelectValue placeholder={loadingDepartments ? "Loading..." : "Select Dept."} />
                             </SelectTrigger>
@@ -83,13 +140,13 @@ export default function Dialer({
                                 ))}
                             </SelectContent>
                         </Select>
-                         <Select onValueChange={setFromNumber} value={fromNumber} disabled={loadingNumbers || !departmentId}>
+                         <Select onValueChange={onSetSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
                             <SelectTrigger variant="ghost">
                                 <SelectValue placeholder={loadingNumbers ? "Loading..." : "From Number"} />
                             </SelectTrigger>
                             <SelectContent>
                                 {phoneNumbers.map(num => (
-                                    <SelectItem key={num.id} value={num.phone_no}>{num.phone_no}</SelectItem>
+                                    <SelectItem key={num.id} value={num.phone_no}>{num.label}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -98,7 +155,7 @@ export default function Dialer({
                     <div className="relative">
                         <Input 
                             value={number} 
-                            onChange={(e) => setNumber(e.target.value)}
+                            onChange={(e) => handleNumberChange(e.target.value)}
                             placeholder="(123) 456-7890"
                             className="text-center text-lg pr-8"
                         />
@@ -115,7 +172,7 @@ export default function Dialer({
                              </Button>
                         ))}
                     </div>
-                    <Button onClick={handleCall} disabled={!number || !fromNumber} className="bg-green-600 hover:bg-green-700">
+                    <Button onClick={handleCall} disabled={!number || !selectedFromNumber} className="bg-green-600 hover:bg-green-700">
                         <Phone className="mr-2 h-4 w-4" />
                         Call
                     </Button>

@@ -2,7 +2,7 @@
 "use client";
 
 import type { Call } from '@/types';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,6 +14,8 @@ import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger 
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import Image from 'next/image';
+import TwilioStatusIndicator from '@/components/twilio-status-indicator';
+import { useTwilio } from '@/context/TwilioContext';
 
 const INITIAL_CALLS: Partial<Call>[] = [
   { id: '1', from: 'John Doe', to: 'Me', created_at: '2024-07-23T10:00:00', duration: "15", direction: 'inbound', category: 'Sales' },
@@ -285,6 +287,12 @@ const DemographicCard = () => (
 
 
 export default function CallsDashboard() {
+  const { connectTwilio } = useTwilio();
+  
+  useEffect(() => {
+    connectTwilio();
+  }, [connectTwilio]);
+
   const topContacts = useMemo(() => {
     const counts: Record<string, number> = {};
     INITIAL_CALLS.forEach(call => {
@@ -352,7 +360,7 @@ export default function CallsDashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                    {/* User profile section can be added here */}
+                    <TwilioStatusIndicator />
                 </div>
             </header>
             <main className="flex-1 p-4 md:p-8 space-y-6">

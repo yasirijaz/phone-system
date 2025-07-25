@@ -30,6 +30,7 @@ import NewMessageForm from "@/components/new-message-form";
 import HardwareSettings from "@/components/hardware-settings";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { InAppSidebar } from "@/components/in-app-sidebar";
+import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name is required."),
@@ -50,16 +51,23 @@ export default function ContactsPage() {
   const [isSmsOpen, setIsSmsOpen] = useState(false);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
 
-  const { device, isDeviceReady } = useTwilio();
+  const { device, isDeviceReady, connectTwilio } = useTwilio();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
   const [loadingNumbers, setLoadingNumbers] = useState(false);
 
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+  const [selectedFromNumber, setSelectedFromNumber] = useState('');
+
   const form = useForm<z.infer<typeof contactSchema>>({
     resolver: zodResolver(contactSchema),
     defaultValues: { name: "", email: "", phone_no: "", phone_type: "mobile" },
   });
+
+  useEffect(() => {
+    connectTwilio();
+  }, [connectTwilio]);
 
   useEffect(() => {
     if (user?.company_id) {
@@ -79,6 +87,31 @@ export default function ContactsPage() {
       setLoading(false);
     }
   };
+  
+    const handleDepartmentChange = useCallback(async (departmentId: string) => {
+        setSelectedDepartmentId(departmentId);
+        if (!departmentId) {
+            setPhoneNumbers([]);
+            setSelectedFromNumber('');
+            return;
+        };
+        setLoadingNumbers(true);
+        try {
+            const numbers = await getPhoneNumbers(Number(departmentId));
+            setPhoneNumbers(numbers);
+            if (numbers.length > 0) {
+                setSelectedFromNumber(numbers[0].phone_no);
+            } else {
+                setSelectedFromNumber('');
+            }
+        } catch (error) {
+            toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
+            setPhoneNumbers([]);
+            setSelectedFromNumber('');
+        } finally {
+            setLoadingNumbers(false);
+        }
+    }, [toast]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -89,8 +122,11 @@ export default function ContactsPage() {
             const fetchedDepts = await (isAdmin && user.company_id
                 ? getDepartments(user.company_id)
                 : getUserDepartments(user.id));
-
-            setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
+            const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
+            setDepartments(depts);
+            if (depts.length > 0) {
+                handleDepartmentChange(String(depts[0].id));
+            }
 
         } catch (error) {
             toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
@@ -99,24 +135,8 @@ export default function ContactsPage() {
         }
     };
     fetchInitialData();
-  }, [user, toast]);
+  }, [user, toast, handleDepartmentChange]);
 
-  const handleDepartmentChange = useCallback(async (departmentId: string) => {
-    if (!departmentId) {
-        setPhoneNumbers([]);
-        return;
-    };
-    setLoadingNumbers(true);
-    try {
-        const numbers = await getPhoneNumbers(Number(departmentId));
-        setPhoneNumbers(numbers);
-    } catch (error) {
-        toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
-        setPhoneNumbers([]);
-    } finally {
-        setLoadingNumbers(false);
-    }
-  }, [toast]);
 
   const handleMakeCall = async (number: string, fromNumber?: string) => {
     if (!device || !isDeviceReady) {
@@ -198,6 +218,7 @@ export default function ContactsPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                     <TwilioStatusIndicator />
                      <Dialer
                         onMakeCall={handleMakeCall}
                         departments={departments}
@@ -205,6 +226,9 @@ export default function ContactsPage() {
                         onDepartmentChange={handleDepartmentChange}
                         loadingDepartments={loadingDepartments}
                         loadingNumbers={loadingNumbers}
+                        selectedDepartmentId={selectedDepartmentId}
+                        selectedFromNumber={selectedFromNumber}
+                        onSetSelectedFromNumber={setSelectedFromNumber}
                      >
                        <Button variant="ghost" size="icon"><Phone className="h-5 w-5" /></Button>
                      </Dialer>
@@ -359,6 +383,9 @@ export default function ContactsPage() {
                 onDepartmentChange={handleDepartmentChange}
                 loadingDepartments={loadingDepartments}
                 loadingNumbers={loadingNumbers}
+                selectedDepartmentId={selectedDepartmentId}
+                selectedFromNumber={selectedFromNumber}
+                onSetSelectedFromNumber={setSelectedFromNumber}
             />
             </DialogContent>
         </Dialog>

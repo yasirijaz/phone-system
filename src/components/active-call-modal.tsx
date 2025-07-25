@@ -107,6 +107,7 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
           </div>
           <div className="text-center">
             <p className="text-xl font-medium">{contactName}</p>
+            <p className="text-muted-foreground">{connection?.parameters.From || ''}</p>
             <p className="text-muted-foreground text-lg">{formatTime(duration)}</p>
           </div>
         </div>

@@ -16,7 +16,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Call, Department, PhoneNumber } from "@/types";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -35,63 +35,8 @@ import CallLog from "@/components/call-log";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InAppSidebar } from "@/components/in-app-sidebar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-function TwilioStatusIndicator() {
-  const { isDeviceReady, isWorkerReady, isConnecting, connectTwilio } = useTwilio();
-
-  if (isDeviceReady && isWorkerReady) {
-    return (
-        <TooltipProvider>
-            <div className="flex items-center gap-3">
-              <Tooltip>
-                <TooltipTrigger className="cursor-default">
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-5 w-5 text-green-500" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="center"><p>Device: Ready</p></TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger className="cursor-default">
-                   <div className="flex items-center gap-2">
-                    <UserCheck className="h-5 w-5 text-green-500" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="center"><p>Worker: Ready</p></TooltipContent>
-              </Tooltip>
-            </div>
-        </TooltipProvider>
-    );
-  }
-
-  return (
-    <TooltipProvider>
-        <div className="flex items-center gap-3">
-          <Tooltip>
-            <TooltipTrigger className="cursor-default">
-              <div className="flex items-center gap-2">
-                <Phone className={`h-5 w-5 ${isDeviceReady ? 'text-green-500' : 'text-destructive'}`} />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" align="center"><p>Device: {isDeviceReady ? 'Ready' : 'Not Ready'}</p></TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger className="cursor-default">
-               <div className="flex items-center gap-2">
-                <UserCheck className={`h-5 w-5 ${isWorkerReady ? 'text-green-500' : 'text-destructive'}`} />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" align="center"><p>Worker: {isWorkerReady ? 'Ready' : 'Not Ready'}</p></TooltipContent>
-          </Tooltip>
-          <Button onClick={connectTwilio} disabled={isConnecting} size="sm" variant="outline">
-            <Zap className="mr-2 h-4 w-4" />
-            {isConnecting ? 'Connecting...' : 'Connect'}
-          </Button>
-        </div>
-      </TooltipProvider>
-  );
-}
-
+import { Popover, PopoverTrigger } from "@radix-ui/react-popover";
+import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 
 export default function AppUIPage() {
   const [isSmsOpen, setIsSmsOpen] = useState(false);
@@ -110,6 +55,13 @@ export default function AppUIPage() {
   const [allCalls, setAllCalls] = useState<Call[]>([]);
   const [unreadCalls, setUnreadCalls] = useState<Call[]>([]);
   const [loadingCalls, setLoadingCalls] = useState(true);
+
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [dialerInitialValue, setDialerInitialValue] = useState('');
+  
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+  const [selectedFromNumber, setSelectedFromNumber] = useState('');
+
 
   useEffect(() => {
     connectTwilio();
@@ -132,6 +84,32 @@ export default function AppUIPage() {
 
     return Array.from(latestCalls.values());
   };
+  
+    const handleDepartmentChange = useCallback(async (departmentId: string) => {
+        setSelectedDepartmentId(departmentId);
+        if (!departmentId) {
+            setPhoneNumbers([]);
+            setSelectedFromNumber('');
+            return;
+        };
+        setLoadingNumbers(true);
+        try {
+            const numbers = await getPhoneNumbers(Number(departmentId));
+            setPhoneNumbers(numbers);
+            if (numbers.length > 0) {
+                setSelectedFromNumber(numbers[0].phone_no);
+            } else {
+                setSelectedFromNumber('');
+            }
+        } catch (error) {
+            toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
+            setPhoneNumbers([]);
+            setSelectedFromNumber('');
+        } finally {
+            setLoadingNumbers(false);
+        }
+    }, [toast]);
+
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -148,7 +126,14 @@ export default function AppUIPage() {
             ]);
 
             const callsData = Array.isArray(allCallLogs) ? allCallLogs : [];
-            setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
+            const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
+            setDepartments(depts);
+            
+            if (depts.length > 0) {
+                // Automatically trigger fetching numbers for the first department
+                handleDepartmentChange(String(depts[0].id));
+            }
+
             setAllCalls(getLatestUniqueCallsByContact(callsData));
             setUnreadCalls(getLatestUniqueCallsByContact(callsData.filter(c => !c.is_read)));
 
@@ -160,24 +145,7 @@ export default function AppUIPage() {
         }
     };
     fetchInitialData();
-  }, [user, toast]);
-  
-  const handleDepartmentChange = useCallback(async (departmentId: string) => {
-    if (!departmentId) {
-        setPhoneNumbers([]);
-        return;
-    };
-    setLoadingNumbers(true);
-    try {
-        const numbers = await getPhoneNumbers(Number(departmentId));
-        setPhoneNumbers(numbers);
-    } catch (error) {
-        toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
-        setPhoneNumbers([]);
-    } finally {
-        setLoadingNumbers(false);
-    }
-  }, [toast]);
+  }, [user, toast, handleDepartmentChange]);
 
 
   const handleMakeCall = async (number: string, fromNumber?: string) => {
@@ -185,12 +153,21 @@ export default function AppUIPage() {
         toast({ title: "Twilio Error", description: "Twilio Device not ready. Please connect first.", variant: 'destructive'});
         return;
     }
+    
+    // If called from call log, we need to open the dialer to select a 'from' number
+    if (!fromNumber) {
+        setDialerInitialValue(number);
+        setDialerOpen(true);
+        return;
+    }
+
     try {
         const params: { To: string, From?: string } = { To: number };
         if (fromNumber) {
             params.From = fromNumber;
         }
         await device.connect({ params });
+        setDialerOpen(false); // Close dialer after making a call
     } catch (error) {
         console.error("Error making call:", error);
         toast({ title: "Call Error", description: "Failed to make call. See console for details.", variant: 'destructive'});
@@ -226,8 +203,14 @@ export default function AppUIPage() {
                               onDepartmentChange={handleDepartmentChange}
                               loadingDepartments={loadingDepartments}
                               loadingNumbers={loadingNumbers}
+                              initialValue={dialerInitialValue}
+                              open={dialerOpen}
+                              onOpenChange={setDialerOpen}
+                              selectedDepartmentId={selectedDepartmentId}
+                              selectedFromNumber={selectedFromNumber}
+                              onSetSelectedFromNumber={setSelectedFromNumber}
                            >
-                             <Button variant="ghost" size="icon"><Phone className="h-5 w-5" /></Button>
+                             <Button variant="ghost" size="icon" onClick={() => { setDialerInitialValue(''); setDialerOpen(true);}}><Phone className="h-5 w-5" /></Button>
                            </Dialer>
                            <Button variant="ghost" size="icon" onClick={() => setIsSmsOpen(true)}><MessageSquare className="h-5 w-5" /></Button>
                            <Button variant="ghost" size="icon" onClick={() => setIsVideoOpen(true)}><Video className="h-5 w-5" /></Button>
@@ -275,16 +258,16 @@ export default function AppUIPage() {
                         <TabsTrigger value="unlogged">Unlogged</TabsTrigger>
                       </TabsList>
                       <TabsContent value="unread" className="mt-6">
-                        {loadingCalls ? <p>Loading...</p> : <CallLog calls={unreadCalls} />}
+                        {loadingCalls ? <p>Loading...</p> : <CallLog calls={unreadCalls} onMakeCall={handleMakeCall} />}
                       </TabsContent>
                         <TabsContent value="all" className="mt-6">
-                         {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls} />}
+                         {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={handleMakeCall} />}
                       </TabsContent>
                       <TabsContent value="calls" className="mt-6">
                           <Card><CardContent className="p-6">Call logs will appear here.</CardContent></Card>
                       </TabsContent>
                         <TabsContent value="missed" className="mt-6">
-                           {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.call_status === 'missed' || c.call_status === 'no-answer' || c.call_status === 'busy' || c.call_status === 'canceled'))} />}
+                           {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.call_status === 'missed' || c.call_status === 'no-answer' || c.call_status === 'busy' || c.call_status === 'canceled'))} onMakeCall={handleMakeCall} />}
                       </TabsContent>
                         <TabsContent value="meetings" className="mt-6">
                           <Card><CardContent className="p-6">Meeting recordings will appear here.</CardContent></Card>
@@ -299,7 +282,7 @@ export default function AppUIPage() {
                           <Card><CardContent className="p-6">Messages will appear here.</CardContent></Card>
                       </TabsContent>
                       <TabsContent value="starred" className="mt-6">
-                          {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.is_starred))} />}
+                          {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.is_starred))} onMakeCall={handleMakeCall} />}
                       </TabsContent>
                       <TabsContent value="spam" className="mt-6">
                           <Card><CardContent className="p-6">Spam will appear here.</CardContent></Card>
@@ -327,6 +310,9 @@ export default function AppUIPage() {
                     onDepartmentChange={handleDepartmentChange}
                     loadingDepartments={loadingDepartments}
                     loadingNumbers={loadingNumbers}
+                     selectedDepartmentId={selectedDepartmentId}
+                    selectedFromNumber={selectedFromNumber}
+                    onSetSelectedFromNumber={setSelectedFromNumber}
                   />
                 </DialogContent>
               </Dialog>
