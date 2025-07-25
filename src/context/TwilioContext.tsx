@@ -140,6 +140,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       newWorker.on('reservationCreated', (reservation: Reservation) => {
         console.log('Reservation created:', reservation);
+        if(reservation.task.attributes.do_nothing){
+          reservation.accept();
+          return;
+        }
         setIncomingReservation(reservation);
         setShowReservationModal(true);
         
