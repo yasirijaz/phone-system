@@ -24,8 +24,8 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
   const [participants, setParticipants] = useState<any[]>([]);
   const { toast } = useToast();
 
-  const conferenceSid = connection?.customParameters.get('conferenceSid');
-  const fromNumber = connection?.customParameters.get('From');
+  const conferenceSid = connection?.parameters?.From || "testing";
+  const fromNumber =  connection?.parameters?.From || "unkown";
 
 
   useEffect(() => {
@@ -106,7 +106,8 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
             </div>
           </div>
           <div className="text-center">
-            <p className="text-xl font-medium">{contactName}</p>
+            <p className="text-xl font-medium">
+              {contactName.length > 10 ? `${contactName.slice(0, 10)}...` : contactName}</p>
             <p className="text-muted-foreground">{connection?.parameters.From || ''}</p>
             <p className="text-muted-foreground text-lg">{formatTime(duration)}</p>
           </div>

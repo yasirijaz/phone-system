@@ -140,10 +140,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       newWorker.on('reservationCreated', (reservation: Reservation) => {
         console.log('Reservation created:', reservation);
-        if(reservation.task.attributes.do_nothing){
-          reservation.call(reservation.task.attributes.from, reservation.task.attributes.to);
-          return;
-        }
         setIncomingReservation(reservation);
         setShowReservationModal(true);
         
@@ -165,8 +161,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setShowReservationModal(false);
         });
 
-        reservation.on('canceled', (res) => {
-          console.log('Reservation canceled.',res);
+        reservation.on('canceled', () => {
+          console.log('Reservation canceled.');
           setIncomingReservation(null);
           setShowReservationModal(false);
         });

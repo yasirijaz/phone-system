@@ -30,9 +30,7 @@ export default function IncomingCallModal({ isOpen, onClose, callerName, callerN
             </div>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold">
-              {callerName.length > 10 ? `${callerName.slice(0, 10)}...` : callerName}
-            </p>
+            <p className="text-2xl font-bold">{callerName}</p>
             <p className="text-muted-foreground">{callerNumber}</p>
           </div>
         </div>
