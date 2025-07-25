@@ -83,7 +83,7 @@ export default function Dialer({
     const handleCall = () => {
         const cleanedNumber = number.replace(/\D/g, '');
         if (cleanedNumber) {
-            onMakeCall(cleanedNumber, fromNumber);
+            onMakeCall(`+1${cleanedNumber}`, fromNumber);
         }
     };
 
