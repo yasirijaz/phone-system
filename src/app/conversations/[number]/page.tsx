@@ -203,7 +203,7 @@ export default function ConversationDetailPage() {
                              </div>
                         </header>
                          <main className="flex-1 overflow-y-auto p-6">
-                           {loading ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={handleMakeCall} />}
+                           {loading ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={handleMakeCall} isClickable={false} />}
                         </main>
                         <footer className="p-4 border-t bg-background space-y-2">
                              <div className="grid grid-cols-2 gap-2">
