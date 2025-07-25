@@ -214,16 +214,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     console.log('accepting reservation', reservation)
     reservation.task.attributes.autoAccept = reservation.sid;
     reservation.conference({
-      conferenceStatusCallback: process.env.NEXT_PUBLIC_CONF_CALLBACK_URL,
-      conferenceStatusCallbackEvent: 'start end join leave',
-      ConferenceRecordingStatusCallback: process.env.NEXT_PUBLIC_CONF_CALLBACK_URL,
+      conferenceStatusCallback: `${process.env.NEXT_PUBLIC_API_URL}/api/twilio/events`,
+      conferenceStatusCallbackEvent: ['start', 'end', 'join', 'leave'],
+      ConferenceRecordingStatusCallback: `${process.env.NEXT_PUBLIC_API_URL}/api/twilio/events`,
       endConferenceOnCustomerExit: false,
       endConferenceOnExit: false,
       startConferenceOnEnter: true,
-      customParameters: {
-        ...reservation.task.attributes,
-        autoAcceptCall: 1
-      }
+      beep: 'onEnter',
+      ...reservation.task.attributes
     } as any);
   };
 
