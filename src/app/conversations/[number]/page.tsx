@@ -34,14 +34,15 @@ export default function ConversationDetailPage() {
                 const filteredLogs = logs.filter(call => call.from === contactNumber || call.to === contactNumber)
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
                 
-                if(filteredLogs.length > 0) {
-                    setAllCalls([filteredLogs[0]]); // Keep only the most recent call
+                if (filteredLogs.length > 0) {
                     const latestCall = filteredLogs[0];
+                    setAllCalls([latestCall]); // Ensure only the latest call is in state
                     const name = latestCall.direction === 'inbound' 
                         ? (latestCall.from_name?.name || latestCall.from) 
                         : (latestCall.to_name?.name || latestCall.to);
                     setContactName(name);
                 } else {
+                    setAllCalls([]);
                     setContactName(contactNumber);
                 }
 
