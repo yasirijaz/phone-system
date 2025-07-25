@@ -34,6 +34,10 @@ export default function Dialer({
     
     const formatPhoneNumber = (value: string): string => {
         const cleaned = value.replace(/\D/g, '');
+        if (cleaned.length > 10) {
+            return number;
+        }
+
         const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
         if (!match) return cleaned;
         
@@ -42,29 +46,25 @@ export default function Dialer({
         let formatted = '';
         if (area) {
             formatted += `(${area}`;
+            if (area.length === 3 && exchange) {
+                formatted += `) ${exchange}`;
+            }
         }
-        if (exchange) {
-            formatted += `) ${exchange}`;
-        }
-        if (subscriber) {
+        if (exchange && exchange.length === 3 && subscriber) {
             formatted += `-${subscriber}`;
         }
-
-        // Handle partial formatting for better UX as user types
-        if (cleaned.length <= 3) {
-            return cleaned;
-        } else if (cleaned.length <= 6) {
-            return `(${area}) ${exchange}`;
-        } else {
-             return `(${area}) ${exchange}-${subscriber}`;
+        if(!exchange && !subscriber) {
+            return formatted
         }
+        if(exchange && !subscriber) {
+            return `(${area}) ${exchange}`
+        }
+
+        return formatted;
     };
     
     const handleNumberChange = (value: string) => {
-        const cleaned = value.replace(/\D/g, '');
-        if (cleaned.length <= 10) {
-            setNumber(formatPhoneNumber(cleaned));
-        }
+        setNumber(formatPhoneNumber(value));
     };
 
 
