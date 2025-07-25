@@ -27,6 +27,7 @@ import { getPhoneNumbers } from '@/services/phoneNumberService';
 import NewMessageForm from '@/components/new-message-form';
 import HardwareSettings from '@/components/hardware-settings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import TwilioStatusIndicator from '@/components/twilio-status-indicator';
 
 const INITIAL_CALLS: Partial<Call>[] = [
   {
@@ -252,7 +253,7 @@ export default function EcommerceDashboard() {
   const [isSmsOpen, setIsSmsOpen] = useState(false);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
   
-  const { device, isDeviceReady } = useTwilio();
+  const { device, isDeviceReady, connectTwilio } = useTwilio();
   const { toast } = useToast();
 
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -260,6 +261,10 @@ export default function EcommerceDashboard() {
   const [loadingDepartments, setLoadingDepartments] = useState(true);
   const [loadingNumbers, setLoadingNumbers] = useState(false);
 
+  useEffect(() => {
+    connectTwilio();
+  }, [connectTwilio]);
+  
   useEffect(() => {
     if(user?.role_id === 1) {
       router.replace('/companies');
@@ -380,6 +385,7 @@ export default function EcommerceDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+                 <TwilioStatusIndicator />
                  <Dialer
                     onMakeCall={handleMakeCall}
                     departments={departments}
@@ -421,7 +427,7 @@ export default function EcommerceDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <CallLog calls={filteredCalls.slice(0, 5)} />
+                <CallLog calls={filteredCalls.slice(0, 5)} onMakeCall={handleMakeCall} />
               </CardContent>
             </Card>
           </main>
@@ -470,4 +476,3 @@ export default function EcommerceDashboard() {
     </SidebarProvider>
   );
 }
-

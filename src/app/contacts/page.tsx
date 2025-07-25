@@ -30,6 +30,7 @@ import NewMessageForm from "@/components/new-message-form";
 import HardwareSettings from "@/components/hardware-settings";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { InAppSidebar } from "@/components/in-app-sidebar";
+import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name is required."),
@@ -50,7 +51,7 @@ export default function ContactsPage() {
   const [isSmsOpen, setIsSmsOpen] = useState(false);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
 
-  const { device, isDeviceReady } = useTwilio();
+  const { device, isDeviceReady, connectTwilio } = useTwilio();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
@@ -60,6 +61,10 @@ export default function ContactsPage() {
     resolver: zodResolver(contactSchema),
     defaultValues: { name: "", email: "", phone_no: "", phone_type: "mobile" },
   });
+
+  useEffect(() => {
+    connectTwilio();
+  }, [connectTwilio]);
 
   useEffect(() => {
     if (user?.company_id) {
@@ -198,6 +203,7 @@ export default function ContactsPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                     <TwilioStatusIndicator />
                      <Dialer
                         onMakeCall={handleMakeCall}
                         departments={departments}

@@ -20,13 +20,14 @@ import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import Dialer from "@/components/dialer";
+import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 
 export default function ConversationDetailPage() {
     const params = useParams();
     const router = useRouter();
     const { user } = useAuth();
     const { toast } = useToast();
-    const { device, isDeviceReady } = useTwilio();
+    const { device, isDeviceReady, connectTwilio } = useTwilio();
 
     const [allCalls, setAllCalls] = useState<Call[]>([]);
     const [loading, setLoading] = useState(true);
@@ -42,6 +43,10 @@ export default function ConversationDetailPage() {
 
     const contactNumber = params.number ? decodeURIComponent(params.number as string) : '';
     
+    useEffect(() => {
+        connectTwilio();
+    }, [connectTwilio]);
+
     useEffect(() => {
         const fetchAndFilterCalls = async () => {
             if (!user) return;
@@ -159,21 +164,24 @@ export default function ConversationDetailPage() {
                                     <p className="text-sm text-muted-foreground">{contactNumber}</p>
                                 </div>
                             </div>
-                             <Dialer
-                                onMakeCall={handleMakeCall}
-                                departments={departments}
-                                phoneNumbers={phoneNumbers}
-                                onDepartmentChange={handleDepartmentChange}
-                                loadingDepartments={loadingDepartments}
-                                loadingNumbers={loadingNumbers}
-                                initialValue={dialerInitialValue}
-                                open={dialerOpen}
-                                onOpenChange={setDialerOpen}
-                             >
-                                <Button variant="ghost" size="icon" onClick={handleCallButtonClick}>
-                                    <Phone />
-                                </Button>
-                            </Dialer>
+                            <div className="flex items-center gap-2">
+                                <TwilioStatusIndicator />
+                                <Dialer
+                                    onMakeCall={handleMakeCall}
+                                    departments={departments}
+                                    phoneNumbers={phoneNumbers}
+                                    onDepartmentChange={handleDepartmentChange}
+                                    loadingDepartments={loadingDepartments}
+                                    loadingNumbers={loadingNumbers}
+                                    initialValue={dialerInitialValue}
+                                    open={dialerOpen}
+                                    onOpenChange={setDialerOpen}
+                                >
+                                    <Button variant="ghost" size="icon" onClick={handleCallButtonClick}>
+                                        <Phone />
+                                    </Button>
+                                </Dialer>
+                             </div>
                         </header>
                          <main className="flex-1 overflow-y-auto p-6">
                            {loading ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={handleMakeCall} />}
