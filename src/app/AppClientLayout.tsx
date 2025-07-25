@@ -10,49 +10,6 @@ import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/comp
 import { useAuth } from '@/context/AuthContext';
 import ReservationModal from '@/components/reservation-modal';
 
-function TwilioStatus() {
-  const { isDeviceReady, isWorkerReady, connectTwilio, isConnecting } = useTwilio();
-
-  if (isDeviceReady && isWorkerReady) {
-    return null;
-  }
-
-  return (
-    <div className="fixed bottom-6 right-6 z-50">
-      <TooltipProvider>
-        <div className="flex items-center gap-3 bg-background p-3 rounded-full shadow-lg border">
-          <Tooltip>
-            <TooltipTrigger className="cursor-default">
-              <div className="flex items-center gap-2">
-                <Phone className={`h-5 w-5 ${isDeviceReady ? 'text-green-500' : 'text-destructive'}`} />
-                <span className="text-sm font-medium sr-only">Device: {isDeviceReady ? 'Ready' : 'Not Ready'}</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="top" align="center">
-              <p>Device: {isDeviceReady ? 'Ready' : 'Not Ready'}</p>
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger className="cursor-default">
-               <div className="flex items-center gap-2">
-                <UserCheck className={`h-5 w-5 ${isWorkerReady ? 'text-green-500' : 'text-destructive'}`} />
-                <span className="text-sm font-medium sr-only">Worker: {isWorkerReady ? 'Ready' : 'Not Ready'}</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="top" align="center">
-              <p>Worker: {isWorkerReady ? 'Ready' : 'Not Ready'}</p>
-            </TooltipContent>
-          </Tooltip>
-          <Button onClick={connectTwilio} disabled={isConnecting} size="sm">
-            <Zap className="mr-2 h-4 w-4" />
-            {isConnecting ? 'Connecting...' : 'Connect to Twilio'}
-          </Button>
-        </div>
-      </TooltipProvider>
-    </div>
-  );
-}
-
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const {
     connection,
@@ -78,7 +35,6 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   return (
     <>
       {children}
-      {user && <TwilioStatus />}
       <IncomingCallModal
         isOpen={!!isIncomingCall}
         onClose={rejectCall}

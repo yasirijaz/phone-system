@@ -12,6 +12,8 @@ import {
   Phone,
   Video,
   MessageSquare,
+  UserCheck,
+  Zap,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
@@ -32,6 +34,64 @@ import { getCallLogs } from "@/services/callLogService";
 import CallLog from "@/components/call-log";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InAppSidebar } from "@/components/in-app-sidebar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+function TwilioStatusIndicator() {
+  const { isDeviceReady, isWorkerReady, isConnecting, connectTwilio } = useTwilio();
+
+  if (isDeviceReady && isWorkerReady) {
+    return (
+        <TooltipProvider>
+            <div className="flex items-center gap-3">
+              <Tooltip>
+                <TooltipTrigger className="cursor-default">
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-5 w-5 text-green-500" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="center"><p>Device: Ready</p></TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger className="cursor-default">
+                   <div className="flex items-center gap-2">
+                    <UserCheck className="h-5 w-5 text-green-500" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="center"><p>Worker: Ready</p></TooltipContent>
+              </Tooltip>
+            </div>
+        </TooltipProvider>
+    );
+  }
+
+  return (
+    <TooltipProvider>
+        <div className="flex items-center gap-3">
+          <Tooltip>
+            <TooltipTrigger className="cursor-default">
+              <div className="flex items-center gap-2">
+                <Phone className={`h-5 w-5 ${isDeviceReady ? 'text-green-500' : 'text-destructive'}`} />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="center"><p>Device: {isDeviceReady ? 'Ready' : 'Not Ready'}</p></TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger className="cursor-default">
+               <div className="flex items-center gap-2">
+                <UserCheck className={`h-5 w-5 ${isWorkerReady ? 'text-green-500' : 'text-destructive'}`} />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="center"><p>Worker: {isWorkerReady ? 'Ready' : 'Not Ready'}</p></TooltipContent>
+          </Tooltip>
+          <Button onClick={connectTwilio} disabled={isConnecting} size="sm" variant="outline">
+            <Zap className="mr-2 h-4 w-4" />
+            {isConnecting ? 'Connecting...' : 'Connect'}
+          </Button>
+        </div>
+      </TooltipProvider>
+  );
+}
+
 
 export default function AppUIPage() {
   const [isSmsOpen, setIsSmsOpen] = useState(false);
@@ -39,7 +99,7 @@ export default function AppUIPage() {
   const { user, logout } = useAuth();
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
 
-  const { device, isDeviceReady } = useTwilio();
+  const { device, isDeviceReady, connectTwilio } = useTwilio();
   const { toast } = useToast();
 
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -50,6 +110,10 @@ export default function AppUIPage() {
   const [allCalls, setAllCalls] = useState<Call[]>([]);
   const [unreadCalls, setUnreadCalls] = useState<Call[]>([]);
   const [loadingCalls, setLoadingCalls] = useState(true);
+
+  useEffect(() => {
+    connectTwilio();
+  }, [connectTwilio]);
 
   const getLatestUniqueCallsByContact = (calls: Call[]): Call[] => {
     const latestCalls = new Map<string, Call>();
@@ -153,7 +217,8 @@ export default function AppUIPage() {
                               </kbd>
                           </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-4">
+                           <TwilioStatusIndicator />
                            <Dialer
                               onMakeCall={handleMakeCall}
                               departments={departments}
