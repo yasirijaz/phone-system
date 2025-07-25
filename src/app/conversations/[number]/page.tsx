@@ -7,13 +7,12 @@ import { getCallLogs } from "@/services/callLogService";
 import type { Call, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Paperclip, Send, Eye, Phone } from "lucide-react";
+import { ArrowLeft, Paperclip, Send, Eye, Phone, Search, MessageSquare, Video, LogOut, Settings } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { useTwilio } from "@/context/TwilioContext";
 import { useToast } from "@/hooks/use-toast";
 import { getDepartments } from "@/services/departmentService";
@@ -21,13 +20,21 @@ import { getUserDepartments } from "@/services/userService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import Dialer from "@/components/dialer";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
+import { Input } from "@/components/ui/input";
+import HardwareSettings from "@/components/hardware-settings";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import Link from "next/link";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import NewMessageForm from "@/components/new-message-form";
 
 export default function ConversationDetailPage() {
     const params = useParams();
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
     const { toast } = useToast();
     const { device, isDeviceReady, connectTwilio } = useTwilio();
+    const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
 
     const [allCalls, setAllCalls] = useState<Call[]>([]);
     const [loading, setLoading] = useState(true);
@@ -43,6 +50,9 @@ export default function ConversationDetailPage() {
     
     const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
     const [selectedFromNumber, setSelectedFromNumber] = useState('');
+    
+    const [isSmsOpen, setIsSmsOpen] = useState(false);
+    const [isVideoOpen, setIsVideoOpen] = useState(false);
 
     const contactNumber = params.number ? decodeURIComponent(params.number as string) : '';
     
@@ -154,10 +164,6 @@ export default function ConversationDetailPage() {
             toast({ title: "Call Error", description: "Failed to make call. See console for details.", variant: 'destructive'});
         }
     };
-    
-    const handleCallButtonClick = () => {
-        handleMakeCall(contactNumber);
-    };
 
     return (
         <SidebarProvider>
@@ -167,40 +173,63 @@ export default function ConversationDetailPage() {
             <SidebarInset>
                 <div className="flex h-screen w-full bg-background text-foreground">
                     <div className="flex flex-1 flex-col">
-                        <header className="sticky top-0 z-30 flex items-center justify-between h-auto py-3 px-4 md:px-8 border-b bg-background shadow-sm">
+                         <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
                             <div className="flex items-center gap-4">
                                 <SidebarTrigger className="md:hidden" />
                                 <Button variant="ghost" size="icon" onClick={() => router.back()}>
                                     <ArrowLeft />
                                 </Button>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h1 className="text-xl font-bold">{contactName}</h1>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">{contactNumber}</p>
+                                <div className="relative flex-1">
+                                    <h1 className="text-xl font-bold">{contactName}</h1>
+                                     <p className="text-sm text-muted-foreground">{contactNumber}</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <TwilioStatusIndicator />
-                                <Dialer
-                                    onMakeCall={handleMakeCall}
-                                    departments={departments}
-                                    phoneNumbers={phoneNumbers}
-                                    onDepartmentChange={handleDepartmentChange}
-                                    loadingDepartments={loadingDepartments}
-                                    loadingNumbers={loadingNumbers}
-                                    initialValue={dialerInitialValue}
-                                    open={dialerOpen}
-                                    onOpenChange={setDialerOpen}
-                                    selectedDepartmentId={selectedDepartmentId}
-                                    selectedFromNumber={selectedFromNumber}
-                                    onSetSelectedFromNumber={setSelectedFromNumber}
-                                >
-                                    <Button variant="ghost" size="icon" onClick={handleCallButtonClick}>
-                                        <Phone />
-                                    </Button>
-                                </Dialer>
-                             </div>
+                           <div className="flex items-center gap-4">
+                               <TwilioStatusIndicator />
+                               <Dialer
+                                  onMakeCall={handleMakeCall}
+                                  departments={departments}
+                                  phoneNumbers={phoneNumbers}
+                                  onDepartmentChange={handleDepartmentChange}
+                                  loadingDepartments={loadingDepartments}
+                                  loadingNumbers={loadingNumbers}
+                                  initialValue={dialerInitialValue}
+                                  open={dialerOpen}
+                                  onOpenChange={setDialerOpen}
+                                  selectedDepartmentId={selectedDepartmentId}
+                                  selectedFromNumber={selectedFromNumber}
+                                  onSetSelectedFromNumber={setSelectedFromNumber}
+                               >
+                                 <Button variant="ghost" size="icon" onClick={() => { setDialerInitialValue(contactNumber); setDialerOpen(true);}}><Phone className="h-5 w-5" /></Button>
+                               </Dialer>
+                               <Button variant="ghost" size="icon" onClick={() => setIsSmsOpen(true)}><MessageSquare className="h-5 w-5" /></Button>
+                               <Button variant="ghost" size="icon" onClick={() => setIsVideoOpen(true)}><Video className="h-5 w-5" /></Button>
+                               <HardwareSettings />
+
+                               <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                                          <Avatar className="h-9 w-9">
+                                              <AvatarImage src={`https://placehold.co/100x100.png?text=${userInitial}`} alt={user?.name} />
+                                              <AvatarFallback>{userInitial}</AvatarFallback>
+                                          </Avatar>
+                                      </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                      <DropdownMenuItem asChild>
+                                          <Link href="/profile">
+                                              <Settings className="mr-2" />
+                                              <span>Profile</span>
+                                          </Link>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={logout}>
+                                          <LogOut className="mr-2" />
+                                          <span>Logout</span>
+                                      </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          </div>
                         </header>
                          <main className="flex-1 overflow-y-auto p-6">
                            {loading ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={handleMakeCall} isClickable={false} />}
@@ -239,6 +268,38 @@ export default function ConversationDetailPage() {
                         </footer>
                     </div>
                 </div>
+                 <Dialog open={isSmsOpen} onOpenChange={setIsSmsOpen}>
+                    <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>New Message</DialogTitle>
+                        <DialogDescription>
+                        Select a department and number to send a message from.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <NewMessageForm 
+                        onClose={() => setIsSmsOpen(false)}
+                        departments={departments}
+                        phoneNumbers={phoneNumbers}
+                        onDepartmentChange={handleDepartmentChange}
+                        loadingDepartments={loadingDepartments}
+                        loadingNumbers={loadingNumbers}
+                        selectedDepartmentId={selectedDepartmentId}
+                        selectedFromNumber={selectedFromNumber}
+                        onSetSelectedFromNumber={setSelectedFromNumber}
+                    />
+                    </DialogContent>
+                </Dialog>
+                
+                <Dialog open={isVideoOpen} onOpenChange={setIsVideoOpen}>
+                    <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>New Video Call</DialogTitle>
+                        <DialogDescription>
+                        This feature is coming soon.
+                        </DialogDescription>
+                    </DialogHeader>
+                    </DialogContent>
+                </Dialog>
             </SidebarInset>
         </SidebarProvider>
     );
