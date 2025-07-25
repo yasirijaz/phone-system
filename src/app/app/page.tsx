@@ -58,6 +58,10 @@ export default function AppUIPage() {
 
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerInitialValue, setDialerInitialValue] = useState('');
+  
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+  const [selectedFromNumber, setSelectedFromNumber] = useState('');
+
 
   useEffect(() => {
     connectTwilio();
@@ -80,6 +84,32 @@ export default function AppUIPage() {
 
     return Array.from(latestCalls.values());
   };
+  
+    const handleDepartmentChange = useCallback(async (departmentId: string) => {
+        setSelectedDepartmentId(departmentId);
+        if (!departmentId) {
+            setPhoneNumbers([]);
+            setSelectedFromNumber('');
+            return;
+        };
+        setLoadingNumbers(true);
+        try {
+            const numbers = await getPhoneNumbers(Number(departmentId));
+            setPhoneNumbers(numbers);
+            if (numbers.length > 0) {
+                setSelectedFromNumber(numbers[0].phone_no);
+            } else {
+                setSelectedFromNumber('');
+            }
+        } catch (error) {
+            toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
+            setPhoneNumbers([]);
+            setSelectedFromNumber('');
+        } finally {
+            setLoadingNumbers(false);
+        }
+    }, [toast]);
+
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -96,7 +126,14 @@ export default function AppUIPage() {
             ]);
 
             const callsData = Array.isArray(allCallLogs) ? allCallLogs : [];
-            setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
+            const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
+            setDepartments(depts);
+            
+            if (depts.length > 0) {
+                // Automatically trigger fetching numbers for the first department
+                handleDepartmentChange(String(depts[0].id));
+            }
+
             setAllCalls(getLatestUniqueCallsByContact(callsData));
             setUnreadCalls(getLatestUniqueCallsByContact(callsData.filter(c => !c.is_read)));
 
@@ -108,24 +145,7 @@ export default function AppUIPage() {
         }
     };
     fetchInitialData();
-  }, [user, toast]);
-  
-  const handleDepartmentChange = useCallback(async (departmentId: string) => {
-    if (!departmentId) {
-        setPhoneNumbers([]);
-        return;
-    };
-    setLoadingNumbers(true);
-    try {
-        const numbers = await getPhoneNumbers(Number(departmentId));
-        setPhoneNumbers(numbers);
-    } catch (error) {
-        toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
-        setPhoneNumbers([]);
-    } finally {
-        setLoadingNumbers(false);
-    }
-  }, [toast]);
+  }, [user, toast, handleDepartmentChange]);
 
 
   const handleMakeCall = async (number: string, fromNumber?: string) => {
@@ -186,6 +206,9 @@ export default function AppUIPage() {
                               initialValue={dialerInitialValue}
                               open={dialerOpen}
                               onOpenChange={setDialerOpen}
+                              selectedDepartmentId={selectedDepartmentId}
+                              selectedFromNumber={selectedFromNumber}
+                              onSetSelectedFromNumber={setSelectedFromNumber}
                            >
                              <Button variant="ghost" size="icon" onClick={() => { setDialerInitialValue(''); setDialerOpen(true);}}><Phone className="h-5 w-5" /></Button>
                            </Dialer>
@@ -287,6 +310,9 @@ export default function AppUIPage() {
                     onDepartmentChange={handleDepartmentChange}
                     loadingDepartments={loadingDepartments}
                     loadingNumbers={loadingNumbers}
+                     selectedDepartmentId={selectedDepartmentId}
+                    selectedFromNumber={selectedFromNumber}
+                    onSetSelectedFromNumber={setSelectedFromNumber}
                   />
                 </DialogContent>
               </Dialog>

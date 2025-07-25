@@ -20,6 +20,9 @@ interface NewMessageFormProps {
     onDepartmentChange: (departmentId: string) => void;
     loadingDepartments: boolean;
     loadingNumbers: boolean;
+    selectedDepartmentId: string;
+    selectedFromNumber: string;
+    onSetSelectedFromNumber: (fromNumber: string) => void;
 }
 
 const messageSchema = z.object({
@@ -37,6 +40,9 @@ export default function NewMessageForm({
     onDepartmentChange,
     loadingDepartments,
     loadingNumbers,
+    selectedDepartmentId,
+    selectedFromNumber,
+    onSetSelectedFromNumber
 }: NewMessageFormProps) {
     const { toast } = useToast();
     
@@ -44,20 +50,19 @@ export default function NewMessageForm({
         resolver: zodResolver(messageSchema),
         defaultValues: { recipient: "", departmentId: "", fromNumber: "", message: "" }
     });
-
-    const selectedDepartmentId = form.watch("departmentId");
-
-    useEffect(() => {
-        if (selectedDepartmentId) {
-            onDepartmentChange(selectedDepartmentId);
-        }
-    }, [selectedDepartmentId, onDepartmentChange]);
     
-    // Reset fromNumber when department changes
     useEffect(() => {
-      form.setValue('fromNumber', '');
-    }, [phoneNumbers, form]);
+        form.setValue("departmentId", selectedDepartmentId);
+        form.setValue("fromNumber", selectedFromNumber);
+    }, [selectedDepartmentId, selectedFromNumber, form]);
 
+    const watchedDepartmentId = form.watch("departmentId");
+
+    useEffect(() => {
+        if (watchedDepartmentId && watchedDepartmentId !== selectedDepartmentId) {
+            onDepartmentChange(watchedDepartmentId);
+        }
+    }, [watchedDepartmentId, onDepartmentChange, selectedDepartmentId]);
     
     const onSubmit = (values: z.infer<typeof messageSchema>) => {
         console.log(values);
@@ -80,7 +85,7 @@ export default function NewMessageForm({
                     <FormField control={form.control} name="departmentId" render={({ field }) => (
                         <FormItem>
                             <FormLabel>From Department</FormLabel>
-                             <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingDepartments}>
+                             <Select onValueChange={field.onChange} value={field.value} disabled={loadingDepartments}>
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder={loadingDepartments ? "Loading..." : "Select Dept."} />
@@ -98,7 +103,7 @@ export default function NewMessageForm({
                      <FormField control={form.control} name="fromNumber" render={({ field }) => (
                         <FormItem>
                             <FormLabel>From Number</FormLabel>
-                             <Select onValueChange={field.onChange} value={field.value} disabled={loadingNumbers || !selectedDepartmentId}>
+                             <Select onValueChange={field.onChange} value={field.value} disabled={loadingNumbers || !watchedDepartmentId}>
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder={loadingNumbers ? "Loading..." : "Select Number"} />

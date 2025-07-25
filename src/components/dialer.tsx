@@ -20,6 +20,9 @@ interface DialerProps {
     initialValue?: string;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
+    selectedDepartmentId: string;
+    selectedFromNumber: string;
+    onSetSelectedFromNumber: (fromNumber: string) => void;
 }
 
 export default function Dialer({ 
@@ -32,11 +35,12 @@ export default function Dialer({
     loadingNumbers,
     initialValue = '',
     open,
-    onOpenChange
+    onOpenChange,
+    selectedDepartmentId,
+    selectedFromNumber,
+    onSetSelectedFromNumber,
 }: DialerProps) {
     const [number, setNumber] = useState('');
-    const [fromNumber, setFromNumber] = useState('');
-    const [departmentId, setDepartmentId] = useState('');
     
     useEffect(() => {
         if (initialValue) {
@@ -97,13 +101,11 @@ export default function Dialer({
     const handleCall = () => {
         const cleanedNumber = number.replace(/\D/g, '');
         if (cleanedNumber) {
-            onMakeCall(`+1${cleanedNumber}`, fromNumber);
+            onMakeCall(`+1${cleanedNumber}`, selectedFromNumber);
         }
     };
 
     const handleDepartmentSelection = (id: string) => {
-        setDepartmentId(id);
-        setFromNumber('');
         onDepartmentChange(id);
     }
     
@@ -128,7 +130,7 @@ export default function Dialer({
                         </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                         <Select onValueChange={handleDepartmentSelection} value={departmentId} disabled={loadingDepartments}>
+                         <Select onValueChange={handleDepartmentSelection} value={selectedDepartmentId} disabled={loadingDepartments}>
                             <SelectTrigger variant="ghost">
                                 <SelectValue placeholder={loadingDepartments ? "Loading..." : "Select Dept."} />
                             </SelectTrigger>
@@ -138,7 +140,7 @@ export default function Dialer({
                                 ))}
                             </SelectContent>
                         </Select>
-                         <Select onValueChange={setFromNumber} value={fromNumber} disabled={loadingNumbers || !departmentId}>
+                         <Select onValueChange={onSetSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
                             <SelectTrigger variant="ghost">
                                 <SelectValue placeholder={loadingNumbers ? "Loading..." : "From Number"} />
                             </SelectTrigger>
@@ -170,7 +172,7 @@ export default function Dialer({
                              </Button>
                         ))}
                     </div>
-                    <Button onClick={handleCall} disabled={!number || !fromNumber} className="bg-green-600 hover:bg-green-700">
+                    <Button onClick={handleCall} disabled={!number || !selectedFromNumber} className="bg-green-600 hover:bg-green-700">
                         <Phone className="mr-2 h-4 w-4" />
                         Call
                     </Button>
