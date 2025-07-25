@@ -17,6 +17,9 @@ interface DialerProps {
     onDepartmentChange: (departmentId: string) => void;
     loadingDepartments: boolean;
     loadingNumbers: boolean;
+    initialValue?: string;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }
 
 export default function Dialer({ 
@@ -27,11 +30,22 @@ export default function Dialer({
     onDepartmentChange,
     loadingDepartments,
     loadingNumbers,
+    initialValue = '',
+    open,
+    onOpenChange
 }: DialerProps) {
     const [number, setNumber] = useState('');
     const [fromNumber, setFromNumber] = useState('');
     const [departmentId, setDepartmentId] = useState('');
     
+    useEffect(() => {
+        if (initialValue) {
+            handleNumberChange(initialValue);
+        } else {
+            setNumber('');
+        }
+    }, [initialValue, open]);
+
     const formatPhoneNumber = (value: string): string => {
         const cleaned = value.replace(/\D/g, '');
         if (cleaned.length > 10) {
@@ -101,7 +115,7 @@ export default function Dialer({
     ];
 
     return (
-        <Popover>
+        <Popover open={open} onOpenChange={onOpenChange}>
             <PopoverTrigger asChild>
                 {children}
             </PopoverTrigger>

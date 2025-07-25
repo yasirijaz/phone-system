@@ -16,7 +16,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Call, Department, PhoneNumber } from "@/types";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -35,6 +35,7 @@ import CallLog from "@/components/call-log";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InAppSidebar } from "@/components/in-app-sidebar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverTrigger } from "@radix-ui/react-popover";
 
 function TwilioStatusIndicator() {
   const { isDeviceReady, isWorkerReady, isConnecting, connectTwilio } = useTwilio();
@@ -111,6 +112,9 @@ export default function AppUIPage() {
   const [unreadCalls, setUnreadCalls] = useState<Call[]>([]);
   const [loadingCalls, setLoadingCalls] = useState(true);
 
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [dialerInitialValue, setDialerInitialValue] = useState('');
+
   useEffect(() => {
     connectTwilio();
   }, [connectTwilio]);
@@ -150,7 +154,7 @@ export default function AppUIPage() {
             const callsData = Array.isArray(allCallLogs) ? allCallLogs : [];
             setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
             setAllCalls(getLatestUniqueCallsByContact(callsData));
-            setUnreadCalls(callsData.filter(c => !c.is_read));
+            setUnreadCalls(getLatestUniqueCallsByContact(callsData.filter(c => !c.is_read)));
 
         } catch (error) {
             toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
@@ -185,12 +189,21 @@ export default function AppUIPage() {
         toast({ title: "Twilio Error", description: "Twilio Device not ready. Please connect first.", variant: 'destructive'});
         return;
     }
+    
+    // If called from call log, we need to open the dialer to select a 'from' number
+    if (!fromNumber) {
+        setDialerInitialValue(number);
+        setDialerOpen(true);
+        return;
+    }
+
     try {
         const params: { To: string, From?: string } = { To: number };
         if (fromNumber) {
             params.From = fromNumber;
         }
         await device.connect({ params });
+        setDialerOpen(false); // Close dialer after making a call
     } catch (error) {
         console.error("Error making call:", error);
         toast({ title: "Call Error", description: "Failed to make call. See console for details.", variant: 'destructive'});
@@ -226,8 +239,11 @@ export default function AppUIPage() {
                               onDepartmentChange={handleDepartmentChange}
                               loadingDepartments={loadingDepartments}
                               loadingNumbers={loadingNumbers}
+                              initialValue={dialerInitialValue}
+                              open={dialerOpen}
+                              onOpenChange={setDialerOpen}
                            >
-                             <Button variant="ghost" size="icon"><Phone className="h-5 w-5" /></Button>
+                             <Button variant="ghost" size="icon" onClick={() => { setDialerInitialValue(''); setDialerOpen(true);}}><Phone className="h-5 w-5" /></Button>
                            </Dialer>
                            <Button variant="ghost" size="icon" onClick={() => setIsSmsOpen(true)}><MessageSquare className="h-5 w-5" /></Button>
                            <Button variant="ghost" size="icon" onClick={() => setIsVideoOpen(true)}><Video className="h-5 w-5" /></Button>
@@ -275,16 +291,16 @@ export default function AppUIPage() {
                         <TabsTrigger value="unlogged">Unlogged</TabsTrigger>
                       </TabsList>
                       <TabsContent value="unread" className="mt-6">
-                        {loadingCalls ? <p>Loading...</p> : <CallLog calls={unreadCalls} />}
+                        {loadingCalls ? <p>Loading...</p> : <CallLog calls={unreadCalls} onMakeCall={handleMakeCall} />}
                       </TabsContent>
                         <TabsContent value="all" className="mt-6">
-                         {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls} />}
+                         {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={handleMakeCall} />}
                       </TabsContent>
                       <TabsContent value="calls" className="mt-6">
                           <Card><CardContent className="p-6">Call logs will appear here.</CardContent></Card>
                       </TabsContent>
                         <TabsContent value="missed" className="mt-6">
-                           {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.call_status === 'missed' || c.call_status === 'no-answer' || c.call_status === 'busy' || c.call_status === 'canceled'))} />}
+                           {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.call_status === 'missed' || c.call_status === 'no-answer' || c.call_status === 'busy' || c.call_status === 'canceled'))} onMakeCall={handleMakeCall} />}
                       </TabsContent>
                         <TabsContent value="meetings" className="mt-6">
                           <Card><CardContent className="p-6">Meeting recordings will appear here.</CardContent></Card>
@@ -299,7 +315,7 @@ export default function AppUIPage() {
                           <Card><CardContent className="p-6">Messages will appear here.</CardContent></Card>
                       </TabsContent>
                       <TabsContent value="starred" className="mt-6">
-                          {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.is_starred))} />}
+                          {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.is_starred))} onMakeCall={handleMakeCall} />}
                       </TabsContent>
                       <TabsContent value="spam" className="mt-6">
                           <Card><CardContent className="p-6">Spam will appear here.</CardContent></Card>
