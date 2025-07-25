@@ -33,9 +33,9 @@ export default function ConversationDetailPage() {
                 const logs = await getCallLogs();
                 const filteredLogs = logs.filter(call => call.from === contactNumber || call.to === contactNumber)
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-                setAllCalls(filteredLogs);
                 
                 if(filteredLogs.length > 0) {
+                    setAllCalls([filteredLogs[0]]); // Keep only the most recent call
                     const latestCall = filteredLogs[0];
                     const name = latestCall.direction === 'inbound' 
                         ? (latestCall.from_name?.name || latestCall.from) 
