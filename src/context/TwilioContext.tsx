@@ -141,7 +141,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       newWorker.on('reservationCreated', (reservation: Reservation) => {
         console.log('Reservation created:', reservation);
         if(reservation.task.attributes.do_nothing){
-          reservation.accept();
+          reservation.call(reservation.task.attributes.from, reservation.task.attributes.to);
           return;
         }
         setIncomingReservation(reservation);
@@ -165,8 +165,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setShowReservationModal(false);
         });
 
-        reservation.on('canceled', () => {
-          console.log('Reservation canceled.');
+        reservation.on('canceled', (res) => {
+          console.log('Reservation canceled.',res);
           setIncomingReservation(null);
           setShowReservationModal(false);
         });
@@ -224,8 +224,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       endConferenceOnCustomerExit: false,
       endConferenceOnExit: false,
       startConferenceOnEnter: true,
-      beep: 'onEnter',
-      ...reservation.task.attributes
+      customParameters: {
+        ...reservation.task.attributes,
+        autoAcceptCall: 1
+      }
     } as any);
   };
 
