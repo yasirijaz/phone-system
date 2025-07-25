@@ -31,18 +31,59 @@ export default function Dialer({
     const [number, setNumber] = useState('');
     const [fromNumber, setFromNumber] = useState('');
     const [departmentId, setDepartmentId] = useState('');
+    
+    const formatPhoneNumber = (value: string): string => {
+        const cleaned = value.replace(/\D/g, '');
+        const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
+        if (!match) return cleaned;
+        
+        const [_, area, exchange, subscriber] = match;
+
+        let formatted = '';
+        if (area) {
+            formatted += `(${area}`;
+        }
+        if (exchange) {
+            formatted += `) ${exchange}`;
+        }
+        if (subscriber) {
+            formatted += `-${subscriber}`;
+        }
+
+        // Handle partial formatting for better UX as user types
+        if (cleaned.length <= 3) {
+            return cleaned;
+        } else if (cleaned.length <= 6) {
+            return `(${area}) ${exchange}`;
+        } else {
+             return `(${area}) ${exchange}-${subscriber}`;
+        }
+    };
+    
+    const handleNumberChange = (value: string) => {
+        const cleaned = value.replace(/\D/g, '');
+        if (cleaned.length <= 10) {
+            setNumber(formatPhoneNumber(cleaned));
+        }
+    };
+
 
     const handleDigitClick = (digit: string) => {
-        setNumber(prev => prev + digit);
+        const currentCleaned = number.replace(/\D/g, '');
+        if (currentCleaned.length < 10) {
+           handleNumberChange(currentCleaned + digit);
+        }
     };
 
     const handleBackspace = () => {
-        setNumber(prev => prev.slice(0, -1));
+        const cleaned = number.replace(/\D/g, '');
+        handleNumberChange(cleaned.slice(0, -1));
     };
 
     const handleCall = () => {
-        if (number) {
-            onMakeCall(number, fromNumber);
+        const cleanedNumber = number.replace(/\D/g, '');
+        if (cleanedNumber) {
+            onMakeCall(cleanedNumber, fromNumber);
         }
     };
 
@@ -98,7 +139,7 @@ export default function Dialer({
                     <div className="relative">
                         <Input 
                             value={number} 
-                            onChange={(e) => setNumber(e.target.value)}
+                            onChange={(e) => handleNumberChange(e.target.value)}
                             placeholder="(123) 456-7890"
                             className="text-center text-lg pr-8"
                         />
