@@ -1,9 +1,10 @@
 
 import type { Call } from '@/types';
-import { PhoneIncoming, PhoneOutgoing } from 'lucide-react';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Button } from './ui/button';
 
 interface CallLogProps {
   calls: Call[];
@@ -46,6 +47,9 @@ function CallCard({ call, onMakeCall }: { call: Call, onMakeCall: (number: strin
                            {call.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />}
                            <span>{call.direction.charAt(0).toUpperCase() + call.direction.slice(1)} / {call.call_status} ({call.duration} min)</span>
                       </div>
+                       <Button variant="ghost" size="icon" onClick={handleCallClick}>
+                            <PhoneIcon className="h-4 w-4" />
+                       </Button>
                     </div>
                     <div className="text-sm mt-2 space-y-1 text-muted-foreground">
                         <p className="text-foreground"><strong>Received By:</strong> {receivedByName}</p>
