@@ -150,7 +150,7 @@ export default function AppUIPage() {
             const callsData = Array.isArray(allCallLogs) ? allCallLogs : [];
             setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
             setAllCalls(getLatestUniqueCallsByContact(callsData));
-            setUnreadCalls(callsData.filter(c => !c.is_read));
+            setUnreadCalls(getLatestUniqueCallsByContact(callsData.filter(c => !c.is_read)));
 
         } catch (error) {
             toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
