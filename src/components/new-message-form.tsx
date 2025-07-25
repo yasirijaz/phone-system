@@ -61,8 +61,17 @@ export default function NewMessageForm({
     useEffect(() => {
         if (watchedDepartmentId && watchedDepartmentId !== selectedDepartmentId) {
             onDepartmentChange(watchedDepartmentId);
+            form.setValue("fromNumber", ""); // Reset from number when department changes
         }
-    }, [watchedDepartmentId, onDepartmentChange, selectedDepartmentId]);
+    }, [watchedDepartmentId, onDepartmentChange, selectedDepartmentId, form]);
+
+    const watchedFromNumber = form.watch("fromNumber");
+
+    useEffect(() => {
+        if(watchedFromNumber !== selectedFromNumber) {
+            onSetSelectedFromNumber(watchedFromNumber);
+        }
+    }, [watchedFromNumber, selectedFromNumber, onSetSelectedFromNumber]);
     
     const onSubmit = (values: z.infer<typeof messageSchema>) => {
         console.log(values);
@@ -111,7 +120,7 @@ export default function NewMessageForm({
                                 </FormControl>
                                 <SelectContent>
                                     {phoneNumbers.map(num => (
-                                        <SelectItem key={num.id} value={num.phone_no}>{num.phone_no} ({num.label})</SelectItem>
+                                        <SelectItem key={num.id} value={num.phone_no}>{num.label}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

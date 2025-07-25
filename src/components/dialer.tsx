@@ -146,7 +146,7 @@ export default function Dialer({
                             </SelectTrigger>
                             <SelectContent>
                                 {phoneNumbers.map(num => (
-                                    <SelectItem key={num.id} value={num.phone_no}>{num.phone_no}</SelectItem>
+                                    <SelectItem key={num.id} value={num.phone_no}>{num.label}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>

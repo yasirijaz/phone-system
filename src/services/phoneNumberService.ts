@@ -4,6 +4,7 @@ import type { PhoneNumber } from '@/types';
 
 export const getPhoneNumbers = async (departmentId: number): Promise<PhoneNumber[]> => {
   const response = await axios.get(`/api/phone-numbers/${departmentId}`);
+  // The API response nests the array inside a `phone_numbers` key
   return response.data.phone_numbers;
 };
 
