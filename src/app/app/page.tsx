@@ -28,7 +28,7 @@ import { getUserDepartments } from "@/services/userService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import { useToast } from "@/hooks/use-toast";
 import HardwareSettings from "@/components/hardware-settings";
-import { getCallLogs, getUnreadCallLogs } from "@/services/callLogService";
+import { getCallLogs } from "@/services/callLogService";
 import CallLog from "@/components/call-log";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InAppSidebar } from "@/components/in-app-sidebar";
@@ -76,17 +76,17 @@ export default function AppUIPage() {
         setLoadingCalls(true);
         try {
             const isAdmin = user.role_id === 1 || user.role_id === 2;
-            const [fetchedDepts, allCallLogs, unreadCallLogs] = await Promise.all([
+            const [fetchedDepts, allCallLogs] = await Promise.all([
                 isAdmin && user.company_id
                     ? getDepartments(user.company_id)
                     : getUserDepartments(user.id),
                 getCallLogs(),
-                getUnreadCallLogs(),
             ]);
 
+            const callsData = Array.isArray(allCallLogs) ? allCallLogs : [];
             setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
-            setAllCalls(Array.isArray(allCallLogs) ? getLatestUniqueCallsByContact(allCallLogs) : []);
-            setUnreadCalls(Array.isArray(unreadCallLogs) ? getLatestUniqueCallsByContact(unreadCallLogs) : []);
+            setAllCalls(getLatestUniqueCallsByContact(callsData));
+            setUnreadCalls(callsData.filter(c => !c.is_read));
 
         } catch (error) {
             toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
