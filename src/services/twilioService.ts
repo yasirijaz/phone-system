@@ -17,3 +17,10 @@ export const removeParticipant = async (conferenceSid: string, callSid: string):
     });
     return response.data;
 }
+
+export const allParticipant = async (conferenceSid: string): Promise<any> => {
+    const response = await axios.post('/api/twilio/participants', {
+        conference_sid: conferenceSid,
+    });
+    return response.data;
+}

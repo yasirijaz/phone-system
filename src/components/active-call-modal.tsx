@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { PhoneOff, Mic, UserPlus, Trash2, Users } from "lucide-react";
-import { addParticipant, removeParticipant } from '@/services/twilioService';
+import { addParticipant, removeParticipant, allParticipant } from '@/services/twilioService';
 import { useToast } from '@/hooks/use-toast';
 import type { Call } from '@twilio/voice-sdk';
 import type { User } from '@/types';
@@ -35,16 +35,30 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
+
+    const fetchParticipants = async () => {
+      if (!conferenceSid) return;
+      try {
+        const result = await allParticipant(conferenceSid);
+        const participantList = Array.isArray(result?.data) ? result.data : [];
+
+        setParticipants(participantList);
+      } catch (error) {
+        console.error('Failed to fetch participants:', error);
+      } finally {
+        
+      }
+    };
+
     if (isOpen) {
       setDuration(0); // Reset timer on new call
       timer = setInterval(() => {
         setDuration(prev => prev + 1);
       }, 1000);
       
-      if (conferenceSid) {
-        setParticipants([
-            { call_sid: 'CA123456789012345678901234567890ab', muted: false, on_hold: false, status: 'connected', friendlyName: 'client:1' },
-        ]);
+      if (isOpen && conferenceSid) {
+        fetchParticipants();
+        timer = setInterval(fetchParticipants, 5000);
       }
       
       const fetchUsers = async () => {
@@ -60,6 +74,7 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
           }
         }
       }
+
       fetchUsers();
 
     } else {
@@ -140,7 +155,7 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
                     <div className="space-y-2 max-h-32 overflow-y-auto">
                         {participants.map(p => (
                             <div key={p.call_sid} className="flex items-center justify-between text-sm p-2 bg-muted rounded-md">
-                                <span>{p.friendlyName || p.call_sid}</span>
+                                <span>{p.call_sid}</span>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveParticipant(p.call_sid)}>
                                     <Trash2 className="h-4 w-4 text-destructive"/>
                                 </Button>
