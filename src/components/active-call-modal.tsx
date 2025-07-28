@@ -4,11 +4,14 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PhoneOff, Mic, UserPlus, Trash2, Users } from "lucide-react";
 import { addParticipant, removeParticipant } from '@/services/twilioService';
 import { useToast } from '@/hooks/use-toast';
 import type { Call } from '@twilio/voice-sdk';
+import type { User } from '@/types';
+import { useAuth } from '@/context/AuthContext';
+import { getUsersByCompany } from '@/services/userService';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface ActiveCallModalProps {
   isOpen: boolean;
@@ -19,13 +22,16 @@ interface ActiveCallModalProps {
 }
 
 export default function ActiveCallModal({ isOpen, contactName, onHangUp, connection, conferenceSid }: ActiveCallModalProps) {
+  const { user: authUser } = useAuth();
   const [duration, setDuration] = useState(0);
-  const [participantNumber, setParticipantNumber] = useState('');
+  const [selectedParticipant, setSelectedParticipant] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [participants, setParticipants] = useState<any[]>([]);
+  const [companyUsers, setCompanyUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const { toast } = useToast();
 
-  const fromNumber =  connection?.parameters?.From || "unkown";
+  const fromNumber =  connection?.parameters?.From || "unknown";
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -35,35 +41,50 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
         setDuration(prev => prev + 1);
       }, 1000);
       
-      // Periodically fetch participants if in a conference
-      // This is a mock-up. In a real app, you'd likely get this from a WebSocket event.
       if (conferenceSid) {
-        // Mock participants for demonstration
         setParticipants([
-            { call_sid: 'CA123456789012345678901234567890ab', muted: false, on_hold: false, status: 'connected' },
-            { call_sid: 'CAabcdef12345678901234567890123456', muted: true, on_hold: false, status: 'connected' },
+            { call_sid: 'CA123456789012345678901234567890ab', muted: false, on_hold: false, status: 'connected', friendlyName: 'client:1' }, // Example with user id
+            { call_sid: 'CAabcdef12345678901234567890123456', muted: true, on_hold: false, status: 'connected', friendlyName: contactName },
         ]);
       }
+      
+      const fetchUsers = async () => {
+        if(authUser?.company_id) {
+          setLoadingUsers(true);
+          try {
+            const usersResponse = await getUsersByCompany(authUser.company_id);
+            setCompanyUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
+          } catch(err) {
+            toast({ title: "Error", description: "Failed to load company users.", variant: 'destructive'});
+          } finally {
+            setLoadingUsers(false);
+          }
+        }
+      }
+      fetchUsers();
 
     } else {
        setParticipants([]);
+       setCompanyUsers([]);
+       setSelectedParticipant('');
     }
     
     return () => {
       clearInterval(timer);
     };
-  }, [isOpen, conferenceSid]);
+  }, [isOpen, conferenceSid, authUser, contactName, toast]);
 
   const handleAddParticipant = async () => {
-    if (!participantNumber || !conferenceSid || !fromNumber) {
+    if (!selectedParticipant || !conferenceSid || !fromNumber) {
         toast({ title: "Error", description: "Missing required information to add participant.", variant: 'destructive'});
         return;
     }
     setIsAdding(true);
     try {
-        await addParticipant(conferenceSid, String(fromNumber), participantNumber);
+        const to = `client:${selectedParticipant}`;
+        await addParticipant(conferenceSid, String(fromNumber), to);
         toast({ title: "Success", description: "Participant added to the conference."});
-        setParticipantNumber('');
+        setSelectedParticipant('');
         // Here you would refresh the participant list in a real app, e.g., via websockets
     } catch(error) {
         toast({ title: "Error", description: "Failed to add participant.", variant: 'destructive' });
@@ -77,7 +98,6 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
     try {
         await removeParticipant(conferenceSid, callSid);
         toast({ title: "Success", description: "Participant removed."});
-        // Here you would refresh the participant list
         setParticipants(prev => prev.filter(p => p.call_sid !== callSid));
     } catch (error) {
         toast({ title: "Error", description: "Failed to remove participant.", variant: 'destructive' });
@@ -89,6 +109,8 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
     const secs = (seconds % 60).toString().padStart(2, '0');
     return `${mins}:${secs}`;
   };
+
+  const activeParticipantIds = participants.map(p => p.friendlyName?.replace('client:', ''));
 
   return (
     <Dialog open={isOpen}>
@@ -106,7 +128,7 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
           </div>
           <div className="text-center">
             <p className="text-xl font-medium">
-              {contactName.length > 10 ? `${contactName.slice(0, 10)}...` : contactName}</p>
+              {contactName.length > 20 ? `${contactName.slice(0, 20)}...` : contactName}</p>
             <p className="text-muted-foreground">{connection?.parameters.From || ''}</p>
             <p className="text-muted-foreground text-lg">{formatTime(duration)}</p>
           </div>
@@ -119,7 +141,7 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
                     <div className="space-y-2 max-h-32 overflow-y-auto">
                         {participants.map(p => (
                             <div key={p.call_sid} className="flex items-center justify-between text-sm p-2 bg-muted rounded-md">
-                                <span>{p.call_sid}</span>
+                                <span>{p.friendlyName || p.call_sid}</span>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveParticipant(p.call_sid)}>
                                     <Trash2 className="h-4 w-4 text-destructive"/>
                                 </Button>
@@ -130,12 +152,19 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <Input 
-                        placeholder="Enter phone number" 
-                        value={participantNumber}
-                        onChange={(e) => setParticipantNumber(e.target.value)}
-                    />
-                    <Button onClick={handleAddParticipant} disabled={isAdding || !participantNumber}>
+                    <Select value={selectedParticipant} onValueChange={setSelectedParticipant} disabled={loadingUsers}>
+                        <SelectTrigger>
+                            <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select a user to add"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {companyUsers.map(user => (
+                                <SelectItem key={user.id} value={String(user.id)} disabled={activeParticipantIds.includes(String(user.id))}>
+                                    {user.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button onClick={handleAddParticipant} disabled={isAdding || !selectedParticipant}>
                         <UserPlus className="mr-2 h-4 w-4" />
                         {isAdding ? "Adding..." : "Add"}
                     </Button>
