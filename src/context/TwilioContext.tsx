@@ -19,6 +19,7 @@ interface TwilioContextType {
   isWorkerReady: boolean;
   isConnecting: boolean;
   error: string | null;
+  conferenceSid: string | null;
   connectTwilio: () => void;
   acceptCall: () => void;
   rejectCall: () => void;
@@ -41,6 +42,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [isDeviceReady, setIsDeviceReady] = useState(false);
   const [isWorkerReady, setIsWorkerReady] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [conferenceSid, setConferenceSid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
 
@@ -147,6 +149,20 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           console.log('Reservation accepted.');
           setIncomingReservation(reservation);
           setShowReservationModal(false);
+
+          // Wait a bit for Twilio to populate `conference.sid`
+          setTimeout(() => {
+            const attributes = reservation.task?.attributes;
+            const confSid = attributes?.conference?.sid;
+            console.log('Extracted conference SID:', confSid);
+
+            if (confSid) {
+              setConferenceSid(confSid); // store in your state
+            } else {
+              console.warn('conference.sid not found yet');
+            }
+          }, 500);
+
         });
         
         reservation.on('timeout', () => {
@@ -211,12 +227,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   };
 
   const acceptReservation = (reservation: Reservation) => {
-    console.log('accepting reservation', reservation)
+    console.log('accepting reservation', reservation);
+
     reservation.task.attributes.autoAccept = reservation.sid;
     let conferenceCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL+'/api/twilio/conference-callback';
     console.log('conferenceCallback', conferenceCallback);
 
-   
     reservation.conference({
       conferenceStatusCallback: conferenceCallback,
       conferenceStatusCallbackMethod: 'POST',
@@ -264,6 +280,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     isWorkerReady,
     isConnecting,
     error,
+    conferenceSid,
     connectTwilio,
     acceptCall,
     rejectCall,

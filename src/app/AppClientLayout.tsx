@@ -13,13 +13,14 @@ import ReservationModal from '@/components/reservation-modal';
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const {
     connection,
+    conferenceSid,
     acceptCall,
     rejectCall,
     hangUp,
     incomingReservation,
     showReservationModal,
     acceptReservation,
-    rejectReservation,
+    rejectReservation
   } = useTwilio();
 
   const { user } = useAuth();
@@ -48,6 +49,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         contactName={activeCallContact}
         onHangUp={hangUp}
         connection={connection}
+        conferenceSid={conferenceSid}
       />
       <ReservationModal
         isOpen={!!showReservationModal}

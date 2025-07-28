@@ -15,18 +15,17 @@ interface ActiveCallModalProps {
   contactName: string;
   onHangUp: () => void;
   connection: Call | null;
+  conferenceSid: string | null;
 }
 
-export default function ActiveCallModal({ isOpen, contactName, onHangUp, connection }: ActiveCallModalProps) {
+export default function ActiveCallModal({ isOpen, contactName, onHangUp, connection, conferenceSid }: ActiveCallModalProps) {
   const [duration, setDuration] = useState(0);
   const [participantNumber, setParticipantNumber] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [participants, setParticipants] = useState<any[]>([]);
   const { toast } = useToast();
 
-  const conferenceSid = connection?.parameters?.From || "testing";
   const fromNumber =  connection?.parameters?.From || "unkown";
-
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
