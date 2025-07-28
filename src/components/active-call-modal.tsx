@@ -43,8 +43,7 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
       
       if (conferenceSid) {
         setParticipants([
-            { call_sid: 'CA123456789012345678901234567890ab', muted: false, on_hold: false, status: 'connected', friendlyName: 'client:1' }, // Example with user id
-            { call_sid: 'CAabcdef12345678901234567890123456', muted: true, on_hold: false, status: 'connected', friendlyName: contactName },
+            { call_sid: 'CA123456789012345678901234567890ab', muted: false, on_hold: false, status: 'connected', friendlyName: 'client:1' },
         ]);
       }
       
@@ -82,7 +81,7 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
     setIsAdding(true);
     try {
         const to = `client:${selectedParticipant}`;
-        await addParticipant(conferenceSid, String(fromNumber), to);
+        await addParticipant(conferenceSid, fromNumber, selectedParticipant);
         toast({ title: "Success", description: "Participant added to the conference."});
         setSelectedParticipant('');
         // Here you would refresh the participant list in a real app, e.g., via websockets

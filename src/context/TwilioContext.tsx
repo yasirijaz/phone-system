@@ -128,6 +128,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       newDevice.on('disconnect', () => {
         console.log('Call disconnected (device event).');
         setConnection(null);
+        setConferenceSid(null);
       });
       
       await newDevice.register();
@@ -147,7 +148,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         
         reservation.on('accepted', () => {
           console.log('Reservation accepted.');
-          setIncomingReservation(reservation);
+          setIncomingReservation(null);
           setShowReservationModal(false);
 
           // Wait a bit for Twilio to populate `conference.sid`
@@ -167,7 +168,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         
         reservation.on('timeout', () => {
             console.log('Reservation timed out.');
-            setIncomingReservation(reservation);
+            setIncomingReservation(null);
             setShowReservationModal(false);
         });
 
@@ -222,28 +223,23 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     if (connection) {
       connection.disconnect();
       setConnection(null); // Close modal immediately for better UX
+      setConferenceSid(null);
       toast({ title: "Call Ended" });
     }
   };
 
   const acceptReservation = (reservation: Reservation) => {
     console.log('accepting reservation', reservation);
-
-    reservation.task.attributes.autoAccept = reservation.sid;
-    let conferenceCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL+'/api/twilio/conference-callback';
-    console.log('conferenceCallback', conferenceCallback);
-
     reservation.conference({
-      conferenceStatusCallback: conferenceCallback,
+      conferenceStatusCallback: 'https://wsh.io/api/twilio/conference-callback',
       conferenceStatusCallbackMethod: 'POST',
       conferenceStatusCallbackEvent: 'start end join leave',
       conferenceRecord: 'true',
       statusCallbackEvent:'start end join leave',
-      statusCallback: conferenceCallback,
-      conferenceRecordingStatusCallback: conferenceCallback,
-      recordingStatusCallback: conferenceCallback,
+      statusCallback: 'https://wsh.io/api/twilio/conference-callback',
+      conferenceRecordingStatusCallback: 'https://wsh.io/api/twilio/conference-callback',
+      recordingStatusCallback: 'https://wsh.io/api/twilio/conference-callback',
       recordingStatusCallbackMethod: 'POST',
-      // transcribe: true,
       endConferenceOnCustomerExit: true,
       endConferenceOnExit: false,
       startConferenceOnEnter: true
