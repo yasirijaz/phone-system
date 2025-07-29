@@ -20,6 +20,7 @@ interface TwilioContextType {
   isConnecting: boolean;
   error: string | null;
   conferenceSid: string | null;
+  fromNumber: string | null;
   connectTwilio: () => void;
   acceptCall: () => void;
   rejectCall: () => void;
@@ -43,6 +44,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [isWorkerReady, setIsWorkerReady] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [conferenceSid, setConferenceSid] = useState<string | null>(null);
+  const [fromNumber, setFromNumber] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
 
@@ -102,19 +104,25 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.log('Incoming call received:', conn);
         setConnection(conn);
 
-        if (conn.customParameters.get('autoAcceptCall') === '1') {
-          conn.accept();
-          toast({ title: "Call Accepted" });
+        if (conn.customParameters.get('conferenceSid')) {
+            setConferenceSid(conn.customParameters.get('conferenceSid'));
+        }
+        if (conn.customParameters.get('fromNumber')) {
+            setFromNumber(conn.customParameters.get('fromNumber'));
         }
 
         conn.on('disconnect', () => {
           console.log('Call disconnected.');
           setConnection(null);
+          setConferenceSid(null);
+          setFromNumber(null);
         });
 
         conn.on('reject', () => {
           console.log('Call rejected.');
           setConnection(null);
+          setConferenceSid(null);
+          setFromNumber(null);
         });
       };
       
@@ -129,6 +137,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.log('Call disconnected (device event).');
         setConnection(null);
         setConferenceSid(null);
+        setFromNumber(null);
       });
       
       await newDevice.register();
@@ -151,50 +160,29 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setIncomingReservation(null);
           setShowReservationModal(false);
 
-          // Wait a bit for Twilio to populate `conference.sid`
           setTimeout(() => {
             const attributes = reservation.task?.attributes;
             const confSid = attributes?.conference?.sid;
+            const fromNum = attributes?.from;
             console.log('Extracted conference SID:', confSid);
+            console.log('Extracted from number:', fromNum);
 
-            if (confSid) {
-              setConferenceSid(confSid); // store in your state
-            } else {
-              console.warn('conference.sid not found yet');
-            }
+            if (confSid) setConferenceSid(confSid);
+            if (fromNum) setFromNumber(fromNum);
+
           }, 500);
-
         });
 
-        reservation.on('rescinded', () => {
-          console.log('Reservation rescinded (another agent accepted it)');
-          setIncomingReservation(null);
-          setShowReservationModal(false);
-        });
-        
-        reservation.on('timeout', () => {
-            console.log('Reservation timed out.');
+        const clearReservation = () => {
             setIncomingReservation(null);
             setShowReservationModal(false);
-        });
+        };
 
-        reservation.on('rejected', () => {
-          console.log('Reservation rejected.');
-          setIncomingReservation(null);
-          setShowReservationModal(false);
-        });
-
-        reservation.on('canceled', () => {
-          console.log('Reservation canceled.');
-          setIncomingReservation(null);
-          setShowReservationModal(false);
-        });
-
-        reservation.on('completed', () => {
-          console.log('Reservation completed.');
-          setIncomingReservation(null);
-          setShowReservationModal(false);
-        });
+        reservation.on('rescinded', () => { console.log('Reservation rescinded'); clearReservation(); });
+        reservation.on('timeout', () => { console.log('Reservation timed out.'); clearReservation(); });
+        reservation.on('rejected', () => { console.log('Reservation rejected.'); clearReservation(); });
+        reservation.on('canceled', () => { console.log('Reservation canceled.'); clearReservation(); });
+        reservation.on('completed', () => { console.log('Reservation completed.'); clearReservation(); });
       });
 
     } catch (err: any) {
@@ -206,9 +194,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   }, [twilio, user, isConnecting, toast]);
   
   const acceptCall = () => {
-    if (incomingReservation) {
-        console.log(`Accepting reservation: ${incomingReservation.sid}`);
-    }
     if (connection) {
         console.log(`Accepting call`);
         connection.accept();
@@ -228,8 +213,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const hangUp = () => {
     if (connection) {
       connection.disconnect();
-      setConnection(null); // Close modal immediately for better UX
+      setConnection(null);
       setConferenceSid(null);
+      setFromNumber(null);
       toast({ title: "Call Ended" });
     }
   };
@@ -237,23 +223,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const acceptReservation = (reservation: Reservation) => {
     console.log('accepting reservation', reservation);
 
-    reservation.task.attributes.autoAccept = reservation.sid;
-    let conferenceCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL+'/api/twilio/conference-callback';
-    console.log('conferenceCallback', conferenceCallback);
+    const conferenceCallback = 'https://callsync-backend-e56580f83a48.herokuapp.com/api/twilio/conference-callback';
 
     reservation.conference({
       conferenceStatusCallback: conferenceCallback,
       conferenceStatusCallbackMethod: 'POST',
-      conferenceStatusCallbackEvent: 'start end join leave',
+      conferenceStatusCallbackEvent: ['start', 'end', 'join', 'leave'],
       conferenceRecord: 'true',
-      statusCallbackEvent:'start end join leave',
-      statusCallback: conferenceCallback,
-      conferenceRecordingStatusCallback: conferenceCallback,
-      recordingStatusCallback: conferenceCallback,
-      recordingStatusCallbackMethod: 'POST',
-      // transcribe: true,
-      endConferenceOnCustomerExit: true,
-      endConferenceOnExit: false,
+      endConferenceOnExit: true,
       startConferenceOnEnter: true
     });
   };
@@ -289,6 +266,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     isConnecting,
     error,
     conferenceSid,
+    fromNumber,
     connectTwilio,
     acceptCall,
     rejectCall,

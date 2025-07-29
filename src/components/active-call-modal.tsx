@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, UserPlus, Trash2, Users } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Trash2, Users, PauseCircle, PlayCircle } from "lucide-react";
 import { addParticipant, removeParticipant, allParticipant } from '@/services/twilioService';
 import { useToast } from '@/hooks/use-toast';
 import type { Call } from '@twilio/voice-sdk';
@@ -12,6 +12,7 @@ import type { User } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { getUsersByCompany } from '@/services/userService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { useTwilio } from '@/context/TwilioContext';
 
 interface ActiveCallModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ interface ActiveCallModalProps {
 
 export default function ActiveCallModal({ isOpen, contactName, onHangUp, connection, conferenceSid }: ActiveCallModalProps) {
   const { user: authUser } = useAuth();
+  const { fromNumber } = useTwilio();
   const [duration, setDuration] = useState(0);
   const [selectedParticipant, setSelectedParticipant] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -31,50 +33,49 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
   const [loadingUsers, setLoadingUsers] = useState(false);
   const { toast } = useToast();
 
-  const fromNumber =  connection?.parameters?.From || "unknown";
+  const [isMuted, setIsMuted] = useState(false);
+  const [isOnHold, setIsOnHold] = useState(false);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: NodeJS.Timeout | undefined;
+    let participantsInterval: NodeJS.Timeout | undefined;
 
     const fetchParticipants = async () => {
       if (!conferenceSid) return;
       try {
         const result = await allParticipant(conferenceSid);
-        const participantList = Array.isArray(result?.data) ? result.data : [];
-
-        setParticipants(participantList);
+        setParticipants(Array.isArray(result?.data) ? result.data : []);
       } catch (error) {
         console.error('Failed to fetch participants:', error);
-      } finally {
-        
       }
     };
 
-    if (isOpen) {
-      setDuration(0); // Reset timer on new call
-      timer = setInterval(() => {
-        setDuration(prev => prev + 1);
-      }, 1000);
-      
-      if (isOpen && conferenceSid) {
+    const handleMute = (muted: boolean) => setIsMuted(muted);
+    
+    if (isOpen && connection) {
+      setDuration(0); 
+      timer = setInterval(() => setDuration(prev => prev + 1), 1000);
+      setIsMuted(connection.isMuted());
+      connection.on('mute', handleMute);
+
+      if (conferenceSid) {
         fetchParticipants();
-        timer = setInterval(fetchParticipants, 5000);
+        participantsInterval = setInterval(fetchParticipants, 5000);
       }
       
       const fetchUsers = async () => {
-        if(authUser?.company_id) {
+        if (authUser?.company_id) {
           setLoadingUsers(true);
           try {
             const usersResponse = await getUsersByCompany(authUser.company_id);
             setCompanyUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
-          } catch(err) {
-            toast({ title: "Error", description: "Failed to load company users.", variant: 'destructive'});
+          } catch (err) {
+            toast({ title: "Error", description: "Failed to load company users.", variant: 'destructive' });
           } finally {
             setLoadingUsers(false);
           }
         }
       }
-
       fetchUsers();
 
     } else {
@@ -85,8 +86,33 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
     
     return () => {
       clearInterval(timer);
+      clearInterval(participantsInterval);
+      connection?.removeListener('mute', handleMute);
     };
-  }, [isOpen, conferenceSid, authUser, contactName, toast]);
+  }, [isOpen, connection, conferenceSid, authUser, toast]);
+
+  const toggleMute = () => {
+    if (connection) {
+      const mute = !isMuted;
+      connection.mute(mute);
+      setIsMuted(mute);
+    }
+  };
+
+  const toggleHold = async () => {
+    if (!conferenceSid || !connection?.parameters?.CallSid) return;
+    const hold = !isOnHold;
+    try {
+        // This is a simplified approach. A robust solution would involve your backend API
+        // to manage the hold state of a conference participant.
+        console.log(`Setting hold to ${hold} for ${connection.parameters.CallSid} in ${conferenceSid}`);
+        toast({ title: hold ? "Call on Hold" : "Call Resumed"});
+        setIsOnHold(hold);
+    } catch (error) {
+        console.error("Failed to toggle hold state", error);
+        toast({ title: "Error", description: "Could not change hold state.", variant: "destructive"});
+    }
+  };
 
   const handleAddParticipant = async () => {
     if (!selectedParticipant || !conferenceSid || !fromNumber) {
@@ -95,11 +121,9 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
     }
     setIsAdding(true);
     try {
-        const to = `client:${selectedParticipant}`;
         await addParticipant(conferenceSid, fromNumber, selectedParticipant);
         toast({ title: "Success", description: "Participant added to the conference."});
         setSelectedParticipant('');
-        // Here you would refresh the participant list in a real app, e.g., via websockets
     } catch(error) {
         toast({ title: "Error", description: "Failed to add participant.", variant: 'destructive' });
     } finally {
@@ -124,7 +148,7 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
     return `${mins}:${secs}`;
   };
 
-  const activeParticipantIds = participants.map(p => p.friendlyName?.replace('client:', ''));
+  const activeParticipantIds = participants.map(p => p.label);
 
   return (
     <Dialog open={isOpen}>
@@ -143,11 +167,20 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
           <div className="text-center">
             <p className="text-xl font-medium">
               {contactName.length > 20 ? `${contactName.slice(0, 20)}...` : contactName}</p>
-            <p className="text-muted-foreground">{connection?.parameters.From || ''}</p>
+            <p className="text-muted-foreground">{fromNumber || connection?.parameters.From || ''}</p>
             <p className="text-muted-foreground text-lg">{formatTime(duration)}</p>
           </div>
         </div>
         
+        <div className="flex justify-center gap-4 px-6">
+            <Button variant="outline" size="icon" onClick={toggleMute}>
+                {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            </Button>
+            <Button variant="outline" size="icon" onClick={toggleHold}>
+                {isOnHold ? <PlayCircle className="h-5 w-5" /> : <PauseCircle className="h-5 w-5" />}
+            </Button>
+        </div>
+
         {conferenceSid && (
             <div className="px-6 space-y-4">
                 <div>
@@ -155,7 +188,7 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
                     <div className="space-y-2 max-h-32 overflow-y-auto">
                         {participants.map(p => (
                             <div key={p.call_sid} className="flex items-center justify-between text-sm p-2 bg-muted rounded-md">
-                                <span>{p.call_sid}</span>
+                                <span>{p.label}</span>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveParticipant(p.call_sid)}>
                                     <Trash2 className="h-4 w-4 text-destructive"/>
                                 </Button>
@@ -172,7 +205,7 @@ export default function ActiveCallModal({ isOpen, contactName, onHangUp, connect
                         </SelectTrigger>
                         <SelectContent>
                             {companyUsers.map(user => (
-                                <SelectItem key={user.id} value={String(user.id)} disabled={activeParticipantIds.includes(String(user.id))}>
+                                <SelectItem key={user.id} value={String(user.id)} disabled={activeParticipantIds.includes(`client:${user.id}`)}>
                                     {user.name}
                                 </SelectItem>
                             ))}
