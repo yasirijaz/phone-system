@@ -1,3 +1,4 @@
+
 import axios from 'axios';
 
 const axiosInstance = axios.create({
@@ -15,5 +16,20 @@ axiosInstance.interceptors.request.use((config) => {
   }
   return config;
 });
+
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 
 export default axiosInstance;
