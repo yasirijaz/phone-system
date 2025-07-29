@@ -261,6 +261,9 @@ export default function EcommerceDashboard() {
   const [loadingDepartments, setLoadingDepartments] = useState(true);
   const [loadingNumbers, setLoadingNumbers] = useState(false);
 
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+  const [selectedFromNumber, setSelectedFromNumber] = useState('');
+
   useEffect(() => {
     connectTwilio();
   }, [connectTwilio]);
@@ -270,6 +273,31 @@ export default function EcommerceDashboard() {
       router.replace('/companies');
     }
   }, [user, router]);
+  
+  const handleDepartmentChange = useCallback(async (departmentId: string) => {
+    setSelectedDepartmentId(departmentId);
+    if (!departmentId) {
+        setPhoneNumbers([]);
+        setSelectedFromNumber('');
+        return;
+    };
+    setLoadingNumbers(true);
+    try {
+        const numbers = await getPhoneNumbers(Number(departmentId));
+        setPhoneNumbers(numbers);
+         if (numbers.length > 0) {
+            setSelectedFromNumber(numbers[0].phone_no);
+        } else {
+            setSelectedFromNumber('');
+        }
+    } catch (error) {
+        toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
+        setPhoneNumbers([]);
+        setSelectedFromNumber('');
+    } finally {
+        setLoadingNumbers(false);
+    }
+  }, [toast]);
   
   useEffect(() => {
     const fetchDepartmentsData = async () => {
@@ -281,7 +309,11 @@ export default function EcommerceDashboard() {
                 ? await getDepartments(user.company_id)
                 : await getUserDepartments(user.id);
             
-            setDepartments(Array.isArray(fetchedDepts) ? fetchedDepts : []);
+            const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
+            setDepartments(depts);
+             if (depts.length > 0) {
+                handleDepartmentChange(String(depts[0].id));
+            }
         } catch (error) {
             toast({ title: "Error", description: "Failed to load departments.", variant: "destructive" });
         } finally {
@@ -289,24 +321,9 @@ export default function EcommerceDashboard() {
         }
     };
     fetchDepartmentsData();
-  }, [user, toast]);
+  }, [user, toast, handleDepartmentChange]);
   
-  const handleDepartmentChange = useCallback(async (departmentId: string) => {
-    if (!departmentId) {
-        setPhoneNumbers([]);
-        return;
-    };
-    setLoadingNumbers(true);
-    try {
-        const numbers = await getPhoneNumbers(Number(departmentId));
-        setPhoneNumbers(numbers);
-    } catch (error) {
-        toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
-        setPhoneNumbers([]);
-    } finally {
-        setLoadingNumbers(false);
-    }
-  }, [toast]);
+  
 
 
   const handleMakeCall = async (number: string, fromNumber?: string) => {
@@ -393,6 +410,9 @@ export default function EcommerceDashboard() {
                     onDepartmentChange={handleDepartmentChange}
                     loadingDepartments={loadingDepartments}
                     loadingNumbers={loadingNumbers}
+                    selectedDepartmentId={selectedDepartmentId}
+                    selectedFromNumber={selectedFromNumber}
+                    onSetSelectedFromNumber={setSelectedFromNumber}
                  >
                    <Button variant="ghost" size="icon"><Phone className="h-5 w-5" /></Button>
                  </Dialer>
@@ -457,6 +477,9 @@ export default function EcommerceDashboard() {
               onDepartmentChange={handleDepartmentChange}
               loadingDepartments={loadingDepartments}
               loadingNumbers={loadingNumbers}
+              selectedDepartmentId={selectedDepartmentId}
+              selectedFromNumber={selectedFromNumber}
+              onSetSelectedFromNumber={setSelectedFromNumber}
             />
           </DialogContent>
         </Dialog>
