@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForward, Circle, ScreenShare, ZapOff } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, ScreenShare, ZapOff } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
 import type { User } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { useToast } from '@/hooks/use-toast';
 import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { cn } from '@/lib/utils';
 
 interface ActiveCallBarProps {
   isOpen: boolean;
@@ -142,7 +143,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                 <ActionButton icon={ZapOff} label="AI Off" />
                 <ActionButton icon={isMuted ? MicOff : Mic} label="Mute" onClick={toggleMute} isActive={isMuted} />
                 <ActionButton icon={isOnHold ? Play : Pause} label="Hold" onClick={toggleHold} isActive={isOnHold} />
-                <ActionButton icon={PhoneForward} label="Transfer" />
+                <ActionButton icon={PhoneForwarded} label="Transfer" />
                 <div className="relative">
                     {isAdmin && <span className="absolute -top-2 right-1/2 translate-x-1/2 text-white bg-red-500 text-[10px] px-2 py-0.5 rounded-full">Admin</span>}
                     <ActionButton icon={Circle} label="Record" />
