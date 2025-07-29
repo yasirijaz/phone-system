@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 
 interface ActiveCallBarProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { ico
 
 export default function ActiveCallBar({ isOpen, contactName, onHangUp, connection }: ActiveCallBarProps) {
   const { user: authUser } = useAuth();
-  const { fromNumber } = useTwilio();
+  const { fromNumber, addParticipant } = useTwilio();
   const [duration, setDuration] = useState(0);
   const [selectedParticipant, setSelectedParticipant] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -44,6 +45,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
 
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
+  const [isAddParticipantModalOpen, setIsAddParticipantModalOpen] = useState(false);
 
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
@@ -100,16 +102,27 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     toast({ title: hold ? "Call on Hold" : "Call Resumed"});
   };
 
-  const handleAddParticipant = () => {
+  const handleAddParticipant = async () => {
     if (!selectedParticipant) {
       toast({ title: "Error", description: "Please select a user to add.", variant: 'destructive' });
       return;
     }
+    if (!connection || !conferenceSid || !fromNumber) {
+        toast({ title: "Error", description: "Cannot add participant. Active call session not found.", variant: 'destructive' });
+        return;
+    }
+
     setIsAdding(true);
-    // In a real scenario, you'd call your backend to add `client:{selectedParticipant}` to the conference.
-    console.log(`Adding user ${selectedParticipant} to the call...`);
-    toast({ title: "Success", description: "Participant added to the conference." });
-    setTimeout(() => setIsAdding(false), 1000);
+    try {
+        const to = `client:${selectedParticipant}`;
+        await addParticipant(conferenceSid, fromNumber, to);
+        toast({ title: "Success", description: "Participant added to the conference." });
+        setIsAddParticipantModalOpen(false);
+    } catch (err) {
+        toast({ title: "Error", description: "Failed to add participant.", variant: 'destructive' });
+    } finally {
+        setIsAdding(false);
+    }
   }
 
   const formatTime = (seconds: number) => {
@@ -148,7 +161,31 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                     <ActionButton icon={Circle} label="Record" />
                 </div>
                 <ActionButton icon={Grip} label="Keypad" />
-                <ActionButton icon={UserPlus} label="Add" />
+                <Dialog open={isAddParticipantModalOpen} onOpenChange={setIsAddParticipantModalOpen}>
+                    <DialogTrigger asChild>
+                         <ActionButton icon={UserPlus} label="Add" />
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Add Participant</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid grid-cols-[1fr,auto] items-center gap-2 py-4">
+                           <Select onValueChange={setSelectedParticipant} disabled={loadingUsers}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={loadingUsers ? 'Loading...' : 'Select a user'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {companyUsers.map(user => (
+                                        <SelectItem key={user.id} value={String(user.id)}>{user.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Button size="icon" onClick={handleAddParticipant} disabled={isAdding || !selectedParticipant}>
+                                <UserPlus className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             <Button size="lg" variant="destructive" className="rounded-full h-12" onClick={onHangUp}>
