@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, ScreenShare, ZapOff } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
 import type { User } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -140,7 +140,6 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
             </div>
 
             <div className="flex items-center gap-4">
-                <ActionButton icon={ZapOff} label="AI Off" />
                 <ActionButton icon={isMuted ? MicOff : Mic} label="Mute" onClick={toggleMute} isActive={isMuted} />
                 <ActionButton icon={isOnHold ? Play : Pause} label="Hold" onClick={toggleHold} isActive={isOnHold} />
                 <ActionButton icon={PhoneForwarded} label="Transfer" />
@@ -150,7 +149,6 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                 </div>
                 <ActionButton icon={Grip} label="Keypad" />
                 <ActionButton icon={UserPlus} label="Add" />
-                <ActionButton icon={ScreenShare} label="Share" />
             </div>
 
             <Button size="lg" variant="destructive" className="rounded-full h-12" onClick={onHangUp}>
