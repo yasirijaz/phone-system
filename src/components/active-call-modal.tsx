@@ -147,7 +147,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                     <AvatarFallback>{contactInitial}</AvatarFallback>
                 </Avatar>
                 <div>
-                    <p className="font-semibold text-lg">{contactName}</p>
+                    <p className="font-semibold text-lg truncate max-w-xs">{contactName}</p>
                     <p className="text-sm text-muted-foreground">{fromNumber} &bull; {formatTime(duration)}</p>
                 </div>
             </div>
