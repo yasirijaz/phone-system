@@ -228,7 +228,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     reservation.conference({
       conferenceStatusCallback: conferenceCallback,
       conferenceStatusCallbackMethod: 'POST',
-      conferenceStatusCallbackEvent: ['start', 'end', 'join', 'leave'],
+      conferenceStatusCallbackEvent: 'start end join leave',
       conferenceRecord: 'true',
       endConferenceOnExit: true,
       startConferenceOnEnter: true
