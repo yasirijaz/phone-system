@@ -3,10 +3,7 @@
 
 import { useTwilio } from '@/context/TwilioContext';
 import IncomingCallModal from '@/components/incoming-call-modal';
-import ActiveCallModal from '@/components/active-call-modal';
-import { Button } from '@/components/ui/button';
-import { Phone, UserCheck, Zap } from 'lucide-react';
-import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import ActiveCallBar from '@/components/active-call-modal';
 import { useAuth } from '@/context/AuthContext';
 import ReservationModal from '@/components/reservation-modal';
 
@@ -44,7 +41,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         onAccept={acceptCall}
         onReject={rejectCall}
       />
-       <ActiveCallModal
+       <ActiveCallBar
         isOpen={!!isActiveCall}
         contactName={activeCallContact}
         onHangUp={hangUp}
