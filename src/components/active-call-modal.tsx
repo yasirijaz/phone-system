@@ -14,7 +14,7 @@ import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from './ui/dialog';
-import { allParticipant, removeParticipant } from '@/services/twilioService';
+import { allParticipant, removeParticipant, addParticipant } from '@/services/twilioService';
 
 interface ActiveCallBarProps {
   isOpen: boolean;
@@ -36,7 +36,7 @@ const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { ico
 
 export default function ActiveCallBar({ isOpen, contactName, onHangUp, connection, conferenceSid }: ActiveCallBarProps) {
   const { user: authUser } = useAuth();
-  const { fromNumber, addParticipant } = useTwilio();
+  const { fromNumber } = useTwilio();
   const [duration, setDuration] = useState(0);
   const [selectedParticipant, setSelectedParticipant] = useState('');
   const [isAdding, setIsAdding] = useState(false);

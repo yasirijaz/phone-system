@@ -8,8 +8,6 @@ import type { Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
 import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { addParticipant as addParticipantService } from '@/services/twilioService';
-
 
 interface TwilioContextType {
   device: Device | null;
@@ -30,7 +28,6 @@ interface TwilioContextType {
   acceptReservation: (reservation: Reservation) => void;
   rejectReservation: (reservation: Reservation) => void;
   completeReservation: (reservation: Reservation) => void;
-  addParticipant: (conferenceSid: string, from: string, userId: string) => Promise<void>;
 }
 
 const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
@@ -106,13 +103,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       const handleIncomingCall = (conn: Call) => {
         console.log('Incoming call received:', conn);
         setConnection(conn);
-
-        if (conn.customParameters.get('conferenceSid')) {
-            setConferenceSid(conn.customParameters.get('conferenceSid'));
-        }
-        if (conn.customParameters.get('fromNumber')) {
-            setFromNumber(conn.customParameters.get('fromNumber'));
-        }
 
         conn.on('disconnect', () => {
           console.log('Call disconnected.');
@@ -226,7 +216,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const acceptReservation = (reservation: Reservation) => {
     console.log('accepting reservation', reservation);
 
-    const conferenceCallback = 'https://callsync-backend-e56580f83a48.herokuapp.com/api/twilio/conference-callback';
+    const conferenceCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL+'/api/twilio/conference-callback';
 
     reservation.conference({
       conferenceStatusCallback: conferenceCallback,
@@ -246,10 +236,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const completeReservation = (reservation: Reservation) => {
     console.log('completing reservation', reservation)
     reservation.complete();
-  };
-
-  const addParticipant = async (conferenceSid: string, from: string, userId: string) => {
-    await addParticipantService(conferenceSid, from, `client:${userId}`);
   };
 
   useEffect(() => {
@@ -280,8 +266,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     hangUp,
     acceptReservation,
     rejectReservation,
-    completeReservation,
-    addParticipant
+    completeReservation
   };
 
   return <TwilioContext.Provider value={value}>{children}</TwilioContext.Provider>;
