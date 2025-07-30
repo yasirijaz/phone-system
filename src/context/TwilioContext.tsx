@@ -225,7 +225,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       conferenceRecord: true,
       endConferenceOnExit: true,
       startConferenceOnEnter: true,
-      transcribe: true
+      transcribe: false
     });
   };
 
