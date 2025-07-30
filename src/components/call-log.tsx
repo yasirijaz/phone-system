@@ -13,12 +13,15 @@ interface CallLogProps {
 }
 
 function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (number: string) => void, isClickable: boolean }) {
-  const fromName = call.from_name?.name || call.from;
-  const toName = call.to_name?.name || call.to;
+  console.log("Rendering CallCard for call:", call);
+  const fromName = call.from_name?.name || call.user?.name || call.from;
+  const toName = call.to_name?.name || call.user?.name || call.to;
 
   const receivedByName = call.user?.name ?? 'Unassigned';
-  
-  const contactName = call.direction === 'inbound' ? fromName : toName;
+  const contactName = call.direction === 'inbound' 
+                        ? (call.from_name?.name || call.user?.name || call.from) 
+                        : (call.to_name?.name || call.user?.name || call.to);
+                        
   const contactInitial = contactName ? contactName.charAt(0).toUpperCase() : '?';
 
   const isMissed = call.call_status === 'missed' || call.call_status === 'no-answer' || call.call_status === 'busy' || call.call_status === 'canceled';
