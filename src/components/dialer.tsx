@@ -6,8 +6,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Phone, Delete } from "lucide-react";
-import type { Department, PhoneNumber } from '@/types';
+import type { Department, PhoneNumber, Contact } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { ScrollArea } from './ui/scroll-area';
 
 interface DialerProps {
     onMakeCall: (number: string, fromNumber?: string) => void;
@@ -23,6 +24,7 @@ interface DialerProps {
     selectedDepartmentId: string;
     selectedFromNumber: string;
     onSetSelectedFromNumber: (fromNumber: string) => void;
+    contacts: Contact[];
 }
 
 export default function Dialer({ 
@@ -39,8 +41,10 @@ export default function Dialer({
     selectedDepartmentId,
     selectedFromNumber,
     onSetSelectedFromNumber,
+    contacts = [],
 }: DialerProps) {
     const [number, setNumber] = useState('');
+    const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
     
     useEffect(() => {
         if (initialValue) {
@@ -83,6 +87,21 @@ export default function Dialer({
     
     const handleNumberChange = (value: string) => {
         setNumber(formatPhoneNumber(value));
+         if (value.length > 2) {
+            const searchTerm = value.toLowerCase();
+            const matchingContacts = contacts.filter(contact => 
+                contact.name.toLowerCase().includes(searchTerm) ||
+                contact.phone_no.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, ''))
+            );
+            setFilteredContacts(matchingContacts);
+        } else {
+            setFilteredContacts([]);
+        }
+    };
+    
+    const handleContactSelect = (contact: Contact) => {
+        setNumber(formatPhoneNumber(contact.phone_no));
+        setFilteredContacts([]);
     };
 
 
@@ -163,6 +182,18 @@ export default function Dialer({
                             <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={handleBackspace}>
                                 <Delete className="h-4 w-4"/>
                             </Button>
+                        )}
+                         {filteredContacts.length > 0 && (
+                            <div className="absolute z-10 w-full bg-background border rounded-md mt-1 max-h-48 overflow-y-auto">
+                                <ScrollArea>
+                                {filteredContacts.map(contact => (
+                                    <div key={contact.id} onClick={() => handleContactSelect(contact)} className="p-2 hover:bg-accent cursor-pointer">
+                                        <p className="font-semibold">{contact.name}</p>
+                                        <p className="text-sm text-muted-foreground">{contact.phone_no}</p>
+                                    </div>
+                                ))}
+                                </ScrollArea>
+                            </div>
                         )}
                     </div>
                     <div className="grid grid-cols-3 gap-2">

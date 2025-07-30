@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Call, Department, PhoneNumber } from "@/types";
+import type { Call, Department, PhoneNumber, Contact } from "@/types";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/AuthContext";
@@ -31,6 +31,7 @@ import { getPhoneNumbers } from "@/services/phoneNumberService";
 import { useToast } from "@/hooks/use-toast";
 import HardwareSettings from "@/components/hardware-settings";
 import { getCallLogs } from "@/services/callLogService";
+import { getContacts } from '@/services/contactService';
 import CallLog from "@/components/call-log";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InAppSidebar } from "@/components/in-app-sidebar";
@@ -55,6 +56,8 @@ export default function AppUIPage() {
   const [allCalls, setAllCalls] = useState<Call[]>([]);
   const [unreadCalls, setUnreadCalls] = useState<Call[]>([]);
   const [loadingCalls, setLoadingCalls] = useState(true);
+  
+  const [contacts, setContacts] = useState<Contact[]>([]);
 
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerInitialValue, setDialerInitialValue] = useState('');
@@ -118,16 +121,18 @@ export default function AppUIPage() {
         setLoadingCalls(true);
         try {
             const isAdmin = user.role_id === 1 || user.role_id === 2;
-            const [fetchedDepts, allCallLogs] = await Promise.all([
+            const [fetchedDepts, allCallLogs, fetchedContacts] = await Promise.all([
                 isAdmin && user.company_id
                     ? getDepartments(user.company_id)
                     : getUserDepartments(user.id),
                 getCallLogs(),
+                user.company_id ? getContacts(user.company_id) : Promise.resolve([])
             ]);
 
             const callsData = Array.isArray(allCallLogs) ? allCallLogs : [];
             const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
             setDepartments(depts);
+            setContacts(Array.isArray(fetchedContacts) ? fetchedContacts : []);
             
             if (depts.length > 0) {
                 // Automatically trigger fetching numbers for the first department
@@ -209,6 +214,7 @@ export default function AppUIPage() {
                               selectedDepartmentId={selectedDepartmentId}
                               selectedFromNumber={selectedFromNumber}
                               onSetSelectedFromNumber={setSelectedFromNumber}
+                              contacts={contacts}
                            >
                              <Button variant="ghost" size="icon" onClick={() => { setDialerInitialValue(''); setDialerOpen(true);}}><Phone className="h-5 w-5" /></Button>
                            </Dialer>
