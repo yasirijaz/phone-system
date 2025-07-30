@@ -222,9 +222,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       conferenceStatusCallback: conferenceCallback,
       conferenceStatusCallbackMethod: 'POST',
       conferenceStatusCallbackEvent: 'start end join leave',
-      conferenceRecord: 'true',
+      conferenceRecord: true,
       endConferenceOnExit: true,
-      startConferenceOnEnter: true
+      startConferenceOnEnter: true,
+      transcribe: true
     });
   };
 
