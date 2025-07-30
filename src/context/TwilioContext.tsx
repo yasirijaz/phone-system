@@ -8,6 +8,8 @@ import type { Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
 import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { addParticipant as addParticipantService } from '@/services/twilioService';
+
 
 interface TwilioContextType {
   device: Device | null;
@@ -28,6 +30,7 @@ interface TwilioContextType {
   acceptReservation: (reservation: Reservation) => void;
   rejectReservation: (reservation: Reservation) => void;
   completeReservation: (reservation: Reservation) => void;
+  addParticipant: (conferenceSid: string, from: string, userId: string) => Promise<void>;
 }
 
 const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
@@ -245,6 +248,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     reservation.complete();
   };
 
+  const addParticipant = async (conferenceSid: string, from: string, userId: string) => {
+    await addParticipantService(conferenceSid, from, `client:${userId}`);
+  };
+
   useEffect(() => {
     const currentDevice = deviceRef.current;
     const currentWorker = workerRef.current;
@@ -273,7 +280,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     hangUp,
     acceptReservation,
     rejectReservation,
-    completeReservation
+    completeReservation,
+    addParticipant
   };
 
   return <TwilioContext.Provider value={value}>{children}</TwilioContext.Provider>;

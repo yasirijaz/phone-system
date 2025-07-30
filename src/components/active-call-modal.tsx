@@ -91,7 +91,8 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
       if (!conferenceSid) return;
       try {
         const response = await allParticipant(conferenceSid);
-        setCurrentParticipants(response.participants || []);
+        const participantList = Array.isArray(response?.data) ? response.data : [];
+        setCurrentParticipants(participantList);
       } catch (error) {
         toast({ title: "Error", description: "Could not fetch participants.", variant: 'destructive' });
       }
@@ -135,7 +136,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
         toast({ title: "Success", description: "Participant added to the conference." });
         setIsAddParticipantModalOpen(false);
     } catch (err) {
-        toast({ title: "Error", description: "Failed to add participant.", variant: 'destructive' });
+       toast({ title: "Error", description: "Failed to add participant.", variant: 'destructive' });
     } finally {
         setIsAdding(false);
     }
