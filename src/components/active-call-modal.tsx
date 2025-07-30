@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from './ui/dialog';
 import { allParticipant, removeParticipant, addParticipant } from '@/services/twilioService';
+import { getCallLogsBySid } from '@/services/callLogService';
 
 interface ActiveCallBarProps {
   isOpen: boolean;
@@ -43,13 +44,37 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   const [companyUsers, setCompanyUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const { toast } = useToast();
-
+  const [displayName, setDisplayName] = useState(contactName);
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
   const [isAddParticipantModalOpen, setIsAddParticipantModalOpen] = useState(false);
   const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
   const [currentParticipants, setCurrentParticipants] = useState<any[]>([]);
 
+   useEffect(() => {
+    if (isOpen && contactName.startsWith('client:')) {
+      console.log("Fetching user name for active call:", contactName);
+      const fetchUserName = async () => {
+        try {
+          const currentCallSid = connection?.parameters?.CallSid || '';
+          const matchingCall = await getCallLogsBySid(currentCallSid);
+          console.log("Matching call:", matchingCall);
+          if (matchingCall?.user?.name) {
+            setDisplayName(matchingCall.user.name);
+          } else {
+            setDisplayName(contactName);
+          }
+        } catch (error) {
+          console.error("Could not fetch user name for active call", error);
+          setDisplayName(contactName); // Fallback to original name
+        }
+      };
+      fetchUserName();
+    } else {
+        setDisplayName(contactName);
+    }
+  }, [isOpen, contactName, connection]);
+  
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
 
@@ -160,7 +185,9 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     return `${mins}:${secs}`;
   };
 
-  const contactInitial = contactName ? contactName.charAt(0).toUpperCase() : '?';
+  // const contactInitial = contactName ? contactName.charAt(0).toUpperCase() : '?';
+   const contactInitial = displayName ? displayName.charAt(0).toUpperCase() : '?';
+
 
   if (!isOpen) {
     return null;
@@ -176,8 +203,8 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                     <AvatarFallback>{contactInitial}</AvatarFallback>
                 </Avatar>
                 <div>
-                    <p className="font-semibold text-lg truncate max-w-[200px]">{contactName}</p>
-                    <p className="text-sm text-muted-foreground">{fromNumber} &bull; {formatTime(duration)}</p>
+                    <p className="font-semibold text-lg truncate max-w-[200px]">{fromNumber}</p>
+                    <p className="text-sm text-muted-foreground">{displayName} &bull; {formatTime(duration)}</p>
                 </div>
             </div>
 

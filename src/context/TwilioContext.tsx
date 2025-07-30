@@ -156,7 +156,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setTimeout(() => {
             const attributes = reservation.task?.attributes;
             const confSid = attributes?.conference?.sid;
-            const fromNum = attributes?.from;
+            const fromNum = attributes.contact_name || attributes?.from;
             console.log('Extracted conference SID:', confSid);
             console.log('Extracted from number:', fromNum);
 
