@@ -33,7 +33,7 @@ const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { ico
 );
 
 
-export default function ActiveCallBar({ isOpen, contactName, onHangUp, connection }: ActiveCallBarProps) {
+export default function ActiveCallBar({ isOpen, contactName, onHangUp, connection, conferenceSid }: ActiveCallBarProps) {
   const { user: authUser } = useAuth();
   const { fromNumber, addParticipant } = useTwilio();
   const [duration, setDuration] = useState(0);
@@ -147,7 +147,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                     <AvatarFallback>{contactInitial}</AvatarFallback>
                 </Avatar>
                 <div>
-                    <p className="font-semibold text-lg truncate max-w-xs">{contactName}</p>
+                    <p className="font-semibold text-lg truncate max-w-[200px]">{contactName}</p>
                     <p className="text-sm text-muted-foreground">{fromNumber} &bull; {formatTime(duration)}</p>
                 </div>
             </div>
