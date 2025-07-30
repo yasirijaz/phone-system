@@ -7,6 +7,20 @@ export const getCallLogs = async (): Promise<Call[]> => {
   return response.data.call_logs;
 };
 
+// Fetch call logs with callSid
+export const getCallLogsBySid = async (callSid: string): Promise<Call | null> => {
+  try {
+    const response = await axios.get(`/api/call-logs/${callSid}`);
+    return response.data.call_log || null;
+  } catch (error) {
+    console.error('Error fetching call log by SID:', error);
+    return null;
+  }
+};
+
+
+
+
 export const getUnreadCallLogs = async (): Promise<Call[]> => {
   const response = await axios.get('/api/call-logs/unread');
   return response.data.call_logs;
