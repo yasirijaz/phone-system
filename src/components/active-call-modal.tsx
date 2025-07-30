@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, Users, Trash2 } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
 import type { User } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -13,7 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from './ui/dialog';
+import { allParticipant, removeParticipant } from '@/services/twilioService';
 
 interface ActiveCallBarProps {
   isOpen: boolean;
@@ -46,6 +47,8 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
   const [isAddParticipantModalOpen, setIsAddParticipantModalOpen] = useState(false);
+  const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
+  const [currentParticipants, setCurrentParticipants] = useState<any[]>([]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
@@ -83,6 +86,23 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
       connection?.removeListener('mute', handleMute);
     };
   }, [isOpen, connection, authUser, toast]);
+  
+  const fetchParticipants = async () => {
+      if (!conferenceSid) return;
+      try {
+        const response = await allParticipant(conferenceSid);
+        setCurrentParticipants(response.participants || []);
+      } catch (error) {
+        toast({ title: "Error", description: "Could not fetch participants.", variant: 'destructive' });
+      }
+    };
+
+
+  useEffect(() => {
+      if (isParticipantsModalOpen) {
+          fetchParticipants();
+      }
+  }, [isParticipantsModalOpen, conferenceSid]);
 
   const toggleMute = () => {
     if (connection) {
@@ -95,9 +115,6 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   const toggleHold = async () => {
     if (!connection) return;
     const hold = !isOnHold;
-    // Note: Twilio Voice JS SDK v2 does not have a direct `call.hold()` method.
-    // This requires backend logic via the Conference API, which is not fully implemented here.
-    // This is a placeholder for the visual state change.
     setIsOnHold(hold);
     toast({ title: hold ? "Call on Hold" : "Call Resumed"});
   };
@@ -114,8 +131,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
 
     setIsAdding(true);
     try {
-        const to = `client:${selectedParticipant}`;
-        await addParticipant(conferenceSid, fromNumber, to);
+        await addParticipant(conferenceSid, fromNumber, selectedParticipant);
         toast({ title: "Success", description: "Participant added to the conference." });
         setIsAddParticipantModalOpen(false);
     } catch (err) {
@@ -124,6 +140,18 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
         setIsAdding(false);
     }
   }
+  
+   const handleRemoveParticipant = async (callSid: string) => {
+    if (!conferenceSid) return;
+    try {
+      await removeParticipant(conferenceSid, callSid);
+      toast({ title: "Success", description: "Participant removed." });
+      fetchParticipants(); // Refresh list
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to remove participant.", variant: 'destructive' });
+    }
+  };
+
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -183,6 +211,29 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                             <Button size="icon" onClick={handleAddParticipant} disabled={isAdding || !selectedParticipant}>
                                 <UserPlus className="h-4 w-4" />
                             </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+                <Dialog open={isParticipantsModalOpen} onOpenChange={setIsParticipantsModalOpen}>
+                    <DialogTrigger asChild>
+                        <ActionButton icon={Users} label="View" />
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Conference Participants</DialogTitle>
+                            <DialogDescription>
+                                {currentParticipants.length > 0 ? `${currentParticipants.length} participant(s) in the call.` : 'Just you for now.'}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4 space-y-2">
+                            {currentParticipants.map((p) => (
+                                <div key={p.call_sid} className="flex items-center justify-between p-2 rounded-md border">
+                                    <span>{p.label || p.call_sid}</span>
+                                    <Button variant="ghost" size="icon" onClick={() => handleRemoveParticipant(p.call_sid)}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                </div>
+                            ))}
                         </div>
                     </DialogContent>
                 </Dialog>
