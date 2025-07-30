@@ -2,7 +2,7 @@
 'use client';
 
 import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup } from '@/components/ui/sidebar';
-import { Hash, Inbox, MessageSquare, Users } from 'lucide-react';
+import { Hash, Inbox, LayoutGrid, MessageSquare, Users } from 'lucide-react';
 import { Logo } from './icons';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -24,6 +24,14 @@ export function InAppSidebar() {
       <SidebarContent>
         <SidebarGroup>
             <SidebarMenu>
+                <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard')}>
+                        <Link href="/dashboard/ecommerce">
+                            <LayoutGrid />
+                            <span>Dashboard</span>
+                        </Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname === '/app'}>
                         <Link href="/app">
