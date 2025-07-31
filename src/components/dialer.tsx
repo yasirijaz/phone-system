@@ -100,6 +100,8 @@ export default function Dialer({
 
     const handleCall = () => {
         const cleanedNumber = number.replace(/\D/g, '');
+        console.log("Making call to:", cleanedNumber);
+        console.log("From number:", selectedFromNumber);
         if (cleanedNumber) {
             onMakeCall(`+1${cleanedNumber}`, selectedFromNumber);
         }

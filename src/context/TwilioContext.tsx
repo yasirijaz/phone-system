@@ -72,9 +72,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     try {
       const tokenRes = await axios.post('/api/twilio/token');
       const token = tokenRes.data.data.token;
-      
+
       if (typeof token !== 'string') throw new Error('Invalid token format received from server.');
-      
+
       const newDevice = new twilio.Device(token, {
         closeExistingSessions: true,
         codecPreferences: ['opus', 'pcmu'],
@@ -84,8 +84,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       deviceRef.current = newDevice;
 
       newDevice.on('registered', () => {
-          console.log('Twilio Device registered');
-          setIsDeviceReady(true);
+        console.log('Twilio Device registered');
+        setIsDeviceReady(true);
       });
 
       newDevice.on('unregistered', () => {
@@ -99,7 +99,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         setError(`Device Error: ${err.message}`);
         setIsDeviceReady(false);
       });
-      
+
       const handleIncomingCall = (conn: Call) => {
         console.log('Incoming call received:', conn);
         setConnection(conn);
@@ -118,7 +118,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setFromNumber(null);
         });
       };
-      
+
       newDevice.on('incoming', handleIncomingCall);
 
       newDevice.on('connect', (conn: Call) => {
@@ -132,22 +132,41 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         setConferenceSid(null);
         setFromNumber(null);
       });
-      
+
       await newDevice.register();
 
       const newWorker = new twilio.Worker(token);
       workerRef.current = newWorker;
 
       newWorker.on('ready', (worker: TwilioWorker) => {
-          console.log(`Worker ${worker.sid} is ready`);
-          setIsWorkerReady(true);
+        console.log(`Worker ${worker.sid} is ready`);
+        setIsWorkerReady(true);
       });
 
       newWorker.on('reservationCreated', (reservation: Reservation) => {
         console.log('Reservation created:', reservation);
         setIncomingReservation(reservation);
         setShowReservationModal(true);
-        
+
+        const attributes = reservation.task?.attributes;
+        if (attributes.do_nothing) {
+          console.log('Reservation is set to do nothing.');
+          if (attributes.do_nothing) {
+            console.log('Reservation is set to do nothing.');
+            const outgoing = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/outgoing-callback';
+
+            reservation.call(
+              attributes.from,
+              outgoing,
+              {
+                accept: true,
+                statusCallbackUrl: process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/call-status',
+                to: attributes.to,
+              }
+            )
+          }
+          return;
+        }
         reservation.on('accepted', () => {
           console.log('Reservation accepted.');
           setIncomingReservation(null);
@@ -167,8 +186,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         });
 
         const clearReservation = () => {
-            setIncomingReservation(null);
-            setShowReservationModal(false);
+          setIncomingReservation(null);
+          setShowReservationModal(false);
         };
 
         reservation.on('rescinded', () => { console.log('Reservation rescinded'); clearReservation(); });
@@ -185,21 +204,21 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       setIsConnecting(false);
     }
   }, [twilio, user, isConnecting, toast]);
-  
+
   const acceptCall = () => {
     if (connection) {
-        console.log(`Accepting call`);
-        connection.accept();
-        toast({ title: "Call Accepted" });
+      console.log(`Accepting call`);
+      connection.accept();
+      toast({ title: "Call Accepted" });
     }
   }
 
   const rejectCall = () => {
     if (connection) {
-        console.log(`Rejecting call`);
-        connection.reject();
-        toast({ title: "Call Rejected" });
-        setConnection(null);
+      console.log(`Rejecting call`);
+      connection.reject();
+      toast({ title: "Call Rejected" });
+      setConnection(null);
     }
   };
 
@@ -215,8 +234,22 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const acceptReservation = (reservation: Reservation) => {
     console.log('accepting reservation', reservation);
+    const attributes = reservation.task?.attributes;
+    if (attributes.do_nothing) {
+      console.log('Reservation is set to do nothing.');
+      const outgoing = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/outgoing-callback';
 
-    const conferenceCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL+'/api/twilio/conference-callback';
+      reservation.call(
+        attributes.from,
+        outgoing,
+        {
+          accept: true,
+          statusCallbackUrl: process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/call-status',
+          to: attributes.to,
+        }
+      )
+    }
+    const conferenceCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/conference-callback';
 
     reservation.conference({
       conferenceStatusCallback: conferenceCallback,
