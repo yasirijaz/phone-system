@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useRouter } from "next/navigation";
+import AppHeader from "@/components/app-header";
 
 const businessHoursSchema = z.object({
   day: z.string(),
@@ -50,7 +51,7 @@ const settingsSchema = z.object({
 });
 
 export default function SettingsPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,11 +161,9 @@ export default function SettingsPage() {
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger />
-              <h1 className="text-xl font-bold">Company Settings</h1>
-            </div>
+          <AppHeader user={user} logout={logout} />
+          <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
+            <h1 className="text-xl font-bold">Company Settings</h1>
              <Button type="submit" form="settings-form">Save Changes</Button>
           </header>
 

@@ -22,6 +22,7 @@ import Link from 'next/link';
 import { ArrowLeft, PlusCircle, Edit, Trash2 } from "lucide-react";
 import type { PhoneNumber } from "@/types";
 import { getPhoneNumbers, createPhoneNumber, updatePhoneNumber, deletePhoneNumber } from "@/services/phoneNumberService";
+import AppHeader from "@/components/app-header";
 
 const phoneNumberSchema = z.object({
   phone_no: z.string().min(10, "Phone number is required."),
@@ -30,7 +31,7 @@ const phoneNumberSchema = z.object({
 });
 
 export default function PhoneNumbersPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const params = useParams();
   const departmentId = Number(params.departmentId);
@@ -119,9 +120,9 @@ export default function PhoneNumbersPage() {
       <Sidebar><SidebarContent><AppSidebar /></SidebarContent></Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
+            <AppHeader user={user} logout={logout} />
+          <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
             <div className="flex items-center gap-4">
-              <SidebarTrigger />
                <Button variant="ghost" size="icon" asChild>
                 <Link href="/departments"><ArrowLeft /></Link>
               </Button>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -21,6 +22,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Loader2, Check, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import AppHeader from "@/components/app-header";
 
 const featureList = [
   "Unlimited call logging",
@@ -31,7 +33,7 @@ const featureList = [
 ];
 
 export default function BillingPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const [subscription, setSubscription] = useState<any>(null);
   const [packages, setPackages] = useState<Package[]>([]);
@@ -187,11 +189,9 @@ export default function BillingPage() {
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger />
-              <h1 className="text-xl font-bold">Billing & Subscription</h1>
-            </div>
+          <AppHeader user={user} logout={logout} />
+          <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
+            <h1 className="text-xl font-bold">Billing & Subscription</h1>
           </header>
 
           <main className="flex-1 p-4 md:p-8 bg-muted/40">

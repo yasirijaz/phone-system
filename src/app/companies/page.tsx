@@ -21,6 +21,7 @@ import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger 
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from 'next/navigation';
 import { Badge } from "@/components/ui/badge";
+import AppHeader from "@/components/app-header";
 
 const companySchema = z.object({
   name: z.string().min(2, "Company name must be at least 2 characters."),
@@ -29,7 +30,7 @@ const companySchema = z.object({
 });
 
 export default function CompaniesPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const [companiesResponse, setCompaniesResponse] = useState<PaginatedResponse<Company> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -173,11 +174,9 @@ export default function CompaniesPage() {
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger />
-              <h1 className="text-xl font-bold">Companies</h1>
-            </div>
+          <AppHeader user={user} logout={logout} pageTitle="Companies" />
+          <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
+            <h1 className="text-xl font-bold">Companies</h1>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => handleDialogOpen()} className="bg-primary hover:bg-primary/90 text-primary-foreground">

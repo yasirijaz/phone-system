@@ -22,6 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import AppHeader from "@/components/app-header";
 
 const assignmentSchema = z.object({
   user_id: z.coerce.number({ required_error: "User is required." }).min(1, "User is required."),
@@ -30,7 +31,7 @@ const assignmentSchema = z.object({
 export default function DepartmentUsersPage() {
   const router = useRouter();
   const params = useParams();
-  const { user: authUser } = useAuth();
+  const { user: authUser, logout } = useAuth();
   const departmentId = Number(params.departmentId);
   const companyId = authUser?.company_id;
 
@@ -109,9 +110,9 @@ export default function DepartmentUsersPage() {
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
+            <AppHeader user={authUser} logout={logout} />
+          <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
             <div className="flex items-center gap-4">
-              <SidebarTrigger />
               <div className="flex items-center gap-2">
                  <Button variant="ghost" size="icon" asChild>
                     <Link href="/departments">

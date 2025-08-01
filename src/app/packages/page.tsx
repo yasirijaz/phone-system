@@ -1,4 +1,4 @@
-  
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -23,6 +23,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from 'next/navigation';
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import AppHeader from "@/components/app-header";
 
 const packageSchema = z.object({
   title: z.string().min(2, "Package name must be at least 2 characters."),
@@ -34,7 +35,7 @@ const packageSchema = z.object({
 });
 
 export default function PackagesPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,11 +141,9 @@ export default function PackagesPage() {
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger />
-              <h1 className="text-xl font-bold">Manage Packages</h1>
-            </div>
+            <AppHeader user={user} logout={logout} />
+          <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
+            <h1 className="text-xl font-bold">Manage Packages</h1>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => handleDialogOpen()}>

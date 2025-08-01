@@ -25,7 +25,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-
+import AppHeader from "@/components/app-header";
 
 const userSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -39,7 +39,7 @@ const assignmentSchema = z.object({
 });
 
 export default function ManageUsersPage() {
-  const { user: authUser } = useAuth();
+  const { user: authUser, logout } = useAuth();
   const router = useRouter();
   const params = useParams();
   const companyId = Number(params.companyId);
@@ -150,9 +150,13 @@ export default function ManageUsersPage() {
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
+          <AppHeader 
+              user={authUser} 
+              logout={logout} 
+              pageTitle={`Manage Users for ${company?.name || '...'}`}
+          />
+          <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
             <div className="flex items-center gap-4">
-              <SidebarTrigger />
               <div className="flex items-center gap-2">
                  <Button variant="ghost" size="icon" asChild>
                     <Link href="/companies">
@@ -324,5 +328,3 @@ export default function ManageUsersPage() {
     </SidebarProvider>
   );
 }
-
-    
