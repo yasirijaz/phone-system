@@ -13,6 +13,7 @@ import LogCallForm from '@/components/log-call-form';
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import IncomingCallModal from '@/components/incoming-call-modal';
+import ActiveCallBar from '@/components/active-call-modal';
 import { useTwilio } from '@/context/TwilioContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/context/AuthContext';
@@ -28,10 +29,11 @@ import NewMessageForm from '@/components/new-message-form';
 import HardwareSettings from '@/components/hardware-settings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import TwilioStatusIndicator from '@/components/twilio-status-indicator';
+import type { Call as TCall } from '@twilio/voice-sdk';
 
 const INITIAL_CALLS: Partial<Call>[] = [
   {
-    id: '1',
+    id: 1,
     from: 'John Doe',
     to: 'Me',
     created_at: '2024-07-23T10:00:00',
@@ -41,7 +43,7 @@ const INITIAL_CALLS: Partial<Call>[] = [
     category: 'Sales',
   },
   {
-    id: '2',
+    id: 2,
     from: 'Me',
     to: 'Jane Smith',
     created_at: '2024-07-23T11:30:00',
@@ -50,8 +52,8 @@ const INITIAL_CALLS: Partial<Call>[] = [
     notes: 'Followed up on support ticket #12345. Issue resolved by clearing browser cache.',
     category: 'Support',
   },
-    {
-    id: '3',
+  {
+    id: 3,
     from: 'Alice Johnson',
     to: 'Me',
     created_at: '2024-06-15T14:00:00',
@@ -61,7 +63,7 @@ const INITIAL_CALLS: Partial<Call>[] = [
     category: 'Sales',
   },
   {
-    id: '4',
+    id: 4,
     from: 'Mom',
     to: 'Me',
     created_at: '2024-05-22T18:45:00',
@@ -69,28 +71,7 @@ const INITIAL_CALLS: Partial<Call>[] = [
     direction: 'inbound',
     notes: 'Called to see how I was doing and talked about weekend plans.',
     category: 'Personal',
-  },
-    {
-    id: '5',
-    from: 'Me',
-    to: 'Tech Support',
-    created_at: '2024-07-21T09:15:00',
-    duration: "45",
-    direction: 'outbound',
-    notes: 'Called about the internet outage. They are working on it, ETA 2 hours.',
-    category: 'Support',
-  },
-  { id: '6', from: 'Bob Brown', to: 'Me', created_at: '2024-01-10T10:00:00', duration: "20", direction: 'inbound', category: 'Sales' },
-  { id: '7', from: 'Me', to: 'Charlie Green', created_at: '2024-02-12T11:30:00', duration: "10", direction: 'outbound', category: 'Support' },
-  { id: '8', from: 'David Black', to: 'Me', created_at: '2024-03-14T14:00:00', duration: "40", direction: 'inbound', category: 'Sales' },
-  { id: '9', from: 'Eve White', to: 'Me', created_at: '2024-04-16T18:45:00', duration: "5", direction: 'inbound', category: 'Personal' },
-  { id: '10', from: 'Me', to: 'Frank Blue', created_at: '2024-05-18T09:15:00', duration: "50", direction: 'outbound', category: 'Support' },
-  { id: '11', from: 'Grace Pink', to: 'Me', created_at: '2024-06-20T10:00:00', duration: "12", direction: 'inbound', category: 'Sales' },
-  { id: '12', from: 'Me', to: 'Harry Yellow', created_at: '2024-08-24T11:30:00', duration: "8", direction: 'outbound', category: 'Support' },
-  { id: '13', from: 'Ivy Orange', to: 'Me', created_at: '2024-09-26T14:00:00', duration: "35", direction: 'inbound', category: 'Sales' },
-  { id: '14', from: 'Jack Purple', to: 'Me', created_at: '2024-10-28T18:45:00', duration: "18", direction: 'inbound', category: 'Personal' },
-  { id: '15', from: 'Me', to: 'Kate Silver', created_at: '2024-11-30T09:15:00', duration: "60", direction: 'outbound', category: 'Support' },
-  { id: '16', from: 'Leo Gold', to: 'Me', created_at: '2024-12-01T10:00:00', duration: "22", direction: 'inbound', category: 'Sales' },
+  }
 ];
 
 const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: string, value: string, icon: React.ElementType, trend: string, trendType: 'up' | 'down' }) => (
@@ -264,6 +245,12 @@ export default function EcommerceDashboard() {
   const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
   const [selectedFromNumber, setSelectedFromNumber] = useState('');
 
+  //for outgoing calls
+  const [activeCall, setActiveCall] = useState<TCall | null>(null);
+  const [isActiveCallOpen, setIsActiveCallOpen] = useState(false);
+  const [activeContactName, setActiveContactName] = useState('');
+  const [activeConferenceSid, setActiveConferenceSid] = useState<string | null>(null);
+
   useEffect(() => {
     connectTwilio();
   }, [connectTwilio]);
@@ -336,7 +323,33 @@ export default function EcommerceDashboard() {
         if (fromNumber) {
             params.From = fromNumber;
         }
-        await device.connect({ params });
+        const connection = await device.connect({ params });
+
+        setActiveContactName(number);
+        setActiveCall(connection);
+        setIsActiveCallOpen(true);
+
+        connection.on('accept', () => {
+          console.log('Call accepted');
+        });
+
+        connection.on('disconnect', () => {
+          setIsActiveCallOpen(false);
+          setActiveCall(null);
+          setActiveConferenceSid(null);
+        });
+
+        connection.on('cancel', () => {
+          setIsActiveCallOpen(false);
+          setActiveCall(null);
+          setActiveConferenceSid(null);
+        });
+
+        connection.on('reject', () => {
+          setIsActiveCallOpen(false);
+          setActiveCall(null);
+          setActiveConferenceSid(null);
+        });
     } catch (error) {
         console.error("Error making call:", error);
         toast({ title: "Call Error", description: "Failed to make call. See console for details.", variant: 'destructive'});
@@ -459,6 +472,19 @@ export default function EcommerceDashboard() {
               callerNumber="+1 (555) 123-4567"
               onAccept={() => { console.log('Call accepted'); setShowIncomingCall(false); }}
               onReject={() => { console.log('Call rejected'); setShowIncomingCall(false); }}
+            />
+
+            <ActiveCallBar
+              isOpen={isActiveCallOpen}
+              contactName={activeContactName}
+              connection={activeCall}
+              conferenceSid={activeConferenceSid}
+              onHangUp={() => {
+                activeCall?.disconnect();
+                setIsActiveCallOpen(false);
+                setActiveCall(null);
+                setActiveConferenceSid(null);
+              }}
             />
         </div>
         

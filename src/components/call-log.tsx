@@ -13,7 +13,6 @@ interface CallLogProps {
 }
 
 function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (number: string) => void, isClickable: boolean }) {
-  console.log("Rendering CallCard for call:", call);
   const fromName = call.from_name?.name || call.user?.name || call.from;
   const toName = call.to_name?.name || call.user?.name || call.to;
 

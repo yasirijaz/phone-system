@@ -167,11 +167,15 @@ export default function AppUIPage() {
     }
 
     try {
-        const params: { To: string, From?: string } = { To: number };
+        const params: { To: string, From?: string, direction?: string } = { To: number };
         if (fromNumber) {
             params.From = fromNumber;
+            params.direction = "outbound";
+
         }
-        await device.connect({ params });
+        console.log("Making call with params:", params);
+        // call
+        await device.connect({params: params });
         setDialerOpen(false); // Close dialer after making a call
     } catch (error) {
         console.error("Error making call:", error);
