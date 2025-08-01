@@ -21,6 +21,8 @@ import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
 import HardwareSettings from "@/components/hardware-settings";
+import ActiveCallBar from "./active-call-modal";
+import type { Call } from '@twilio/voice-sdk';
 
 interface AppHeaderProps {
     user: User | null;
@@ -46,6 +48,12 @@ export default function AppHeader({ user, logout, pageTitle, showBackButton = fa
     const [dialerInitialValue, setDialerInitialValue] = useState('');
     const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
     const [selectedFromNumber, setSelectedFromNumber] = useState('');
+
+    //for outgoing calls
+    const [activeCall, setActiveCall] = useState<Call | null>(null);
+    const [isActiveCallOpen, setIsActiveCallOpen] = useState(false);
+    const [activeContactName, setActiveContactName] = useState('');
+    const [activeConferenceSid, setActiveConferenceSid] = useState<string | null>(null);
     
     useEffect(() => {
         connectTwilio();
@@ -119,8 +127,34 @@ export default function AppHeader({ user, logout, pageTitle, showBackButton = fa
                 params.From = fromNumber;
                 params.direction = "outbound";
             }
-            await device.connect({ params });
+            const connection = await device.connect({ params });
             setDialerOpen(false);
+
+            setActiveContactName(number);
+            setActiveCall(connection);
+            setIsActiveCallOpen(true);
+
+            connection.on('accept', () => {
+                console.log('Call accepted');
+            });
+
+            connection.on('disconnect', () => {
+                setIsActiveCallOpen(false);
+                setActiveCall(null);
+                setActiveConferenceSid(null);
+            });
+
+            connection.on('cancel', () => {
+                setIsActiveCallOpen(false);
+                setActiveCall(null);
+                setActiveConferenceSid(null);
+            });
+
+            connection.on('reject', () => {
+                setIsActiveCallOpen(false);
+                setActiveCall(null);
+                setActiveConferenceSid(null);
+            });
         } catch (error) {
             console.error("Error making call:", error);
             toast({ title: "Call Error", description: "Failed to make call. See console for details.", variant: 'destructive'});
@@ -214,18 +248,31 @@ export default function AppHeader({ user, logout, pageTitle, showBackButton = fa
                     contacts={contacts}
                   />
                 </DialogContent>
-              </Dialog>
+            </Dialog>
               
-              <Dialog open={isVideoOpen} onOpenChange={setIsVideoOpen}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>New Video Call</DialogTitle>
-                    <DialogDescription>
-                      This feature is coming soon.
-                    </DialogDescription>
-                  </DialogHeader>
-                </DialogContent>
-              </Dialog>
+            <Dialog open={isVideoOpen} onOpenChange={setIsVideoOpen}>
+            <DialogContent>
+                <DialogHeader>
+                <DialogTitle>New Video Call</DialogTitle>
+                <DialogDescription>
+                    This feature is coming soon.
+                </DialogDescription>
+                </DialogHeader>
+            </DialogContent>
+            </Dialog>
+            
+            <ActiveCallBar
+              isOpen={isActiveCallOpen}
+              contactName={activeContactName}
+              connection={activeCall}
+              conferenceSid={activeConferenceSid}
+              onHangUp={() => {
+                activeCall?.disconnect();
+                setIsActiveCallOpen(false);
+                setActiveCall(null);
+                setActiveConferenceSid(null);
+              }}
+            />
         </>
     );
 }
