@@ -1,78 +1,21 @@
 
 "use client";
 
-import { useState, useMemo, type ChangeEvent, useEffect, useCallback } from 'react';
-import type { Call, Department, PhoneNumber } from '@/types';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import type { Call, Department, PhoneNumber, Contact } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PlusCircle, Search, Phone, UserCheck, Zap, ArrowUp, ArrowDown, Users, Clock, MoreHorizontal, Calendar, AreaChart, BarChart as BarChartIcon, MessageSquare, Video } from 'lucide-react';
 import CallLog from '@/components/call-log';
 import LogCallForm from '@/components/log-call-form';
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
-import IncomingCallModal from '@/components/incoming-call-modal';
-import ActiveCallBar from '@/components/active-call-modal';
-import { useTwilio } from '@/context/TwilioContext';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, ComposedChart } from 'recharts';
-import { Badge } from '@/components/ui/badge';
-import Dialer from '@/components/dialer';
 import { useToast } from '@/hooks/use-toast';
-import { getDepartments } from '@/services/departmentService';
-import { getUserDepartments } from '@/services/userService';
-import { getPhoneNumbers } from '@/services/phoneNumberService';
-import NewMessageForm from '@/components/new-message-form';
-import HardwareSettings from '@/components/hardware-settings';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import TwilioStatusIndicator from '@/components/twilio-status-indicator';
-import type { Call as TCall } from '@twilio/voice-sdk';
-
-const INITIAL_CALLS: Partial<Call>[] = [
-  {
-    id: 1,
-    from: 'John Doe',
-    to: 'Me',
-    created_at: '2024-07-23T10:00:00',
-    duration: "15",
-    direction: 'inbound',
-    notes: 'Discussed Q3 sales targets and performance. Client is happy with the progress but wants to see more detailed reporting.',
-    category: 'Sales',
-  },
-  {
-    id: 2,
-    from: 'Me',
-    to: 'Jane Smith',
-    created_at: '2024-07-23T11:30:00',
-    duration: "5",
-    direction: 'outbound',
-    notes: 'Followed up on support ticket #12345. Issue resolved by clearing browser cache.',
-    category: 'Support',
-  },
-  {
-    id: 3,
-    from: 'Alice Johnson',
-    to: 'Me',
-    created_at: '2024-06-15T14:00:00',
-    duration: "30",
-    direction: 'inbound',
-    notes: 'Initial discovery call. Potential for a large enterprise deal. Scheduled a follow-up demo for next week.',
-    category: 'Sales',
-  },
-  {
-    id: 4,
-    from: 'Mom',
-    to: 'Me',
-    created_at: '2024-05-22T18:45:00',
-    duration: "25",
-    direction: 'inbound',
-    notes: 'Called to see how I was doing and talked about weekend plans.',
-    category: 'Personal',
-  }
-];
+import { getCallLogs } from '@/services/callLogService';
+import AppHeader from '@/components/app-header';
 
 const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: string, value: string, icon: React.ElementType, trend: string, trendType: 'up' | 'down' }) => (
     <Card>
@@ -89,7 +32,6 @@ const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: strin
         </CardContent>
     </Card>
 );
-
 
 const MonthlySalesChart = ({ calls }: { calls: Partial<Call>[] }) => {
     const data = useMemo(() => {
@@ -184,76 +126,11 @@ const StatisticsChart = ({ calls }: { calls: Partial<Call>[] }) => {
   );
 };
 
-
-const MonthlyTargetCard = () => (
-     <Card>
-        <CardHeader>
-            <div className="flex justify-between items-center">
-                <CardTitle>Monthly Target</CardTitle>
-                 <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4"/></Button>
-            </div>
-            <CardDescription>Target you've set for each month</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center justify-center">
-             <div className="relative w-40 h-20 mb-4">
-                <svg viewBox="0 0 100 50" className="w-full h-full">
-                    <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="hsl(var(--border))" strokeWidth="10" />
-                    <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="hsl(var(--primary))" strokeWidth="10" strokeDasharray="125.6" strokeDashoffset="31.4" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-end pb-1">
-                    <span className="text-3xl font-bold">75.55%</span>
-                    <Badge variant="secondary" className="bg-green-100 text-green-700">+10%</Badge>
-                </div>
-            </div>
-            <p className="text-center text-sm text-muted-foreground mb-4">You earn $3287 today, it’s higher than last month. Keep up your good work!</p>
-            <div className="flex w-full justify-around">
-                <div className="text-center">
-                    <p className="text-sm text-muted-foreground">Target</p>
-                    <p className="font-bold flex items-center">$20K <ArrowDown className="h-4 w-4 text-red-500 ml-1"/></p>
-                </div>
-                <div className="text-center">
-                    <p className="text-sm text-muted-foreground">Revenue</p>
-                    <p className="font-bold flex items-center">$20K <ArrowUp className="h-4 w-4 text-green-500 ml-1"/></p>
-                </div>
-                <div className="text-center">
-                    <p className="text-sm text-muted-foreground">Today</p>
-                    <p className="font-bold flex items-center">$20K <ArrowUp className="h-4 w-4 text-green-500 ml-1"/></p>
-                </div>
-            </div>
-        </CardContent>
-    </Card>
-)
-
 export default function EcommerceDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
-  const [calls, setCalls] = useState<Call[]>(INITIAL_CALLS as Call[]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showIncomingCall, setShowIncomingCall] = useState(false);
-  
-  const [isSmsOpen, setIsSmsOpen] = useState(false);
-  const [isVideoOpen, setIsVideoOpen] = useState(false);
-  
-  const { device, isDeviceReady, connectTwilio } = useTwilio();
+  const [calls, setCalls] = useState<Call[]>([]);
   const { toast } = useToast();
-
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
-  const [loadingDepartments, setLoadingDepartments] = useState(true);
-  const [loadingNumbers, setLoadingNumbers] = useState(false);
-
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
-  const [selectedFromNumber, setSelectedFromNumber] = useState('');
-
-  //for outgoing calls
-  const [activeCall, setActiveCall] = useState<TCall | null>(null);
-  const [isActiveCallOpen, setIsActiveCallOpen] = useState(false);
-  const [activeContactName, setActiveContactName] = useState('');
-  const [activeConferenceSid, setActiveConferenceSid] = useState<string | null>(null);
-
-  useEffect(() => {
-    connectTwilio();
-  }, [connectTwilio]);
   
   useEffect(() => {
     if(user?.role_id === 1) {
@@ -261,111 +138,25 @@ export default function EcommerceDashboard() {
     }
   }, [user, router]);
   
-  const handleDepartmentChange = useCallback(async (departmentId: string) => {
-    setSelectedDepartmentId(departmentId);
-    if (!departmentId) {
-        setPhoneNumbers([]);
-        setSelectedFromNumber('');
-        return;
-    };
-    setLoadingNumbers(true);
-    try {
-        const numbers = await getPhoneNumbers(Number(departmentId));
-        setPhoneNumbers(numbers);
-         if (numbers.length > 0) {
-            setSelectedFromNumber(numbers[0].phone_no);
-        } else {
-            setSelectedFromNumber('');
-        }
-    } catch (error) {
-        toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
-        setPhoneNumbers([]);
-        setSelectedFromNumber('');
-    } finally {
-        setLoadingNumbers(false);
-    }
-  }, [toast]);
-  
   useEffect(() => {
-    const fetchDepartmentsData = async () => {
-        if (!user) return;
-        setLoadingDepartments(true);
-        try {
-            const isAdmin = user.role_id === 1 || user.role_id === 2;
-            const fetchedDepts = isAdmin && user.company_id
-                ? await getDepartments(user.company_id)
-                : await getUserDepartments(user.id);
-            
-            const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
-            setDepartments(depts);
-             if (depts.length > 0) {
-                handleDepartmentChange(String(depts[0].id));
-            }
-        } catch (error) {
-            toast({ title: "Error", description: "Failed to load departments.", variant: "destructive" });
-        } finally {
-            setLoadingDepartments(false);
-        }
+    const fetchCalls = async () => {
+      try {
+        const fetchedCalls = await getCallLogs();
+        setCalls(Array.isArray(fetchedCalls) ? fetchedCalls : []);
+      } catch (error) {
+        toast({ title: "Error", description: "Failed to load call history.", variant: "destructive" });
+      }
     };
-    fetchDepartmentsData();
-  }, [user, toast, handleDepartmentChange]);
-  
-  
-
-
-  const handleMakeCall = async (number: string, fromNumber?: string) => {
-    if (!device || !isDeviceReady) {
-        toast({ title: "Twilio Error", description: "Twilio Device not ready. Please connect first.", variant: 'destructive'});
-        return;
+    if (user) {
+      fetchCalls();
     }
-    try {
-        const params: { To: string, From?: string } = { To: number };
-        if (fromNumber) {
-            params.From = fromNumber;
-        }
-        const connection = await device.connect({ params });
+  }, [user, toast]);
 
-        setActiveContactName(number);
-        setActiveCall(connection);
-        setIsActiveCallOpen(true);
-
-        connection.on('accept', () => {
-          console.log('Call accepted');
-        });
-
-        connection.on('disconnect', () => {
-          setIsActiveCallOpen(false);
-          setActiveCall(null);
-          setActiveConferenceSid(null);
-        });
-
-        connection.on('cancel', () => {
-          setIsActiveCallOpen(false);
-          setActiveCall(null);
-          setActiveConferenceSid(null);
-        });
-
-        connection.on('reject', () => {
-          setIsActiveCallOpen(false);
-          setActiveCall(null);
-          setActiveConferenceSid(null);
-        });
-    } catch (error) {
-        console.error("Error making call:", error);
-        toast({ title: "Call Error", description: "Failed to make call. See console for details.", variant: 'destructive'});
-    }
+  const handleMakeCall = () => {
+    // This will now be handled by the AppHeader's dialer
+    toast({ title: "Info", description: "Please use the dialer in the header to make calls." });
   };
-
-
-  const filteredCalls = useMemo(() => {
-    return calls
-      .filter(call => {
-          const contact = call.direction === 'inbound' ? call.from : call.to;
-          return contact.toLowerCase().includes(searchTerm.toLowerCase())
-      })
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [calls, searchTerm]);
-
+  
   const { totalCalls, totalDuration, mostFrequentContact } = useMemo(() => {
     if (calls.length === 0) {
       return { totalCalls: 0, totalDuration: 0, mostFrequentContact: 'N/A' };
@@ -374,14 +165,14 @@ export default function EcommerceDashboard() {
     const totalDuration = calls.reduce((acc, call) => acc + (parseInt(call.duration, 10) || 0), 0);
 
     const contactCounts = calls.reduce((acc, call) => {
-      const contact = call.direction === 'inbound' ? call.from : call.to;
+      const contact = call.direction === 'inbound' ? (call.from_name?.name || call.from) : (call.to_name?.name || call.to);
       acc[contact] = (acc[contact] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
-    const mostFrequentContact = Object.keys(contactCounts).reduce((a, b) =>
-      contactCounts[a] > contactCounts[b] ? a : b
-    );
+    const mostFrequentContact = Object.keys(contactCounts).length > 0
+      ? Object.keys(contactCounts).reduce((a, b) => contactCounts[a] > contactCounts[b] ? a : b)
+      : 'N/A';
 
     return {
       totalCalls: calls.length,
@@ -403,37 +194,7 @@ export default function EcommerceDashboard() {
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger />
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search or type command..." className="pl-9 w-full md:w-96" />
-                 <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 md:flex">
-                    <span className="text-xs">⌘</span>K
-                </kbd>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-                 <TwilioStatusIndicator />
-                 <Dialer
-                    onMakeCall={handleMakeCall}
-                    departments={departments}
-                    phoneNumbers={phoneNumbers}
-                    onDepartmentChange={handleDepartmentChange}
-                    loadingDepartments={loadingDepartments}
-                    loadingNumbers={loadingNumbers}
-                    selectedDepartmentId={selectedDepartmentId}
-                    selectedFromNumber={selectedFromNumber}
-                    onSetSelectedFromNumber={setSelectedFromNumber}
-                 >
-                   <Button variant="ghost" size="icon"><Phone className="h-5 w-5" /></Button>
-                 </Dialer>
-                 <Button variant="ghost" size="icon" onClick={() => setIsSmsOpen(true)}><MessageSquare className="h-5 w-5" /></Button>
-                 <Button variant="ghost" size="icon" onClick={() => setIsVideoOpen(true)}><Video className="h-5 w-5" /></Button>
-                 <HardwareSettings />
-            </div>
-          </header>
+          <AppHeader user={user} logout={logout} />
 
           <main className="flex-1 p-4 md:p-8 space-y-8">
              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4 2xl:gap-7.5">
@@ -460,67 +221,11 @@ export default function EcommerceDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <CallLog calls={filteredCalls.slice(0, 5)} onMakeCall={handleMakeCall} />
+                <CallLog calls={calls.slice(0, 5)} onMakeCall={handleMakeCall} />
               </CardContent>
             </Card>
           </main>
-          
-           <IncomingCallModal
-              isOpen={showIncomingCall}
-              onClose={() => setShowIncomingCall(false)}
-              callerName="Jane Doe"
-              callerNumber="+1 (555) 123-4567"
-              onAccept={() => { console.log('Call accepted'); setShowIncomingCall(false); }}
-              onReject={() => { console.log('Call rejected'); setShowIncomingCall(false); }}
-            />
-
-            <ActiveCallBar
-              isOpen={isActiveCallOpen}
-              contactName={activeContactName}
-              connection={activeCall}
-              conferenceSid={activeConferenceSid}
-              onHangUp={() => {
-                activeCall?.disconnect();
-                setIsActiveCallOpen(false);
-                setActiveCall(null);
-                setActiveConferenceSid(null);
-              }}
-            />
         </div>
-        
-        <Dialog open={isSmsOpen} onOpenChange={setIsSmsOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>New Message</DialogTitle>
-               <DialogDescription>
-                Select a department and number to send a message from.
-              </DialogDescription>
-            </DialogHeader>
-            <NewMessageForm 
-              onClose={() => setIsSmsOpen(false)}
-              departments={departments}
-              phoneNumbers={phoneNumbers}
-              onDepartmentChange={handleDepartmentChange}
-              loadingDepartments={loadingDepartments}
-              loadingNumbers={loadingNumbers}
-              selectedDepartmentId={selectedDepartmentId}
-              selectedFromNumber={selectedFromNumber}
-              onSetSelectedFromNumber={setSelectedFromNumber}
-            />
-          </DialogContent>
-        </Dialog>
-        
-        <Dialog open={isVideoOpen} onOpenChange={setIsVideoOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>New Video Call</DialogTitle>
-              <DialogDescription>
-                This feature is coming soon.
-              </DialogDescription>
-            </DialogHeader>
-          </DialogContent>
-        </Dialog>
-
       </SidebarInset>
     </SidebarProvider>
   );

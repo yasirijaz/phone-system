@@ -5,13 +5,15 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Department, PhoneNumber } from '@/types';
+import type { Department, PhoneNumber, Contact } from '@/types';
 import { Button } from './ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from './ui/scroll-area';
+
 
 interface NewMessageFormProps {
     onClose: () => void;
@@ -23,6 +25,7 @@ interface NewMessageFormProps {
     selectedDepartmentId: string;
     selectedFromNumber: string;
     onSetSelectedFromNumber: (fromNumber: string) => void;
+    contacts: Contact[];
 }
 
 const messageSchema = z.object({
@@ -42,9 +45,11 @@ export default function NewMessageForm({
     loadingNumbers,
     selectedDepartmentId,
     selectedFromNumber,
-    onSetSelectedFromNumber
+    onSetSelectedFromNumber,
+    contacts = []
 }: NewMessageFormProps) {
     const { toast } = useToast();
+    const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
     
     const form = useForm<z.infer<typeof messageSchema>>({
         resolver: zodResolver(messageSchema),
@@ -66,12 +71,31 @@ export default function NewMessageForm({
     }, [watchedDepartmentId, onDepartmentChange, selectedDepartmentId, form]);
 
     const watchedFromNumber = form.watch("fromNumber");
+    const watchedRecipient = form.watch("recipient");
 
     useEffect(() => {
         if(watchedFromNumber !== selectedFromNumber) {
             onSetSelectedFromNumber(watchedFromNumber);
         }
     }, [watchedFromNumber, selectedFromNumber, onSetSelectedFromNumber]);
+
+    useEffect(() => {
+        if (watchedRecipient.length > 2) {
+            const searchTerm = watchedRecipient.toLowerCase();
+            const matchingContacts = contacts.filter(contact => 
+                contact.name.toLowerCase().includes(searchTerm) ||
+                contact.phone_no.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, ''))
+            );
+            setFilteredContacts(matchingContacts);
+        } else {
+            setFilteredContacts([]);
+        }
+    }, [watchedRecipient, contacts]);
+
+    const handleContactSelect = (contact: Contact) => {
+        form.setValue("recipient", contact.phone_no);
+        setFilteredContacts([]);
+    };
     
     const onSubmit = (values: z.infer<typeof messageSchema>) => {
         console.log(values);
@@ -85,7 +109,23 @@ export default function NewMessageForm({
                  <FormField control={form.control} name="recipient" render={({ field }) => (
                     <FormItem>
                         <FormLabel>To</FormLabel>
-                        <FormControl><Input placeholder="Enter recipient's phone number" {...field} /></FormControl>
+                        <FormControl>
+                            <div className="relative">
+                                <Input placeholder="Enter recipient's phone number or name" {...field} />
+                                 {filteredContacts.length > 0 && (
+                                    <div className="absolute z-10 w-full bg-background border rounded-md mt-1 max-h-48 overflow-y-auto">
+                                        <ScrollArea className="h-full">
+                                        {filteredContacts.map(contact => (
+                                            <div key={contact.id} onClick={() => handleContactSelect(contact)} className="p-2 hover:bg-accent cursor-pointer">
+                                                <p className="font-semibold">{contact.name}</p>
+                                                <p className="text-sm text-muted-foreground">{contact.phone_no}</p>
+                                            </div>
+                                        ))}
+                                        </ScrollArea>
+                                    </div>
+                                )}
+                            </div>
+                        </FormControl>
                         <FormMessage />
                     </FormItem>
                  )} />

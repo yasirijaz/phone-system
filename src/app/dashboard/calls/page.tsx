@@ -11,19 +11,17 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, 
 import { MoreHorizontal, Eye, Users, Phone, Clock, TrendingDown, TrendingUp, Filter, Globe } from 'lucide-react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import Image from 'next/image';
-import TwilioStatusIndicator from '@/components/twilio-status-indicator';
-import { useTwilio } from '@/context/TwilioContext';
+import { useAuth } from '@/context/AuthContext';
+import AppHeader from '@/components/app-header';
 
 const INITIAL_CALLS: Partial<Call>[] = [
-  { id: '1', from: 'John Doe', to: 'Me', created_at: '2024-07-23T10:00:00', duration: "15", direction: 'inbound', category: 'Sales' },
-  { id: '2', from: 'Me', to: 'Jane Smith', created_at: '2024-07-23T11:30:00', duration: "5", direction: 'outbound', category: 'Support' },
-  { id: '3', from: 'Alice Johnson', to: 'Me', created_at: '2024-06-15T14:00:00', duration: "30", direction: 'inbound', category: 'Sales' },
-  { id: '4', from: 'Mom', to: 'Me', created_at: '2024-05-22T18:45:00', duration: "25", direction: 'inbound', category: 'Personal' },
-  { id: '5', from: 'Me', to: 'Tech Support', created_at: '2024-07-21T09:15:00', duration: "45", direction: 'outbound', category: 'Support' },
-  ...Array.from({ length: 25 }, (_, i) => ({ id: `${i + 6}`, from: i % 2 === 0 ? `Contact ${i + 1}` : 'Me', to: i % 2 === 0 ? 'Me' : `Contact ${i + 1}`, created_at: `2024-07-${String(i + 1).padStart(2, '0')}T10:00:00`, duration: String(Math.floor(Math.random() * 60)), direction: i % 2 === 0 ? 'inbound' : 'outbound', category: ['Sales', 'Support', 'Personal'][i % 3] })),
+  { id: 1, from: 'John Doe', to: 'Me', created_at: '2024-07-23T10:00:00', duration: "15", direction: 'inbound', category: 'Sales' },
+  { id: 2, from: 'Me', to: 'Jane Smith', created_at: '2024-07-23T11:30:00', duration: "5", direction: 'outbound', category: 'Support' },
+  { id: 3, from: 'Alice Johnson', to: 'Me', created_at: '2024-06-15T14:00:00', duration: "30", direction: 'inbound', category: 'Sales' },
+  { id: 4, from: 'Mom', to: 'Me', created_at: '2024-05-22T18:45:00', duration: "25", direction: 'inbound', category: 'Personal' },
+  { id: 5, from: 'Me', to: 'Tech Support', created_at: '2024-07-21T09:15:00', duration: "45", direction: 'outbound', category: 'Support' },
+  ...Array.from({ length: 25 }, (_, i) => ({ id: i + 6, from: i % 2 === 0 ? `Contact ${i + 1}` : 'Me', to: i % 2 === 0 ? 'Me' : `Contact ${i + 1}`, created_at: `2024-07-${String(i + 1).padStart(2, '0')}T10:00:00`, duration: String(Math.floor(Math.random() * 60)), direction: i % 2 === 0 ? 'inbound' : 'outbound', category: ['Sales', 'Support', 'Personal'][i % 3] })),
 ];
 
 
@@ -287,12 +285,8 @@ const DemographicCard = () => (
 
 
 export default function CallsDashboard() {
-  const { connectTwilio } = useTwilio();
+  const { user, logout } = useAuth();
   
-  useEffect(() => {
-    connectTwilio();
-  }, [connectTwilio]);
-
   const topContacts = useMemo(() => {
     const counts: Record<string, number> = {};
     INITIAL_CALLS.forEach(call => {
@@ -348,21 +342,7 @@ export default function CallsDashboard() {
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-            <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
-                <div className="flex items-center gap-4">
-                  <SidebarTrigger />
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search or type command..." className="pl-9 w-full md:w-96" />
-                     <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 md:flex">
-                        <span className="text-xs">⌘</span>K
-                    </kbd>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                    <TwilioStatusIndicator />
-                </div>
-            </header>
+            <AppHeader user={user} logout={logout} pageTitle="Calls Dashboard" />
             <main className="flex-1 p-4 md:p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                     <StatCard title="Total Calls" value={INITIAL_CALLS.length.toString()} percentage="+20%" change="vs last month" icon={Phone} changeType="up" />
