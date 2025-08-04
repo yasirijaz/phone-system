@@ -101,7 +101,7 @@ export function InAppSidebar() {
                 ) : departments.length > 0 ? (
                     departments.map((dept) => (
                         <SidebarMenuItem key={dept.id}>
-                            <SidebarMenuButton asChild>
+                            <SidebarMenuButton asChild isActive={pathname === `/departments/${dept.id}`}>
                                 <Link href={`/departments/${dept.id}`}>
                                     <Building className="h-4 w-4" />
                                     <span>{dept.name}</span>
