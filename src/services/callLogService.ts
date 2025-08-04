@@ -19,7 +19,7 @@ export const getCallLogsBySid = async (callSid: string): Promise<Call | null> =>
 };
 
 export const getDepartmentNewCalls = async (department_id: number): Promise<Call[]> => {
-    const response = await axios.post('/api/department/getDepartmentNewCalls', { department_id });
+    const response = await axios.post('/api/departments/getDepartmentNewCalls', { department_id });
     return response.data.calls;
 };
 
