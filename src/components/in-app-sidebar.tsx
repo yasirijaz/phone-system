@@ -1,14 +1,39 @@
 
 'use client';
 
-import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup } from '@/components/ui/sidebar';
-import { Hash, Inbox, LayoutGrid, MessageSquare, Users } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup, SidebarGroupLabel } from '@/components/ui/sidebar';
+import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building } from 'lucide-react';
 import { Logo } from './icons';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
+import { getUserDepartments } from '@/services/userService';
+import type { Department } from '@/types';
 
 export function InAppSidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+        const fetchDepartments = async () => {
+            try {
+                setLoading(true);
+                const userDepts = await getUserDepartments(user.id);
+                setDepartments(Array.isArray(userDepts) ? userDepts : []);
+            } catch (error) {
+                console.error("Failed to fetch user departments", error);
+                setDepartments([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchDepartments();
+    }
+  }, [user]);
 
   return (
     <>
@@ -64,6 +89,31 @@ export function InAppSidebar() {
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
+            </SidebarMenu>
+        </SidebarGroup>
+         <SidebarGroup>
+            <SidebarGroupLabel>Departments</SidebarGroupLabel>
+            <SidebarMenu>
+                {loading ? (
+                    <SidebarMenuItem>
+                        <SidebarMenuButton disabled>Loading...</SidebarMenuButton>
+                    </SidebarMenuItem>
+                ) : departments.length > 0 ? (
+                    departments.map((dept) => (
+                        <SidebarMenuItem key={dept.id}>
+                            <SidebarMenuButton asChild>
+                                <Link href={`/departments/${dept.id}`}>
+                                    <Building className="h-4 w-4" />
+                                    <span>{dept.name}</span>
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    ))
+                ) : (
+                     <SidebarMenuItem>
+                        <SidebarMenuButton disabled>No departments</SidebarMenuButton>
+                    </SidebarMenuItem>
+                )}
             </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
