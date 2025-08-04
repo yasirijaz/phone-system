@@ -64,7 +64,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const connectTwilio = useCallback(async () => {
-    if (!twilio || !user || isConnecting || deviceRef.current) return;
+    if (!twilio || !user || isConnecting || deviceRef.current || user.role_id === 1) return;
 
     setIsConnecting(true);
     setError(null);
