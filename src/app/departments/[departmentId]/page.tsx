@@ -7,7 +7,7 @@ import type { Call, Department, PhoneNumber, User } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
-import { getCallLogs } from "@/services/callLogService";
+import { getCallLogs, getDepartmentNewCalls } from "@/services/callLogService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
@@ -31,6 +31,7 @@ export default function DepartmentDetailPage() {
 
   const [department, setDepartment] = useState<Department | null>(null);
   const [allCalls, setAllCalls] = useState<Call[]>([]);
+  const [newCalls, setNewCalls] = useState<Call[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [operators, setOperators] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,11 +48,15 @@ export default function DepartmentDetailPage() {
             const numbers = await getPhoneNumbers(departmentId);
             setPhoneNumbers(numbers);
 
-            const allCallLogs = await getCallLogs();
+            const [allCallLogs, newCallLogs, operatorsResponse] = await Promise.all([
+              getCallLogs(),
+              getDepartmentNewCalls(departmentId),
+              getDepartmentUsers(user.company_id, departmentId)
+            ]);
+            
             const departmentCalls = allCallLogs.filter(c => c.department_id === departmentId);
             setAllCalls(departmentCalls);
-
-            const operatorsResponse = await getDepartmentUsers(user.company_id, departmentId);
+            setNewCalls(Array.isArray(newCallLogs) ? newCallLogs : []);
             setOperators(Array.isArray(operatorsResponse.users) ? operatorsResponse.users : []);
 
         } catch (error) {
@@ -151,7 +156,7 @@ export default function DepartmentDetailPage() {
                          </Card>
                       </TabsContent>
                        <TabsContent value="new" className="mt-6">
-                         <Card><CardContent className="p-6">New calls will appear here.</CardContent></Card>
+                        {loading ? <p>Loading...</p> : <CallLog calls={newCalls} onMakeCall={handleMakeCall} />}
                       </TabsContent>
                       <TabsContent value="all" className="mt-6">
                         {loading ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={handleMakeCall} />}
