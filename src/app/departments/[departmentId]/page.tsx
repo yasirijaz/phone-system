@@ -3,11 +3,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from 'next/navigation';
-import type { Call, Department } from "@/types";
+import type { Call, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
 import { getCallLogs } from "@/services/callLogService";
+import { getPhoneNumbers } from "@/services/phoneNumberService";
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
@@ -28,6 +29,7 @@ export default function DepartmentDetailPage() {
 
   const [department, setDepartment] = useState<Department | null>(null);
   const [allCalls, setAllCalls] = useState<Call[]>([]);
+  const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,6 +41,9 @@ export default function DepartmentDetailPage() {
                 const depts = await getDepartments(user.company_id);
                 const currentDept = depts.find(d => d.id === departmentId);
                 setDepartment(currentDept || null);
+                
+                const numbers = await getPhoneNumbers(departmentId);
+                setPhoneNumbers(numbers);
             }
 
             const allCallLogs = await getCallLogs();
@@ -61,6 +66,8 @@ export default function DepartmentDetailPage() {
     }
     console.log("Request to call:", number);
   };
+  
+  const departmentPhoneNumber = phoneNumbers.length > 0 ? phoneNumbers[0].phone_no : 'No number assigned';
 
   return (
     <SidebarProvider>
@@ -74,7 +81,10 @@ export default function DepartmentDetailPage() {
 
                   <main className="flex-1 p-6 overflow-y-auto">
                     <div className="flex items-center justify-between mb-6">
-                        <h1 className="text-2xl font-bold">{department?.name || 'Department'}</h1>
+                        <div>
+                          <h1 className="text-2xl font-bold">{department?.name || 'Department'}</h1>
+                          <p className="text-sm text-muted-foreground">{departmentPhoneNumber}</p>
+                        </div>
                         <div className="flex items-center space-x-2">
                             <Label htmlFor="dnd-switch">DO NOT DISTURB</Label>
                             <Switch id="dnd-switch" />
