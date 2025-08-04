@@ -7,7 +7,7 @@ import type { Call, Department, PhoneNumber, User } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
-import { getCallLogs, getDepartmentNewCalls } from "@/services/callLogService";
+import { getCallLogs, getDepartmentNewCalls, getDepartmentMissedCalls, getDepartmentRecordings } from "@/services/callLogService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
@@ -32,6 +32,8 @@ export default function DepartmentDetailPage() {
   const [department, setDepartment] = useState<Department | null>(null);
   const [allCalls, setAllCalls] = useState<Call[]>([]);
   const [newCalls, setNewCalls] = useState<Call[]>([]);
+  const [missedCalls, setMissedCalls] = useState<Call[]>([]);
+  const [recordings, setRecordings] = useState<Call[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [operators, setOperators] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,16 +50,20 @@ export default function DepartmentDetailPage() {
             const numbers = await getPhoneNumbers(departmentId);
             setPhoneNumbers(numbers);
 
-            const [allCallLogs, newCallLogs, operatorsResponse] = await Promise.all([
+            const [allCallLogs, newCallLogs, operatorsResponse, missedCallLogs, recordingLogs] = await Promise.all([
               getCallLogs(),
               getDepartmentNewCalls(departmentId),
-              getDepartmentUsers(user.company_id, departmentId)
+              getDepartmentUsers(user.company_id, departmentId),
+              getDepartmentMissedCalls(departmentId),
+              getDepartmentRecordings(departmentId)
             ]);
             
             const departmentCalls = allCallLogs.filter(c => c.department_id === departmentId);
             setAllCalls(departmentCalls);
             setNewCalls(Array.isArray(newCallLogs) ? newCallLogs : []);
             setOperators(Array.isArray(operatorsResponse.users) ? operatorsResponse.users : []);
+            setMissedCalls(Array.isArray(missedCallLogs) ? missedCallLogs : []);
+            setRecordings(Array.isArray(recordingLogs) ? recordingLogs : []);
 
         } catch (error) {
             toast({ title: "Error", description: "Failed to load department data.", variant: "destructive" });
@@ -162,13 +168,13 @@ export default function DepartmentDetailPage() {
                         {loading ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={handleMakeCall} />}
                       </TabsContent>
                        <TabsContent value="missed" className="mt-6">
-                         <Card><CardContent className="p-6">Missed calls will appear here.</CardContent></Card>
+                         {loading ? <p>Loading...</p> : <CallLog calls={missedCalls} onMakeCall={handleMakeCall} />}
                       </TabsContent>
                        <TabsContent value="voicemails" className="mt-6">
                          <Card><CardContent className="p-6">Voicemails will appear here.</CardContent></Card>
                       </TabsContent>
                        <TabsContent value="recordings" className="mt-6">
-                         <Card><CardContent className="p-6">Recordings will appear here.</CardContent></Card>
+                         {loading ? <p>Loading...</p> : <CallLog calls={recordings} onMakeCall={handleMakeCall} />}
                       </TabsContent>
                     </Tabs>
                   </main>

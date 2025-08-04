@@ -23,6 +23,16 @@ export const getDepartmentNewCalls = async (department_id: number): Promise<Call
     return response.data.calls;
 };
 
+export const getDepartmentMissedCalls = async (department_id: number): Promise<Call[]> => {
+    const response = await axios.post('/api/departments/getDepartmentMissedCalls', { department_id });
+    return response.data.calls;
+};
+
+export const getDepartmentRecordings = async (department_id: number): Promise<Call[]> => {
+    const response = await axios.post('/api/departments/getDepartmentRecordings', { department_id });
+    return response.data.calls;
+};
+
 
 export const getUnreadCallLogs = async (): Promise<Call[]> => {
   const response = await axios.get('/api/call-logs/unread');
