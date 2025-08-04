@@ -19,6 +19,7 @@ import { getDepartmentUsers, getDepartments } from "@/services/departmentService
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 
 export default function DepartmentDetailPage() {
@@ -71,6 +72,15 @@ export default function DepartmentDetailPage() {
   };
   
   const departmentPhoneNumber = phoneNumbers.length > 0 ? phoneNumbers[0].phone_no : 'No number assigned';
+  
+  const getRoleName = (roleId?: number) => {
+    switch (roleId) {
+        case 1: return 'Super Admin';
+        case 2: return 'Admin';
+        case 3: return 'User';
+        default: return 'Unknown';
+    }
+  }
 
   return (
     <SidebarProvider>
@@ -114,20 +124,26 @@ export default function DepartmentDetailPage() {
                                         <TableRow>
                                             <TableHead>Name</TableHead>
                                             <TableHead>Email</TableHead>
+                                            <TableHead>Role</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {loading ? (
-                                            <TableRow><TableCell colSpan={2} className="text-center">Loading...</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={3} className="text-center">Loading...</TableCell></TableRow>
                                         ) : operators.length > 0 ? (
                                             operators.map((op) => (
                                                 <TableRow key={op.id}>
                                                     <TableCell>{op.name}</TableCell>
                                                     <TableCell>{op.email}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={op.role_id === 2 ? 'default' : 'secondary'}>
+                                                            {getRoleName(op.role_id)}
+                                                        </Badge>
+                                                    </TableCell>
                                                 </TableRow>
                                             ))
                                         ) : (
-                                            <TableRow><TableCell colSpan={2} className="text-center h-24">No operators assigned</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={3} className="text-center h-24">No operators assigned</TableCell></TableRow>
                                         )}
                                     </TableBody>
                                 </Table>
