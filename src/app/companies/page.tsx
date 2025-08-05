@@ -22,6 +22,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from 'next/navigation';
 import { Badge } from "@/components/ui/badge";
 import AppHeader from "@/components/app-header";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const companySchema = z.object({
   name: z.string().min(2, "Company name must be at least 2 characters."),
@@ -287,81 +288,113 @@ export default function CompaniesPage() {
                 ) : (
                   <>
                   <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Subdomain</TableHead>
-                          <TableHead>Owner Email</TableHead>
-                          <TableHead>Users</TableHead>
-                          <TableHead>Depts</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {Array.isArray(companies) && companies.map((company) => (
-                          <TableRow key={company.id}>
-                            <TableCell className="font-medium">{company.name}</TableCell>
-                            <TableCell>{company.subdomain}</TableCell>
-                            <TableCell>{company.email || 'N/A'}</TableCell>
-                            <TableCell>{company.users?.length || 0}</TableCell>
-                            <TableCell>{company.departments?.length || 0}</TableCell>
-                            <TableCell>
-                              <Badge variant={company.status === 'active' ? 'default' : 'secondary'}>{company.status}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {company.status === 'pending' && (
-                                <Button variant="ghost" size="icon" onClick={() => handleApprove(company.id)}>
-                                  <CheckCircle className="h-4 w-4 text-green-500" />
-                                </Button>
-                              )}
-                              <Button variant="ghost" size="icon" onClick={() => handleManageUsers(company.id)}>
-                                <Users className="h-4 w-4" />
-                              </Button>
-                               <Button variant="ghost" size="icon" onClick={() => handleManageSettings(company.id)}>
-                                <Settings className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleManageAssignments(company.id)}>
-                                <UserCog className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(company)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This action cannot be undone. This will permanently delete the
-                                      company and all associated data from our servers.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(company.id)}>
-                                      Continue
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </TableCell>
+                    <TooltipProvider>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Subdomain</TableHead>
+                            <TableHead>Owner Email</TableHead>
+                            <TableHead>Users</TableHead>
+                            <TableHead>Depts</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
-                        ))}
-                        {(!Array.isArray(companies) || companies.length === 0) && (
-                            <TableRow>
-                              <TableCell colSpan={7} className="text-center h-24">
-                                No companies found.
+                        </TableHeader>
+                        <TableBody>
+                          {Array.isArray(companies) && companies.map((company) => (
+                            <TableRow key={company.id}>
+                              <TableCell className="font-medium">{company.name}</TableCell>
+                              <TableCell>{company.subdomain}</TableCell>
+                              <TableCell>{company.email || 'N/A'}</TableCell>
+                              <TableCell>{company.users?.length || 0}</TableCell>
+                              <TableCell>{company.departments?.length || 0}</TableCell>
+                              <TableCell>
+                                <Badge variant={company.status === 'active' ? 'default' : 'secondary'}>{company.status}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right space-x-1">
+                                {company.status === 'pending' && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" onClick={() => handleApprove(company.id)}>
+                                        <CheckCircle className="h-4 w-4 text-green-500" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Approve Company</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" onClick={() => handleManageUsers(company.id)}>
+                                      <Users className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Manage Users</p></TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" onClick={() => handleManageSettings(company.id)}>
+                                      <Settings className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Company Settings</p></TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" onClick={() => handleManageAssignments(company.id)}>
+                                      <UserCog className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Manage Assignments</p></TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(company)}>
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Edit Company</p></TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon">
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            This action cannot be undone. This will permanently delete the
+                                            company and all associated data from our servers.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => handleDelete(company.id)}>
+                                            Continue
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Delete Company</p></TooltipContent>
+                                </Tooltip>
                               </TableCell>
                             </TableRow>
-                          )}
-                      </TableBody>
-                    </Table>
+                          ))}
+                          {(!Array.isArray(companies) || companies.length === 0) && (
+                              <TableRow>
+                                <TableCell colSpan={7} className="text-center h-24">
+                                  No companies found.
+                                </TableCell>
+                              </TableRow>
+                            )}
+                        </TableBody>
+                      </Table>
+                    </TooltipProvider>
                   </div>
                    <div className="flex items-center justify-end space-x-2 py-4">
                       <Button
