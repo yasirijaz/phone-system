@@ -4,7 +4,7 @@ import type { Contact } from '@/types';
 
 export const getContacts = async (companyId: number): Promise<Contact[]> => {
   const response = await axios.post(`/api/contacts/${companyId}`);
-  return response.data.contacts;
+  return response.data.contacts.data;
 };
 
 export const createContact = async (contactData: Omit<Contact, 'id'>): Promise<Contact> => {
