@@ -53,7 +53,6 @@ export default function DepartmentDetailPage() {
             setPhoneNumbers(numbers);
             
             const dnd = await getDndStatus(departmentId, user.id);
-            console.log(dnd);
             setDndStatus(dnd.is_dnd);
 
             const [allCallLogs, newCallLogs, operatorsResponse, missedCallLogs, recordingLogs] = await Promise.all([
