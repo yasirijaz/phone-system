@@ -149,13 +149,11 @@ export default function CompanySettingsPage() {
     }
   };
 
-  if (user?.role_id === 3) {
-    return null;
-  }
-
   if (loading) {
     return <p>Loading settings...</p>;
   }
+  
+  const isSuperAdmin = user?.role_id === 1;
 
   return (
     <SidebarProvider>
@@ -167,9 +165,9 @@ export default function CompanySettingsPage() {
           <AppHeader 
               user={user} 
               logout={logout} 
-              pageTitle="Company Settings"
+              pageTitle={!isSuperAdmin ? "Company Settings" : ""}
           />
-          {user?.role_id === 1 && (
+          {isSuperAdmin && (
             <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" asChild>
