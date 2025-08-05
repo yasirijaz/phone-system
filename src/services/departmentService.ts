@@ -40,5 +40,5 @@ export const getDndStatus = async (departmentId: number, userId: number): Promis
         department_id: departmentId,
         user_id: userId,
     });
-    return response.data;
+    return response.data.data;
 }
