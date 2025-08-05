@@ -36,7 +36,7 @@ export default function AppHeader({ user, logout, pageTitle, showBackButton = fa
     const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
     const [isSmsOpen, setIsSmsOpen] = useState(false);
     const [isVideoOpen, setIsVideoOpen] = useState(false);
-    const { device, isDeviceReady, connectTwilio } = useTwilio();
+    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity } = useTwilio();
     const { toast } = useToast();
 
     const [departments, setDepartments] = useState<Department[]>([]);
@@ -180,6 +180,20 @@ export default function AppHeader({ user, logout, pageTitle, showBackButton = fa
                 </div>
                 <div className="flex items-center gap-4">
                      <TwilioStatusIndicator />
+                     <select
+                        value={activityName || ''}
+                        onChange={(e) => toggleActivity(e.target.value)}
+                        className={`text-xs px-2 py-1 rounded border ${
+                            activityName === 'Available' ? 'bg-green-500 text-white' :
+                            activityName === 'Unavailable' ? 'bg-yellow-500 text-white' :
+                            activityName === 'Offline' ? 'bg-red-500 text-white' :
+                            'bg-gray-200 text-black'
+                        }`}
+                        >
+                        <option value="Available">Available</option>
+                        <option value="Unavailable">Unavailable</option>
+                        <option value="Offline">Offline</option>
+                    </select>
                      <Dialer
                         onMakeCall={handleMakeCall}
                         departments={departments}
