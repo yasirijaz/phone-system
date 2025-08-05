@@ -28,6 +28,8 @@ interface TwilioContextType {
   acceptReservation: (reservation: Reservation) => void;
   rejectReservation: (reservation: Reservation) => void;
   completeReservation: (reservation: Reservation) => void;
+  activityName: string | null;
+  toggleActivity: (selectedActivityName: string) => void;
 }
 
 const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
@@ -47,6 +49,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [fromNumber, setFromNumber] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
+  const [activityName, setActivityName] = useState<string | null>(null);
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -141,6 +144,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       newWorker.on('ready', (worker: TwilioWorker) => {
         console.log(`Worker ${worker.sid} is ready`);
         setIsWorkerReady(true);
+        setActivityName(worker.activity?.name || null);
+        // worker.activities.forEach((activity) => {
+        //   console.log(`${activity.name} => ${activity.sid}`);
+        // });
       });
 
       newWorker.on('reservationCreated', (reservation: Reservation) => {
@@ -272,6 +279,24 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     reservation.complete();
   };
 
+  const toggleActivity = async (selectedActivityName?: string) => {
+    if (!workerRef.current) return;
+
+    const currentActivity = workerRef.current.activity?.name;
+    const newActivityName = selectedActivityName || (currentActivity === 'Available' ? 'Unavailable' : 'Available');
+
+    const newActivity = Array.from(workerRef.current.activities.values()).find(
+      (activity) => activity.name === newActivityName
+    );
+
+    if (newActivity) {
+      await newActivity.setAsCurrent();
+      setActivityName(newActivity.name);
+    } else {
+      console.error(`Activity '${newActivityName}' not found in worker.activities`);
+    }
+  };
+
   useEffect(() => {
     const currentDevice = deviceRef.current;
     const currentWorker = workerRef.current;
@@ -300,7 +325,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     hangUp,
     acceptReservation,
     rejectReservation,
-    completeReservation
+    completeReservation,
+    activityName,
+    toggleActivity
   };
 
   return <TwilioContext.Provider value={value}>{children}</TwilioContext.Provider>;
