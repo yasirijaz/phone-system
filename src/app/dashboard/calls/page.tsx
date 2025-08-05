@@ -2,7 +2,7 @@
 "use client";
 
 import type { Call } from '@/types';
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,6 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import AppHeader from '@/components/app-header';
 import { getCallLogs } from '@/services/callLogService';
 import { useToast } from '@/hooks/use-toast';
+import { subDays, subHours, subMonths, format, startOfHour, startOfDay, startOfMonth } from 'date-fns';
 
 
 const StatCard = ({ title, value, percentage, change, icon: Icon, changeType }: { title: string, value: string, percentage: string, change: string, icon: React.ElementType, changeType: 'up' | 'down' }) => (
@@ -34,24 +35,86 @@ const StatCard = ({ title, value, percentage, change, icon: Icon, changeType }: 
     </Card>
 );
 
-const AnalyticsChart = ({ calls }: { calls: Partial<Call>[] }) => {
+type TimeRange = '24h' | '7d' | '30d' | '12m';
+
+const AnalyticsChart = ({ calls, timeRange, setTimeRange }: { calls: Partial<Call>[], timeRange: TimeRange, setTimeRange: (range: TimeRange) => void }) => {
     const data = useMemo(() => {
-        const callsByDay: { [key: string]: number } = {};
-        for(let i=1; i<=30; i++) {
-            callsByDay[i] = 0;
+        const now = new Date();
+        let filteredCalls: Partial<Call>[] = [];
+        let dataMap: { [key: string]: number } = {};
+        let formatLabel: (date: Date) => string;
+        let labels: string[] = [];
+
+        switch (timeRange) {
+            case '24h':
+                const last24h = subHours(now, 24);
+                filteredCalls = calls.filter(call => call.created_at && new Date(call.created_at) > last24h);
+                formatLabel = (date: Date) => format(date, 'ha'); // '3am', '4am', etc.
+                for (let i = 0; i <= 24; i++) {
+                   const date = subHours(now, i);
+                   labels.push(format(startOfHour(date), 'ha'));
+                }
+                labels.reverse();
+                labels.forEach(label => dataMap[label] = 0);
+                filteredCalls.forEach(call => {
+                    const hourLabel = format(startOfHour(new Date(call.created_at!)), 'ha');
+                    if(hourLabel in dataMap) dataMap[hourLabel]++;
+                });
+                break;
+            case '7d':
+                const last7d = subDays(now, 7);
+                filteredCalls = calls.filter(call => call.created_at && new Date(call.created_at) > last7d);
+                formatLabel = (date: Date) => format(date, 'eee'); // 'Mon', 'Tue', etc.
+                for (let i = 6; i >= 0; i--) {
+                   const date = subDays(now, i);
+                   labels.push(format(startOfDay(date), 'eee'));
+                }
+                labels.forEach(label => dataMap[label] = 0);
+                filteredCalls.forEach(call => {
+                    const dayLabel = format(startOfDay(new Date(call.created_at!)), 'eee');
+                    if(dayLabel in dataMap) dataMap[dayLabel]++;
+                });
+                break;
+            case '12m':
+                 const last12m = subMonths(now, 12);
+                 filteredCalls = calls.filter(call => call.created_at && new Date(call.created_at) > last12m);
+                 formatLabel = (date: Date) => format(date, 'MMM');
+                 for (let i = 11; i >= 0; i--) {
+                    const date = subMonths(now, i);
+                    labels.push(format(startOfMonth(date), 'MMM'));
+                 }
+                 labels.forEach(label => dataMap[label] = 0);
+                 filteredCalls.forEach(call => {
+                    const monthLabel = format(startOfMonth(new Date(call.created_at!)), 'MMM');
+                    if(monthLabel in dataMap) dataMap[monthLabel]++;
+                 });
+                 break;
+            case '30d':
+            default:
+                const last30d = subDays(now, 30);
+                filteredCalls = calls.filter(call => call.created_at && new Date(call.created_at) > last30d);
+                formatLabel = (date: Date) => format(date, 'd');
+                for (let i = 29; i >= 0; i--) {
+                    const date = subDays(now, i);
+                    labels.push(format(startOfDay(date), 'd MMM'));
+                }
+                 labels.forEach(label => dataMap[label] = 0);
+                filteredCalls.forEach(call => {
+                    const dayOfMonthLabel = format(startOfDay(new Date(call.created_at!)), 'd MMM');
+                    if(dayOfMonthLabel in dataMap) dataMap[dayOfMonthLabel]++;
+                });
+                break;
         }
 
-        calls.forEach(call => {
-            if (call.created_at) {
-                const day = new Date(call.created_at).getDate();
-                if(day >= 1 && day <= 30){
-                    callsByDay[day] = (callsByDay[day] || 0) + 1;
-                }
-            }
-        });
+        return Object.keys(dataMap).map(name => ({ name, calls: dataMap[name] }));
+    }, [calls, timeRange]);
 
-        return Object.keys(callsByDay).map(day => ({ name: day, calls: callsByDay[parseInt(day)] }));
-    }, [calls]);
+    const descriptions: Record<TimeRange, string> = {
+        '24h': 'Call analytics for the last 24 hours',
+        '7d': 'Call analytics for the last 7 days',
+        '30d': 'Call analytics for the last 30 days',
+        '12m': 'Call analytics for the last 12 months',
+    };
 
     return (
         <Card className="col-span-12">
@@ -59,20 +122,20 @@ const AnalyticsChart = ({ calls }: { calls: Partial<Call>[] }) => {
                 <div className="flex justify-between items-center">
                     <CardTitle>Analytics</CardTitle>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm">12 months</Button>
-                        <Button variant="ghost" size="sm">30 days</Button>
-                        <Button variant="ghost" size="sm">7 days</Button>
-                        <Button variant="ghost" size="sm">24 hours</Button>
+                        <Button variant={timeRange === '12m' ? 'default' : 'outline'} size="sm" onClick={() => setTimeRange('12m')}>12 months</Button>
+                        <Button variant={timeRange === '30d' ? 'default' : 'outline'} size="sm" onClick={() => setTimeRange('30d')}>30 days</Button>
+                        <Button variant={timeRange === '7d' ? 'default' : 'outline'} size="sm" onClick={() => setTimeRange('7d')}>7 days</Button>
+                        <Button variant={timeRange === '24h' ? 'default' : 'outline'} size="sm" onClick={() => setTimeRange('24h')}>24 hours</Button>
                     </div>
                 </div>
-                <CardDescription>Call analytics for last 30 days</CardDescription>
+                <CardDescription>{descriptions[timeRange]}</CardDescription>
             </CardHeader>
             <CardContent>
                  <ResponsiveContainer width="100%" height={350}>
                     <BarChart data={data}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
                          <Tooltip
                           cursor={{ fill: 'hsla(var(--accent), 0.5)' }}
                           contentStyle={{ 
@@ -281,6 +344,7 @@ export default function CallsDashboard() {
   const { user, logout } = useAuth();
   const [calls, setCalls] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<TimeRange>('30d');
   const { toast } = useToast();
   
   useEffect(() => {
@@ -369,7 +433,7 @@ export default function CallsDashboard() {
                     <StatCard title="Avg. Duration" value={`${avgDuration.toFixed(1)} min`} percentage="-1.59%" change="vs last month" icon={TrendingDown} changeType="down" />
                     <StatCard title="Answer Rate" value="92%" percentage="+7%" change="vs last month" icon={TrendingUp} changeType="up" />
                 </div>
-                <AnalyticsChart calls={calls} />
+                <AnalyticsChart calls={calls} timeRange={timeRange} setTimeRange={setTimeRange} />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <TopListCard title="Top Contacts" data={topContacts} headers={['Source', 'Calls']} />
                     <TopListCard title="Top Categories" data={topCategories} headers={['Page', 'Calls']} />
