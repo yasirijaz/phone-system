@@ -87,8 +87,12 @@ export default function SettingsPage() {
 
 
   useEffect(() => {
-     if (user && ![1, 2].includes(user.role_id ?? 0)) {
+     if (user && user.role_id === 3) {
         router.replace('/');
+        return;
+    }
+    if(user?.role_id === 1) {
+        router.replace('/companies');
         return;
     }
     if (user?.company_id) {
@@ -144,7 +148,7 @@ export default function SettingsPage() {
     }
   };
   
-  if (user && ![1, 2].includes(user.role_id ?? 0)) {
+  if (user && ![2].includes(user.role_id ?? 0)) {
     return null; // or a loading/redirect component
   }
 
@@ -400,3 +404,5 @@ export default function SettingsPage() {
     </SidebarProvider>
   );
 }
+
+    

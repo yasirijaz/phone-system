@@ -92,10 +92,16 @@ export default function CompanySettingsPage() {
 
 
   useEffect(() => {
-    if (user?.role_id !== 1) {
+    if (user?.role_id === 3) {
        router.replace('/');
        return;
     }
+
+    if(user?.role_id === 2 && user?.company_id !== companyId) {
+        router.replace('/');
+        return;
+    }
+    
     if(companyId) {
         fetchSettings();
     }
@@ -143,7 +149,7 @@ export default function CompanySettingsPage() {
     }
   };
 
-  if (user?.role_id !== 1) {
+  if (user?.role_id === 3) {
     return null;
   }
 
@@ -163,17 +169,19 @@ export default function CompanySettingsPage() {
               logout={logout} 
               pageTitle="Company Settings"
           />
-          <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
-            <div className="flex items-center gap-4">
-                 <Button variant="ghost" size="icon" asChild>
-                    <Link href="/companies">
-                      <ArrowLeft />
-                    </Link>
-                </Button>
-                <h1 className="text-xl font-bold">Company Settings</h1>
-            </div>
-             <Button type="submit" form="settings-form">Save Changes</Button>
-          </header>
+          {user?.role_id === 1 && (
+            <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
+                <div className="flex items-center gap-4">
+                    <Button variant="ghost" size="icon" asChild>
+                        <Link href="/companies">
+                        <ArrowLeft />
+                        </Link>
+                    </Button>
+                    <h1 className="text-xl font-bold">Company Settings</h1>
+                </div>
+                <Button type="submit" form="settings-form">Save Changes</Button>
+            </header>
+          )}
 
           <main className="flex-1 p-4 md:p-8 bg-muted/40">
             <Form {...form}>
@@ -408,3 +416,5 @@ export default function CompanySettingsPage() {
     </SidebarProvider>
   );
 }
+
+    
