@@ -25,3 +25,20 @@ export const getDepartmentUsers = async (companyId: number, departmentId: number
     const response = await axios.get(`/api/companies/${companyId}/departments/${departmentId}/users`);
     return response.data;
 };
+
+export const updateDndStatus = async (departmentId: number, userId: number, isDnd: boolean): Promise<any> => {
+    const response = await axios.post('/api/departments/updateDnd', {
+        department_id: departmentId,
+        user_id: userId,
+        is_dnd: isDnd ? 1 : 0,
+    });
+    return response.data;
+};
+
+export const getDndStatus = async (departmentId: number, userId: number): Promise<{ is_dnd: boolean }> => {
+    const response = await axios.post('/api/departments/getDndStatus', {
+        department_id: departmentId,
+        user_id: userId,
+    });
+    return response.data;
+}

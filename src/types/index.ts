@@ -36,6 +36,7 @@ export interface User {
   role_id?: number;
   company_id?: number;
   company?: Company;
+  is_dnd?: boolean;
 }
 
 export interface ProfilePayload {

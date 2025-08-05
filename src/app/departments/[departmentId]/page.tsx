@@ -15,7 +15,7 @@ import AppHeader from "@/components/app-header";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { getDepartmentUsers, getDepartments } from "@/services/departmentService";
+import { getDepartmentUsers, getDepartments, updateDndStatus, getDndStatus } from "@/services/departmentService";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -37,6 +37,8 @@ export default function DepartmentDetailPage() {
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [operators, setOperators] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dndStatus, setDndStatus] = useState(false);
+  const [dndLoading, setDndLoading] = useState(false);
 
   useEffect(() => {
     const fetchDepartmentData = async () => {
@@ -49,6 +51,9 @@ export default function DepartmentDetailPage() {
             
             const numbers = await getPhoneNumbers(departmentId);
             setPhoneNumbers(numbers);
+            
+            const dnd = await getDndStatus(departmentId, user.id);
+            setDndStatus(dnd.is_dnd);
 
             const [allCallLogs, newCallLogs, operatorsResponse, missedCallLogs, recordingLogs] = await Promise.all([
               getCallLogs(),
@@ -82,6 +87,28 @@ export default function DepartmentDetailPage() {
     console.log("Request to call:", number);
   };
   
+  const handleDndChange = async (checked: boolean) => {
+    if (!user) return;
+    setDndLoading(true);
+    setDndStatus(checked);
+    try {
+        await updateDndStatus(departmentId, user.id, checked);
+        toast({
+            title: "Success",
+            description: `Do Not Disturb has been ${checked ? 'enabled' : 'disabled'}.`,
+        });
+    } catch (error) {
+        setDndStatus(!checked); // Revert on error
+        toast({
+            title: "Error",
+            description: "Failed to update DND status.",
+            variant: "destructive",
+        });
+    } finally {
+        setDndLoading(false);
+    }
+  };
+
   const departmentPhoneNumber = phoneNumbers.length > 0 ? phoneNumbers[0].phone_no : 'No number assigned';
   
   const getRoleName = (roleId?: number) => {
@@ -111,7 +138,12 @@ export default function DepartmentDetailPage() {
                         </div>
                         <div className="flex items-center space-x-2">
                             <Label htmlFor="dnd-switch">DO NOT DISTURB</Label>
-                            <Switch id="dnd-switch" />
+                            <Switch 
+                              id="dnd-switch"
+                              checked={dndStatus}
+                              onCheckedChange={handleDndChange}
+                              disabled={dndLoading}
+                            />
                         </div>
                     </div>
                     <Tabs defaultValue="hold-queue">
