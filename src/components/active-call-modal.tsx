@@ -257,7 +257,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                         <div className="py-4 space-y-2">
                             {currentParticipants.map((p) => (
                                 <div key={p.call_sid} className="flex items-center justify-between p-2 rounded-md border">
-                                    <span>{p.label || p.call_sid}</span>
+                                    <span>{p.label}</span>
                                     <Button variant="ghost" size="icon" onClick={() => handleRemoveParticipant(p.call_sid)}>
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
