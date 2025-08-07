@@ -273,15 +273,22 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       )
     }
     const conferenceCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/conference-callback';
+    const recordingCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/recording-callback';
+    const conferenceEventCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/conference-eventCallback';
 
     reservation.conference({
       conferenceStatusCallback: conferenceCallback,
       conferenceStatusCallbackMethod: 'POST',
       conferenceStatusCallbackEvent: 'start end join leave',
+      statusCallback: conferenceCallback,
+      statusCallbackMethod: 'POST',
+      statusCallbackEvent: 'start end join leave',
       conferenceRecord: true,
       endConferenceOnExit: true,
       startConferenceOnEnter: true,
-      transcribe: false
+      transcribe: false,
+      recordingStatusCallback: recordingCallback,
+      conferenceRecordingStatusCallback: conferenceEventCallback,
     });
   };
 
