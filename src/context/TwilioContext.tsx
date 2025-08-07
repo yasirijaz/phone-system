@@ -52,6 +52,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
   const [activityName, setActivityName] = useState<string | null>(null);
+  const audio = new Audio('/sounds/reservation.mp3');
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -107,8 +108,15 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       const handleIncomingCall = (conn: Call) => {
         console.log('Incoming call received:', conn);
+        
         setConnection(conn);
-
+        const autoAccept = conn.customParameters.get('autoAccept');
+        if(autoAccept && autoAccept === '0') {
+          // for later user.
+        } else {
+          conn.accept();
+          toast({ title: "Incoming Call Accepted" });
+        }
         conn.on('disconnect', () => {
           console.log('Call disconnected.');
           setConnection(null);
@@ -156,6 +164,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.log('Reservation created:', reservation);
         setIncomingReservation(reservation);
         setShowReservationModal(true);
+        // play ringtone or notification sound here
+        // play in loop until accepted or rejected
+        audio.loop = true;
+        audio.play();
 
         const attributes = reservation.task?.attributes;
         if (attributes.do_nothing) {
@@ -180,7 +192,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           console.log('Reservation accepted.');
           setIncomingReservation(null);
           setShowReservationModal(false);
-
+          audio.pause();
           setTimeout(() => {
             const attributes = reservation.task?.attributes;
             const confSid = attributes?.conference?.sid;
@@ -195,6 +207,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         });
 
         const clearReservation = () => {
+           audio.pause();
           setIncomingReservation(null);
           setShowReservationModal(false);
         };
@@ -242,6 +255,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   };
 
   const acceptReservation = (reservation: Reservation) => {
+     audio.pause();
     console.log('accepting reservation', reservation);
     const attributes = reservation.task?.attributes;
     if (attributes.do_nothing) {

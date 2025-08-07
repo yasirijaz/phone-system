@@ -122,8 +122,9 @@ export default function AppHeader({ user, logout, pageTitle, showBackButton = fa
         }
     
         try {
-            const params: { To: string, From?: string, direction?: string } = { To: number };
+            const params: { To: string, From?: string, direction?: string, autoAccept?: string } = { To: number };
             if (fromNumber) {
+                params.autoAccept = "0";
                 params.From = fromNumber;
                 params.direction = "outbound";
                 setFromNumber(fromNumber);
