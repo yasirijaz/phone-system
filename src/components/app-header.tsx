@@ -7,7 +7,7 @@ import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
 import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
-import { getPhoneNumbers } from "@/services/phoneNumberService";
+import { getPhoneNumbers, getconferenceSid } from "@/services/phoneNumberService";
 import { getContacts } from "@/services/contactService";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ export default function AppHeader({ user, logout, pageTitle, showBackButton = fa
     const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
     const [isSmsOpen, setIsSmsOpen] = useState(false);
     const [isVideoOpen, setIsVideoOpen] = useState(false);
-    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity } = useTwilio();
+    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid } = useTwilio();
     const { toast } = useToast();
 
     const [departments, setDepartments] = useState<Department[]>([]);
@@ -126,6 +126,7 @@ export default function AppHeader({ user, logout, pageTitle, showBackButton = fa
             if (fromNumber) {
                 params.From = fromNumber;
                 params.direction = "outbound";
+                setFromNumber(fromNumber);
             }
             const connection = await device.connect({ params });
             setDialerOpen(false);
@@ -134,8 +135,20 @@ export default function AppHeader({ user, logout, pageTitle, showBackButton = fa
             setActiveCall(connection);
             setIsActiveCallOpen(true);
 
-            connection.on('accept', () => {
+           connection.on('accept', async () => {
                 console.log('Call accepted');
+                const callSid = connection.parameters.CallSid;
+                try {
+                    const data = await getconferenceSid(callSid);
+                    if (data.conferenceSid) {
+                        setConferenceSid(data.conferenceSid);
+                        setActiveConferenceSid(data.conferenceSid);
+                    } else {
+                        console.warn('No conferenceSid found yet.');
+                    }
+                } catch (e) {
+                    console.error('Error fetching conferenceSid:', e);
+                }
             });
 
             connection.on('disconnect', () => {

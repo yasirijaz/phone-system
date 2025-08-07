@@ -30,6 +30,8 @@ interface TwilioContextType {
   completeReservation: (reservation: Reservation) => void;
   activityName: string | null;
   toggleActivity: (selectedActivityName: string) => void;
+  setFromNumber: (from: string | null) => void;
+  setConferenceSid: (sid: string | null) => void;
 }
 
 const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
@@ -327,7 +329,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     rejectReservation,
     completeReservation,
     activityName,
-    toggleActivity
+    toggleActivity,
+    setFromNumber,
+    setConferenceSid,
   };
 
   return <TwilioContext.Provider value={value}>{children}</TwilioContext.Provider>;

@@ -150,6 +150,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
       toast({ title: "Error", description: "Please select a user to add.", variant: 'destructive' });
       return;
     }
+    
     if (!connection || !conferenceSid || !fromNumber) {
         toast({ title: "Error", description: "Cannot add participant. Active call session not found.", variant: 'destructive' });
         return;
