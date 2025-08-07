@@ -233,7 +233,11 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                                 </SelectTrigger>
                                 <SelectContent>
                                     {companyUsers.map(user => (
-                                        <SelectItem key={user.id} value={String(user.id)}>{user.name}</SelectItem>
+                                        authUser && user.id !== authUser.id && (
+                                          <SelectItem key={user.id} value={String(user.id)}>
+                                            {user.name}
+                                          </SelectItem>
+                                        )
                                     ))}
                                 </SelectContent>
                             </Select>
