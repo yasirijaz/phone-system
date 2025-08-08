@@ -21,3 +21,8 @@ export const updatePhoneNumber = async (id: number, data: Partial<PhoneNumber>):
 export const deletePhoneNumber = async (id: number): Promise<void> => {
   await axios.delete(`/api/phone-numbers/${id}`);
 };
+
+export const getconferenceSid = async (callSid: string) => {
+  const response = await axios.get(`/api/twilio/conference-sid/${callSid}`);
+  return response.data;
+};

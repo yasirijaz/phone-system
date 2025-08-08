@@ -60,7 +60,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                 </div>
                  {hasRecording && (
                     <div className="mt-2">
-                        <audio controls src={call.recording_url} className="w-full h-8" onClick={(e) => e.preventDefault()}></audio>
+                        {/* <audio controls src={call.recording_url} className="w-full h-8" onClick={(e) => e.preventDefault()}></audio> */}
                     </div>
                 )}
             </div>

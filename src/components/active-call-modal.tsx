@@ -150,6 +150,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
       toast({ title: "Error", description: "Please select a user to add.", variant: 'destructive' });
       return;
     }
+    
     if (!connection || !conferenceSid || !fromNumber) {
         toast({ title: "Error", description: "Cannot add participant. Active call session not found.", variant: 'destructive' });
         return;
@@ -232,7 +233,11 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                                 </SelectTrigger>
                                 <SelectContent>
                                     {companyUsers.map(user => (
-                                        <SelectItem key={user.id} value={String(user.id)}>{user.name}</SelectItem>
+                                        authUser && user.id !== authUser.id && (
+                                          <SelectItem key={user.id} value={String(user.id)}>
+                                            {user.name}
+                                          </SelectItem>
+                                        )
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -256,7 +261,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                         <div className="py-4 space-y-2">
                             {currentParticipants.map((p) => (
                                 <div key={p.call_sid} className="flex items-center justify-between p-2 rounded-md border">
-                                    <span>{p.label || p.call_sid}</span>
+                                    <span>{p.label}</span>
                                     <Button variant="ghost" size="icon" onClick={() => handleRemoveParticipant(p.call_sid)}>
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>

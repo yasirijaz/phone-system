@@ -168,6 +168,8 @@ export default function DepartmentDetailPage() {
                                             <TableHead>Name</TableHead>
                                             <TableHead>Email</TableHead>
                                             <TableHead>Role</TableHead>
+                                            <TableHead>In-Call</TableHead>
+                                            <TableHead>DND</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -181,6 +183,16 @@ export default function DepartmentDetailPage() {
                                                     <TableCell>
                                                         <Badge variant={op.role_id === 2 ? 'default' : 'secondary'}>
                                                             {getRoleName(op.role_id)}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={op.in_call === 0 ? 'default' : 'secondary'}>
+                                                            {op.in_call === 0 ? 'No' : 'Yes'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={op.do_not_disturb === 0 ? 'default' : 'secondary'}>
+                                                            {op.do_not_disturb === 0 ? 'No' : 'Yes'}
                                                         </Badge>
                                                     </TableCell>
                                                 </TableRow>

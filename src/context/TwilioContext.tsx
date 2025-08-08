@@ -30,6 +30,8 @@ interface TwilioContextType {
   completeReservation: (reservation: Reservation) => void;
   activityName: string | null;
   toggleActivity: (selectedActivityName: string) => void;
+  setFromNumber: (from: string | null) => void;
+  setConferenceSid: (sid: string | null) => void;
 }
 
 const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
@@ -50,6 +52,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
   const [activityName, setActivityName] = useState<string | null>(null);
+  const audio = new Audio('/sounds/reservation.mp3');
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -105,8 +108,15 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       const handleIncomingCall = (conn: Call) => {
         console.log('Incoming call received:', conn);
+        
         setConnection(conn);
-
+        const autoAccept = conn.customParameters.get('autoAccept');
+        if(autoAccept && autoAccept === '0') {
+          // for later user.
+        } else {
+          conn.accept();
+          toast({ title: "Incoming Call Accepted" });
+        }
         conn.on('disconnect', () => {
           console.log('Call disconnected.');
           setConnection(null);
@@ -154,6 +164,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.log('Reservation created:', reservation);
         setIncomingReservation(reservation);
         setShowReservationModal(true);
+        // play ringtone or notification sound here
+        // play in loop until accepted or rejected
+        audio.loop = true;
+        audio.play();
 
         const attributes = reservation.task?.attributes;
         if (attributes.do_nothing) {
@@ -178,7 +192,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           console.log('Reservation accepted.');
           setIncomingReservation(null);
           setShowReservationModal(false);
-
+          audio.pause();
           setTimeout(() => {
             const attributes = reservation.task?.attributes;
             const confSid = attributes?.conference?.sid;
@@ -193,6 +207,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         });
 
         const clearReservation = () => {
+           audio.pause();
           setIncomingReservation(null);
           setShowReservationModal(false);
         };
@@ -240,6 +255,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   };
 
   const acceptReservation = (reservation: Reservation) => {
+     audio.pause();
     console.log('accepting reservation', reservation);
     const attributes = reservation.task?.attributes;
     if (attributes.do_nothing) {
@@ -257,15 +273,22 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       )
     }
     const conferenceCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/conference-callback';
+    const recordingCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/recording-callback';
+    const conferenceEventCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/conference-eventCallback';
 
     reservation.conference({
       conferenceStatusCallback: conferenceCallback,
       conferenceStatusCallbackMethod: 'POST',
       conferenceStatusCallbackEvent: 'start end join leave',
+      statusCallback: conferenceCallback,
+      statusCallbackMethod: 'POST',
+      statusCallbackEvent: 'start end join leave',
       conferenceRecord: true,
       endConferenceOnExit: true,
       startConferenceOnEnter: true,
-      transcribe: false
+      transcribe: false,
+      recordingStatusCallback: recordingCallback,
+      conferenceRecordingStatusCallback: conferenceEventCallback,
     });
   };
 
@@ -327,7 +350,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     rejectReservation,
     completeReservation,
     activityName,
-    toggleActivity
+    toggleActivity,
+    setFromNumber,
+    setConferenceSid,
   };
 
   return <TwilioContext.Provider value={value}>{children}</TwilioContext.Provider>;

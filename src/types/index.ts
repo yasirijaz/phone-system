@@ -37,6 +37,8 @@ export interface User {
   company_id?: number;
   company?: Company;
   is_dnd?: boolean;
+  do_not_disturb?: number;
+  in_call?: number;
 }
 
 export interface ProfilePayload {
