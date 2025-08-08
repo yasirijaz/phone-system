@@ -30,9 +30,21 @@ interface AppHeaderProps {
     pageTitle?: string;
     showBackButton?: boolean;
     backButtonHref?: string;
+    dialerOpen?: boolean;
+    onDialerOpenChange?: (open: boolean) => void;
+    dialerInitialValue?: string;
 }
 
-export default function AppHeader({ user, logout, pageTitle, showBackButton = false, backButtonHref = "" }: AppHeaderProps) {
+export default function AppHeader({ 
+    user, 
+    logout, 
+    pageTitle, 
+    showBackButton = false, 
+    backButtonHref = "", 
+    dialerOpen: controlledDialerOpen, 
+    onDialerOpenChange: setControlledDialerOpen, 
+    dialerInitialValue: controlledDialerInitialValue 
+}: AppHeaderProps) {
     const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
     const [isSmsOpen, setIsSmsOpen] = useState(false);
     const [isVideoOpen, setIsVideoOpen] = useState(false);
@@ -44,8 +56,15 @@ export default function AppHeader({ user, logout, pageTitle, showBackButton = fa
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [loadingDepartments, setLoadingDepartments] = useState(true);
     const [loadingNumbers, setLoadingNumbers] = useState(false);
-    const [dialerOpen, setDialerOpen] = useState(false);
-    const [dialerInitialValue, setDialerInitialValue] = useState('');
+    
+    // Internal state for uncontrolled usage
+    const [internalDialerOpen, setInternalDialerOpen] = useState(false);
+    const [internalDialerInitialValue, setInternalDialerInitialValue] = useState('');
+
+    const dialerOpen = controlledDialerOpen ?? internalDialerOpen;
+    const setDialerOpen = setControlledDialerOpen ?? setInternalDialerOpen;
+    const dialerInitialValue = controlledDialerInitialValue ?? internalDialerInitialValue;
+    
     const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
     const [selectedFromNumber, setSelectedFromNumber] = useState('');
 
@@ -116,8 +135,13 @@ export default function AppHeader({ user, logout, pageTitle, showBackButton = fa
         }
         
         if (!fromNumber) {
-            setDialerInitialValue(number);
-            setDialerOpen(true);
+            // If used as uncontrolled, update internal state
+            if (setControlledDialerOpen === undefined) {
+                setInternalDialerInitialValue(number);
+                setInternalDialerOpen(true);
+            } else { // If controlled, expect parent to handle it
+                 setControlledDialerOpen(true);
+            }
             return;
         }
     
@@ -223,7 +247,14 @@ export default function AppHeader({ user, logout, pageTitle, showBackButton = fa
                         onSetSelectedFromNumber={setSelectedFromNumber}
                         contacts={contacts}
                      >
-                       <Button variant="ghost" size="icon" onClick={() => { setDialerInitialValue(''); setDialerOpen(true);}}><Phone className="h-5 w-5" /></Button>
+                       <Button variant="ghost" size="icon" onClick={() => { 
+                           if (setControlledDialerOpen === undefined) {
+                               setInternalDialerInitialValue(''); 
+                           }
+                           setDialerOpen(true);
+                        }}>
+                           <Phone className="h-5 w-5" />
+                        </Button>
                      </Dialer>
                      <Button variant="ghost" size="icon" onClick={() => setIsSmsOpen(true)}><MessageSquare className="h-5 w-5" /></Button>
                      <Button variant="ghost" size="icon" onClick={() => setIsVideoOpen(true)}><Video className="h-5 w-5" /></Button>

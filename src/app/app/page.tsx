@@ -30,6 +30,9 @@ export default function AppUIPage() {
   const [unreadCalls, setUnreadCalls] = useState<Call[]>([]);
   const [loadingCalls, setLoadingCalls] = useState(true);
 
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [dialerInitialValue, setDialerInitialValue] = useState('');
+
   const getLatestUniqueCallsByContact = (calls: Call[]): Call[] => {
     const latestCalls = new Map<string, Call>();
     const sortedCalls = [...calls].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -70,10 +73,8 @@ export default function AppUIPage() {
         toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});
         return;
     }
-    // The actual call logic is now centralized in AppHeader
-    // but the trigger can still originate from the call log on this page.
-    // For now, we'll let the header's dialer handle it.
-    console.log("Request to call:", number);
+    setDialerInitialValue(number);
+    setDialerOpen(true);
   };
 
   return (
@@ -84,7 +85,13 @@ export default function AppUIPage() {
         <SidebarInset>
              <div className="flex h-screen w-full bg-background text-foreground">
                 <div className="flex flex-1 flex-col">
-                  <AppHeader user={user} logout={logout} />
+                  <AppHeader 
+                    user={user} 
+                    logout={logout} 
+                    dialerOpen={dialerOpen}
+                    onDialerOpenChange={setDialerOpen}
+                    dialerInitialValue={dialerInitialValue}
+                  />
 
                   <main className="flex-1 p-6 overflow-y-auto">
                     <Tabs defaultValue="unread">
