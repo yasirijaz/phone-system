@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -32,7 +31,7 @@ export default function ReservationModal({ isOpen, onClose, reservation, onAccep
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className="bg-gray-800 text-white border-0 w-full max-w-md h-full sm:h-auto sm:max-h-[90vh] flex flex-col justify-between p-8" 
+        className="bg-gray-700 text-white border-0 w-full max-w-md h-full sm:h-auto sm:max-h-[90vh] flex flex-col justify-between p-8" 
         onInteractOutside={(e) => e.preventDefault()}
         hideCloseButton={true}
       >
