@@ -1,10 +1,12 @@
 
 'use client';
 
+import * as React from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Phone, PhoneOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 
 interface IncomingCallModalProps {
   isOpen: boolean;
@@ -134,7 +136,4 @@ const OriginalDialogContent = React.forwardRef<
 OriginalDialogContent.displayName = DialogPrimitive.Content.displayName;
 
 // @ts-ignore
-import * as DialogPrimitive from "@radix-ui/react-dialog";
-// @ts-ignore
 DialogContent.render = OriginalDialogContent.render;
-
