@@ -11,6 +11,7 @@ import { Logo } from '@/components/icons';
 import { useToast } from '@/hooks/use-toast';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { forgotPassword } from '@/store/slices/authSlice';
+import { useRouter } from 'next/navigation';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -18,6 +19,7 @@ export default function ForgotPasswordPage() {
   const { loading, error } = useAppSelector((state) => state.auth);
   const { toast } = useToast();
   const [message, setMessage] = useState('');
+  const router = useRouter();
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,9 +28,14 @@ export default function ForgotPasswordPage() {
     if (forgotPassword.fulfilled.match(result)) {
         toast({
             title: 'Success',
-            description: result.payload.status,
+            description: "Redirecting you to reset your password.",
         });
-        setMessage(result.payload.status);
+        // The API sends back the full URL in the 'email' field.
+        if (result.payload?.email) {
+            router.push(result.payload.email);
+        } else {
+             setMessage("Could not get reset link. Please try again.");
+        }
     } else if (forgotPassword.rejected.match(result)) {
         const errorMessage = typeof result.payload === 'string' ? result.payload : 'An unknown error occurred';
          toast({

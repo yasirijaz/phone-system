@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ import { resetPassword } from '@/store/slices/authSlice';
 export default function ResetPasswordPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const token = params.token as string;
   
   const [email, setEmail] = useState('');
@@ -26,6 +27,13 @@ export default function ResetPasswordPage() {
   const { toast } = useToast();
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((state) => state.auth);
+
+  useEffect(() => {
+    const emailFromUrl = searchParams.get('email');
+    if(emailFromUrl) {
+      setEmail(decodeURIComponent(emailFromUrl));
+    }
+  }, [searchParams]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +93,7 @@ export default function ResetPasswordPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
+                disabled={loading || !!searchParams.get('email')}
               />
             </div>
             <div className="space-y-2">
