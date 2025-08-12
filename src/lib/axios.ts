@@ -7,6 +7,8 @@ const axiosInstance = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
+  // @ts-ignore - a temporary workaround for a type definition issue
+  trailingSlash: false,
 });
 
 axiosInstance.interceptors.request.use((config) => {
