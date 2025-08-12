@@ -37,6 +37,27 @@ export const registerUser = createAsyncThunk('auth/registerUser', async (userDat
     }
 });
 
+export const forgotPassword = createAsyncThunk('auth/forgotPassword', async ({ email }: { email: string }, { rejectWithValue }) => {
+    try {
+        const response = await axios.post('/api/forgot-password', { email });
+        return response.data;
+    } catch (error: any) {
+        return rejectWithValue(error.response?.data?.message || 'Failed to send reset link.');
+    }
+});
+
+export const resetPassword = createAsyncThunk('auth/resetPassword', async (data: any, { rejectWithValue }) => {
+    try {
+        const response = await axios.post('/api/reset-password', data);
+        return response.data;
+    } catch (error: any) {
+         if (error.response?.data?.errors) {
+            return rejectWithValue(Object.values(error.response.data.errors).flat().join(' '));
+        }
+        return rejectWithValue(error.response?.data?.message || 'Failed to reset password.');
+    }
+});
+
 
 const authSlice = createSlice({
   name: 'auth',
@@ -105,6 +126,28 @@ const authSlice = createSlice({
         localStorage.setItem('user', JSON.stringify(action.payload.user));
       })
       .addCase(registerUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(forgotPassword.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(forgotPassword.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(forgotPassword.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(resetPassword.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(resetPassword.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(resetPassword.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
