@@ -25,16 +25,29 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setMessage('');
     const result = await dispatch(forgotPassword({ email }));
+    
     if (forgotPassword.fulfilled.match(result)) {
-        toast({
-            title: 'Success',
-            description: "Redirecting you to reset your password.",
-        });
-        // The API sends back the full URL in the 'email' field.
-        if (result.payload?.email) {
-            router.push(result.payload.email);
+        const payload = result.payload as { email?: string, status?: string };
+        if (payload.email && payload.email.includes('reset-password')) {
+            toast({
+                title: 'Success',
+                description: "Redirecting you to reset your password.",
+            });
+            // The API sends back the full URL in the 'email' field.
+            // We need to construct a relative path from the absolute URL.
+            try {
+              const url = new URL(payload.email);
+              router.push(url.pathname + url.search);
+            } catch (e) {
+               setMessage("Received an invalid reset link. Please try again.");
+               toast({ title: 'Error', description: 'Invalid reset link from server.', variant: 'destructive' });
+            }
+        } else if (payload.status) {
+             setMessage(payload.status);
+             toast({ title: 'Info', description: payload.status });
         } else {
              setMessage("Could not get reset link. Please try again.");
+             toast({ title: 'Error', description: 'Could not get reset link.', variant: 'destructive' });
         }
     } else if (forgotPassword.rejected.match(result)) {
         const errorMessage = typeof result.payload === 'string' ? result.payload : 'An unknown error occurred';
