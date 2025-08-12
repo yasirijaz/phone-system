@@ -33,8 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/login');
   };
   
-  const unprotectedRoutes = ['/login', '/register', '/pricing'];
-  const isProtectedRoute = !unprotectedRoutes.includes(pathname);
+  const unprotectedRoutes = ['/login', '/register', '/pricing', '/forgot-password', '/reset-password'];
+  const isProtectedRoute = !unprotectedRoutes.some(route => pathname.startsWith(route));
   const isAuthRoute = ['/login', '/register'].includes(pathname);
 
   useEffect(() => {
@@ -83,5 +83,3 @@ export function useAuth() {
   }
   return context;
 }
-
-    
