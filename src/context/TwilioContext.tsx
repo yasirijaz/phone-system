@@ -174,14 +174,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           console.log('Reservation is set to do nothing.');
           if (attributes.do_nothing) {
             console.log('Reservation is set to do nothing.');
-            const outgoing = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/outgoing-callback';
+            const outgoing = process.env.NEXT_PUBLIC_API_URL + '/api/twilio/outgoing-callback';
 
             reservation.call(
               attributes.from,
               outgoing,
               {
                 accept: true,
-                statusCallbackUrl: process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/call-status',
+                statusCallbackUrl: process.env.NEXT_PUBLIC_API_URL + '/api/twilio/call-status',
                 to: attributes.to,
               }
             )
@@ -260,21 +260,21 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     const attributes = reservation.task?.attributes;
     if (attributes.do_nothing) {
       console.log('Reservation is set to do nothing.');
-      const outgoing = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/outgoing-callback';
+      const outgoing = process.env.NEXT_PUBLIC_API_URL + '/api/twilio/outgoing-callback';
 
       reservation.call(
         attributes.from,
         outgoing,
         {
           accept: true,
-          statusCallbackUrl: process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/call-status',
+          statusCallbackUrl: process.env.NEXT_PUBLIC_API_URL + '/api/twilio/call-status',
           to: attributes.to,
         }
       )
     }
-    const conferenceCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/conference-callback';
-    const recordingCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/recording-callback';
-    const conferenceEventCallback = process.env.NEXT_PUBLIC_CONF_CALLBACK_URL + '/api/twilio/conference-eventCallback';
+    const conferenceCallback = process.env.NEXT_PUBLIC_API_URL + '/api/twilio/conference-callback';
+    const recordingCallback = process.env.NEXT_PUBLIC_API_URL + '/api/twilio/recording-callback';
+    const conferenceEventCallback = process.env.NEXT_PUBLIC_API_URL + '/api/twilio/conference-eventCallback';
 
     reservation.conference({
       conferenceStatusCallback: conferenceCallback,
