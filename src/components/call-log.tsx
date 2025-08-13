@@ -40,12 +40,14 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
   const contactDisplayNumber = call.direction === 'inbound' ? call.from : call.to;
   
   const handleCallClick = (e: React.MouseEvent) => {
-    e.preventDefault();
     e.stopPropagation();
+    e.preventDefault();
     onMakeCall(contactDisplayNumber);
   }
   
-  const handleJoinCall = async (options: { silent?: boolean, coach?: boolean }) => {
+  const handleJoinCall = async (e: React.MouseEvent, options: { silent?: boolean, coach?: boolean }) => {
+    e.stopPropagation();
+    e.preventDefault();
     if (!user || !call.conference_sid) {
       toast({ title: "Error", description: "Cannot join call. Required information is missing.", variant: "destructive" });
       return;
@@ -101,11 +103,11 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                 </div>
                  {isInProgress && isAdmin && (
                     <div className="mt-4 flex gap-2 border-t pt-2">
-                        <Button variant="outline" size="sm" onClick={() => handleJoinCall({ silent: true, coach: true })}>
+                        <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true, coach: true })}>
                             <Ear className="mr-2 h-4 w-4" />
                             Silently Listen
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleJoinCall({ coach: true })}>
+                        <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { coach: true })}>
                             <Mic className="mr-2 h-4 w-4" />
                             Barge In
                         </Button>
