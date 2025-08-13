@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode, useRef } from 'react';
 import type { Device, Call } from '@twilio/voice-sdk';
 import type { Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
+import { io, type Socket } from 'socket.io-client';
 
 import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
@@ -21,6 +22,7 @@ interface TwilioContextType {
   error: string | null;
   conferenceSid: string | null;
   fromNumber: string | null;
+  socket: Socket | null;
   connectTwilio: () => void;
   acceptCall: () => void;
   rejectCall: () => void;
@@ -41,6 +43,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const deviceRef = useRef<Device | null>(null);
   const workerRef = useRef<TwilioWorker | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const [connection, setConnection] = useState<Call | null>(null);
   const [incomingReservation, setIncomingReservation] = useState<Reservation | null>(null);
   const [showReservationModal, setShowReservationModal] = useState<boolean | null>(null);
@@ -53,6 +56,33 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [twilio, setTwilio] = useState<any>(null);
   const [activityName, setActivityName] = useState<string | null>(null);
   const audio = new Audio('/sounds/reservation.mp3');
+
+  useEffect(() => {
+    if (user && !socketRef.current) {
+        const newSocket = io('https://socket.windshieldhub.com', {
+            query: { user_id: user.id }
+        });
+
+        socketRef.current = newSocket;
+
+        newSocket.on('connect', () => {
+            console.log('Socket connected with ID:', newSocket.id);
+        });
+
+        newSocket.on('disconnect', () => {
+            console.log('Socket disconnected.');
+        });
+        
+        return () => {
+            console.log('Disconnecting socket...');
+            newSocket.disconnect();
+            socketRef.current = null;
+        };
+    } else if (!user && socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+    }
+  }, [user]);
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -342,6 +372,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     error,
     conferenceSid,
     fromNumber,
+    socket: socketRef.current,
     connectTwilio,
     acceptCall,
     rejectCall,
