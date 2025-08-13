@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode, useRef } from 'react';
 import type { Device, Call } from '@twilio/voice-sdk';
 import type { Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
-import { connect, io, type Socket } from 'socket.io-client';
+import { io, type Socket } from 'socket.io-client';
 
 import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
@@ -43,7 +43,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const deviceRef = useRef<Device | null>(null);
   const workerRef = useRef<TwilioWorker | null>(null);
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
   const [connection, setConnection] = useState<Call | null>(null);
   const [incomingReservation, setIncomingReservation] = useState<Reservation | null>(null);
   const [showReservationModal, setShowReservationModal] = useState<boolean | null>(null);
@@ -58,28 +58,41 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const audio = new Audio('/sounds/reservation.mp3');
 
   useEffect(() => {
+    socketRef.current = null;
     if (user && !socketRef.current) {
-        const newSocket = connect('wss://socket.windshieldhub.com', {
-            query: { user_id: user.id }
-        });
+      const WS_URL = 'wss://socket.windshieldhub.com';
+      const newSocket = new WebSocket(WS_URL);
 
         socketRef.current = newSocket;
 
-        newSocket.on('connect', () => {
-            console.log('Socket connected with ID:', newSocket.id);
-        });
-
-        newSocket.on('disconnect', () => {
-            console.log('Socket disconnected.');
-        });
-        
-        return () => {
-            console.log('Disconnecting socket...');
-            newSocket.disconnect();
-            socketRef.current = null;
+        newSocket.onopen = () => {
+          // socketRef.current = null;
+          console.log('WebSocket connection established');
+          // If your server expects an auth or subscription message, send it here:
+          // newSocket.send(JSON.stringify({ type: 'subscribe', token: '<JWT or key>' }));
         };
+
+        newSocket.onmessage = (evt) => {
+          try {
+            const data = JSON.parse(evt.data);
+            console.log('WebSocket message received:', data);
+          } catch (e) {
+            // If the server sends non-JSON frames, handle them here
+            console.warn('Non-JSON message:', evt.data);
+          }
+        };
+
+        newSocket.onerror = () => {
+          // Let onclose handle the retry logic
+          try { newSocket.close(); } catch {}
+        };
+
+        newSocket.onclose = () => {
+          
+        };
+      
     } else if (!user && socketRef.current) {
-        socketRef.current.disconnect();
+        socketRef.current.close();
         socketRef.current = null;
     }
   }, [user]);
