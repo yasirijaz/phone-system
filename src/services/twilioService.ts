@@ -1,12 +1,15 @@
 
 import axios from '@/lib/axios';
 
-export const addParticipant = async (conferenceSid: string, from: string, user_id: string): Promise<any> => {
-    const response = await axios.post('/api/twilio/addParticipent', {
+export const addParticipant = async (conferenceSid: string, from: string, user_id: string, options: { silent?: boolean, coach?: boolean } = {}): Promise<any> => {
+    const payload = {
         conference_sid: conferenceSid,
         from,
-        user_id
-    });
+        user_id,
+        silent: options.silent,
+        coach: options.coach,
+    };
+    const response = await axios.post('/api/twilio/addParticipent', payload);
     return response.data;
 }
 

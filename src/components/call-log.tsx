@@ -7,6 +7,8 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Button } from './ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from './ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { addParticipant } from '@/services/twilioService';
 
 interface CallLogProps {
   calls: Call[];
@@ -16,6 +18,7 @@ interface CallLogProps {
 
 function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (number: string) => void, isClickable: boolean }) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const isAdmin = user?.role_id === 1 || user?.role_id === 2;
 
   const fromName = call.from_name?.name || call.user?.name || call.from;
@@ -41,11 +44,26 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
     e.stopPropagation();
     onMakeCall(contactDisplayNumber);
   }
+  
+  const handleJoinCall = async (options: { silent?: boolean, coach?: boolean }) => {
+    if (!user || !call.conference_sid) {
+      toast({ title: "Error", description: "Cannot join call. Required information is missing.", variant: "destructive" });
+      return;
+    }
+    
+    try {
+      await addParticipant(call.conference_sid, call.from, String(user.id), options);
+      toast({ title: "Success", description: "You have joined the call." });
+    } catch(error) {
+       toast({ title: "Error", description: "Failed to join the call.", variant: "destructive" });
+    }
+  }
+
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
         case 'completed': return <Badge variant="default">Completed</Badge>;
-        case 'in-progress': return <Badge variant="secondary" className="bg-blue-100 text-blue-800">In Progress</Badge>;
+        case 'in_progress': return <Badge variant="secondary" className="bg-blue-100 text-blue-800">In Progress</Badge>;
         case 'ringing': return <Badge variant="outline">Ringing</Badge>;
         case 'missed':
         case 'no-answer':
@@ -83,11 +101,11 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                 </div>
                  {isInProgress && isAdmin && (
                     <div className="mt-4 flex gap-2 border-t pt-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleJoinCall({ silent: true })}>
                             <Ear className="mr-2 h-4 w-4" />
                             Silently Listen
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleJoinCall({ coach: true })}>
                             <Mic className="mr-2 h-4 w-4" />
                             Barge In
                         </Button>

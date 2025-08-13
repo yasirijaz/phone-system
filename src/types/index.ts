@@ -6,6 +6,7 @@ export interface Call {
   client_name?: string | null;
   user_id?: number | null;
   call_sid?: string;
+  conference_sid?: string;
   account_sid?: string;
   to: string;
   from: string;
