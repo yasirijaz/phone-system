@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode, useRef } from 'react';
 import type { Device, Call } from '@twilio/voice-sdk';
 import type { Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
-import { io, type Socket } from 'socket.io-client';
+import { connect, io, type Socket } from 'socket.io-client';
 
 import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
@@ -59,7 +59,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (user && !socketRef.current) {
-        const newSocket = io('https://socket.windshieldhub.com', {
+        const newSocket = connect('wss://socket.windshieldhub.com', {
             query: { user_id: user.id }
         });
 
