@@ -101,7 +101,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                 </div>
                  {isInProgress && isAdmin && (
                     <div className="mt-4 flex gap-2 border-t pt-2">
-                        <Button variant="outline" size="sm" onClick={() => handleJoinCall({ silent: true })}>
+                        <Button variant="outline" size="sm" onClick={() => handleJoinCall({ silent: true, coach: true })}>
                             <Ear className="mr-2 h-4 w-4" />
                             Silently Listen
                         </Button>
