@@ -1,10 +1,12 @@
 
-import type { Call } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon } from 'lucide-react';
+import type { Call, User } from '@/types';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Button } from './ui/button';
+import { useAuth } from '@/context/AuthContext';
+import { Badge } from './ui/badge';
 
 interface CallLogProps {
   calls: Call[];
@@ -13,6 +15,9 @@ interface CallLogProps {
 }
 
 function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (number: string) => void, isClickable: boolean }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role_id === 1 || user?.role_id === 2;
+
   const fromName = call.from_name?.name || call.user?.name || call.from;
   const toName = call.to_name?.name || call.user?.name || call.to;
 
@@ -24,9 +29,10 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
   const contactInitial = contactName ? contactName.charAt(0).toUpperCase() : '?';
 
   const isMissed = call.call_status === 'missed' || call.call_status === 'no-answer' || call.call_status === 'busy' || call.call_status === 'canceled';
+  const isInProgress = call.call_status === 'in_progress';
   const hasRecording = !!call.recording_url;
   
-  const cardBg = isMissed ? 'bg-red-50' : hasRecording ? 'bg-green-50' : 'bg-background';
+  const cardBg = isMissed ? 'bg-red-50 dark:bg-red-950/20' : hasRecording ? 'bg-green-50 dark:bg-green-950/20' : 'bg-background';
 
   const contactDisplayNumber = call.direction === 'inbound' ? call.from : call.to;
   
@@ -34,6 +40,21 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
     e.preventDefault();
     e.stopPropagation();
     onMakeCall(contactDisplayNumber);
+  }
+
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+        case 'completed': return <Badge variant="default">Completed</Badge>;
+        case 'in-progress': return <Badge variant="secondary" className="bg-blue-100 text-blue-800">In Progress</Badge>;
+        case 'ringing': return <Badge variant="outline">Ringing</Badge>;
+        case 'missed':
+        case 'no-answer':
+        case 'busy':
+        case 'canceled':
+            return <Badge variant="destructive">Missed</Badge>;
+        default:
+            return <Badge variant="secondary">{status}</Badge>;
+    }
   }
 
   const CardContent = () => (
@@ -47,7 +68,9 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium">
                        {call.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />}
-                       <span>{call.direction.charAt(0).toUpperCase() + call.direction.slice(1)} / {call.call_status} ({call.duration} min)</span>
+                       <span>{call.direction.charAt(0).toUpperCase() + call.direction.slice(1)}</span>
+                       {getStatusBadge(call.call_status)}
+                       <span>({call.duration} min)</span>
                   </div>
                    <Button variant="ghost" size="icon" onClick={handleCallClick}>
                         <PhoneIcon className="h-4 w-4" />
@@ -58,6 +81,18 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                     <p><strong>From:</strong> {fromName} ({call.from})</p>
                     <p><strong>To:</strong> {toName} ({call.to})</p>
                 </div>
+                 {isInProgress && isAdmin && (
+                    <div className="mt-4 flex gap-2 border-t pt-2">
+                        <Button variant="outline" size="sm">
+                            <Ear className="mr-2 h-4 w-4" />
+                            Silently Listen
+                        </Button>
+                        <Button variant="outline" size="sm">
+                            <Mic className="mr-2 h-4 w-4" />
+                            Barge In
+                        </Button>
+                    </div>
+                 )}
                  {hasRecording && (
                     <div className="mt-2">
                         {/* <audio controls src={call.recording_url} className="w-full h-8" onClick={(e) => e.preventDefault()}></audio> */}
