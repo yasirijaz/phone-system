@@ -104,18 +104,18 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-80">
-                                    <div className="grid gap-4">
-                                        <div className="space-y-2">
+                                    <div className="grid gap-1">
+                                        <div className="space-y-1">
                                             <h4 className="font-medium leading-none">Task Assignments</h4>
                                             <p className="text-sm text-muted-foreground">
                                                 Status of assigned workers for this call.
                                             </p>
                                         </div>
-                                        <div className="grid gap-2">
+                                        <div className="grid gap-1">
                                             {call.task_assignments?.map((assignment: any) => (
                                                 <div key={assignment.worker_sid} className="flex items-center justify-between">
                                                     <span>{assignment.user?.name || assignment.worker_name || 'Unknown Worker'}</span>
-                                                    <Badge variant={assignment.assignment_status === 'accepted' ? 'default' : 'secondary'}>{assignment.assignment_status}</Badge>
+                                                    <Badge variant={assignment.status === 'completed' ? 'default' : 'destructive'}>{assignment.status}</Badge>
                                                 </div>
                                             ))}
                                         </div>
