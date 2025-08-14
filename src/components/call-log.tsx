@@ -55,7 +55,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
     }
     
     try {
-      await addParticipant(call.conference_sid, call.from, String(user.id), { ...options, coach: true });
+      await addParticipant(call.conference_sid, call.from, String(user.id), { ...options, coach: true, silent: options.silent });
       toast({ title: "Success", description: "You have joined the call." });
     } catch(error) {
        toast({ title: "Error", description: "Failed to join the call.", variant: "destructive" });
