@@ -55,7 +55,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
     }
     
     try {
-      await addParticipant(call.conference_sid, call.from, String(user.id), options);
+      await addParticipant(call.conference_sid, call.from, String(user.id), { ...options, coach: true });
       toast({ title: "Success", description: "You have joined the call." });
     } catch(error) {
        toast({ title: "Error", description: "Failed to join the call.", variant: "destructive" });
@@ -114,7 +114,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                                         <div className="grid gap-2">
                                             {call.task_assignments?.map((assignment: any) => (
                                                 <div key={assignment.worker_sid} className="flex items-center justify-between">
-                                                    <span>{assignment.worker_name || 'Unknown Worker'}</span>
+                                                    <span>{assignment.user?.name || assignment.worker_name || 'Unknown Worker'}</span>
                                                     <Badge variant={assignment.assignment_status === 'accepted' ? 'default' : 'secondary'}>{assignment.assignment_status}</Badge>
                                                 </div>
                                             ))}
@@ -135,7 +135,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                 </div>
                  {isInProgress && isAdmin && (
                     <div className="mt-4 flex gap-2 border-t pt-2">
-                        <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { coach: true, silent: true })}>
+                        <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true })}>
                             <Ear className="mr-2 h-4 w-4" />
                             Silently Listen
                         </Button>

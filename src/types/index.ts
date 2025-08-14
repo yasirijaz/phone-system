@@ -28,7 +28,12 @@ export interface Call {
   user?: User | null;
   notes?: string;
   category?: string;
-  task_assignments?: any[];
+  task_assignments?: {
+    worker_sid: string;
+    assignment_status: string;
+    worker_name?: string;
+    user?: Partial<User>;
+  }[];
 }
 
 export interface User {
