@@ -1,6 +1,6 @@
 
 import type { Call, User } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic } from 'lucide-react';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Badge } from './ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { addParticipant } from '@/services/twilioService';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 interface CallLogProps {
   calls: Call[];
@@ -76,6 +77,8 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
             return <Badge variant="secondary">{status}</Badge>;
     }
   }
+  
+  const hasAssignments = Array.isArray(call.task_assignments) && call.task_assignments.length > 0;
 
   const CardContent = () => (
     <div className="flex items-start gap-4">
@@ -92,9 +95,38 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                        {getStatusBadge(call.call_status)}
                        <span>({call.duration} min)</span>
                   </div>
-                   <Button variant="ghost" size="icon" onClick={handleCallClick}>
-                        <PhoneIcon className="h-4 w-4" />
-                   </Button>
+                   <div className="flex items-center">
+                        {hasAssignments && (
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
+                                        <Info className="h-4 w-4" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80">
+                                    <div className="grid gap-4">
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium leading-none">Task Assignments</h4>
+                                            <p className="text-sm text-muted-foreground">
+                                                Status of assigned workers for this call.
+                                            </p>
+                                        </div>
+                                        <div className="grid gap-2">
+                                            {call.task_assignments?.map((assignment: any) => (
+                                                <div key={assignment.worker_sid} className="flex items-center justify-between">
+                                                    <span>{assignment.worker_name || 'Unknown Worker'}</span>
+                                                    <Badge variant={assignment.assignment_status === 'accepted' ? 'default' : 'secondary'}>{assignment.assignment_status}</Badge>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        )}
+                        <Button variant="ghost" size="icon" onClick={handleCallClick}>
+                            <PhoneIcon className="h-4 w-4" />
+                        </Button>
+                   </div>
                 </div>
                 <div className="text-sm mt-2 space-y-1 text-muted-foreground">
                     <p className="text-foreground"><strong>Received By:</strong> {receivedByName}</p>
@@ -103,7 +135,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                 </div>
                  {isInProgress && isAdmin && (
                     <div className="mt-4 flex gap-2 border-t pt-2">
-                        <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true, coach: true })}>
+                        <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { coach: true, silent: true })}>
                             <Ear className="mr-2 h-4 w-4" />
                             Silently Listen
                         </Button>

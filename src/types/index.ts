@@ -28,6 +28,7 @@ export interface Call {
   user?: User | null;
   notes?: string;
   category?: string;
+  task_assignments?: any[];
 }
 
 export interface User {
