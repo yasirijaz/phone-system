@@ -78,7 +78,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
   }
   
   const hasAssignments = Array.isArray(call.task_assignments) && call.task_assignments.length > 0;
-
+  
   const CardContent = () => (
     <div className="flex items-start gap-4">
         <Avatar>
@@ -114,7 +114,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                                             {call.task_assignments?.map((assignment: any) => (
                                                 <div key={assignment.worker_sid} className="flex items-center justify-between">
                                                     <span>{assignment.user?.name || assignment.worker_name || 'Unknown Worker'}</span>
-                                                    <Badge variant={assignment.status === 'completed' ? 'default' : 'destructive'}>{assignment.assignment_status}</Badge>
+                                                    <Badge variant={assignment.status === 'completed' ? 'default' : 'destructive'}>{assignment.status}</Badge>
                                                 </div>
                                             ))}
                                         </div>
