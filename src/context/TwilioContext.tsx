@@ -45,7 +45,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const deviceRef = useRef<Device | null>(null);
   const workerRef = useRef<TwilioWorker | null>(null);
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
   const [connection, setConnection] = useState<Call | null>(null);
   const [incomingReservation, setIncomingReservation] = useState<Reservation | null>(null);
   const [showReservationModal, setShowReservationModal] = useState<boolean | null>(null);
@@ -67,36 +67,44 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     socketRef.current = null;
     if (user && !socketRef.current) {
-      const WS_URL = 'https://socket.windshieldhub.com';
-      const newSocket = io(WS_URL, {
-        query: { user_id: user.id }
-      });
+      const WS_URL = `wss://socket.windshieldhub.com?user_id=${user.id}`;
+      const newSocket = new WebSocket(WS_URL);
 
         socketRef.current = newSocket;
 
-        newSocket.on('connect', () => {
+        newSocket.onopen = () => {
+          // socketRef.current = null;
           console.log('WebSocket connection established');
-        });
+          // If your server expects an auth or subscription message, send it here:
+          // newSocket.send(JSON.stringify({ type: 'subscribe', token: '<JWT or key>' }));
+        };
 
-        newSocket.on('message', (data) => {
+        newSocket.onmessage = (evt) => {
           try {
+            const data = JSON.parse(evt.data);
             console.log('WebSocket message received:', data);
-                  const { task_type } = data;
-                  if (task_type === 'incoming_call' || task_type === 'call_accepted') {
-                    refreshCallListing();
-                  }
+            const { task_type, method_type } = data;
+            if (method_type === 'refresh_listing') {
+              refreshCallListing();
+            }
           } catch (e) {
-            console.warn('Non-JSON message:', data);
+            // If the server sends non-JSON frames, handle them here
+            console.warn('Non-JSON message:', evt.data);
           }
-        });
+        };
+
+        newSocket.onerror = () => {
+          // Let onclose handle the retry logic
+          try { newSocket.close(); } catch {}
+        };
+
+        newSocket.onclose = () => {
+          
+        };
       
     } else if (!user && socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
-    }
-
-    return () => {
-        socketRef.current?.close();
     }
   }, [user, refreshCallListing]);
 
