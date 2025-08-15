@@ -42,7 +42,6 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
   
   const handleCallClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    e.preventDefault();
     onMakeCall(contactDisplayNumber);
   }
   
@@ -55,7 +54,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
     }
     
     try {
-      await addParticipant(call.conference_sid, call.from, String(user.id), { ...options, coach: true, silent: options.silent });
+      await addParticipant(call.conference_sid, call.from, String(user.id), { coach: true, silent: options.silent });
       toast({ title: "Success", description: "You have joined the call." });
     } catch(error) {
        toast({ title: "Error", description: "Failed to join the call.", variant: "destructive" });
@@ -96,10 +95,10 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                        <span>({call.duration} min)</span>
                   </div>
                    <div className="flex items-center">
-                        {hasAssignments && (
+                        {hasAssignments && !isClickable && (
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
+                                    <Button variant="ghost" size="icon">
                                         <Info className="h-4 w-4" />
                                     </Button>
                                 </PopoverTrigger>
@@ -115,7 +114,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                                             {call.task_assignments?.map((assignment: any) => (
                                                 <div key={assignment.worker_sid} className="flex items-center justify-between">
                                                     <span>{assignment.user?.name || assignment.worker_name || 'Unknown Worker'}</span>
-                                                    <Badge variant={assignment.status === 'completed' ? 'default' : 'destructive'}>{assignment.status}</Badge>
+                                                    <Badge variant={assignment.status === 'completed' ? 'default' : 'destructive'}>{assignment.assignment_status}</Badge>
                                                 </div>
                                             ))}
                                         </div>
