@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, typ
 import type { Device, Call } from '@twilio/voice-sdk';
 import type { Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
 import { io, type Socket } from 'socket.io-client';
+import { events } from '@/lib/events';
 
 import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
@@ -34,6 +35,7 @@ interface TwilioContextType {
   toggleActivity: (selectedActivityName: string) => void;
   setFromNumber: (from: string | null) => void;
   setConferenceSid: (sid: string | null) => void;
+  refreshCallListing: () => void;
 }
 
 const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
@@ -43,7 +45,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const deviceRef = useRef<Device | null>(null);
   const workerRef = useRef<TwilioWorker | null>(null);
-  const socketRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const [connection, setConnection] = useState<Call | null>(null);
   const [incomingReservation, setIncomingReservation] = useState<Reservation | null>(null);
   const [showReservationModal, setShowReservationModal] = useState<boolean | null>(null);
@@ -57,45 +59,46 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [activityName, setActivityName] = useState<string | null>(null);
   const audio = new Audio('/sounds/reservation.mp3');
 
+  const refreshCallListing = useCallback(() => {
+    console.log('Emitting refreshCalls event');
+    events.emit('refreshCalls');
+  }, []);
+
   useEffect(() => {
     socketRef.current = null;
     if (user && !socketRef.current) {
-      const WS_URL = 'wss://socket.windshieldhub.com';
-      const newSocket = new WebSocket(WS_URL);
+      const WS_URL = 'https://socket.windshieldhub.com';
+      const newSocket = io(WS_URL, {
+        query: { user_id: user.id }
+      });
 
         socketRef.current = newSocket;
 
-        newSocket.onopen = () => {
-          // socketRef.current = null;
+        newSocket.on('connect', () => {
           console.log('WebSocket connection established');
-          // If your server expects an auth or subscription message, send it here:
-          // newSocket.send(JSON.stringify({ type: 'subscribe', token: '<JWT or key>' }));
-        };
+        });
 
-        newSocket.onmessage = (evt) => {
+        newSocket.on('message', (data) => {
           try {
-            const data = JSON.parse(evt.data);
             console.log('WebSocket message received:', data);
+                  const { task_type } = data;
+                  if (task_type === 'incoming_call' || task_type === 'call_accepted') {
+                    refreshCallListing();
+                  }
           } catch (e) {
-            // If the server sends non-JSON frames, handle them here
-            console.warn('Non-JSON message:', evt.data);
+            console.warn('Non-JSON message:', data);
           }
-        };
-
-        newSocket.onerror = () => {
-          // Let onclose handle the retry logic
-          try { newSocket.close(); } catch {}
-        };
-
-        newSocket.onclose = () => {
-          
-        };
+        });
       
     } else if (!user && socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
     }
-  }, [user]);
+
+    return () => {
+        socketRef.current?.close();
+    }
+  }, [user, refreshCallListing]);
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -397,6 +400,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     toggleActivity,
     setFromNumber,
     setConferenceSid,
+    refreshCallListing,
   };
 
   return <TwilioContext.Provider value={value}>{children}</TwilioContext.Provider>;

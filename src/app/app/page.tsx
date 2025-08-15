@@ -17,6 +17,7 @@ import { getContacts } from '@/services/contactService';
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
+import { events } from '@/lib/events';
 
 export default function AppUIPage() {
   const { user, logout } = useAuth();
@@ -44,6 +45,21 @@ export default function AppUIPage() {
     });
     return Array.from(latestCalls.values());
   };
+
+  const fetchCallData = useCallback(async () => {
+    if (!user) return;
+    setLoadingCalls(true);
+    try {
+        const allCallLogs = await getCallLogs();
+        const callsData = Array.isArray(allCallLogs) ? allCallLogs : [];
+        setAllCalls(getLatestUniqueCallsByContact(callsData));
+        setUnreadCalls(getLatestUniqueCallsByContact(callsData.filter(c => !c.is_read)));
+    } catch (error) {
+        toast({ title: "Error", description: "Failed to load call data.", variant: "destructive" });
+    } finally {
+        setLoadingCalls(false);
+    }
+  }, [user, toast]);
   
   const handleDepartmentChange = useCallback(async (departmentId: string) => {
     // This function will be passed to the header, but its logic resides here
@@ -51,22 +67,21 @@ export default function AppUIPage() {
   }, [toast]);
 
   useEffect(() => {
-    const fetchInitialData = async () => {
-        if (!user) return;
-        setLoadingCalls(true);
-        try {
-            const allCallLogs = await getCallLogs();
-            const callsData = Array.isArray(allCallLogs) ? allCallLogs : [];
-            setAllCalls(getLatestUniqueCallsByContact(callsData));
-            setUnreadCalls(getLatestUniqueCallsByContact(callsData.filter(c => !c.is_read)));
-        } catch (error) {
-            toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
-        } finally {
-            setLoadingCalls(false);
-        }
+    fetchCallData();
+  }, [fetchCallData]);
+  
+  useEffect(() => {
+    const handleRefresh = () => {
+        console.log('Refresh event received, fetching new call data...');
+        fetchCallData();
     };
-    fetchInitialData();
-  }, [user, toast]);
+
+    events.on('refreshCalls', handleRefresh);
+
+    return () => {
+        events.off('refreshCalls', handleRefresh);
+    };
+  }, [fetchCallData]);
 
   const handleMakeCall = async (number: string) => {
      if (!device) {
