@@ -131,6 +131,8 @@ export default function EcommerceDashboard() {
   const router = useRouter();
   const [calls, setCalls] = useState<Call[]>([]);
   const { toast } = useToast();
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [dialerNumber, setDialerNumber] = useState('');
   
   useEffect(() => {
     if(user?.role_id === 1) {
@@ -151,11 +153,6 @@ export default function EcommerceDashboard() {
       fetchCalls();
     }
   }, [user, toast]);
-
-  const handleMakeCall = () => {
-    // This will now be handled by the AppHeader's dialer
-    toast({ title: "Info", description: "Please use the dialer in the header to make calls." });
-  };
   
   const { totalCalls, totalDuration, mostFrequentContact } = useMemo(() => {
     if (calls.length === 0) {
@@ -194,7 +191,7 @@ export default function EcommerceDashboard() {
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <AppHeader user={user} logout={logout} />
+          <AppHeader user={user} logout={logout} dialerOpen={dialerOpen} dialerInitialValue={dialerNumber} onDialerOpenChange={() => setDialerOpen(!dialerOpen)} />
 
           <main className="flex-1 p-4 md:p-8 space-y-8">
              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4 2xl:gap-7.5">
@@ -221,7 +218,10 @@ export default function EcommerceDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <CallLog calls={calls.slice(0, 5)} onMakeCall={handleMakeCall} />
+                <CallLog calls={calls.slice(0, 5)} onMakeCall={(number) => {
+                  setDialerNumber(number.replace(/^\+1/, ""));
+                  setDialerOpen(true);
+                }} />
               </CardContent>
             </Card>
           </main>

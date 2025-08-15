@@ -41,6 +41,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
   const contactDisplayNumber = call.direction === 'inbound' ? call.from : call.to;
   
   const handleCallClick = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     onMakeCall(contactDisplayNumber);
   }

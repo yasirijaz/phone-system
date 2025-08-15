@@ -73,7 +73,7 @@ export default function AppUIPage() {
         toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});
         return;
     }
-    setDialerInitialValue(number);
+    setDialerInitialValue(number.replace(/^\+1/, ""));
     setDialerOpen(true);
   };
 
