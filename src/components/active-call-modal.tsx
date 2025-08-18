@@ -50,6 +50,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
   const [isAddParticipantModalOpen, setIsAddParticipantModalOpen] = useState(false);
+  const [isKeypadModalOpen, setIsKeypadModalOpen] = useState(false);
   const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
   const [currentParticipants, setCurrentParticipants] = useState<any[]>([]);
   const [dialerNumber, setDialerNumber] = useState('');
@@ -206,6 +207,13 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     setDialerNumber((prev) => prev + digit);
    };
 
+   const handleSendDigits = (digit: string) => {
+    if (connection) {
+        connection.sendDigits(digit);
+        toast({ title: `Sent digit: ${digit}` });
+    }
+   };
+
     const handleBackspace = () => {
         setDialerNumber((prev) => prev.slice(0, -1));
     };
@@ -238,7 +246,24 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                     {isAdmin && <span className="absolute -top-2 right-1/2 translate-x-1/2 text-white bg-red-500 text-[10px] px-2 py-0.5 rounded-full">Admin</span>}
                     <ActionButton icon={Circle} label="Record" />
                 </div>
-                <ActionButton icon={Grip} label="Keypad" />
+                 <Dialog open={isKeypadModalOpen} onOpenChange={setIsKeypadModalOpen}>
+                    <DialogTrigger asChild>
+                        <ActionButton icon={Grip} label="Keypad" />
+                    </DialogTrigger>
+                    <DialogContent>
+                         <DialogHeader>
+                            <DialogTitle>Keypad</DialogTitle>
+                            <DialogDescription>Send DTMF tones to the call.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid grid-cols-3 gap-2 pt-4">
+                            {dialpadKeys.map(key => (
+                                <Button key={key} variant="outline" className="h-14 text-xl" onClick={() => handleSendDigits(key)}>
+                                    {key}
+                                </Button>
+                            ))}
+                        </div>
+                    </DialogContent>
+                </Dialog>
                 <Dialog open={isAddParticipantModalOpen} onOpenChange={setIsAddParticipantModalOpen}>
                     <DialogTrigger asChild>
                          <ActionButton icon={UserPlus} label="Add" />
