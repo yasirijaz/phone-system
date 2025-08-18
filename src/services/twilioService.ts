@@ -1,14 +1,29 @@
 
 import axios from '@/lib/axios';
 
-export const addParticipant = async (conferenceSid: string, from: string, user_id: string, options: { silent?: boolean, coach?: boolean } = {}): Promise<any> => {
-    const payload = {
+export const addParticipant = async (conferenceSid: string, from: string, user_id?: string, phone_number?: string, options: { silent?: boolean, coach?: boolean } = {}): Promise<any> => {
+    const payload: {
+        conference_sid: string;
+        from: string;
+        user_id?: string;
+        phone_number?: string;
+        silent?: boolean;
+        coach?: boolean;
+    } = {
         conference_sid: conferenceSid,
         from,
-        user_id,
         silent: options.silent,
         coach: options.coach,
     };
+
+    if (user_id) {
+        payload.user_id = user_id;
+    } else if (phone_number) {
+        payload.phone_number = phone_number;
+    } else {
+        throw new Error("Either user_id or phone_number must be provided.");
+    }
+    
     const response = await axios.post('/api/twilio/addParticipent', payload);
     return response.data;
 }

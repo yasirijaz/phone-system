@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, Users, Trash2 } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, Users, Trash2, Delete } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
 import type { User } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from './ui/dialog';
 import { allParticipant, removeParticipant, addParticipant } from '@/services/twilioService';
 import { getCallLogsBySid } from '@/services/callLogService';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Input } from './ui/input';
 
 interface ActiveCallBarProps {
   isOpen: boolean;
@@ -50,6 +52,14 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   const [isAddParticipantModalOpen, setIsAddParticipantModalOpen] = useState(false);
   const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
   const [currentParticipants, setCurrentParticipants] = useState<any[]>([]);
+  const [dialerNumber, setDialerNumber] = useState('');
+  
+  const dialpadKeys = [
+    '1', '2', '3',
+    '4', '5', '6',
+    '7', '8', '9',
+    '*', '0', '#'
+  ];
 
    useEffect(() => {
     if (isOpen && contactName.startsWith('client:')) {
@@ -146,8 +156,8 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   };
 
   const handleAddParticipant = async () => {
-    if (!selectedParticipant) {
-      toast({ title: "Error", description: "Please select a user to add.", variant: 'destructive' });
+    if (!selectedParticipant && !dialerNumber) {
+      toast({ title: "Error", description: "Please select a user or enter a number.", variant: 'destructive' });
       return;
     }
     
@@ -158,9 +168,13 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
 
     setIsAdding(true);
     try {
-        await addParticipant(conferenceSid, fromNumber, selectedParticipant);
+        const phoneNumber = dialerNumber ? `+1${dialerNumber.replace(/\D/g, '')}` : undefined;
+        const userId = selectedParticipant || undefined;
+        await addParticipant(conferenceSid, fromNumber, userId, phoneNumber);
         toast({ title: "Success", description: "Participant added to the conference." });
         setIsAddParticipantModalOpen(false);
+        setDialerNumber('');
+        setSelectedParticipant('');
     } catch (err) {
        toast({ title: "Error", description: "Failed to add participant.", variant: 'destructive' });
     } finally {
@@ -186,8 +200,15 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     return `${mins}:${secs}`;
   };
 
-  // const contactInitial = contactName ? contactName.charAt(0).toUpperCase() : '?';
    const contactInitial = displayName ? displayName.charAt(0).toUpperCase() : '?';
+
+   const handleDigitClick = (digit: string) => {
+    setDialerNumber((prev) => prev + digit);
+   };
+
+    const handleBackspace = () => {
+        setDialerNumber((prev) => prev.slice(0, -1));
+    };
 
 
   if (!isOpen) {
@@ -226,25 +247,54 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                         <DialogHeader>
                             <DialogTitle>Add Participant</DialogTitle>
                         </DialogHeader>
-                        <div className="grid grid-cols-[1fr,auto] items-center gap-2 py-4">
-                           <Select onValueChange={setSelectedParticipant} disabled={loadingUsers}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={loadingUsers ? 'Loading...' : 'Select a user'} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {companyUsers.map(user => (
-                                        authUser && user.id !== authUser.id && (
-                                          <SelectItem key={user.id} value={String(user.id)}>
-                                            {user.name}
-                                          </SelectItem>
-                                        )
+                        <Tabs defaultValue="internal">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="internal">Internal User</TabsTrigger>
+                                <TabsTrigger value="external">Dial Number</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="internal" className="py-4">
+                               <Select onValueChange={setSelectedParticipant} disabled={loadingUsers}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={loadingUsers ? 'Loading...' : 'Select a user'} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {companyUsers.map(user => (
+                                            authUser && user.id !== authUser.id && (
+                                            <SelectItem key={user.id} value={String(user.id)}>
+                                                {user.name}
+                                            </SelectItem>
+                                            )
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </TabsContent>
+                            <TabsContent value="external" className="py-4 space-y-4">
+                               <div className="relative">
+                                    <Input 
+                                        value={dialerNumber} 
+                                        readOnly
+                                        placeholder="Enter number"
+                                        className="text-center text-lg pr-8"
+                                    />
+                                    {dialerNumber.length > 0 && (
+                                        <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={handleBackspace}>
+                                            <Delete className="h-4 w-4"/>
+                                        </Button>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {dialpadKeys.map(key => (
+                                        <Button key={key} variant="outline" className="h-14 text-xl" onClick={() => handleDigitClick(key)}>
+                                            {key}
+                                        </Button>
                                     ))}
-                                </SelectContent>
-                            </Select>
-                            <Button size="icon" onClick={handleAddParticipant} disabled={isAdding || !selectedParticipant}>
-                                <UserPlus className="h-4 w-4" />
-                            </Button>
-                        </div>
+                                </div>
+                            </TabsContent>
+                        </Tabs>
+                         <Button onClick={handleAddParticipant} disabled={isAdding || (!selectedParticipant && !dialerNumber)}>
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            Add Participant
+                        </Button>
                     </DialogContent>
                 </Dialog>
                 <Dialog open={isParticipantsModalOpen} onOpenChange={setIsParticipantsModalOpen}>
