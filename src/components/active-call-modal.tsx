@@ -108,7 +108,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
               getContacts(authUser.company_id)
             ]);
             setCompanyUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
-            setCompanyContacts(Array.isArray(contactsResponse) ? contactsResponse : []);
+            setCompanyContacts(contactsResponse || []);
           } catch (err) {
             toast({ title: "Error", description: "Failed to load company users or contacts.", variant: 'destructive' });
           } finally {
@@ -174,7 +174,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
         return;
     }
 
-    const twilioNumber = connection.direction === 'incoming' ? connection.parameters.To : connection.parameters.From;
+    const twilioNumber = connection.direction === 'INCOMING' ? connection.parameters.From : connection.parameters.To;
 
     if (!twilioNumber) {
       toast({ title: "Error", description: "Could not determine a valid Twilio number for this call.", variant: 'destructive' });
@@ -315,7 +315,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                                     <SelectContent>
                                         {companyContacts.map(contact => (
                                             <SelectItem key={contact.id} value={contact.phone_no}>
-                                                {contact.name} ({contact.phone_no})
+                                                {contact.name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
