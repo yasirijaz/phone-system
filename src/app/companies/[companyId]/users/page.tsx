@@ -384,5 +384,3 @@ export default function ManageUsersPage() {
     </SidebarProvider>
   );
 }
-
-    
