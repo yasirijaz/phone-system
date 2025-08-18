@@ -9,7 +9,7 @@ import type { User, Company, Department, Assignment } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { getCompany } from "@/services/companyService";
 import { getDepartments } from "@/services/departmentService";
-import { getUsersByCompany, addUserToCompany, assignUserToDepartment, removeUserFromDepartment } from "@/services/userService";
+import { getUsersByCompany, addUserToCompany, assignUserToDepartment, removeUserFromDepartment, updateUser, deleteUser } from "@/services/userService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +30,7 @@ import AppHeader from "@/components/app-header";
 const userSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email("Invalid email address."),
-  password: z.string().min(6, "Password must be at least 6 characters."),
+  password: z.string().min(6, "Password must be at least 6 characters.").optional().or(z.literal('')),
   role_id: z.coerce.number({ required_error: "Role is required."}).min(1, "Role is required."),
 });
 
@@ -50,13 +50,14 @@ export default function ManageUsersPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const { toast } = useToast();
 
   const userForm = useForm<z.infer<typeof userSchema>>({
     resolver: zodResolver(userSchema),
-    defaultValues: { name: "", email: "", password: "" },
+    defaultValues: { name: "", email: "", password: "", role_id: 3 },
   });
 
   const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({
@@ -93,9 +94,25 @@ export default function ManageUsersPage() {
     }
   };
   
+  const handleUserDialogOpen = (user: User | null = null) => {
+    setEditingUser(user);
+    if (user) {
+      userForm.reset({
+        name: user.name,
+        email: user.email,
+        password: "",
+        role_id: user.role_id,
+      });
+    } else {
+      userForm.reset({ name: "", email: "", password: "", role_id: 3 });
+    }
+    setIsUserDialogOpen(true);
+  }
+  
   const handleUserDialogClose = () => {
     setIsUserDialogOpen(false);
     userForm.reset();
+    setEditingUser(null);
   }
   
   const handleAssignmentDialogClose = () => {
@@ -109,20 +126,43 @@ export default function ManageUsersPage() {
     setIsAssignmentDialogOpen(true);
   };
 
-
   const onUserSubmit = async (values: z.infer<typeof userSchema>) => {
     try {
-      await addUserToCompany(companyId, values);
-      toast({ title: "Success", description: "User added successfully." });
+      if (editingUser) {
+        const payload: { name: string, email: string, role_id: number, password?: string } = {
+          name: values.name,
+          email: values.email,
+          role_id: values.role_id,
+        };
+        if (values.password) {
+          payload.password = values.password;
+        }
+        await updateUser(editingUser.id, payload);
+        toast({ title: "Success", description: "User updated successfully." });
+      } else {
+        await addUserToCompany(companyId, values);
+        toast({ title: "Success", description: "User added successfully." });
+      }
       fetchData();
       handleUserDialogClose();
     } catch (error: any) {
         const errorMessage = error.response?.data?.message || "An unexpected error occurred.";
         toast({
-            title: "Error adding user",
+            title: `Error ${editingUser ? 'updating' : 'adding'} user`,
             description: errorMessage,
             variant: "destructive",
         });
+    }
+  };
+  
+  const handleDeleteUser = async (userId: number) => {
+    try {
+      await deleteUser(userId);
+      toast({ title: "Success", description: "User deleted successfully." });
+      fetchData();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || "Failed to delete user.";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     }
   };
   
@@ -170,13 +210,13 @@ export default function ManageUsersPage() {
             </div>
              <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => setIsUserDialogOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Button onClick={() => handleUserDialogOpen(null)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                   <PlusCircle className="mr-2 h-4 w-4" /> Add User
                 </Button>
               </DialogTrigger>
               <DialogContent onInteractOutside={handleUserDialogClose} className="sm:max-w-[425px]">
                 <DialogHeader>
-                  <DialogTitle>Add New User</DialogTitle>
+                  <DialogTitle>{editingUser ? 'Edit User' : 'Add New User'}</DialogTitle>
                 </DialogHeader>
                 <Form {...userForm}>
                   <form onSubmit={userForm.handleSubmit(onUserSubmit)} className="space-y-4">
@@ -187,12 +227,12 @@ export default function ManageUsersPage() {
                         <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="e.g. john@acme.com" {...field} /></FormControl><FormMessage /></FormItem>
                      )}/>
                      <FormField control={userForm.control} name="password" render={({ field }) => (
-                        <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" placeholder="******" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" placeholder={editingUser ? 'Leave blank to keep current' : '******'} {...field} /></FormControl><FormMessage /></FormItem>
                      )}/>
                      <FormField control={userForm.control} name="role_id" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Role</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={String(field.value)}>
+                          <Select onValueChange={field.onChange} value={String(field.value)}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select a role" />
@@ -207,8 +247,8 @@ export default function ManageUsersPage() {
                         </FormItem>
                      )}/>
                     <DialogFooter>
-                      <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
-                      <Button type="submit">Add User</Button>
+                      <DialogClose asChild><Button type="button" variant="secondary" onClick={handleUserDialogClose}>Cancel</Button></DialogClose>
+                      <Button type="submit">{editingUser ? 'Save Changes' : 'Add User'}</Button>
                     </DialogFooter>
                   </form>
                 </Form>
@@ -268,8 +308,24 @@ export default function ManageUsersPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               <Button variant="ghost" size="icon" onClick={() => handleOpenAssignmentDialog(u)}><Briefcase className="h-4 w-4" /></Button>
-                              <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
-                              <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleUserDialogOpen(u)}><Edit className="h-4 w-4" /></Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This action will permanently delete the user.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteUser(u.id)}>Delete</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -328,3 +384,5 @@ export default function ManageUsersPage() {
     </SidebarProvider>
   );
 }
+
+    

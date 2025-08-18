@@ -12,6 +12,15 @@ export const addUserToCompany = async (companyId: number, userData: Omit<User, '
   return response.data;
 };
 
+export const updateUser = async (id: number, userData: Partial<Omit<User, 'id' | 'company_id'>>): Promise<User> => {
+  const response = await axios.put(`/api/users/${id}`, userData);
+  return response.data;
+};
+
+export const deleteUser = async (id: number): Promise<void> => {
+  await axios.delete(`/api/users/${id}`);
+};
+
 export const assignUserToDepartment = async (companyId: number, departmentId: number, userId: number): Promise<any> => {
     const response = await axios.post(`/api/companies/${companyId}/departments/${departmentId}/users`, {
         user_id: userId,
@@ -32,5 +41,7 @@ export const getUserDepartments = async (userId: number): Promise<Department[]> 
     const response = await axios.get(`/api/users/${userId}/departments`);
     return response.data.departments;
 };
+
+    
 
     
