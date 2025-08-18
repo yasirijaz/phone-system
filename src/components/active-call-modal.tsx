@@ -5,9 +5,10 @@ import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, Users, Trash2, Delete } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
-import type { User } from '@/types';
+import type { User, Contact } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { getUsersByCompany } from '@/services/userService';
+import { getContacts } from '@/services/contactService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useTwilio } from '@/context/TwilioContext';
@@ -44,6 +45,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   const [selectedParticipant, setSelectedParticipant] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [companyUsers, setCompanyUsers] = useState<User[]>([]);
+  const [companyContacts, setCompanyContacts] = useState<Contact[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const { toast } = useToast();
   const [displayName, setDisplayName] = useState(contactName);
@@ -97,23 +99,28 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
       setIsMuted(connection.isMuted());
       connection.on('mute', handleMute);
 
-      const fetchUsers = async () => {
+      const fetchRelatedData = async () => {
         if (authUser?.company_id) {
           setLoadingUsers(true);
           try {
-            const usersResponse = await getUsersByCompany(authUser.company_id);
+            const [usersResponse, contactsResponse] = await Promise.all([
+              getUsersByCompany(authUser.company_id),
+              getContacts(authUser.company_id)
+            ]);
             setCompanyUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
+            setCompanyContacts(Array.isArray(contactsResponse) ? contactsResponse : []);
           } catch (err) {
-            toast({ title: "Error", description: "Failed to load company users.", variant: 'destructive' });
+            toast({ title: "Error", description: "Failed to load company users or contacts.", variant: 'destructive' });
           } finally {
             setLoadingUsers(false);
           }
         }
       }
-      fetchUsers();
+      fetchRelatedData();
 
     } else {
        setCompanyUsers([]);
+       setCompanyContacts([]);
        setSelectedParticipant('');
     }
     
@@ -167,9 +174,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
         return;
     }
 
-    const direction = connection.direction;
-    console.log(connection,direction);
-    const twilioNumber = direction === 'INCOMING' ? connection.parameters.From : connection.parameters.To;
+    const twilioNumber = connection.direction === 'incoming' ? connection.parameters.To : connection.parameters.From;
 
     if (!twilioNumber) {
       toast({ title: "Error", description: "Could not determine a valid Twilio number for this call.", variant: 'destructive' });
@@ -303,11 +308,23 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                                 </Select>
                             </TabsContent>
                             <TabsContent value="external" className="py-4 space-y-4">
+                               <Select onValueChange={setDialerNumber} disabled={loadingUsers}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={loadingUsers ? 'Loading contacts...' : 'Select a contact'} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {companyContacts.map(contact => (
+                                            <SelectItem key={contact.id} value={contact.phone_no}>
+                                                {contact.name} ({contact.phone_no})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                <div className="relative">
                                     <Input 
-                                        value={dialerNumber} 
-                                        readOnly
-                                        placeholder="Enter number"
+                                        value={dialerNumber}
+                                        onChange={(e) => setDialerNumber(e.target.value)}
+                                        placeholder="Or enter number manually"
                                         className="text-center text-lg pr-8"
                                     />
                                     {dialerNumber.length > 0 && (
@@ -364,3 +381,6 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     </div>
   );
 }
+
+
+      
