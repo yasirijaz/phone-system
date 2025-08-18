@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
 import { allParticipant, removeParticipant, addParticipant } from '@/services/twilioService';
 import { getCallLogsBySid } from '@/services/callLogService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -162,16 +162,24 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
       return;
     }
     
-    if (!connection || !conferenceSid || !fromNumber) {
+    if (!connection || !conferenceSid) {
         toast({ title: "Error", description: "Cannot add participant. Active call session not found.", variant: 'destructive' });
         return;
+    }
+
+    const direction = connection.direction();
+    const twilioNumber = direction === 'INCOMING' ? connection.parameters.To : connection.parameters.From;
+
+    if (!twilioNumber) {
+      toast({ title: "Error", description: "Could not determine a valid Twilio number for this call.", variant: 'destructive' });
+      return;
     }
 
     setIsAdding(true);
     try {
         const phoneNumber = dialerNumber ? `+1${dialerNumber.replace(/\D/g, '')}` : undefined;
         const userId = selectedParticipant || undefined;
-        await addParticipant(conferenceSid, fromNumber, userId, phoneNumber);
+        await addParticipant(conferenceSid, twilioNumber, userId, phoneNumber);
         toast({ title: "Success", description: "Participant added to the conference." });
         setIsAddParticipantModalOpen(false);
         setDialerNumber('');
@@ -233,8 +241,8 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                     <AvatarFallback>{contactInitial}</AvatarFallback>
                 </Avatar>
                 <div>
-                    <p className="font-semibold text-lg truncate max-w-[200px]">{fromNumber}</p>
-                    <p className="text-sm text-muted-foreground">{displayName} &bull; {formatTime(duration)}</p>
+                    <p className="font-semibold text-lg truncate max-w-[200px]">{displayName}</p>
+                    <p className="text-sm text-muted-foreground">{contactName} &bull; {formatTime(duration)}</p>
                 </div>
             </div>
 
@@ -246,12 +254,12 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                     {isAdmin && <span className="absolute -top-2 right-1/2 translate-x-1/2 text-white bg-red-500 text-[10px] px-2 py-0.5 rounded-full">Admin</span>}
                     <ActionButton icon={Circle} label="Record" />
                 </div>
-                 <Dialog open={isKeypadModalOpen} onOpenChange={setIsKeypadModalOpen}>
+                <Dialog open={isKeypadModalOpen} onOpenChange={setIsKeypadModalOpen}>
                     <DialogTrigger asChild>
-                        <ActionButton icon={Grip} label="Keypad" />
+                         <ActionButton icon={Grip} label="Keypad" />
                     </DialogTrigger>
                     <DialogContent>
-                         <DialogHeader>
+                        <DialogHeader>
                             <DialogTitle>Keypad</DialogTitle>
                             <DialogDescription>Send DTMF tones to the call.</DialogDescription>
                         </DialogHeader>
