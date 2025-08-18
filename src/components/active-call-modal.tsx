@@ -168,7 +168,8 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     }
 
     const direction = connection.direction;
-    const twilioNumber = direction === 'INCOMING' ? connection.parameters.To : connection.parameters.From;
+    console.log(connection,direction);
+    const twilioNumber = direction === 'INCOMING' ? connection.parameters.From : connection.parameters.To;
 
     if (!twilioNumber) {
       toast({ title: "Error", description: "Could not determine a valid Twilio number for this call.", variant: 'destructive' });
