@@ -16,6 +16,7 @@ export const getCompanySettings = async (companyId: number): Promise<CompanySett
     call_settings: typeof data.call_settings === 'string' ? JSON.parse(data.call_settings) : data.call_settings,
     voicemail_settings: typeof data.voicemail_settings === 'string' ? JSON.parse(data.voicemail_settings) : data.voicemail_settings,
     business_hours: typeof data.business_hours === 'string' ? JSON.parse(data.business_hours) : data.business_hours,
+    holiday_schedule: typeof data.holiday_schedule === 'string' ? JSON.parse(data.holiday_schedule) : data.holiday_schedule,
     routing_preferences: typeof data.routing_preferences === 'string' ? JSON.parse(data.routing_preferences) : data.routing_preferences,
   };
 };
@@ -26,6 +27,7 @@ export const createOrUpdateCompanySettings = async (id: number | undefined, sett
         call_settings: JSON.stringify(settings.call_settings),
         voicemail_settings: JSON.stringify(settings.voicemail_settings),
         business_hours: JSON.stringify(settings.business_hours),
+        holiday_schedule: JSON.stringify(settings.holiday_schedule),
         routing_preferences: JSON.stringify(settings.routing_preferences),
     };
 

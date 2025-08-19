@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, PlusCircle, Trash2 } from "lucide-react";
 import Link from "next/link";
 import AppHeader from "@/components/app-header";
 
@@ -30,6 +30,11 @@ const businessHoursSchema = z.object({
   enabled: z.boolean(),
   open: z.string(),
   close: z.string(),
+});
+
+const holidaySchema = z.object({
+  name: z.string().min(1, "Holiday name is required"),
+  date: z.string().min(1, "Date is required"),
 });
 
 const settingsSchema = z.object({
@@ -45,6 +50,9 @@ const settingsSchema = z.object({
   business_hours: z.object({
     is_24_7: z.boolean().default(false),
     days: z.array(businessHoursSchema),
+  }),
+  holiday_schedule: z.object({
+    holidays: z.array(holidaySchema),
   }),
   routing_preferences: z.object({
     default_route: z.string().default("voicemail"),
@@ -79,15 +87,21 @@ export default function CompanySettingsPage() {
           { day: "Sunday", enabled: false, open: "09:00", close: "17:00" },
         ],
       },
+      holiday_schedule: { holidays: [] },
       routing_preferences: { default_route: "voicemail", timeout: 30 },
     },
   });
   
-  const { fields } = useFieldArray({
+  const { fields, append: appendHoliday, remove: removeHoliday } = useFieldArray({
+    control: form.control,
+    name: "holiday_schedule.holidays",
+  });
+  
+  const { fields: businessHoursFields } = useFieldArray({
     control: form.control,
     name: "business_hours.days",
   });
-  
+
   const is247 = form.watch("business_hours.is_24_7");
 
 
@@ -112,10 +126,8 @@ export default function CompanySettingsPage() {
       form.reset({
         call_settings: settings.call_settings,
         voicemail_settings: settings.voicemail_settings,
-        business_hours: {
-          is_24_7: settings.business_hours.is_24_7,
-          days: settings.business_hours.days,
-        },
+        business_hours: settings.business_hours,
+        holiday_schedule: settings.holiday_schedule || { holidays: [] },
         routing_preferences: settings.routing_preferences,
       });
     }
@@ -185,10 +197,11 @@ export default function CompanySettingsPage() {
             <Form {...form}>
               <form id="settings-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                  <Tabs defaultValue="call-settings">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-5">
                         <TabsTrigger value="call-settings">Call Settings</TabsTrigger>
                         <TabsTrigger value="voicemail">Voicemail</TabsTrigger>
                         <TabsTrigger value="business-hours">Business Hours</TabsTrigger>
+                        <TabsTrigger value="holiday-schedule">Holiday Schedule</TabsTrigger>
                         <TabsTrigger value="routing">Routing</TabsTrigger>
                     </TabsList>
                     
@@ -314,7 +327,7 @@ export default function CompanySettingsPage() {
                                     </FormItem>
                                   )}
                                 />
-                                {!is247 && fields.map((field, index) => (
+                                {!is247 && businessHoursFields.map((field, index) => (
                                   <div key={field.id} className="flex items-center space-x-4 p-4 border rounded-lg">
                                     <FormField
                                       control={form.control}
@@ -361,6 +374,49 @@ export default function CompanySettingsPage() {
                         </Card>
                     </TabsContent>
                     
+                    <TabsContent value="holiday-schedule">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Holiday Schedule</CardTitle>
+                                <CardDescription>Define company holidays. Calls will be handled according to your out-of-hours settings on these days.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                {fields.map((field, index) => (
+                                  <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg">
+                                    <FormField
+                                      control={form.control}
+                                      name={`holiday_schedule.holidays.${index}.name`}
+                                      render={({ field }) => (
+                                        <FormItem className="flex-1">
+                                          <FormLabel>Holiday Name</FormLabel>
+                                          <FormControl><Input placeholder="e.g. New Year's Day" {...field} /></FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                     <FormField
+                                      control={form.control}
+                                      name={`holiday_schedule.holidays.${index}.date`}
+                                      render={({ field }) => (
+                                        <FormItem className="flex-1">
+                                          <FormLabel>Date</FormLabel>
+                                          <FormControl><Input type="date" {...field} /></FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <Button type="button" variant="destructive" size="icon" onClick={() => removeHoliday(index)}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                <Button type="button" variant="outline" onClick={() => appendHoliday({ name: '', date: '' })}>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Holiday
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
                      <TabsContent value="routing">
                         <Card>
                             <CardHeader>
@@ -414,5 +470,3 @@ export default function CompanySettingsPage() {
     </SidebarProvider>
   );
 }
-
-    

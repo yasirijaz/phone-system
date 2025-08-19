@@ -87,6 +87,11 @@ export interface PhoneNumber {
   label: string;
 }
 
+export interface Holiday {
+  name: string;
+  date: string;
+}
+
 export interface CompanySettings {
   id: number;
   company_id: number;
@@ -108,6 +113,9 @@ export interface CompanySettings {
       close: string;
     }[];
   };
+  holiday_schedule: {
+    holidays: Holiday[];
+  };
   routing_preferences: {
     default_route: string;
     timeout: number;
@@ -120,11 +128,6 @@ export interface IvrOption {
   digit: string;
   action: string;
   destination: string;
-}
-
-export interface Holiday {
-  name: string;
-  date: string;
 }
 
 export interface DepartmentSettings {
