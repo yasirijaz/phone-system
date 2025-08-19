@@ -9,7 +9,7 @@ import type { CompanySettings } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { getCompanySettings, createOrUpdateCompanySettings } from "@/services/companySettingsService";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -242,6 +242,9 @@ export default function CompanySettingsPage() {
                                     )}
                                 />
                             </CardContent>
+                            <CardFooter className="border-t px-6 py-4">
+                                <Button type="submit">Save Changes</Button>
+                            </CardFooter>
                         </Card>
                     </TabsContent>
 
@@ -470,3 +473,5 @@ export default function CompanySettingsPage() {
     </SidebarProvider>
   );
 }
+
+    
