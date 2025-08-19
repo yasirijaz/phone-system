@@ -1,6 +1,6 @@
 
 import type { Call, User } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info } from 'lucide-react';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -36,7 +36,13 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
   const isInProgress = call.call_status === 'in_progress';
   const hasRecording = !!call.recording_url;
   
-  const cardBg = isMissed ? 'bg-red-50 dark:bg-red-950/20' : hasRecording ? 'bg-green-50 dark:bg-green-950/20' : 'bg-background';
+  const cardBg = isInProgress
+    ? 'bg-orange-300 border-orange-300 dark:bg-orange-950/20 dark:border-orange-800'
+    : isMissed
+    ? 'bg-red-50 dark:bg-red-950/20'
+    : hasRecording
+    ? 'bg-green-50 dark:bg-green-950/20'
+    : 'bg-background';
 
   const contactDisplayNumber = call.direction === 'inbound' ? call.from : call.to;
   
@@ -66,7 +72,13 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
   const getStatusBadge = (status?: string) => {
     switch (status) {
         case 'completed': return <Badge variant="default">Completed</Badge>;
-        case 'in_progress': return <Badge variant="secondary" className="bg-blue-100 text-blue-800">In Progress</Badge>;
+        case 'in_progress':
+        return (
+          <Badge className="bg-orange-600 text-white font-semibold flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            In Progress
+          </Badge>
+        );
         case 'ringing': return <Badge variant="outline">Ringing</Badge>;
         case 'missed':
         case 'no-answer':
