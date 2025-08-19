@@ -109,10 +109,10 @@ export default function AppUIPage() {
                   />
 
                   <main className="flex-1 p-6 overflow-y-auto">
-                    <Tabs defaultValue="unread">
+                    <Tabs defaultValue="all">
                       <TabsList>
-                        <TabsTrigger value="unread">Unread</TabsTrigger>
                         <TabsTrigger value="all">All</TabsTrigger>
+                        <TabsTrigger value="unread">Unread</TabsTrigger>
                         <TabsTrigger value="calls">Calls</TabsTrigger>
                         <TabsTrigger value="missed">Missed</TabsTrigger>
                         <TabsTrigger value="meetings">Meetings</TabsTrigger>
@@ -123,17 +123,17 @@ export default function AppUIPage() {
                         <TabsTrigger value="spam">Spam</TabsTrigger>
                         <TabsTrigger value="unlogged">Unlogged</TabsTrigger>
                       </TabsList>
-                      <TabsContent value="unread" className="mt-6">
-                        {loadingCalls ? <p>Loading...</p> : <CallLog calls={unreadCalls} onMakeCall={handleMakeCall} />}
+                      <TabsContent value="all" className="mt-6">
+                         {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
-                        <TabsContent value="all" className="mt-6">
-                         {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={handleMakeCall} />}
+                      <TabsContent value="unread" className="mt-6">
+                        {loadingCalls ? <p>Loading...</p> : <CallLog calls={unreadCalls} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="calls" className="mt-6">
                           <Card><CardContent className="p-6">Call logs will appear here.</CardContent></Card>
                       </TabsContent>
                         <TabsContent value="missed" className="mt-6">
-                           {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.call_status === 'missed' || c.call_status === 'no-answer' || c.call_status === 'busy' || c.call_status === 'canceled'))} onMakeCall={handleMakeCall} />}
+                           {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.call_status === 'missed' || c.call_status === 'no-answer' || c.call_status === 'busy' || c.call_status === 'canceled'))} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                         <TabsContent value="meetings" className="mt-6">
                           <Card><CardContent className="p-6">Meeting recordings will appear here.</CardContent></Card>
@@ -148,7 +148,7 @@ export default function AppUIPage() {
                           <Card><CardContent className="p-6">Messages will appear here.</CardContent></Card>
                       </TabsContent>
                       <TabsContent value="starred" className="mt-6">
-                          {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.is_starred))} onMakeCall={handleMakeCall} />}
+                          {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.is_starred))} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="spam" className="mt-6">
                           <Card><CardContent className="p-6">Spam will appear here.</CardContent></Card>
