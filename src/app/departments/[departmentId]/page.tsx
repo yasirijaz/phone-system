@@ -40,6 +40,9 @@ export default function DepartmentDetailPage() {
   const [dndStatus, setDndStatus] = useState(false);
   const [dndLoading, setDndLoading] = useState(false);
 
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [dialerInitialValue, setDialerInitialValue] = useState('');
+
   useEffect(() => {
     const fetchDepartmentData = async () => {
         if (!user || !departmentId || !user.company_id) return;
@@ -56,15 +59,14 @@ export default function DepartmentDetailPage() {
             setDndStatus(dnd.is_dnd);
 
             const [allCallLogs, newCallLogs, operatorsResponse, missedCallLogs, recordingLogs] = await Promise.all([
-              getCallLogs(),
+              getCallLogs(departmentId),
               getDepartmentNewCalls(departmentId),
               getDepartmentUsers(user.company_id, departmentId),
               getDepartmentMissedCalls(departmentId),
               getDepartmentRecordings(departmentId)
             ]);
             
-            const departmentCalls = allCallLogs.filter(c => c.department_id === departmentId);
-            setAllCalls(departmentCalls);
+            setAllCalls(Array.isArray(allCallLogs) ? allCallLogs : []);
             setNewCalls(Array.isArray(newCallLogs) ? newCallLogs : []);
             setOperators(Array.isArray(operatorsResponse.users) ? operatorsResponse.users : []);
             setMissedCalls(Array.isArray(missedCallLogs) ? missedCallLogs : []);
@@ -84,7 +86,8 @@ export default function DepartmentDetailPage() {
         toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});
         return;
     }
-    console.log("Request to call:", number);
+    setDialerInitialValue(number.replace(/^\+1/, ""));
+    setDialerOpen(true);
   };
   
   const handleDndChange = async (checked: boolean) => {
@@ -128,7 +131,13 @@ export default function DepartmentDetailPage() {
         <SidebarInset>
              <div className="flex h-screen w-full bg-background text-foreground">
                 <div className="flex flex-1 flex-col">
-                  <AppHeader user={user} logout={logout} />
+                  <AppHeader 
+                    user={user} 
+                    logout={logout} 
+                    dialerOpen={dialerOpen}
+                    onDialerOpenChange={setDialerOpen}
+                    dialerInitialValue={dialerInitialValue}
+                  />
 
                   <main className="flex-1 p-6 overflow-y-auto">
                     <div className="flex items-center justify-between mb-6">
@@ -146,16 +155,19 @@ export default function DepartmentDetailPage() {
                             />
                         </div>
                     </div>
-                    <Tabs defaultValue="hold-queue">
+                    <Tabs defaultValue="all">
                       <TabsList>
+                        <TabsTrigger value="all">All</TabsTrigger>
+                        <TabsTrigger value="new">New</TabsTrigger>
                         <TabsTrigger value="hold-queue">Hold Queue</TabsTrigger>
                         <TabsTrigger value="operators">Operators</TabsTrigger>
-                        <TabsTrigger value="new">New</TabsTrigger>
-                        <TabsTrigger value="all">All</TabsTrigger>
                         <TabsTrigger value="missed">Missed</TabsTrigger>
                         <TabsTrigger value="voicemails">Voicemails</TabsTrigger>
                         <TabsTrigger value="recordings">Recordings</TabsTrigger>
                       </TabsList>
+                      <TabsContent value="all" className="mt-6">
+                        {loading ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={(number) => handleMakeCall(number)} />}
+                      </TabsContent>
                       <TabsContent value="hold-queue" className="mt-6">
                          <Card><CardContent className="p-6 text-center text-muted-foreground">No Record Found</CardContent></Card>
                       </TabsContent>
@@ -206,19 +218,16 @@ export default function DepartmentDetailPage() {
                          </Card>
                       </TabsContent>
                        <TabsContent value="new" className="mt-6">
-                        {loading ? <p>Loading...</p> : <CallLog calls={newCalls} onMakeCall={handleMakeCall} />}
-                      </TabsContent>
-                      <TabsContent value="all" className="mt-6">
-                        {loading ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={handleMakeCall} />}
+                        {loading ? <p>Loading...</p> : <CallLog calls={newCalls} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                        <TabsContent value="missed" className="mt-6">
-                         {loading ? <p>Loading...</p> : <CallLog calls={missedCalls} onMakeCall={handleMakeCall} />}
+                         {loading ? <p>Loading...</p> : <CallLog calls={missedCalls} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                        <TabsContent value="voicemails" className="mt-6">
                          <Card><CardContent className="p-6">Voicemails will appear here.</CardContent></Card>
                       </TabsContent>
                        <TabsContent value="recordings" className="mt-6">
-                         {loading ? <p>Loading...</p> : <CallLog calls={recordings} onMakeCall={handleMakeCall} />}
+                         {loading ? <p>Loading...</p> : <CallLog calls={recordings} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                     </Tabs>
                   </main>

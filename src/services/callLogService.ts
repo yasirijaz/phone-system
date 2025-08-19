@@ -2,8 +2,12 @@
 import axios from '@/lib/axios';
 import type { Call } from '@/types';
 
-export const getCallLogs = async (): Promise<Call[]> => {
-  const response = await axios.get('/api/call-logs');
+export const getCallLogs = async (departmentId?: number): Promise<Call[]> => {
+  const url = departmentId
+    ? `/api/call-logs/${departmentId}`
+    : `/api/call-logs`;
+
+  const response = await axios.get(url);
   return response.data.call_logs;
 };
 
@@ -34,8 +38,12 @@ export const getDepartmentRecordings = async (department_id: number): Promise<Ca
 };
 
 
-export const getUnreadCallLogs = async (): Promise<Call[]> => {
-  const response = await axios.get('/api/call-logs/unread');
+export const getUnreadCallLogs = async (departmentId?: number): Promise<Call[]> => {
+  const url = departmentId
+    ? `/api/call-logs/unread/${departmentId}`
+    : `/api/call-logs/unread`;
+
+  const response = await axios.get(url);
   return response.data.call_logs;
 };
 
