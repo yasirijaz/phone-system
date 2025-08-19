@@ -1,6 +1,7 @@
+
 'use client';
 
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Phone, PhoneOff } from "lucide-react";
 import { Reservation } from "twilio-taskrouter";
@@ -35,6 +36,7 @@ export default function ReservationModal({ isOpen, onClose, reservation, onAccep
         onInteractOutside={(e) => e.preventDefault()}
         hideCloseButton={true}
       >
+        <DialogTitle className="sr-only">Incoming Reservation</DialogTitle>
         <div className="text-center pt-8">
           <p className="text-lg text-neutral-400">Incoming Reservation</p>
         </div>
