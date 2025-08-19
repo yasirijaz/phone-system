@@ -179,19 +179,19 @@ export default function CompanySettingsPage() {
               logout={logout} 
               pageTitle={!isSuperAdmin ? "Company Settings" : ""}
           />
-          {isSuperAdmin && (
-            <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" asChild>
-                        <Link href="/companies">
-                        <ArrowLeft />
-                        </Link>
-                    </Button>
-                    <h1 className="text-xl font-bold">Company Settings</h1>
-                </div>
-                <Button type="submit" form="settings-form">Save Changes</Button>
-            </header>
-          )}
+          <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
+            <div className="flex items-center gap-4">
+              {isSuperAdmin && (
+                <Button variant="ghost" size="icon" asChild>
+                  <Link href="/companies">
+                    <ArrowLeft />
+                  </Link>
+                </Button>
+              )}
+              <h1 className="text-xl font-bold">Company Settings</h1>
+            </div>
+            <Button type="submit" form="settings-form">Save Changes</Button>
+          </header>
 
           <main className="flex-1 p-4 md:p-8 bg-muted/40">
             <Form {...form}>
@@ -242,9 +242,6 @@ export default function CompanySettingsPage() {
                                     )}
                                 />
                             </CardContent>
-                            <CardFooter className="border-t px-6 py-4">
-                                <Button type="submit">Save Changes</Button>
-                            </CardFooter>
                         </Card>
                     </TabsContent>
 
@@ -473,5 +470,3 @@ export default function CompanySettingsPage() {
     </SidebarProvider>
   );
 }
-
-    
