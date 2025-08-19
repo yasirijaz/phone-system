@@ -33,28 +33,28 @@ const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: strin
     </Card>
 );
 
-const MonthlySalesChart = ({ calls }: { calls: Partial<Call>[] }) => {
+const MonthlyCallsChart = ({ calls }: { calls: Partial<Call>[] }) => {
     const data = useMemo(() => {
-        const salesByMonth: { [key: string]: number } = {};
+        const callsByMonth: { [key: string]: number } = {};
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         
-        monthNames.forEach(name => salesByMonth[name] = 0);
+        monthNames.forEach(name => callsByMonth[name] = 0);
 
         calls.forEach(call => {
             if (call.created_at) {
                 const month = new Date(call.created_at).getMonth();
                 const monthName = monthNames[month];
-                salesByMonth[monthName] += 1;
+                callsByMonth[monthName] += 1;
             }
         });
 
-        return monthNames.map(name => ({ name, sales: salesByMonth[name] }));
+        return monthNames.map(name => ({ name, calls: callsByMonth[name] }));
     }, [calls]);
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Monthly Sales</CardTitle>
+                <CardTitle>Monthly Calls</CardTitle>
             </CardHeader>
             <CardContent>
                  <ResponsiveContainer width="100%" height={300}>
@@ -62,7 +62,7 @@ const MonthlySalesChart = ({ calls }: { calls: Partial<Call>[] }) => {
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
                         <YAxis fontSize={12} tickLine={false} axisLine={false} />
-                        <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="calls" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                     </BarChart>
                 </ResponsiveContainer>
             </CardContent>
@@ -203,7 +203,7 @@ export default function EcommerceDashboard() {
             
             <div className="grid grid-cols-12 gap-4 md:gap-6 2xl:gap-7.5">
                 <div className="col-span-12">
-                     <MonthlySalesChart calls={calls} />
+                     <MonthlyCallsChart calls={calls} />
                 </div>
             </div>
 
