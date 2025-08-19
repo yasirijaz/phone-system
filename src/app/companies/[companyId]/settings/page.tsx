@@ -470,3 +470,5 @@ export default function CompanySettingsPage() {
     </SidebarProvider>
   );
 }
+
+
