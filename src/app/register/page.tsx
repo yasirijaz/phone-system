@@ -50,7 +50,13 @@ export default function RegisterPage() {
     step === 2 ? domainSchema : 
     passwordSchema;
 
-  const { control, trigger, getValues } = useForm({
+  const { 
+    control, 
+    trigger, 
+    getValues,
+    register,
+    formState: { errors }
+  } = useForm({
     resolver: zodResolver(currentValidationSchema),
     mode: "onChange"
   });
@@ -93,13 +99,6 @@ export default function RegisterPage() {
       router.push('/');
     }
   }, [error, user, router, toast]);
-
-  const {
-      register,
-      formState: { errors }
-  } = useForm({
-    resolver: zodResolver(currentValidationSchema),
-  });
 
   const variants = {
     hidden: { opacity: 0, x: 50 },
