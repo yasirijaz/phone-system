@@ -110,8 +110,7 @@ export default function MediaPage() {
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
           <AppHeader user={user} logout={logout} pageTitle="Media Library" />
-          <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
-            <h1 className="text-xl font-bold">Media Library</h1>
+          <header className="sticky top-16 z-20 flex items-center justify-end h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
             <div className="flex items-center gap-2">
                 <Input id="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="File Title" className="max-w-xs" />
                 <Input id="file-upload" type="file" onChange={handleFileChange} className="max-w-xs" />
