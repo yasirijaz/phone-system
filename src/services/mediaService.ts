@@ -4,7 +4,7 @@ import type { MediaFile } from '@/types';
 
 export const getMediaFiles = async (): Promise<MediaFile[]> => {
   const response = await axios.get('/api/uploads');
-  return response.data.media;
+  return response.data.data;
 };
 
 export const uploadMedia = async (file: File): Promise<MediaFile> => {

@@ -214,8 +214,12 @@ export interface Contact {
 export interface MediaFile {
     id: number;
     company_id: number;
-    name: string;
-    url: string;
+    user_id: number;
+    file_name: string;
+    file_url: string;
+    file_path: string;
+    file_size: number;
+    file_type: string;
     created_at: string;
     updated_at: string;
 }

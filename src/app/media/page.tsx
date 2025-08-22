@@ -139,11 +139,11 @@ export default function MediaPage() {
                     <TableBody>
                       {mediaFiles.length > 0 ? mediaFiles.map((file) => (
                         <TableRow key={file.id}>
-                          <TableCell className="font-medium">{file.name}</TableCell>
+                          <TableCell className="font-medium">{file.file_name}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                                <Input type="text" readOnly value={file.url} className="flex-1" />
-                                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(file.url)}>
+                                <Input type="text" readOnly value={file.file_url} className="flex-1" />
+                                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(file.file_url)}>
                                     <Copy className="h-4 w-4" />
                                 </Button>
                             </div>
