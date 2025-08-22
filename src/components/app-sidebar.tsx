@@ -13,7 +13,7 @@ import {
   SidebarMenuSubButton,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
-import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog, Package, CreditCard, AppWindow } from 'lucide-react';
+import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog, Package, CreditCard, AppWindow, UploadCloud } from 'lucide-react';
 import { Button } from './ui/button';
 import { Logo } from './icons';
 import { usePathname, useRouter } from 'next/navigation';
@@ -127,6 +127,7 @@ export function AppSidebar() {
           )}
 
            {isCompanyAdmin && (
+            <>
              <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname.startsWith('/companies') && pathname.endsWith('/users')} tooltip="Users">
                   <Link href={usersLink}>
@@ -135,6 +136,15 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/media')} tooltip="Media">
+                    <Link href="/media">
+                        <UploadCloud />
+                        <span>Media</span>
+                    </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </>
            )}
         </SidebarGroup>
         
@@ -160,9 +170,9 @@ export function AppSidebar() {
             )}
             {(isCompanyAdmin) && (
              <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/billing'} tooltip="Billing">
+              <SidebarMenuButton asChild isActive={pathname === '/settings/billing'} tooltip="Billing">
                 <Link href="/settings/billing">
-                  <Settings />
+                  <CreditCard />
                   <span>Billing</span>
                 </Link>
               </SidebarMenuButton>

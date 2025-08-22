@@ -210,3 +210,12 @@ export interface Contact {
   phone_no: string;
   phone_type: string;
 }
+
+export interface MediaFile {
+    id: number;
+    company_id: number;
+    name: string;
+    url: string;
+    created_at: string;
+    updated_at: string;
+}
