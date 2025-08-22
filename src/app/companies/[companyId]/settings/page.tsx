@@ -1,13 +1,14 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import type { CompanySettings } from "@/types";
+import type { CompanySettings, MediaFile } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { getCompanySettings, createOrUpdateCompanySettings } from "@/services/companySettingsService";
+import { uploadMedia } from "@/services/mediaService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -21,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, PlusCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, PlusCircle, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import AppHeader from "@/components/app-header";
 
@@ -41,6 +42,7 @@ const settingsSchema = z.object({
   call_settings: z.object({
     record_calls: z.boolean().default(false),
     greeting_message: z.string().optional(),
+    hold_music_url: z.string().url().optional().or(z.literal('')),
   }),
   voicemail_settings: z.object({
     enabled: z.boolean().default(true),
@@ -69,11 +71,13 @@ export default function CompanySettingsPage() {
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const form = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
-      call_settings: { record_calls: false, greeting_message: "" },
+      call_settings: { record_calls: false, greeting_message: "", hold_music_url: "" },
       voicemail_settings: { enabled: true, greeting: "", send_transcription: false },
       business_hours: {
         is_24_7: false,
@@ -143,6 +147,29 @@ export default function CompanySettingsPage() {
       setSettings(null); 
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setUploading(true);
+      try {
+        const response: MediaFile = await uploadMedia(file, "hold-music");
+        form.setValue("call_settings.hold_music_url", response.file_url);
+        toast({
+          title: "Upload Successful",
+          description: "Hold music URL has been updated.",
+        });
+      } catch (error) {
+        toast({
+          title: "Upload Failed",
+          description: "Could not upload the file. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setUploading(false);
+      }
     }
   };
 
@@ -240,6 +267,37 @@ export default function CompanySettingsPage() {
                                             <FormMessage />
                                         </FormItem>
                                     )}
+                                />
+                                 <FormField
+                                  control={form.control}
+                                  name="call_settings.hold_music_url"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Hold Music URL</FormLabel>
+                                      <div className="flex items-center gap-2">
+                                        <FormControl>
+                                          <Input placeholder="https://example.com/music.mp3" {...field} />
+                                        </FormControl>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          onClick={() => fileInputRef.current?.click()}
+                                          disabled={uploading}
+                                        >
+                                          <Upload className="mr-2 h-4 w-4" />
+                                          {uploading ? "Uploading..." : "Upload"}
+                                        </Button>
+                                        <input
+                                          type="file"
+                                          ref={fileInputRef}
+                                          onChange={handleFileChange}
+                                          className="hidden"
+                                          accept="audio/*"
+                                        />
+                                      </div>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
                                 />
                             </CardContent>
                         </Card>
@@ -470,5 +528,3 @@ export default function CompanySettingsPage() {
     </SidebarProvider>
   );
 }
-
-

@@ -17,7 +17,7 @@ export const uploadMedia = async (file: File, title: string): Promise<MediaFile>
       'Content-Type': 'multipart/form-data',
     },
   });
-  return response.data.media;
+  return response.data.data;
 };
 
 export const deleteMediaFile = async (id: number): Promise<void> => {

@@ -98,6 +98,7 @@ export interface CompanySettings {
   call_settings: {
     record_calls: boolean;
     greeting_message?: string;
+    hold_music_url?: string;
   };
   voicemail_settings: {
     enabled: boolean;
@@ -213,6 +214,7 @@ export interface Contact {
 
 export interface MediaFile {
     id: number;
+    title: string | null;
     company_id: number;
     user_id: number;
     file_name: string;
