@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, Users, Trash2, Delete } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
-import type { User, Contact } from '@/types';
+import type { User, Contact, DepartmentSettings, CompanySettings } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { getUsersByCompany } from '@/services/userService';
 import { getContacts } from '@/services/contactService';
@@ -16,6 +16,8 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
 import { allParticipant, removeParticipant, addParticipant } from '@/services/twilioService';
+import { getDepartmentSettings } from '@/services/departmentSettingsService';
+import { getCompanySettings } from '@/services/companySettingsService';
 import { getCallLogsBySid } from '@/services/callLogService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
@@ -56,6 +58,8 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
   const [currentParticipants, setCurrentParticipants] = useState<any[]>([]);
   const [dialerNumber, setDialerNumber] = useState('');
+  const [departmentSettings, setDepartmentSettings] = useState<DepartmentSettings | null>(null);
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   
   const dialpadKeys = [
     '1', '2', '3',
@@ -71,20 +75,38 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
         try {
           const currentCallSid = connection?.parameters?.CallSid || '';
           const matchingCall = await getCallLogsBySid(currentCallSid);
-          console.log("Matching call:", matchingCall);
+          
           if (matchingCall?.user?.name) {
             setDisplayName(matchingCall.user.name);
           } else {
             setDisplayName(contactName);
+          }
+
+          if (currentCallSid) {
+            if (matchingCall?.department_id) {
+              const deptSettings = await getDepartmentSettings(matchingCall.department_id);
+              setDepartmentSettings(deptSettings);
+            }
+
+            if (matchingCall?.company_id) {
+              const comSettings = await getCompanySettings(matchingCall.company_id);
+              setCompanySettings(comSettings);
+            }
           }
         } catch (error) {
           console.error("Could not fetch user name for active call", error);
           setDisplayName(contactName); // Fallback to original name
         }
       };
+
       fetchUserName();
     } else {
         setDisplayName(contactName);
+    }
+
+    if (!isOpen) {
+      setDepartmentSettings(null);
+      setCompanySettings(null);
     }
   }, [isOpen, contactName, connection]);
   
@@ -258,7 +280,9 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                 <ActionButton icon={PhoneForwarded} label="Transfer" />
                 <div className="relative">
                     {isAdmin && <span className="absolute -top-2 right-1/2 translate-x-1/2 text-white bg-red-500 text-[10px] px-2 py-0.5 rounded-full">Admin</span>}
-                    <ActionButton icon={Circle} label="Record" />
+                    {companySettings?.call_settings?.record_calls && (
+                      <ActionButton icon={Circle} label="Record" />
+                    )}
                 </div>
                 <Dialog open={isKeypadModalOpen} onOpenChange={setIsKeypadModalOpen}>
                     <DialogTrigger asChild>

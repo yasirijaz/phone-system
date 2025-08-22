@@ -3,6 +3,7 @@
 export interface Call {
   id: number;
   department_id?: number;
+  company_id?: number;
   client_name?: string | null;
   user_id?: number | null;
   call_sid?: string;
