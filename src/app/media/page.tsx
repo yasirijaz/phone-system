@@ -25,6 +25,7 @@ export default function MediaPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
   const { toast } = useToast();
 
   const isCompanyAdmin = user?.role_id === 2;
@@ -66,12 +67,13 @@ export default function MediaPage() {
     }
     setUploading(true);
     try {
-      await uploadMedia(selectedFile);
+      await uploadMedia(selectedFile, title);
       toast({ title: "Success", description: "File uploaded successfully." });
-      setSelectedFile(null); 
+      setSelectedFile(null);
+      setTitle(''); 
       // Clear the input visually
-      const input = document.getElementById('file-upload') as HTMLInputElement;
-      if (input) input.value = '';
+      const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
       fetchMediaFiles(); 
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || "Failed to upload file.";
@@ -111,6 +113,7 @@ export default function MediaPage() {
           <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
             <h1 className="text-xl font-bold">Media Library</h1>
             <div className="flex items-center gap-2">
+                <Input id="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="File Title" className="max-w-xs" />
                 <Input id="file-upload" type="file" onChange={handleFileChange} className="max-w-xs" />
                 <Button onClick={handleUpload} disabled={uploading || !selectedFile}>
                   {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
@@ -130,6 +133,7 @@ export default function MediaPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Title</TableHead>
                         <TableHead>File Name</TableHead>
                         <TableHead>URL</TableHead>
                         <TableHead>Uploaded At</TableHead>
@@ -139,6 +143,7 @@ export default function MediaPage() {
                     <TableBody>
                       {mediaFiles.length > 0 ? mediaFiles.map((file) => (
                         <TableRow key={file.id}>
+                          <TableCell className="font-medium">{file.title || 'N/A'}</TableCell>
                           <TableCell className="font-medium">{file.file_name}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -168,7 +173,7 @@ export default function MediaPage() {
                           </TableCell>
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={4} className="text-center h-24">No media files found. Upload one to get started.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center h-24">No media files found. Upload one to get started.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>

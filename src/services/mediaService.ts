@@ -7,9 +7,10 @@ export const getMediaFiles = async (): Promise<MediaFile[]> => {
   return response.data.data;
 };
 
-export const uploadMedia = async (file: File): Promise<MediaFile> => {
+export const uploadMedia = async (file: File, title: string): Promise<MediaFile> => {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('title', title);
 
   const response = await axios.post('/api/uploads', formData, {
     headers: {
