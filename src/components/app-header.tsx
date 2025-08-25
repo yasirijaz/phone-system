@@ -14,9 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, MessageSquare, Video, Settings, LogOut } from "lucide-react";
+import { Search, Phone, MessageSquare, Video, Settings, LogOut, Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList } from "lucide-react";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
@@ -73,6 +74,10 @@ export default function AppHeader({
     const [isActiveCallOpen, setIsActiveCallOpen] = useState(false);
     const [activeContactName, setActiveContactName] = useState('');
     const [activeConferenceSid, setActiveConferenceSid] = useState<string | null>(null);
+
+    // Search state
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchValue, setSearchValue] = useState("");
     
     useEffect(() => {
         connectTwilio();
@@ -137,8 +142,8 @@ export default function AppHeader({
         if (!fromNumber) {
             // If used as uncontrolled, update internal state
             if (setControlledDialerOpen === undefined) {
-                setInternalDialerInitialValue(number);
                 setInternalDialerOpen(true);
+                setInternalDialerInitialValue(number.replace(/^\+1/, ""));
             } else { // If controlled, expect parent to handle it
                  setControlledDialerOpen(true);
             }
@@ -198,6 +203,20 @@ export default function AppHeader({
             toast({ title: "Call Error", description: "Failed to make call. See console for details.", variant: 'destructive'});
         }
     };
+    
+    const handleContactSelect = (contact: Contact) => {
+        handleMakeCall(contact.phone_no, selectedFromNumber || undefined);
+        setSearchOpen(false);
+    };
+    
+    const filteredContacts = searchValue
+    ? contacts.filter(
+        contact =>
+          contact.name.toLowerCase().includes(searchValue.toLowerCase()) ||
+          contact.phone_no.includes(searchValue)
+      )
+    : contacts;
+
 
     return (
         <>
@@ -207,13 +226,45 @@ export default function AppHeader({
                      {pageTitle ? (
                         <h1 className="text-xl font-bold">{pageTitle}</h1>
                      ) : (
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Search or type command..." className="pl-9 w-full md:w-96" />
-                            <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 md:flex">
-                                <span className="text-xs">⌘</span>K
-                            </kbd>
-                        </div>
+                        <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    className="w-full md:w-96 justify-start text-muted-foreground"
+                                >
+                                    <Search className="h-4 w-4 mr-2" />
+                                    <span>Search contacts...</span>
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="p-0 w-[--radix-popover-trigger-width]">
+                                <Command>
+                                    <CommandInput 
+                                        placeholder="Search by name or number..."
+                                        value={searchValue}
+                                        onValueChange={setSearchValue}
+                                    />
+                                    <CommandList>
+                                        <CommandEmpty>No results found.</CommandEmpty>
+                                        <CommandGroup heading="Contacts">
+                                            {filteredContacts.map(contact => (
+                                                <CommandItem 
+                                                    key={contact.id}
+                                                    onSelect={() => handleContactSelect(contact)}
+                                                >
+                                                    <Avatar className="h-6 w-6 mr-2">
+                                                        <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="flex-1">
+                                                        <p>{contact.name}</p>
+                                                        <p className="text-xs text-muted-foreground">{contact.phone_no}</p>
+                                                    </div>
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
                      )}
                 </div>
                 <div className="flex items-center gap-4">
