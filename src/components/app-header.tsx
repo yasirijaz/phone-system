@@ -14,17 +14,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Search, Phone, MessageSquare, Video, Settings, LogOut } from "lucide-react";
-import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
 import HardwareSettings from "@/components/hardware-settings";
 import ActiveCallBar from "./active-call-modal";
 import type { Call } from '@twilio/voice-sdk';
+import { ScrollArea } from "./ui/scroll-area";
 
 interface AppHeaderProps {
     user: User | null;
@@ -206,9 +205,19 @@ export default function AppHeader({
     };
     
     const handleContactSelect = (contact: Contact) => {
-        handleMakeCall(contact.phone_no, selectedFromNumber || undefined);
+        setSearchValue('');
         setSearchOpen(false);
+        
+        if (setControlledDialerOpen !== undefined) {
+            setControlledDialerOpen(true);
+        } else {
+            setInternalDialerOpen(true);
+        }
+        
+        // This relies on the dialer being able to receive the initial value.
+        setInternalDialerInitialValue(contact.phone_no.replace(/^\+1/, ''));
     };
+
     
     const filteredContacts = searchValue
     ? contacts.filter(
@@ -216,7 +225,7 @@ export default function AppHeader({
           contact.name.toLowerCase().includes(searchValue.toLowerCase()) ||
           contact.phone_no.includes(searchValue)
       )
-    : contacts;
+    : [];
 
 
     return (
@@ -227,45 +236,33 @@ export default function AppHeader({
                      {pageTitle ? (
                         <h1 className="text-xl font-bold">{pageTitle}</h1>
                      ) : (
-                        <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    className="w-full md:w-96 justify-start text-muted-foreground"
-                                >
-                                    <Search className="h-4 w-4 mr-2" />
-                                    <span>Search contacts...</span>
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="p-0 w-[--radix-popover-trigger-width]">
-                                <Command>
-                                    <CommandInput 
-                                        placeholder="Search by name or number..."
-                                        value={searchValue}
-                                        onValueChange={setSearchValue}
-                                    />
-                                    <CommandList>
-                                        <CommandEmpty>No results found.</CommandEmpty>
-                                        <CommandGroup heading="Contacts">
-                                            {filteredContacts.map(contact => (
-                                                <CommandItem 
-                                                    key={contact.id}
-                                                    onSelect={() => handleContactSelect(contact)}
-                                                >
-                                                    <Avatar className="h-6 w-6 mr-2">
-                                                        <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
-                                                    </Avatar>
-                                                    <div className="flex-1">
-                                                        <p>{contact.name}</p>
-                                                        <p className="text-xs text-muted-foreground">{contact.phone_no}</p>
-                                                    </div>
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
+                        <div className="relative w-full md:w-96">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                                placeholder="Search contacts..."
+                                className="pl-9"
+                                value={searchValue}
+                                onFocus={() => setSearchOpen(true)}
+                                onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+                                onChange={(e) => setSearchValue(e.target.value)}
+                            />
+                            {searchOpen && filteredContacts.length > 0 && (
+                                <div className="absolute z-10 top-full mt-1 w-full bg-background border rounded-md shadow-lg">
+                                    <ScrollArea className="max-h-60">
+                                        {filteredContacts.map(contact => (
+                                            <div 
+                                                key={contact.id}
+                                                onMouseDown={() => handleContactSelect(contact)}
+                                                className="p-2 hover:bg-accent cursor-pointer"
+                                            >
+                                                <p className="font-medium">{contact.name}</p>
+                                                <p className="text-xs text-muted-foreground">{contact.phone_no}</p>
+                                            </div>
+                                        ))}
+                                    </ScrollArea>
+                                </div>
+                            )}
+                        </div>
                      )}
                 </div>
                 <div className="flex items-center gap-4">
