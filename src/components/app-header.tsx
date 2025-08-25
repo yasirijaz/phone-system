@@ -17,7 +17,8 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, MessageSquare, Video, Settings, LogOut, Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList } from "lucide-react";
+import { Search, Phone, MessageSquare, Video, Settings, LogOut } from "lucide-react";
+import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
