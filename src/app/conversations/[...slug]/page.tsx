@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from 'next/navigation';
 import { getCommunicationThread } from "@/services/callLogService";
 import type { Communication, Department, PhoneNumber } from "@/types";
@@ -40,6 +40,7 @@ export default function ConversationDetailPage() {
     const [selectedFromNumber, setSelectedFromNumber] = useState<string>('');
     const [loadingDepartments, setLoadingDepartments] = useState(true);
     const [loadingNumbers, setLoadingNumbers] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
     
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from, to] = slug.map(part => decodeURIComponent(part));
@@ -128,7 +129,13 @@ export default function ConversationDetailPage() {
         if (user && from && to) {
             fetchInitialData();
         }
-    }, [user, from, to, toast]);
+    }, [user, from, to, toast, handleDepartmentChange]);
+    
+    useEffect(() => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+        }
+    }, [allComms, loading]);
 
 
     const handleMakeCall = async (number: string) => {
@@ -193,6 +200,7 @@ export default function ConversationDetailPage() {
                         </header>
                          <main className="flex-1 overflow-y-auto p-6">
                            {loading ? <p>Loading...</p> : <CallLog calls={allComms} onMakeCall={handleMakeCall} isClickable={false} />}
+                           <div ref={messagesEndRef} />
                         </main>
                         <footer className="p-4 border-t bg-background space-y-2">
                              <div className="grid grid-cols-2 gap-2">
