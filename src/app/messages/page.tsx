@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send, Smile, Paperclip, Mic } from "lucide-react";
-import { MessagesIllustration } from "@/components/messages.svg";
+import MessagesIllustration from "@/components/messages.svg";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function MessagesPage() {
