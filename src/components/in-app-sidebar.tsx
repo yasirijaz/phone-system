@@ -65,6 +65,14 @@ export function InAppSidebar() {
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
+                 <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith('/messages')}>
+                        <Link href="/messages">
+                            <MessageSquare />
+                            <span>Messages</span>
+                        </Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith('/contacts')}>
                         <Link href="/contacts">
@@ -78,14 +86,6 @@ export function InAppSidebar() {
                         <Link href="#">
                             <Hash />
                             <span>All Channels</span>
-                        </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                        <Link href="#">
-                            <MessageSquare />
-                            <span>Threads</span>
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>

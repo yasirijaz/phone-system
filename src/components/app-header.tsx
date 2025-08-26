@@ -24,6 +24,7 @@ import HardwareSettings from "@/components/hardware-settings";
 import ActiveCallBar from "./active-call-modal";
 import type { Call } from '@twilio/voice-sdk';
 import { ScrollArea } from "./ui/scroll-area";
+import { useRouter } from "next/navigation";
 
 interface AppHeaderProps {
     user: User | null;
@@ -47,10 +48,10 @@ export default function AppHeader({
     dialerInitialValue: controlledDialerInitialValue 
 }: AppHeaderProps) {
     const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
-    const [isSmsOpen, setIsSmsOpen] = useState(false);
     const [isVideoOpen, setIsVideoOpen] = useState(false);
     const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid } = useTwilio();
     const { toast } = useToast();
+    const router = useRouter();
 
     const [departments, setDepartments] = useState<Department[]>([]);
     const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
@@ -305,7 +306,7 @@ export default function AppHeader({
                            <Phone className="h-5 w-5" />
                         </Button>
                      </Dialer>
-                     <Button variant="ghost" size="icon" onClick={() => setIsSmsOpen(true)}><MessageSquare className="h-5 w-5" /></Button>
+                     <Button variant="ghost" size="icon" onClick={() => router.push('/messages')}><MessageSquare className="h-5 w-5" /></Button>
                      <Button variant="ghost" size="icon" onClick={() => setIsVideoOpen(true)}><Video className="h-5 w-5" /></Button>
                      <HardwareSettings />
 
@@ -334,29 +335,6 @@ export default function AppHeader({
                     </DropdownMenu>
                 </div>
             </header>
-            
-            <Dialog open={isSmsOpen} onOpenChange={setIsSmsOpen}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>New Message</DialogTitle>
-                     <DialogDescription>
-                      Select a department and number to send a message from.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <NewMessageForm 
-                    onClose={() => setIsSmsOpen(false)}
-                    departments={departments}
-                    phoneNumbers={phoneNumbers}
-                    onDepartmentChange={handleDepartmentChange}
-                    loadingDepartments={loadingDepartments}
-                    loadingNumbers={loadingNumbers}
-                     selectedDepartmentId={selectedDepartmentId}
-                    selectedFromNumber={selectedFromNumber}
-                    onSetSelectedFromNumber={setSelectedFromNumber}
-                    contacts={contacts}
-                  />
-                </DialogContent>
-            </Dialog>
               
             <Dialog open={isVideoOpen} onOpenChange={setIsVideoOpen}>
             <DialogContent>

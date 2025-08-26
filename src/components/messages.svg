@@ -1,0 +1,35 @@
+
+import * as React from "react"
+
+export const MessagesIllustration = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <g clipPath="url(#clip0_1_2)">
+            <path d="M128 256C198.703 256 256 198.703 256 128C256 57.2975 198.703 0 128 0C57.2975 0 0 57.2975 0 128C0 198.703 57.2975 256 128 256Z" fill="#F3F4F6"/>
+            <path d="M189.923 151.077L154.557 122.378L139.634 142.146L189.923 151.077Z" fill="white" stroke="#1F2937" strokeWidth="3" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M172.93 113.882C182.012 110.155 186.377 100.222 183.84 90.9634C181.303 81.7049 172.585 75.8779 163.504 79.6053L146.438 86.4382L159.204 107.575L172.93 113.882Z" fill="white" stroke="#1F2937" strokeWidth="3" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M152.091 101.442C154.912 101.815 157.361 103.888 158.05 106.666L163.504 79.6052L146.438 86.4381L152.091 101.442Z" fill="#1F2937"/>
+            <path d="M141.493 147.288L154.556 122.378L139.633 142.146L141.493 147.288Z" fill="#E5E7EB"/>
+            <path d
+                ="M101.696 177.348C97.1549 177.348 93.543 173.736 93.543 169.195V151.077C93.543 146.536 97.1549 142.924 101.696 142.924H103.555C108.096 142.924 111.708 146.536 111.708 151.077V169.195C111.708 173.736 108.096 177.348 103.555 177.348H101.696Z"
+                stroke="#1F2937"
+                strokeWidth="3"
+                strokeMiterlimit="10"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path d="M103.555 142.924L128.84 153.493" stroke="#1F2937" strokeWidth="3" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M111.708 151.077H139.633V133.04C139.633 129.074 136.38 125.821 132.414 125.821H125.199C121.233 125.821 117.98 129.074 117.98 133.04V151.077" stroke="#1F2937" strokeWidth="3" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M128.84 153.493L139.633 151.077V133.04" stroke="#1F29_37" strokeWidth="3" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M139.633 151.077L154.556 122.378" stroke="#1F2937" strokeWidth="3" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M189.923 151.077H111.708" stroke="#1F2937" strokeWidth="3" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M150.232 101.996C148.74 102.368 147.434 103.295 146.438 104.537L159.204 107.575L152.091 101.442C151.537 101.628 150.892 101.815 150.232 101.996Z" fill="#E5E7EB"/>
+            <path d="M141.493 147.288C136.952 147.288 133.25 150.99 133.25 155.531V165.65C133.25 170.191 136.952 173.893 141.493 173.893H165.362C169.903 173.893 173.605 170.191 173.605 165.65V155.531C173.605 150.99 169.903 147.288 165.362 147.288H141.493Z" fill="#4338CA" stroke="#1F2937" strokeWidth="3" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        </g>
+        <defs>
+            <clipPath id="clip0_1_2">
+                <rect width="256" height="256" fill="white"/>
+            </clipPath>
+        </defs>
+    </svg>
+)
+
