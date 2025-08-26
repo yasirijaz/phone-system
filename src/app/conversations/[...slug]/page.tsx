@@ -128,7 +128,7 @@ export default function ConversationDetailPage() {
         if (user && from && to) {
             fetchInitialData();
         }
-    }, [user, from, to, toast, handleDepartmentChange]);
+    }, [user, from, to, toast]);
 
 
     const handleMakeCall = async (number: string) => {
