@@ -37,6 +37,10 @@ export interface Communication {
     worker_name?: string;
     user?: Partial<User>;
   }[];
+  latest_type?: 'call' | 'sms';
+  latest_created_at?: string;
+  sms_count?: number;
+  call_count?: number;
 }
 
 export interface User {

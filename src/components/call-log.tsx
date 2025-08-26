@@ -90,7 +90,8 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
   const hasAssignments = Array.isArray(comm.task_assignments) && comm.task_assignments.length > 0;
 
   const renderIcon = () => {
-    if (comm.type === 'sms') {
+    const type = comm.latest_type || comm.type;
+    if (type === 'sms') {
       return <MessageSquare className="h-4 w-4" />;
     }
     return comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />;
@@ -107,7 +108,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium">
                        {renderIcon()}
-                       <span>{(comm.type === 'sms' ? 'SMS' : (comm.direction || '')).charAt(0).toUpperCase() + (comm.type === 'sms' ? 'SMS' : (comm.direction || '')).slice(1)}</span>
+                       <span>{(comm.latest_type || comm.type || '').charAt(0).toUpperCase() + (comm.latest_type || comm.type || '').slice(1)}</span>
                        {comm.type === 'call' && getStatusBadge(comm.call_status)}
                        {comm.type === 'call' && comm.duration && <span>({comm.duration} min)</span>}
                   </div>
@@ -150,8 +151,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                     </div>
                 ) : (
                   <div className="text-sm mt-2 space-y-1 text-muted-foreground">
-                      <p className="text-foreground"><strong>Received By:</strong> {comm.user?.name ?? 'Unassigned'}</p>
-                      <p><strong>From:</strong> {comm.from_name?.name || comm.from}</p>
+                      <p className="text-foreground"><strong>From:</strong> {comm.from_name?.name || comm.from}</p>
                       <p><strong>To:</strong> {comm.to_name?.name || comm.to}</p>
                   </div>
                 )}
@@ -173,7 +173,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                     </div>
                 )}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{format(parseISO(comm.created_at), 'p')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{format(parseISO(comm.created_at || comm.latest_created_at!), 'p')}</p>
         </div>
     </div>
   );
@@ -202,9 +202,9 @@ export default function CallLog({ calls: communications, onMakeCall, isClickable
   }
   
   const groupedCommunications = communications
-    .filter(comm => comm.created_at) // Filter out items with no created_at date
+    .filter(comm => comm.created_at || comm.latest_created_at) // Filter out items with no created_at date
     .reduce((acc, comm) => {
-      const date = format(parseISO(comm.created_at), 'yyyy-MM-dd');
+      const date = format(parseISO(comm.created_at || comm.latest_created_at!), 'yyyy-MM-dd');
       if (!acc[date]) {
           acc[date] = [];
       }
@@ -223,7 +223,7 @@ export default function CallLog({ calls: communications, onMakeCall, isClickable
             </div>
              <div className="space-y-4">
                 {commsForDay.map((comm) => (
-                    <CommunicationCard comm={comm} key={comm.id} onMakeCall={onMakeCall} isClickable={isClickable} />
+                    <CommunicationCard comm={comm} key={comm.id || `${comm.from}-${comm.to}`} onMakeCall={onMakeCall} isClickable={isClickable} />
                 ))}
              </div>
         </div>

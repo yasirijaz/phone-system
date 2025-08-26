@@ -84,8 +84,8 @@ export default function AppUIPage() {
     setDialerOpen(true);
   };
   
-  const getCalls = (comms: Communication[]) => comms.filter(c => c.type === 'call');
-  const getMessages = (comms: Communication[]) => comms.filter(c => c.type === 'sms');
+  const getCalls = (comms: Communication[]) => comms.filter(c => c.latest_type === 'call');
+  const getMessages = (comms: Communication[]) => comms.filter(c => c.latest_type === 'sms');
 
   return (
     <SidebarProvider>
