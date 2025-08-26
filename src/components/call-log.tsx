@@ -145,16 +145,11 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                         </Button>
                    </div>
                 </div>
-                {comm.type === 'sms' ? (
-                    <div className="text-sm mt-2 space-y-1 text-muted-foreground">
-                      <p>{comm.body}</p>
-                    </div>
-                ) : (
-                  <div className="text-sm mt-2 space-y-1 text-muted-foreground">
-                      <p className="text-foreground"><strong>From:</strong> {comm.from_name?.name || comm.from}</p>
-                      <p><strong>To:</strong> {comm.to_name?.name || comm.to}</p>
-                  </div>
-                )}
+                <div className="text-sm mt-2 space-y-1 text-muted-foreground">
+                    <p className="text-foreground"><strong>From:</strong> {comm.from_name?.name || comm.from}</p>
+                    <p><strong>To:</strong> {comm.to_name?.name || comm.to}</p>
+                    {comm.type === 'sms' && <p className="pt-2 text-foreground">{comm.body}</p>}
+                </div>
                  {isInProgress && isAdmin && (
                     <div className="mt-4 flex gap-2 border-t pt-2">
                         <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true, coach: true })}>
