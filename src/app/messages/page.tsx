@@ -105,7 +105,7 @@ const handleContactSelect = (contact: Contact) => {
             <main className="flex-1 flex flex-col bg-muted/40">
                 <div className="p-4 border-b">
                     <h1 className="text-xl font-bold">New Message</h1>
-                    <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="space-y-4 mt-4">
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-muted-foreground w-16">From:</span>
                             <Select onValueChange={handleDepartmentChange} disabled={loadingDepartments}>
