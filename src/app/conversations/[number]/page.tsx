@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from 'next/navigation';
-import { getCommunications } from "@/services/callLogService";
+import { getCommunicationThread } from "@/services/callLogService";
 import type { Communication, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -28,27 +28,26 @@ export default function ConversationDetailPage() {
     const [loading, setLoading] = useState(true);
     const [contactName, setContactName] = useState('');
     
-    const contactNumber = params.number ? decodeURIComponent(params.number as string) : '';
+    const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
+    const [from, to] = slug.map(part => decodeURIComponent(part));
 
     useEffect(() => {
         const fetchAndFilterComms = async () => {
-            if (!user) return;
+            if (!user || !from || !to) return;
             setLoading(true);
             try {
-                const logs = await getCommunications();
-                const filteredLogs = logs.filter(comm => comm.from === contactNumber || comm.to === contactNumber)
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-                
-                setAllComms(filteredLogs);
+                const logs = await getCommunicationThread(from, to);
+                const sortedLogs = logs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                setAllComms(sortedLogs);
 
-                if (filteredLogs.length > 0) {
-                    const latestComm = filteredLogs[0];
+                if (sortedLogs.length > 0) {
+                    const latestComm = sortedLogs[0];
                     const name = latestComm.direction === 'inbound' 
-                        ? (latestComm.from_name?.name || latestComm.from) 
-                        : (latestComm.to_name?.name || latestComm.to);
+                        ? (latestComm.from_name?.name || from) 
+                        : (latestComm.to_name?.name || to);
                     setContactName(name);
                 } else {
-                    setContactName(contactNumber);
+                    setContactName(to);
                 }
 
             } catch (error) {
@@ -59,14 +58,13 @@ export default function ConversationDetailPage() {
         };
 
         fetchAndFilterComms();
-    }, [user, contactNumber]);
+    }, [user, from, to]);
 
     const handleMakeCall = async (number: string) => {
         if (!device || !isDeviceReady) {
             toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});
             return;
         }
-        // This will be handled by the AppHeader dialer now
         console.log("Request to call from conversation detail:", number);
     };
 
@@ -86,7 +84,7 @@ export default function ConversationDetailPage() {
                                 </Button>
                                 <div className="relative flex-1">
                                     <h1 className="text-xl font-bold">{contactName}</h1>
-                                     <p className="text-sm text-muted-foreground">{contactNumber}</p>
+                                     <p className="text-sm text-muted-foreground">{to}</p>
                                 </div>
                             </div>
                         </header>

@@ -12,7 +12,7 @@ import { useTwilio } from '@/context/TwilioContext';
 import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
 import { useToast } from "@/hooks/use-toast";
-import { getCommunications } from "@/services/callLogService";
+import { getCommunicationThreads } from "@/services/callLogService";
 import { getContacts } from '@/services/contactService';
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
@@ -38,13 +38,11 @@ export default function AppUIPage() {
     if (!user) return;
     setLoading(true);
     try {
-        const communications = await getCommunications();
+        const communications = await getCommunicationThreads();
         const commsData = Array.isArray(communications) ? communications : [];
         
-        // Assuming API returns latest unique communications
         setAllCommunications(commsData);
         
-        // Filter for unread communications (calls and messages)
         const unread = commsData.filter(c => !c.is_read);
         setUnreadCommunications(unread);
         

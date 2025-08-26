@@ -145,7 +145,11 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                    </div>
                 </div>
                 {comm.type === 'sms' ? (
-                  <p className="text-sm mt-2 text-muted-foreground">{comm.body}</p>
+                    <div className="text-sm mt-2 space-y-1 text-muted-foreground">
+                      <p>{comm.body}</p>
+                      <p className="text-foreground"><strong>From:</strong> {comm.from}</p>
+                      <p><strong>To:</strong> {comm.to}</p>
+                    </div>
                 ) : (
                   <div className="text-sm mt-2 space-y-1 text-muted-foreground">
                       <p className="text-foreground"><strong>Received By:</strong> {comm.user?.name ?? 'Unassigned'}</p>
@@ -177,8 +181,10 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
   );
 
   if (isClickable) {
+    const from = encodeURIComponent(comm.from);
+    const to = encodeURIComponent(comm.to);
     return (
-        <Link href={`/conversations/${encodeURIComponent(contactDisplayNumber)}`} key={comm.id} className="block">
+        <Link href={`/conversations/${from}/${to}`} key={comm.id} className="block">
             <CardContent />
         </Link>
     );
