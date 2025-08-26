@@ -1,6 +1,6 @@
 
-import type { Call, User } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2 } from 'lucide-react';
+import type { Communication, User } from '@/types';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -12,29 +12,25 @@ import { addParticipant } from '@/services/twilioService';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 interface CallLogProps {
-  calls: Call[];
+  calls: Communication[];
   onMakeCall: (number: string) => void;
   isClickable?: boolean;
 }
 
-function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (number: string) => void, isClickable: boolean }) {
+function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communication, onMakeCall: (number: string) => void, isClickable: boolean }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const isAdmin = user?.role_id === 1 || user?.role_id === 2;
 
-  const fromName = call.from_name?.name || call.user?.name || call.from;
-  const toName = call.to_name?.name || call.user?.name || call.to;
-
-  const receivedByName = call.user?.name ?? 'Unassigned';
-  const contactName = call.direction === 'inbound' 
-                        ? (call.from_name?.name || call.user?.name || call.from) 
-                        : (call.to_name?.name || call.user?.name || call.to);
+  const contactName = comm.direction === 'inbound' 
+                        ? (comm.from_name?.name || comm.user?.name || comm.from) 
+                        : (comm.to_name?.name || comm.user?.name || comm.to);
                         
   const contactInitial = contactName ? contactName.charAt(0).toUpperCase() : '?';
 
-  const isMissed = call.call_status === 'missed' || call.call_status === 'no-answer' || call.call_status === 'busy' || call.call_status === 'canceled';
-  const isInProgress = call.call_status === 'in_progress';
-  const hasRecording = !!call.recording_url;
+  const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
+  const isInProgress = comm.call_status === 'in_progress';
+  const hasRecording = !!comm.recording_url;
   
   const cardBg = isInProgress
     ? 'bg-orange-300 border-orange-300 dark:bg-orange-950/20 dark:border-orange-800'
@@ -44,7 +40,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
     ? 'bg-green-50 dark:bg-green-950/20'
     : 'bg-background';
 
-  const contactDisplayNumber = call.direction === 'inbound' ? call.from : call.to;
+  const contactDisplayNumber = comm.direction === 'inbound' ? comm.from : comm.to;
   
   const handleCallClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -55,13 +51,13 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
   const handleJoinCall = async (e: React.MouseEvent, options: { silent?: boolean, coach?: boolean }) => {
     e.stopPropagation();
     e.preventDefault();
-    if (!user || !call.conference_sid) {
+    if (!user || !comm.conference_sid) {
       toast({ title: "Error", description: "Cannot join call. Required information is missing.", variant: "destructive" });
       return;
     }
     
     try {
-      await addParticipant(call.conference_sid, call.from, String(user.id), { coach: true, silent: options.silent });
+      await addParticipant(comm.conference_sid, comm.from, String(user.id), { coach: true, silent: options.silent });
       toast({ title: "Success", description: "You have joined the call." });
     } catch(error) {
        toast({ title: "Error", description: "Failed to join the call.", variant: "destructive" });
@@ -70,6 +66,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
 
 
   const getStatusBadge = (status?: string) => {
+    if (!status) return null;
     switch (status) {
         case 'completed': return <Badge variant="default">Completed</Badge>;
         case 'in_progress':
@@ -90,7 +87,14 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
     }
   }
   
-  const hasAssignments = Array.isArray(call.task_assignments) && call.task_assignments.length > 0;
+  const hasAssignments = Array.isArray(comm.task_assignments) && comm.task_assignments.length > 0;
+
+  const renderIcon = () => {
+    if (comm.type === 'sms') {
+      return <MessageSquare className="h-4 w-4" />;
+    }
+    return comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />;
+  }
   
   const CardContent = () => (
     <div className="flex items-start gap-4">
@@ -102,10 +106,10 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
             <div className={`p-4 rounded-lg border ${cardBg}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium">
-                       {call.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />}
-                       <span>{call.direction.charAt(0).toUpperCase() + call.direction.slice(1)}</span>
-                       {getStatusBadge(call.call_status)}
-                       <span>({call.duration} min)</span>
+                       {renderIcon()}
+                       <span>{(comm.type === 'sms' ? 'SMS' : comm.direction).charAt(0).toUpperCase() + (comm.type === 'sms' ? 'SMS' : comm.direction).slice(1)}</span>
+                       {comm.type === 'call' && getStatusBadge(comm.call_status)}
+                       {comm.type === 'call' && comm.duration && <span>({comm.duration} min)</span>}
                   </div>
                    <div className="flex items-center">
                         {hasAssignments && !isClickable && (
@@ -124,7 +128,7 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                                             </p>
                                         </div>
                                         <div className="grid gap-1">
-                                            {call.task_assignments?.map((assignment: any) => (
+                                            {comm.task_assignments?.map((assignment: any) => (
                                                 <div key={assignment.worker_sid} className="flex items-center justify-between">
                                                     <span>{assignment.user?.name || assignment.worker_name || 'Unknown Worker'}</span>
                                                     <Badge variant={assignment.status === 'completed' ? 'default' : 'destructive'}>{assignment.status}</Badge>
@@ -140,11 +144,15 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                         </Button>
                    </div>
                 </div>
-                <div className="text-sm mt-2 space-y-1 text-muted-foreground">
-                    <p className="text-foreground"><strong>Received By:</strong> {receivedByName}</p>
-                    <p><strong>From:</strong> {fromName} ({call.from})</p>
-                    <p><strong>To:</strong> {toName} ({call.to})</p>
-                </div>
+                {comm.type === 'sms' ? (
+                  <p className="text-sm mt-2 text-muted-foreground">{comm.body}</p>
+                ) : (
+                  <div className="text-sm mt-2 space-y-1 text-muted-foreground">
+                      <p className="text-foreground"><strong>Received By:</strong> {comm.user?.name ?? 'Unassigned'}</p>
+                      <p><strong>From:</strong> {comm.from_name?.name || comm.from}</p>
+                      <p><strong>To:</strong> {comm.to_name?.name || comm.to}</p>
+                  </div>
+                )}
                  {isInProgress && isAdmin && (
                     <div className="mt-4 flex gap-2 border-t pt-2">
                         <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true, coach: true })}>
@@ -163,14 +171,14 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
                     </div>
                 )}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{format(parseISO(call.created_at), 'p')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{format(parseISO(comm.created_at), 'p')}</p>
         </div>
     </div>
   );
 
   if (isClickable) {
     return (
-        <Link href={`/conversations/${encodeURIComponent(contactDisplayNumber)}`} key={call.id} className="block">
+        <Link href={`/conversations/${encodeURIComponent(contactDisplayNumber)}`} key={comm.id} className="block">
             <CardContent />
         </Link>
     );
@@ -179,8 +187,8 @@ function CallCard({ call, onMakeCall, isClickable }: { call: Call, onMakeCall: (
   return <CardContent />;
 }
 
-export default function CallLog({ calls, onMakeCall, isClickable = true }: CallLogProps) {
-  if (calls.length === 0) {
+export default function CallLog({ calls: communications, onMakeCall, isClickable = true }: CallLogProps) {
+  if (communications.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 border-2 border-dashed rounded-lg">
         <p className="text-lg font-medium">No activity yet</p>
@@ -189,18 +197,18 @@ export default function CallLog({ calls, onMakeCall, isClickable = true }: CallL
     );
   }
   
-  const groupedCalls = calls.reduce((acc, call) => {
-    const date = format(parseISO(call.created_at), 'yyyy-MM-dd');
+  const groupedCommunications = communications.reduce((acc, comm) => {
+    const date = format(parseISO(comm.created_at), 'yyyy-MM-dd');
     if (!acc[date]) {
         acc[date] = [];
     }
-    acc[date].push(call);
+    acc[date].push(comm);
     return acc;
-  }, {} as Record<string, Call[]>);
+  }, {} as Record<string, Communication[]>);
 
   return (
     <div className="space-y-6">
-      {Object.entries(groupedCalls).map(([date, callsForDay]) => (
+      {Object.entries(groupedCommunications).map(([date, commsForDay]) => (
         <div key={date}>
             <div className="flex items-center justify-center my-4">
                 <div className="text-xs text-muted-foreground bg-secondary px-3 py-1 rounded-full">
@@ -208,8 +216,8 @@ export default function CallLog({ calls, onMakeCall, isClickable = true }: CallL
                 </div>
             </div>
              <div className="space-y-4">
-                {callsForDay.map((call) => (
-                    <CallCard call={call} key={call.id} onMakeCall={onMakeCall} isClickable={isClickable} />
+                {commsForDay.map((comm) => (
+                    <CommunicationCard comm={comm} key={comm.id} onMakeCall={onMakeCall} isClickable={isClickable} />
                 ))}
              </div>
         </div>

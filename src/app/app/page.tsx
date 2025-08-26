@@ -5,14 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
-import type { Call, Department, PhoneNumber, Contact } from "@/types";
+import type { Communication, Department, PhoneNumber, Contact } from "@/types";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
 import { useToast } from "@/hooks/use-toast";
-import { getCallLogs } from "@/services/callLogService";
+import { getCommunications } from "@/services/callLogService";
 import { getContacts } from '@/services/contactService';
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
@@ -27,37 +27,31 @@ export default function AppUIPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   
-  const [allCalls, setAllCalls] = useState<Call[]>([]);
-  const [unreadCalls, setUnreadCalls] = useState<Call[]>([]);
-  const [loadingCalls, setLoadingCalls] = useState(true);
+  const [allCommunications, setAllCommunications] = useState<Communication[]>([]);
+  const [unreadCommunications, setUnreadCommunications] = useState<Communication[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerInitialValue, setDialerInitialValue] = useState('');
 
-  const getLatestUniqueCallsByContact = (calls: Call[]): Call[] => {
-    const latestCalls = new Map<string, Call>();
-    const sortedCalls = [...calls].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    sortedCalls.forEach(call => {
-        const otherPartyNumber = call.direction === 'inbound' ? call.from : call.to;
-        if (otherPartyNumber && !latestCalls.has(otherPartyNumber)) {
-            latestCalls.set(otherPartyNumber, call);
-        }
-    });
-    return Array.from(latestCalls.values());
-  };
-
-  const fetchCallData = useCallback(async () => {
+  const fetchCommunicationData = useCallback(async () => {
     if (!user) return;
-    setLoadingCalls(true);
+    setLoading(true);
     try {
-        const allCallLogs = await getCallLogs();
-        const callsData = Array.isArray(allCallLogs) ? allCallLogs : [];
-        setAllCalls(getLatestUniqueCallsByContact(callsData));
-        setUnreadCalls(getLatestUniqueCallsByContact(callsData.filter(c => !c.is_read)));
+        const communications = await getCommunications();
+        const commsData = Array.isArray(communications) ? communications : [];
+        
+        // Assuming API returns latest unique communications
+        setAllCommunications(commsData);
+        
+        // Filter for unread communications (calls and messages)
+        const unread = commsData.filter(c => !c.is_read);
+        setUnreadCommunications(unread);
+        
     } catch (error) {
-        toast({ title: "Error", description: "Failed to load call data.", variant: "destructive" });
+        toast({ title: "Error", description: "Failed to load communications data.", variant: "destructive" });
     } finally {
-        setLoadingCalls(false);
+        setLoading(false);
     }
   }, [user, toast]);
   
@@ -67,13 +61,13 @@ export default function AppUIPage() {
   }, [toast]);
 
   useEffect(() => {
-    fetchCallData();
-  }, [fetchCallData]);
+    fetchCommunicationData();
+  }, [fetchCommunicationData]);
   
   useEffect(() => {
     const handleRefresh = () => {
-        console.log('Refresh event received, fetching new call data...');
-        fetchCallData();
+        console.log('Refresh event received, fetching new communication data...');
+        fetchCommunicationData();
     };
 
     events.on('refreshCalls', handleRefresh);
@@ -81,7 +75,7 @@ export default function AppUIPage() {
     return () => {
         events.off('refreshCalls', handleRefresh);
     };
-  }, [fetchCallData]);
+  }, [fetchCommunicationData]);
 
   const handleMakeCall = async (number: string) => {
      if (!device) {
@@ -91,6 +85,9 @@ export default function AppUIPage() {
     setDialerInitialValue(number.replace(/^\+1/, ""));
     setDialerOpen(true);
   };
+  
+  const getCalls = (comms: Communication[]) => comms.filter(c => c.type === 'call');
+  const getMessages = (comms: Communication[]) => comms.filter(c => c.type === 'sms');
 
   return (
     <SidebarProvider>
@@ -103,9 +100,6 @@ export default function AppUIPage() {
                   <AppHeader 
                     user={user} 
                     logout={logout} 
-                    dialerOpen={dialerOpen}
-                    onDialerOpenChange={setDialerOpen}
-                    dialerInitialValue={dialerInitialValue}
                   />
 
                   <main className="flex-1 p-6 overflow-y-auto">
@@ -124,36 +118,36 @@ export default function AppUIPage() {
                         <TabsTrigger value="unlogged">Unlogged</TabsTrigger>
                       </TabsList>
                       <TabsContent value="all" className="mt-6">
-                         {loadingCalls ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={(number) => handleMakeCall(number)} />}
+                         {loading ? <p>Loading...</p> : <CallLog calls={allCommunications} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="unread" className="mt-6">
-                        {loadingCalls ? <p>Loading...</p> : <CallLog calls={unreadCalls} onMakeCall={(number) => handleMakeCall(number)} />}
+                        {loading ? <p>Loading...</p> : <CallLog calls={unreadCommunications} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="calls" className="mt-6">
-                          <Card><CardContent className="p-6">Call logs will appear here.</CardContent></Card>
+                          {loading ? <p>Loading...</p> : <CallLog calls={getCalls(allCommunications)} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
-                        <TabsContent value="missed" className="mt-6">
-                           {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.call_status === 'missed' || c.call_status === 'no-answer' || c.call_status === 'busy' || c.call_status === 'canceled'))} onMakeCall={(number) => handleMakeCall(number)} />}
+                      <TabsContent value="missed" className="mt-6">
+                         {loading ? <p>Loading...</p> : <CallLog calls={getCalls(allCommunications).filter(c => c.call_status === 'missed' || c.call_status === 'no-answer' || c.call_status === 'busy' || c.call_status === 'canceled')} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
-                        <TabsContent value="meetings" className="mt-6">
-                          <Card><CardContent className="p-6">Meeting recordings will appear here.</CardContent></Card>
+                      <TabsContent value="meetings" className="mt-6">
+                        <Card><CardContent className="p-6">Meeting recordings will appear here.</CardContent></Card>
                       </TabsContent>
-                        <TabsContent value="voicemails" className="mt-6">
-                          <Card><CardContent className="p-6">Voicemails will appear here.</CardContent></Card>
+                      <TabsContent value="voicemails" className="mt-6">
+                        <Card><CardContent className="p-6">Voicemails will appear here.</CardContent></Card>
                       </TabsContent>
-                        <TabsContent value="recordings" className="mt-6">
-                          <Card><CardContent className="p-6">Call recordings will appear here.</CardContent></Card>
+                      <TabsContent value="recordings" className="mt-6">
+                        <Card><CardContent className="p-6">Call recordings will appear here.</CardContent></Card>
                       </TabsContent>
-                        <TabsContent value="messages" className="mt-6">
-                          <Card><CardContent className="p-6">Messages will appear here.</CardContent></Card>
+                      <TabsContent value="messages" className="mt-6">
+                        {loading ? <p>Loading...</p> : <CallLog calls={getMessages(allCommunications)} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="starred" className="mt-6">
-                          {loadingCalls ? <p>Loading...</p> : <CallLog calls={getLatestUniqueCallsByContact(allCalls.filter(c => c.is_starred))} onMakeCall={(number) => handleMakeCall(number)} />}
+                          {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => c.is_starred)} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="spam" className="mt-6">
                           <Card><CardContent className="p-6">Spam will appear here.</CardContent></Card>
                       </TabsContent>
-                        <TabsContent value="unlogged" className="mt-6">
+                      <TabsContent value="unlogged" className="mt-6">
                           <Card><CardContent className="p-6">Unlogged calls will appear here.</CardContent></Card>
                       </TabsContent>
                     </Tabs>

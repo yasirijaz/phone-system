@@ -1,7 +1,9 @@
 
 
-export interface Call {
+export interface Communication {
   id: number;
+  type: 'call' | 'sms';
+  body?: string; // For SMS
   department_id?: number;
   company_id?: number;
   client_name?: string | null;
@@ -15,7 +17,7 @@ export interface Call {
   direction: 'inbound' | 'outbound';
   task_sid?: string;
   worker_sid?: string;
-  duration: string;
+  duration?: string;
   call_duration?: string;
   meta_data?: any;
   is_read?: boolean;

@@ -1,18 +1,18 @@
 
 import axios from '@/lib/axios';
-import type { Call } from '@/types';
+import type { Communication } from '@/types';
 
-export const getCallLogs = async (departmentId?: number): Promise<Call[]> => {
+export const getCommunications = async (departmentId?: number): Promise<Communication[]> => {
   const url = departmentId
-    ? `/api/call-logs/${departmentId}`
-    : `/api/call-logs`;
+    ? `/api/communications/${departmentId}`
+    : `/api/communications`;
 
   const response = await axios.get(url);
-  return response.data.call_logs;
+  return response.data.communications;
 };
 
 // Fetch call logs with callSid
-export const getCallLogsBySid = async (callSid: string): Promise<Call | null> => {
+export const getCallLogsBySid = async (callSid: string): Promise<Communication | null> => {
   try {
     const response = await axios.get(`/api/call-logs/${callSid}`);
     return response.data.call_log || null;
@@ -22,23 +22,23 @@ export const getCallLogsBySid = async (callSid: string): Promise<Call | null> =>
   }
 };
 
-export const getDepartmentNewCalls = async (department_id: number): Promise<Call[]> => {
+export const getDepartmentNewCalls = async (department_id: number): Promise<Communication[]> => {
     const response = await axios.post('/api/departments/getDepartmentNewCalls', { department_id });
     return response.data.calls;
 };
 
-export const getDepartmentMissedCalls = async (department_id: number): Promise<Call[]> => {
+export const getDepartmentMissedCalls = async (department_id: number): Promise<Communication[]> => {
     const response = await axios.post('/api/departments/getDepartmentMissedCalls', { department_id });
     return response.data.calls;
 };
 
-export const getDepartmentRecordings = async (department_id: number): Promise<Call[]> => {
+export const getDepartmentRecordings = async (department_id: number): Promise<Communication[]> => {
     const response = await axios.post('/api/departments/getDepartmentRecordings', { department_id });
     return response.data.calls;
 };
 
 
-export const getUnreadCallLogs = async (departmentId?: number): Promise<Call[]> => {
+export const getUnreadCallLogs = async (departmentId?: number): Promise<Communication[]> => {
   const url = departmentId
     ? `/api/call-logs/unread/${departmentId}`
     : `/api/call-logs/unread`;
