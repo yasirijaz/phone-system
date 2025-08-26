@@ -41,6 +41,7 @@ export interface Communication {
   latest_created_at?: string;
   sms_count?: number;
   call_count?: number;
+  status?: string; // for SMS
 }
 
 export interface User {

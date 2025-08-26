@@ -141,7 +141,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                   <div className="flex items-center gap-2 text-sm font-medium">
                        {renderIcon()}
                        <span>{(comm.latest_type || comm.type || '').charAt(0).toUpperCase() + (comm.latest_type || comm.type || '').slice(1)}</span>
-                       {comm.type === 'call' && getStatusBadge(comm.call_status)}
+                       {comm.type === 'call' ? getStatusBadge(comm.call_status) : getStatusBadge(comm.status)}
                        {comm.type === 'call' && comm.duration && <span>({comm.duration} min)</span>}
                   </div>
                    <div className="flex items-center">
