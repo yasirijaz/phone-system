@@ -141,8 +141,8 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                   <div className="flex items-center gap-2 text-sm font-medium">
                        {renderIcon()}
                        <span>{(comm.latest_type || comm.type || '').charAt(0).toUpperCase() + (comm.latest_type || comm.type || '').slice(1)}</span>
-                       {comm.type === 'call' ? getStatusBadge(comm.call_status) : getStatusBadge(comm.status)}
-                       {comm.type === 'call' && comm.duration && <span>({comm.duration} min)</span>}
+                       {(comm.latest_type || comm.type) === 'call' ? getStatusBadge(comm.call_status) : getStatusBadge(comm.status)}
+                       {(comm.latest_type || comm.type) === 'call' && comm.duration && <span>({comm.duration} min)</span>}
                   </div>
                    <div className="flex items-center">
                         {hasAssignments && !isClickable && (
@@ -180,7 +180,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                 <div className="text-sm mt-2 space-y-1 text-muted-foreground">
                     <p className="text-foreground"><strong>From:</strong> {comm.from_name?.name || comm.from}</p>
                     <p><strong>To:</strong> {comm.to_name?.name || comm.to}</p>
-                    {comm.type === 'sms' && <p className="pt-2 text-foreground">{comm.body}</p>}
+                    {(comm.latest_type || comm.type) === 'sms' && <p className="pt-2 text-foreground">{comm.body}</p>}
                 </div>
                  {isInProgress && isAdmin && (
                     <div className="mt-4 flex gap-2 border-t pt-2">
