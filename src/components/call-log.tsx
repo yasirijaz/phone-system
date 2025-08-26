@@ -1,6 +1,6 @@
 
 import type { Communication, User } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare } from 'lucide-react';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Play, Pause } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -10,6 +10,7 @@ import { Badge } from './ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { addParticipant } from '@/services/twilioService';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import React from 'react';
 
 interface CallLogProps {
   calls: Communication[];
@@ -31,13 +32,13 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
   const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
   const isInProgress = comm.call_status === 'in_progress';
   const hasRecording = !!comm.recording_url;
+  const audioRef = React.useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = React.useState(false);
   
   const cardBg = isInProgress
     ? 'bg-orange-300 border-orange-300 dark:bg-orange-950/20 dark:border-orange-800'
     : isMissed
     ? 'bg-red-50 dark:bg-red-950/20'
-    : hasRecording
-    ? 'bg-green-50 dark:bg-green-950/20'
     : 'bg-background';
 
   const contactDisplayNumber = comm.direction === 'inbound' ? comm.from : comm.to;
@@ -47,6 +48,37 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
     e.stopPropagation();
     onMakeCall(contactDisplayNumber);
   }
+
+    const togglePlay = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (audioRef.current) {
+          if (isPlaying) {
+              audioRef.current.pause();
+          } else {
+              audioRef.current.play();
+          }
+      }
+  };
+
+  React.useEffect(() => {
+    const audioElement = audioRef.current;
+    if (audioElement) {
+        const handlePlay = () => setIsPlaying(true);
+        const handlePause = () => setIsPlaying(false);
+        const handleEnded = () => setIsPlaying(false);
+
+        audioElement.addEventListener('play', handlePlay);
+        audioElement.addEventListener('pause', handlePause);
+        audioElement.addEventListener('ended', handleEnded);
+
+        return () => {
+            audioElement.removeEventListener('play', handlePlay);
+            audioElement.removeEventListener('pause', handlePause);
+            audioElement.removeEventListener('ended', handleEnded);
+        };
+    }
+  }, [audioRef]);
   
   const handleJoinCall = async (e: React.MouseEvent, options: { silent?: boolean, coach?: boolean }) => {
     e.stopPropagation();
@@ -57,7 +89,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
     }
     
     try {
-      await addParticipant(comm.conference_sid, comm.from, String(user.id), { coach: true, silent: options.silent });
+      await addParticipant(comm.conference_sid, comm.from, String(user.id), undefined, { coach: true, silent: options.silent });
       toast({ title: "Success", description: "You have joined the call." });
     } catch(error) {
        toast({ title: "Error", description: "Failed to join the call.", variant: "destructive" });
@@ -156,15 +188,19 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                             <Ear className="mr-2 h-4 w-4" />
                             Silently Listen
                         </Button>
-                        <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { coach: true })}>
+                        <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true, coach: false })}>
                             <Mic className="mr-2 h-4 w-4" />
                             Barge In
                         </Button>
                     </div>
                  )}
                  {hasRecording && (
-                    <div className="mt-2">
-                        {/* <audio controls src={call.recording_url} className="w-full h-8" onClick={(e) => e.preventDefault()}></audio> */}
+                    <div className="mt-2 flex items-center gap-2">
+                        <Button variant="outline" size="icon" onClick={togglePlay}>
+                            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                        </Button>
+                        <audio ref={audioRef} src={comm.recording_url} className="hidden" preload="none" />
+                        <span className="text-xs text-muted-foreground">Play Recording</span>
                     </div>
                 )}
             </div>
@@ -177,7 +213,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
     const from = encodeURIComponent(comm.from);
     const to = encodeURIComponent(comm.to);
     return (
-        <Link href={`/conversations/${from}/${to}`} key={comm.id} className="block">
+        <Link href={`/conversations/${from}/${to}`} key={comm.id || `${comm.from}-${comm.to}`} className="block">
             <CardContent />
         </Link>
     );
