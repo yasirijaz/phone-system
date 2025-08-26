@@ -9,6 +9,7 @@ import { getContacts } from "@/services/contactService";
 import type { Department, PhoneNumber, Contact } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { sendSms } from "@/services/twilioService";
+import { useRouter } from 'next/navigation';
 
 import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
@@ -23,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 export default function MessagesPage() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
@@ -113,6 +115,7 @@ export default function MessagesPage() {
         await sendSms(selectedFromNumber, recipient, messageBody);
         toast({ title: "Success", description: "Message sent successfully." });
         setMessageBody(""); // Clear message box on success
+        router.push(`/conversations/${encodeURIComponent(recipient)}`);
     } catch (error: any) {
         const errorMessage = error.response?.data?.message || "Failed to send message.";
         toast({ title: "Error", description: errorMessage, variant: "destructive" });
@@ -133,8 +136,7 @@ export default function MessagesPage() {
             <AppHeader user={user} logout={logout} />
             <main className="flex-1 flex flex-col bg-muted/40">
                 <div className="p-4 border-b space-y-2">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-muted-foreground">From:</span>
+                    <div className="grid grid-cols-2 gap-2">
                         <Select onValueChange={handleDepartmentChange} disabled={loadingDepartments}>
                             <SelectTrigger className="flex-1">
                                 <SelectValue placeholder="Select Department" />
@@ -161,7 +163,6 @@ export default function MessagesPage() {
                         </Select>
                     </div>
                     <div className="relative flex items-center gap-2">
-                         <span className="text-sm font-medium text-muted-foreground">To:</span>
                          <div className="relative flex-1">
                              <Input 
                                 placeholder="Type a name or number" 
