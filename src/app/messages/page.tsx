@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Send, Smile, Paperclip, Mic } from "lucide-react";
 import MessagesIllustration from "@/components/messages.svg";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import Image from "next/image";
 
 export default function MessagesPage() {
   const { user, logout } = useAuth();
@@ -159,7 +160,7 @@ const handleContactSelect = (contact: Contact) => {
                     </div>
                 </div>
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                     <MessagesIllustration className="w-64 h-64" />
+                     <Image src={MessagesIllustration} alt="Messages Illustration" className="w-64 h-64" />
                      <h2 className="text-2xl font-bold mt-8">What's on your mind?</h2>
                      <p className="text-muted-foreground mt-2">Enter a name or number to start chatting</p>
                 </div>
