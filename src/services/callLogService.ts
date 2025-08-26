@@ -8,7 +8,7 @@ export const getCommunications = async (departmentId?: number): Promise<Communic
     : `/api/communications`;
 
   const response = await axios.get(url);
-  return response.data.communications;
+  return response.data.logs;
 };
 
 // Fetch call logs with callSid
