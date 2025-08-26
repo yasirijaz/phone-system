@@ -107,7 +107,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium">
                        {renderIcon()}
-                       <span>{(comm.type === 'sms' ? 'SMS' : comm.direction).charAt(0).toUpperCase() + (comm.type === 'sms' ? 'SMS' : comm.direction).slice(1)}</span>
+                       <span>{(comm.type === 'sms' ? 'SMS' : (comm.direction || '')).charAt(0).toUpperCase() + (comm.type === 'sms' ? 'SMS' : (comm.direction || '')).slice(1)}</span>
                        {comm.type === 'call' && getStatusBadge(comm.call_status)}
                        {comm.type === 'call' && comm.duration && <span>({comm.duration} min)</span>}
                   </div>
@@ -147,8 +147,6 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                 {comm.type === 'sms' ? (
                     <div className="text-sm mt-2 space-y-1 text-muted-foreground">
                       <p>{comm.body}</p>
-                      <p className="text-foreground"><strong>From:</strong> {comm.from}</p>
-                      <p><strong>To:</strong> {comm.to}</p>
                     </div>
                 ) : (
                   <div className="text-sm mt-2 space-y-1 text-muted-foreground">
@@ -203,14 +201,16 @@ export default function CallLog({ calls: communications, onMakeCall, isClickable
     );
   }
   
-  const groupedCommunications = communications.reduce((acc, comm) => {
-    const date = format(parseISO(comm.created_at), 'yyyy-MM-dd');
-    if (!acc[date]) {
-        acc[date] = [];
-    }
-    acc[date].push(comm);
-    return acc;
-  }, {} as Record<string, Communication[]>);
+  const groupedCommunications = communications
+    .filter(comm => comm.created_at) // Filter out items with no created_at date
+    .reduce((acc, comm) => {
+      const date = format(parseISO(comm.created_at), 'yyyy-MM-dd');
+      if (!acc[date]) {
+          acc[date] = [];
+      }
+      acc[date].push(comm);
+      return acc;
+    }, {} as Record<string, Communication[]>);
 
   return (
     <div className="space-y-6">
