@@ -21,7 +21,7 @@ export const getCommunicationThreads = async (departmentId?: number): Promise<Co
 
 export const getCommunicationThread = async (from: string, to: string): Promise<Communication[]> => {
     const response = await axios.get(`/api/communications/thread/${from}/${to}`);
-    return response.data.thread;
+    return response.data.logs;
 };
 
 // Fetch call logs with callSid
