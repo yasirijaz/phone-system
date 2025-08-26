@@ -3,11 +3,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from 'next/navigation';
-import type { Call, Department, PhoneNumber, User } from "@/types";
+import type { Communication, Department, PhoneNumber, User } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
-import { getCallLogs, getDepartmentNewCalls, getDepartmentMissedCalls, getDepartmentRecordings } from "@/services/callLogService";
+import { getCommunications, getDepartmentNewCalls, getDepartmentMissedCalls, getDepartmentRecordings } from "@/services/callLogService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
@@ -30,18 +30,15 @@ export default function DepartmentDetailPage() {
   const departmentId = Number(params.departmentId);
 
   const [department, setDepartment] = useState<Department | null>(null);
-  const [allCalls, setAllCalls] = useState<Call[]>([]);
-  const [newCalls, setNewCalls] = useState<Call[]>([]);
-  const [missedCalls, setMissedCalls] = useState<Call[]>([]);
-  const [recordings, setRecordings] = useState<Call[]>([]);
+  const [allCalls, setAllCalls] = useState<Communication[]>([]);
+  const [newCalls, setNewCalls] = useState<Communication[]>([]);
+  const [missedCalls, setMissedCalls] = useState<Communication[]>([]);
+  const [recordings, setRecordings] = useState<Communication[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [operators, setOperators] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [dndStatus, setDndStatus] = useState(false);
   const [dndLoading, setDndLoading] = useState(false);
-
-  const [dialerOpen, setDialerOpen] = useState(false);
-  const [dialerInitialValue, setDialerInitialValue] = useState('');
 
   useEffect(() => {
     const fetchDepartmentData = async () => {
@@ -58,15 +55,15 @@ export default function DepartmentDetailPage() {
             const dnd = await getDndStatus(departmentId, user.id);
             setDndStatus(dnd.is_dnd);
 
-            const [allCallLogs, newCallLogs, operatorsResponse, missedCallLogs, recordingLogs] = await Promise.all([
-              getCallLogs(departmentId),
+            const [allComms, newCallLogs, operatorsResponse, missedCallLogs, recordingLogs] = await Promise.all([
+              getCommunications(departmentId),
               getDepartmentNewCalls(departmentId),
               getDepartmentUsers(user.company_id, departmentId),
               getDepartmentMissedCalls(departmentId),
               getDepartmentRecordings(departmentId)
             ]);
             
-            setAllCalls(Array.isArray(allCallLogs) ? allCallLogs : []);
+            setAllCalls(Array.isArray(allComms) ? allComms : []);
             setNewCalls(Array.isArray(newCallLogs) ? newCallLogs : []);
             setOperators(Array.isArray(operatorsResponse.users) ? operatorsResponse.users : []);
             setMissedCalls(Array.isArray(missedCallLogs) ? missedCallLogs : []);
@@ -86,8 +83,7 @@ export default function DepartmentDetailPage() {
         toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});
         return;
     }
-    setDialerInitialValue(number.replace(/^\+1/, ""));
-    setDialerOpen(true);
+    // Dialer is in header, this might need to trigger state up
   };
   
   const handleDndChange = async (checked: boolean) => {
@@ -134,9 +130,6 @@ export default function DepartmentDetailPage() {
                   <AppHeader 
                     user={user} 
                     logout={logout} 
-                    dialerOpen={dialerOpen}
-                    onDialerOpenChange={setDialerOpen}
-                    dialerInitialValue={dialerInitialValue}
                   />
 
                   <main className="flex-1 p-6 overflow-y-auto">

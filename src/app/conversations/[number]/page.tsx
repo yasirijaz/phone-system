@@ -3,8 +3,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from 'next/navigation';
-import { getCallLogs } from "@/services/callLogService";
-import type { Call, Department, PhoneNumber } from "@/types";
+import { getCommunications } from "@/services/callLogService";
+import type { Communication, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Send } from "lucide-react";
@@ -24,41 +24,41 @@ export default function ConversationDetailPage() {
     const { toast } = useToast();
     const { device, isDeviceReady } = useTwilio();
 
-    const [allCalls, setAllCalls] = useState<Call[]>([]);
+    const [allComms, setAllComms] = useState<Communication[]>([]);
     const [loading, setLoading] = useState(true);
     const [contactName, setContactName] = useState('');
     
     const contactNumber = params.number ? decodeURIComponent(params.number as string) : '';
 
     useEffect(() => {
-        const fetchAndFilterCalls = async () => {
+        const fetchAndFilterComms = async () => {
             if (!user) return;
             setLoading(true);
             try {
-                const logs = await getCallLogs();
-                const filteredLogs = logs.filter(call => call.from === contactNumber || call.to === contactNumber)
+                const logs = await getCommunications();
+                const filteredLogs = logs.filter(comm => comm.from === contactNumber || comm.to === contactNumber)
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
                 
-                setAllCalls(filteredLogs);
+                setAllComms(filteredLogs);
 
                 if (filteredLogs.length > 0) {
-                    const latestCall = filteredLogs[0];
-                    const name = latestCall.direction === 'inbound' 
-                        ? (latestCall.from_name?.name || latestCall.from) 
-                        : (latestCall.to_name?.name || latestCall.to);
+                    const latestComm = filteredLogs[0];
+                    const name = latestComm.direction === 'inbound' 
+                        ? (latestComm.from_name?.name || latestComm.from) 
+                        : (latestComm.to_name?.name || latestComm.to);
                     setContactName(name);
                 } else {
                     setContactName(contactNumber);
                 }
 
             } catch (error) {
-                console.error("Failed to fetch call logs", error);
+                console.error("Failed to fetch communication logs", error);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchAndFilterCalls();
+        fetchAndFilterComms();
     }, [user, contactNumber]);
 
     const handleMakeCall = async (number: string) => {
@@ -91,7 +91,7 @@ export default function ConversationDetailPage() {
                             </div>
                         </header>
                          <main className="flex-1 overflow-y-auto p-6">
-                           {loading ? <p>Loading...</p> : <CallLog calls={allCalls} onMakeCall={handleMakeCall} isClickable={false} />}
+                           {loading ? <p>Loading...</p> : <CallLog calls={allComms} onMakeCall={handleMakeCall} isClickable={false} />}
                         </main>
                         <footer className="p-4 border-t bg-background space-y-2">
                              <div className="grid grid-cols-2 gap-2">

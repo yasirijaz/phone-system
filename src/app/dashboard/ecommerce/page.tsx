@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import type { Call, Department, PhoneNumber, Contact } from '@/types';
+import type { Communication, Department, PhoneNumber, Contact } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PlusCircle, Search, Phone, UserCheck, Zap, ArrowUp, ArrowDown, Users, Clock, MoreHorizontal, Calendar, AreaChart, BarChart as BarChartIcon, MessageSquare, Video } from 'lucide-react';
@@ -14,7 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, ComposedChart } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
-import { getCallLogs } from '@/services/callLogService';
+import { getCommunications } from '@/services/callLogService';
 import AppHeader from '@/components/app-header';
 
 const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: string, value: string, icon: React.ElementType, trend: string, trendType: 'up' | 'down' }) => (
@@ -33,7 +33,7 @@ const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: strin
     </Card>
 );
 
-const MonthlyCallsChart = ({ calls }: { calls: Partial<Call>[] }) => {
+const MonthlyCallsChart = ({ calls }: { calls: Partial<Communication>[] }) => {
     const data = useMemo(() => {
         const callsByMonth: { [key: string]: number } = {};
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -70,7 +70,7 @@ const MonthlyCallsChart = ({ calls }: { calls: Partial<Call>[] }) => {
     );
 };
 
-const StatisticsChart = ({ calls }: { calls: Partial<Call>[] }) => {
+const StatisticsChart = ({ calls }: { calls: Partial<Communication>[] }) => {
   const data = useMemo(() => {
     const statsByMonth: { [key: string]: { calls: number, duration: number } } = {};
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -129,7 +129,7 @@ const StatisticsChart = ({ calls }: { calls: Partial<Call>[] }) => {
 export default function EcommerceDashboard() {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [calls, setCalls] = useState<Call[]>([]);
+  const [communications, setCommunications] = useState<Communication[]>([]);
   const { toast } = useToast();
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerNumber, setDialerNumber] = useState('');
@@ -141,27 +141,27 @@ export default function EcommerceDashboard() {
   }, [user, router]);
   
   useEffect(() => {
-    const fetchCalls = async () => {
+    const fetchCommunications = async () => {
       try {
-        const fetchedCalls = await getCallLogs();
-        setCalls(Array.isArray(fetchedCalls) ? fetchedCalls : []);
+        const fetchedComms = await getCommunications();
+        setCommunications(Array.isArray(fetchedComms) ? fetchedComms : []);
       } catch (error) {
-        toast({ title: "Error", description: "Failed to load call history.", variant: "destructive" });
+        toast({ title: "Error", description: "Failed to load communication history.", variant: "destructive" });
       }
     };
     if (user) {
-      fetchCalls();
+      fetchCommunications();
     }
   }, [user, toast]);
   
   const { totalCalls, totalDuration, mostFrequentContact } = useMemo(() => {
-    if (calls.length === 0) {
+    if (communications.length === 0) {
       return { totalCalls: 0, totalDuration: 0, mostFrequentContact: 'N/A' };
     }
 
-    const totalDuration = calls.reduce((acc, call) => acc + (parseInt(call.duration, 10) || 0), 0);
+    const totalDuration = communications.reduce((acc, call) => acc + (parseInt(call.duration, 10) || 0), 0);
 
-    const contactCounts = calls.reduce((acc, call) => {
+    const contactCounts = communications.reduce((acc, call) => {
       const contact = call.direction === 'inbound' ? (call.from_name?.name || call.from) : (call.to_name?.name || call.to);
       acc[contact] = (acc[contact] || 0) + 1;
       return acc;
@@ -172,11 +172,11 @@ export default function EcommerceDashboard() {
       : 'N/A';
 
     return {
-      totalCalls: calls.length,
+      totalCalls: communications.length,
       totalDuration,
       mostFrequentContact,
     };
-  }, [calls]);
+  }, [communications]);
 
   if(user?.role_id === 1) {
     return null; // or a loading spinner, as redirection is happening
@@ -191,7 +191,7 @@ export default function EcommerceDashboard() {
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <AppHeader user={user} logout={logout} dialerOpen={dialerOpen} dialerInitialValue={dialerNumber} onDialerOpenChange={() => setDialerOpen(!dialerOpen)} />
+          <AppHeader user={user} logout={logout} />
 
           <main className="flex-1 p-4 md:p-8 space-y-8">
              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4 2xl:gap-7.5">
@@ -203,12 +203,12 @@ export default function EcommerceDashboard() {
             
             <div className="grid grid-cols-12 gap-4 md:gap-6 2xl:gap-7.5">
                 <div className="col-span-12">
-                     <MonthlyCallsChart calls={calls} />
+                     <MonthlyCallsChart calls={communications} />
                 </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:gap-6">
-                <StatisticsChart calls={calls} />
+                <StatisticsChart calls={communications} />
             </div>
             
             <Card>
@@ -218,7 +218,7 @@ export default function EcommerceDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <CallLog calls={calls.slice(0, 5)} onMakeCall={(number) => {
+                <CallLog calls={communications.slice(0, 5)} onMakeCall={(number) => {
                   setDialerNumber(number.replace(/^\+1/, ""));
                   setDialerOpen(true);
                 }} />

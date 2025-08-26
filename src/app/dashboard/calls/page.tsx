@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Call } from '@/types';
+import type { Communication } from '@/types';
 import { useMemo, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -14,7 +14,7 @@ import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger 
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import AppHeader from '@/components/app-header';
-import { getCallLogs } from '@/services/callLogService';
+import { getCommunications } from '@/services/callLogService';
 import { useToast } from '@/hooks/use-toast';
 import { subDays, subHours, subMonths, format, startOfHour, startOfDay, startOfMonth } from 'date-fns';
 
@@ -37,10 +37,10 @@ const StatCard = ({ title, value, percentage, change, icon: Icon, changeType }: 
 
 type TimeRange = '24h' | '7d' | '30d' | '12m';
 
-const AnalyticsChart = ({ calls, timeRange, setTimeRange }: { calls: Partial<Call>[], timeRange: TimeRange, setTimeRange: (range: TimeRange) => void }) => {
+const AnalyticsChart = ({ calls, timeRange, setTimeRange }: { calls: Partial<Communication>[], timeRange: TimeRange, setTimeRange: (range: TimeRange) => void }) => {
     const data = useMemo(() => {
         const now = new Date();
-        let filteredCalls: Partial<Call>[] = [];
+        let filteredCalls: Partial<Communication>[] = [];
         let dataMap: { [key: string]: number } = {};
         let formatLabel: (date: Date) => string;
         let labels: string[] = [];
@@ -260,7 +260,7 @@ const DonutChartCard = ({ title, data, legendItems }: { title: string, data: { n
     </Card>
 );
 
-const RecentCallsTable = ({ calls }: { calls: Partial<Call>[] }) => (
+const RecentCallsTable = ({ calls }: { calls: Partial<Communication>[] }) => (
   <Card className="col-span-12">
     <CardHeader>
       <div className="flex justify-between items-center">
@@ -342,29 +342,29 @@ const DemographicCard = () => (
 
 export default function CallsDashboard() {
   const { user, logout } = useAuth();
-  const [calls, setCalls] = useState<Call[]>([]);
+  const [communications, setCommunications] = useState<Communication[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
   const { toast } = useToast();
   
   useEffect(() => {
-    const fetchCalls = async () => {
+    const fetchCommunications = async () => {
         try {
             setLoading(true);
-            const fetchedCalls = await getCallLogs();
-            setCalls(Array.isArray(fetchedCalls) ? fetchedCalls : []);
+            const fetchedComms = await getCommunications();
+            setCommunications(Array.isArray(fetchedComms) ? fetchedComms : []);
         } catch (error) {
-            toast({ title: "Error", description: "Failed to load call history.", variant: "destructive" });
+            toast({ title: "Error", description: "Failed to load communication history.", variant: "destructive" });
         } finally {
             setLoading(false);
         }
     };
-    fetchCalls();
+    fetchCommunications();
   }, [toast]);
   
   const topContacts = useMemo(() => {
     const counts: Record<string, number> = {};
-    calls.forEach(call => {
+    communications.forEach(call => {
         const contact = call.direction === 'inbound' ? (call.from_name?.name || call.from) : (call.to_name?.name || call.to);
         if(contact) counts[contact] = (counts[contact] || 0) + 1;
     });
@@ -372,11 +372,11 @@ export default function CallsDashboard() {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 4)
         .map(([source, value]) => ({ source, value: `${value} calls` }));
-  }, [calls]);
+  }, [communications]);
 
   const topCategories = useMemo(() => {
     const counts: Record<string, number> = {};
-    calls.forEach(call => {
+    communications.forEach(call => {
         if (call.category) {
             counts[call.category] = (counts[call.category] || 0) + 1;
         }
@@ -385,11 +385,11 @@ export default function CallsDashboard() {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 4)
         .map(([source, value]) => ({ source, value: `${value} calls` }));
-  }, [calls]);
+  }, [communications]);
   
   const callsByCategoryData = useMemo(() => {
     const counts: Record<string, number> = {};
-    calls.forEach(call => {
+    communications.forEach(call => {
         if(call.category){
             counts[call.category] = (counts[call.category] || 0) + 1;
         }
@@ -397,18 +397,18 @@ export default function CallsDashboard() {
     const colors = ["hsl(var(--primary))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))"];
     return Object.entries(counts)
       .map(([name, value], i) => ({ name, value, fill: colors[i % colors.length] }));
-  }, [calls]);
+  }, [communications]);
 
   const legendItems = callsByCategoryData.map(d => d.name);
 
   const totalDuration = useMemo(() => {
-    return calls.reduce((acc, c) => acc + (parseInt(c.duration || '0', 10)), 0);
-  }, [calls]);
+    return communications.reduce((acc, c) => acc + (parseInt(c.duration || '0', 10)), 0);
+  }, [communications]);
 
   const avgDuration = useMemo(() => {
-    if (calls.length === 0) return 0;
-    return totalDuration / calls.length;
-  }, [totalDuration, calls]);
+    if (communications.length === 0) return 0;
+    return totalDuration / communications.length;
+  }, [totalDuration, communications]);
 
   if (loading) {
     return (
@@ -428,12 +428,12 @@ export default function CallsDashboard() {
             <AppHeader user={user} logout={logout} pageTitle="Calls Dashboard" />
             <main className="flex-1 p-4 md:p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                    <StatCard title="Total Calls" value={calls.length.toString()} percentage="+20%" change="vs last month" icon={Phone} changeType="up" />
+                    <StatCard title="Total Calls" value={communications.length.toString()} percentage="+20%" change="vs last month" icon={Phone} changeType="up" />
                     <StatCard title="Total Duration" value={`${totalDuration} min`} percentage="+4%" change="vs last month" icon={Clock} changeType="up" />
                     <StatCard title="Avg. Duration" value={`${avgDuration.toFixed(1)} min`} percentage="-1.59%" change="vs last month" icon={TrendingDown} changeType="down" />
                     <StatCard title="Answer Rate" value="92%" percentage="+7%" change="vs last month" icon={TrendingUp} changeType="up" />
                 </div>
-                <AnalyticsChart calls={calls} timeRange={timeRange} setTimeRange={setTimeRange} />
+                <AnalyticsChart calls={communications} timeRange={timeRange} setTimeRange={setTimeRange} />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <TopListCard title="Top Contacts" data={topContacts} headers={['Source', 'Calls']} />
                     <TopListCard title="Top Categories" data={topCategories} headers={['Page', 'Calls']} />
@@ -443,7 +443,7 @@ export default function CallsDashboard() {
                      <DonutChartCard title="Sessions By Device" data={callsByCategoryData} legendItems={legendItems} />
                      <DemographicCard />
                 </div>
-                <RecentCallsTable calls={calls} />
+                <RecentCallsTable calls={communications} />
             </main>
         </div>
       </SidebarInset>
