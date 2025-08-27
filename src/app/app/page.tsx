@@ -131,7 +131,7 @@ export default function AppUIPage() {
                         <Card><CardContent className="p-6">Meeting recordings will appear here.</CardContent></Card>
                       </TabsContent>
                       <TabsContent value="voicemails" className="mt-6">
-                        <Card><CardContent className="p-6">Voicemails will appear here.</CardContent></Card>
+                        {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => c.voice_mail)} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="recordings" className="mt-6">
                         <Card><CardContent className="p-6">Call recordings will appear here.</CardContent></Card>
