@@ -10,6 +10,7 @@ import { Badge } from './ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { addParticipant } from '@/services/twilioService';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import AudioPlayer from './AudioPlayer';
 import React from 'react';
 
 interface CallLogProps {
@@ -31,9 +32,6 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
 
   const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
   const isInProgress = comm.call_status === 'in_progress';
-  const hasRecording = !!comm.recording_url;
-  const audioRef = React.useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = React.useState(false);
   
   const cardBg = isInProgress
     ? 'bg-orange-300 border-orange-300 dark:bg-orange-950/20 dark:border-orange-800'
@@ -49,36 +47,6 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
     onMakeCall(contactDisplayNumber);
   }
 
-    const togglePlay = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      e.preventDefault();
-      if (audioRef.current) {
-          if (isPlaying) {
-              audioRef.current.pause();
-          } else {
-              audioRef.current.play();
-          }
-      }
-  };
-
-  React.useEffect(() => {
-    const audioElement = audioRef.current;
-    if (audioElement) {
-        const handlePlay = () => setIsPlaying(true);
-        const handlePause = () => setIsPlaying(false);
-        const handleEnded = () => setIsPlaying(false);
-
-        audioElement.addEventListener('play', handlePlay);
-        audioElement.addEventListener('pause', handlePause);
-        audioElement.addEventListener('ended', handleEnded);
-
-        return () => {
-            audioElement.removeEventListener('play', handlePlay);
-            audioElement.removeEventListener('pause', handlePause);
-            audioElement.removeEventListener('ended', handleEnded);
-        };
-    }
-  }, [audioRef]);
   
   const handleJoinCall = async (e: React.MouseEvent, options: { silent?: boolean, coach?: boolean }) => {
     e.stopPropagation();
@@ -194,14 +162,8 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                         </Button>
                     </div>
                  )}
-                 {hasRecording && (
-                    <div className="mt-2 flex items-center gap-2">
-                        <Button variant="outline" size="icon" onClick={togglePlay}>
-                            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        </Button>
-                        <audio ref={audioRef} src={comm.recording_url} className="hidden" preload="none" />
-                        <span className="text-xs text-muted-foreground">Play Recording</span>
-                    </div>
+                 {!!comm.recording_url && (
+                    <AudioPlayer src={comm.recording_url} />
                 )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">{format(parseISO(comm.created_at || comm.latest_created_at!), 'p')}</p>
