@@ -73,7 +73,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         socketRef.current = newSocket;
 
         newSocket.onopen = () => {
-          // socketRef.current = null;
           console.log('WebSocket connection established');
           // If your server expects an auth or subscription message, send it here:
           // newSocket.send(JSON.stringify({ type: 'subscribe', token: '<JWT or key>' }));
