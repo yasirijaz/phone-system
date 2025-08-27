@@ -4,8 +4,8 @@ import type { Communication } from '@/types';
 
 export const getCommunications = async (departmentId?: number): Promise<Communication[]> => {
   const url = departmentId
-    ? `/api/communications/${departmentId}`
-    : `/api/communications`;
+    ? `/api/communications/threads/${departmentId}`
+    : `/api/communications/threads`;
 
   const response = await axios.get(url);
   return response.data.logs;

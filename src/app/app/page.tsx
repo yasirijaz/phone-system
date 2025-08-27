@@ -42,8 +42,8 @@ export default function AppUIPage() {
         const commsData = Array.isArray(communications) ? communications : [];
         
         setAllCommunications(commsData);
-        
-        const unread = commsData.filter(c => c.is_read === false);
+        console.log(commsData,'commsData');
+        const unread = commsData.filter(c => c.is_read == false);
         setUnreadCommunications(unread);
         
     } catch (error) {
@@ -104,7 +104,7 @@ export default function AppUIPage() {
                     <Tabs defaultValue="all">
                       <TabsList>
                         <TabsTrigger value="all">All</TabsTrigger>
-                        <TabsTrigger value="unread">Unread</TabsTrigger>
+                        <TabsTrigger value="unread">Unread {unreadCommunications.length > 0 && <span className="ml-1 text-xs text-muted-foreground">{unreadCommunications.length}</span>}</TabsTrigger>
                         <TabsTrigger value="calls">Calls</TabsTrigger>
                         <TabsTrigger value="missed">Missed</TabsTrigger>
                         <TabsTrigger value="meetings">Meetings</TabsTrigger>
@@ -119,7 +119,7 @@ export default function AppUIPage() {
                          {loading ? <p>Loading...</p> : <CallLog calls={allCommunications} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="unread" className="mt-6">
-                        {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => c.is_read === false)} onMakeCall={(number) => handleMakeCall(number)} source="unread" />}
+                        {loading ? <p>Loading...</p> : <CallLog calls={unreadCommunications} onMakeCall={(number) => handleMakeCall(number)} source="unread" />}
                       </TabsContent>
                       <TabsContent value="calls" className="mt-6">
                           {loading ? <p>Loading...</p> : <CallLog calls={getCalls(allCommunications)} onMakeCall={(number) => handleMakeCall(number)} />}
@@ -131,10 +131,10 @@ export default function AppUIPage() {
                         <Card><CardContent className="p-6">Meeting recordings will appear here.</CardContent></Card>
                       </TabsContent>
                       <TabsContent value="voicemails" className="mt-6">
-                        {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => c.voice_mail)} onMakeCall={(number) => handleMakeCall(number)} />}
+                        {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => c.voice_mail != 'null')} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="recordings" className="mt-6">
-                        {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => c.recording_url)} onMakeCall={(number) => handleMakeCall(number)} />}
+                        {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => c.recording_url != 'null')} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="messages" className="mt-6">
                         {loading ? <p>Loading...</p> : <CallLog calls={getMessages(allCommunications)} onMakeCall={(number) => handleMakeCall(number)} />}
