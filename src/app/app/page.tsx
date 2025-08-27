@@ -43,7 +43,7 @@ export default function AppUIPage() {
         
         setAllCommunications(commsData);
         
-        const unread = commsData.filter(c => !c.is_read);
+        const unread = commsData.filter(c => c.is_read === false);
         setUnreadCommunications(unread);
         
     } catch (error) {
