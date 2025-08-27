@@ -8,6 +8,10 @@ export const getCommunications = async (departmentId?: number): Promise<Communic
     : `/api/communications/threads`;
 
   const response = await axios.get(url);
+  // Handle both paginated and non-paginated responses for different endpoints
+  if (response.data.data && Array.isArray(response.data.data.results)) {
+    return response.data.data.results;
+  }
   return response.data.logs;
 };
 
@@ -37,22 +41,22 @@ export const getCallLogsBySid = async (callSid: string): Promise<Communication |
 
 export const getDepartmentNewCalls = async (department_id: number): Promise<Communication[]> => {
     const response = await axios.post('/api/departments/getDepartmentNewCalls', { department_id });
-    return response.data.calls;
+    return response.data.data.results;
 };
 
 export const getDepartmentMissedCalls = async (department_id: number): Promise<Communication[]> => {
     const response = await axios.post('/api/departments/getDepartmentMissedCalls', { department_id });
-    return response.data.calls;
+    return response.data.data.results;
 };
 
 export const getDepartmentRecordings = async (department_id: number): Promise<Communication[]> => {
     const response = await axios.post('/api/departments/getDepartmentRecordings', { department_id });
-    return response.data.calls;
+    return response.data.data.results;
 };
 
 export const getDepartmentVoiceMails = async (department_id: number): Promise<Communication[]> => {
     const response = await axios.post('/api/departments/getDepartmentVoiceMails', { department_id });
-    return response.data.calls;
+    return response.data.data.results;
 };
 
 export const getUnreadCallLogs = async (departmentId?: number): Promise<Communication[]> => {
