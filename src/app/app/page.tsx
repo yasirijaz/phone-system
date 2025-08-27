@@ -119,7 +119,7 @@ export default function AppUIPage() {
                          {loading ? <p>Loading...</p> : <CallLog calls={allCommunications} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="unread" className="mt-6">
-                        {loading ? <p>Loading...</p> : <CallLog calls={unreadCommunications} onMakeCall={(number) => handleMakeCall(number)} source="unread" />}
+                        {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => c.is_read === false)} onMakeCall={(number) => handleMakeCall(number)} source="unread" />}
                       </TabsContent>
                       <TabsContent value="calls" className="mt-6">
                           {loading ? <p>Loading...</p> : <CallLog calls={getCalls(allCommunications)} onMakeCall={(number) => handleMakeCall(number)} />}
@@ -134,7 +134,7 @@ export default function AppUIPage() {
                         {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => c.voice_mail)} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="recordings" className="mt-6">
-                        <Card><CardContent className="p-6">Call recordings will appear here.</CardContent></Card>
+                        {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => c.recording_url)} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="messages" className="mt-6">
                         {loading ? <p>Loading...</p> : <CallLog calls={getMessages(allCommunications)} onMakeCall={(number) => handleMakeCall(number)} />}
