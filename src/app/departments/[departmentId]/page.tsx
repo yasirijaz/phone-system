@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from 'next/navigation';
-import type { Communication, Department, PhoneNumber, User } from "@/types";
+import type { Communication, Department, PhoneNumber, User, PaginatedCommunicationsResponse } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
@@ -77,11 +77,11 @@ export default function DepartmentDetailPage() {
   const departmentId = Number(params.departmentId);
 
   const [department, setDepartment] = useState<Department | null>(null);
-  const [allCalls, setAllCalls] = useState<Communication[]>([]);
-  const [newCalls, setNewCalls] = useState<Communication[]>([]);
-  const [missedCalls, setMissedCalls] = useState<Communication[]>([]);
-  const [recordings, setRecordings] = useState<Communication[]>([]);
-  const [voicemails, setVoicemails] = useState<Communication[]>([]);
+  const [allCalls, setAllCalls] = useState<PaginatedCommunicationsResponse | null>(null);
+  const [newCalls, setNewCalls] = useState<PaginatedCommunicationsResponse | null>(null);
+  const [missedCalls, setMissedCalls] = useState<PaginatedCommunicationsResponse | null>(null);
+  const [recordings, setRecordings] = useState<PaginatedCommunicationsResponse | null>(null);
+  const [voicemails, setVoicemails] = useState<PaginatedCommunicationsResponse | null>(null);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [operators, setOperators] = useState<User[]>([]);
   
@@ -107,23 +107,23 @@ export default function DepartmentDetailPage() {
             switch(tab) {
                 case 'all':
                     response = await getCommunications(departmentId, page);
-                    setAllCalls(response.results);
+                    setAllCalls(response);
                     break;
                 case 'new':
                     response = await getDepartmentNewCalls(departmentId, page);
-                    setNewCalls(response.results);
+                    setNewCalls(response);
                     break;
                 case 'missed':
                     response = await getDepartmentMissedCalls(departmentId, page);
-                    setMissedCalls(response.results);
+                    setMissedCalls(response);
                     break;
                 case 'voicemails':
                     response = await getDepartmentVoiceMails(departmentId, page);
-                    setVoicemails(response.results);
+                    setVoicemails(response);
                     break;
                 case 'recordings':
                     response = await getDepartmentRecordings(departmentId, page);
-                    setRecordings(response.results);
+                    setRecordings(response);
                     break;
                 default:
                     return;
@@ -256,7 +256,7 @@ export default function DepartmentDetailPage() {
                       </TabsList>
                       <TabsContent value="all" className="mt-6">
                         <Card>
-                            <CallLog calls={allCalls} onMakeCall={(number) => handleMakeCall(number)} />
+                            <CallLog calls={allCalls?.results || []} onMakeCall={(number) => handleMakeCall(number)} />
                             <PaginationControls {...paginationState.all} onPageChange={(page) => handlePageChange('all', page)} isLoading={paginationState.all.loading}/>
                         </Card>
                       </TabsContent>
@@ -309,25 +309,25 @@ export default function DepartmentDetailPage() {
                       </TabsContent>
                        <TabsContent value="new" className="mt-6">
                          <Card>
-                            <CallLog calls={newCalls} onMakeCall={(number) => handleMakeCall(number)} />
+                            <CallLog calls={newCalls?.results || []} onMakeCall={(number) => handleMakeCall(number)} />
                             <PaginationControls {...paginationState.new} onPageChange={(page) => handlePageChange('new', page)} isLoading={paginationState.new.loading}/>
                          </Card>
                       </TabsContent>
                        <TabsContent value="missed" className="mt-6">
                          <Card>
-                            <CallLog calls={missedCalls} onMakeCall={(number) => handleMakeCall(number)} />
+                            <CallLog calls={missedCalls?.results || []} onMakeCall={(number) => handleMakeCall(number)} />
                             <PaginationControls {...paginationState.missed} onPageChange={(page) => handlePageChange('missed', page)} isLoading={paginationState.missed.loading}/>
                          </Card>
                       </TabsContent>
                        <TabsContent value="voicemails" className="mt-6">
                          <Card>
-                            <CallLog calls={voicemails} onMakeCall={(number) => handleMakeCall(number)} />
+                            <CallLog calls={voicemails?.results || []} onMakeCall={(number) => handleMakeCall(number)} />
                             <PaginationControls {...paginationState.voicemails} onPageChange={(page) => handlePageChange('voicemails', page)} isLoading={paginationState.voicemails.loading}/>
                          </Card>
                       </TabsContent>
                        <TabsContent value="recordings" className="mt-6">
                          <Card>
-                             <CallLog calls={recordings} onMakeCall={(number) => handleMakeCall(number)} />
+                             <CallLog calls={recordings?.results || []} onMakeCall={(number) => handleMakeCall(number)} />
                              <PaginationControls {...paginationState.recordings} onPageChange={(page) => handlePageChange('recordings', page)} isLoading={paginationState.recordings.loading}/>
                          </Card>
                       </TabsContent>
