@@ -45,6 +45,16 @@ export interface Communication {
   status?: string; // for SMS
 }
 
+export interface PaginatedCommunicationsResponse {
+    TotalRecords: number;
+    TotalPages: number;
+    recordsFiltered: number;
+    page_no: number;
+    success: boolean;
+    results: Communication[];
+}
+
+
 export interface User {
   id: number;
   name:string;

@@ -1,17 +1,20 @@
 
-import axios from '@/lib/axios';
-import type { Communication } from '@/types';
 
-export const getCommunications = async (departmentId?: number): Promise<Communication[]> => {
+import axios from '@/lib/axios';
+import type { Communication, PaginatedCommunicationsResponse } from '@/types';
+
+export const getCommunications = async (departmentId?: number, page: number = 1): Promise<PaginatedCommunicationsResponse> => {
   const url = departmentId
-    ? `/api/communications/threads/${departmentId}`
-    : `/api/communications/threads`;
+    ? `/api/communications/threads/${departmentId}?page=${page}`
+    : `/api/communications/threads?page=${page}`;
 
   const response = await axios.get(url);
   // Handle both paginated and non-paginated responses for different endpoints
   if (response.data.data && Array.isArray(response.data.data.results)) {
-    return response.data.data.results;
+    return response.data.data;
   }
+  // This part might need adjustment if the non-departmentId endpoint has a different structure.
+  // For now, assuming it returns a similar structure or we create a specific function for it.
   return response.data.logs;
 };
 
@@ -39,24 +42,24 @@ export const getCallLogsBySid = async (callSid: string): Promise<Communication |
   }
 };
 
-export const getDepartmentNewCalls = async (department_id: number): Promise<Communication[]> => {
-    const response = await axios.post('/api/departments/getDepartmentNewCalls', { department_id });
-    return response.data.data.results;
+export const getDepartmentNewCalls = async (department_id: number, page: number = 1): Promise<PaginatedCommunicationsResponse> => {
+    const response = await axios.post(`/api/departments/getDepartmentNewCalls?page=${page}`, { department_id });
+    return response.data.data;
 };
 
-export const getDepartmentMissedCalls = async (department_id: number): Promise<Communication[]> => {
-    const response = await axios.post('/api/departments/getDepartmentMissedCalls', { department_id });
-    return response.data.data.results;
+export const getDepartmentMissedCalls = async (department_id: number, page: number = 1): Promise<PaginatedCommunicationsResponse> => {
+    const response = await axios.post(`/api/departments/getDepartmentMissedCalls?page=${page}`, { department_id });
+    return response.data.data;
 };
 
-export const getDepartmentRecordings = async (department_id: number): Promise<Communication[]> => {
-    const response = await axios.post('/api/departments/getDepartmentRecordings', { department_id });
-    return response.data.data.results;
+export const getDepartmentRecordings = async (department_id: number, page: number = 1): Promise<PaginatedCommunicationsResponse> => {
+    const response = await axios.post(`/api/departments/getDepartmentRecordings?page=${page}`, { department_id });
+    return response.data.data;
 };
 
-export const getDepartmentVoiceMails = async (department_id: number): Promise<Communication[]> => {
-    const response = await axios.post('/api/departments/getDepartmentVoiceMails', { department_id });
-    return response.data.data.results;
+export const getDepartmentVoiceMails = async (department_id: number, page: number = 1): Promise<PaginatedCommunicationsResponse> => {
+    const response = await axios.post(`/api/departments/getDepartmentVoiceMails?page=${page}`, { department_id });
+    return response.data.data;
 };
 
 export const getUnreadCallLogs = async (departmentId?: number): Promise<Communication[]> => {
