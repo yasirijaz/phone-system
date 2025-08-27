@@ -9,13 +9,7 @@ export const getCommunications = async (departmentId?: number, page: number = 1)
     : `/api/communications/threads?page=${page}`;
 
   const response = await axios.get(url);
-  // Handle both paginated and non-paginated responses for different endpoints
-  if (response.data.data && Array.isArray(response.data.data.results)) {
-    return response.data.data;
-  }
-  // This part might need adjustment if the non-departmentId endpoint has a different structure.
-  // For now, assuming it returns a similar structure or we create a specific function for it.
-  return response.data.logs;
+  return response.data.threads;
 };
 
 export const getCommunicationThreads = async (departmentId?: number): Promise<Communication[]> => {
