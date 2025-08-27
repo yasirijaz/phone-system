@@ -64,6 +64,10 @@ export const markRead = async (id: string): Promise<void> => {
   await axios.post(`/api/call-logs/${id}/mark-read`);
 };
 
+export const markThreadAsRead = async (from: string, to: string): Promise<void> => {
+  await axios.post(`/api/communications/thread/mark-read`, { from, to });
+};
+
 export const starCall = async (id: string): Promise<void> => {
   await axios.post(`/api/call-logs/${id}/star`);
 };

@@ -119,7 +119,7 @@ export default function AppUIPage() {
                          {loading ? <p>Loading...</p> : <CallLog calls={allCommunications} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="unread" className="mt-6">
-                        {loading ? <p>Loading...</p> : <CallLog calls={unreadCommunications} onMakeCall={(number) => handleMakeCall(number)} />}
+                        {loading ? <p>Loading...</p> : <CallLog calls={unreadCommunications} onMakeCall={(number) => handleMakeCall(number)} source="unread" />}
                       </TabsContent>
                       <TabsContent value="calls" className="mt-6">
                           {loading ? <p>Loading...</p> : <CallLog calls={getCalls(allCommunications)} onMakeCall={(number) => handleMakeCall(number)} />}

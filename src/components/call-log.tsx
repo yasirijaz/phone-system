@@ -17,9 +17,10 @@ interface CallLogProps {
   calls: Communication[];
   onMakeCall: (number: string) => void;
   isClickable?: boolean;
+  source?: string;
 }
 
-function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communication, onMakeCall: (number: string) => void, isClickable: boolean }) {
+function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Communication, onMakeCall: (number: string) => void, isClickable: boolean, source?: string }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const isAdmin = user?.role_id === 1 || user?.role_id === 2;
@@ -109,7 +110,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
                   <div className="flex items-center gap-2 text-sm font-medium">
                        {renderIcon()}
                        <span>{(comm.latest_type || comm.type || '').charAt(0).toUpperCase() + (comm.latest_type || comm.type || '').slice(1)}</span>
-                       {(comm.latest_type || comm.type) === 'call' ? getStatusBadge(comm.call_status) : getStatusBadge(comm.status)}
+                       {comm.latest_type === 'call' ? getStatusBadge(comm.call_status) : getStatusBadge(comm.status)}
                        {(comm.latest_type || comm.type) === 'call' && comm.duration && <span>({comm.duration} min)</span>}
                   </div>
                    <div className="flex items-center">
@@ -174,8 +175,9 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
   if (isClickable) {
     const from = encodeURIComponent(comm.from);
     const to = encodeURIComponent(comm.to);
+    const queryString = source === 'unread' ? `?source=unread` : '';
     return (
-        <Link href={`/conversations/${from}/${to}`} key={comm.id || `${comm.from}-${comm.to}`} className="block">
+        <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="block">
             <CardContent />
         </Link>
     );
@@ -184,7 +186,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable }: { comm: Communicat
   return <CardContent />;
 }
 
-export default function CallLog({ calls: communications, onMakeCall, isClickable = true }: CallLogProps) {
+export default function CallLog({ calls: communications, onMakeCall, isClickable = true, source }: CallLogProps) {
   if (communications.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 border-2 border-dashed rounded-lg">
@@ -216,7 +218,7 @@ export default function CallLog({ calls: communications, onMakeCall, isClickable
             </div>
              <div className="space-y-4">
                 {commsForDay.map((comm) => (
-                    <CommunicationCard comm={comm} key={comm.id || `${comm.from}-${comm.to}`} onMakeCall={onMakeCall} isClickable={isClickable} />
+                    <CommunicationCard comm={comm} key={comm.id || `${comm.from}-${comm.to}`} onMakeCall={onMakeCall} isClickable={isClickable} source={source} />
                 ))}
              </div>
         </div>

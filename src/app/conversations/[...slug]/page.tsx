@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useRouter } from 'next/navigation';
-import { getCommunicationThread } from "@/services/callLogService";
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { getCommunicationThread, markThreadAsRead } from "@/services/callLogService";
 import type { Communication, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { sendSms } from "@/services/twilioService";
 export default function ConversationDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { user, logout } = useAuth();
     const { toast } = useToast();
     const { device, isDeviceReady } = useTwilio();
@@ -90,6 +91,10 @@ export default function ConversationDetailPage() {
                 const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                 setAllComms(sortedLogs);
                 
+                if (searchParams.get('source') === 'unread') {
+                    await markThreadAsRead(from, to);
+                }
+                
                 if (sortedLogs.length > 0) {
                     const latestComm = sortedLogs[sortedLogs.length - 1];
                     const name = latestComm.direction === 'inbound' 
@@ -129,7 +134,7 @@ export default function ConversationDetailPage() {
         if (user && from && to) {
             fetchInitialData();
         }
-    }, [user, from, to, toast, handleDepartmentChange]);
+    }, [user, from, to, toast, handleDepartmentChange, searchParams]);
     
     useEffect(() => {
         if (messagesEndRef.current) {
