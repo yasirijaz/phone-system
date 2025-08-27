@@ -163,9 +163,13 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Co
                         </Button>
                     </div>
                  )}
-                 {!!comm.recording_url && (
-                    <AudioPlayer src={comm.recording_url} />
-                )}
+                  {!!comm.recording_url && (
+                    <AudioPlayer src={comm.recording_url} type= 'Recording' />
+                  )}
+
+                  {!!comm.voice_mail && (
+                    <AudioPlayer src={comm.voice_mail} type= 'VoiceMail' />
+                  )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">{format(parseISO(comm.created_at || comm.latest_created_at!), 'p')}</p>
         </div>

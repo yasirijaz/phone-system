@@ -50,6 +50,10 @@ export const getDepartmentRecordings = async (department_id: number): Promise<Co
     return response.data.calls;
 };
 
+export const getDepartmentVoiceMails = async (department_id: number): Promise<Communication[]> => {
+    const response = await axios.post('/api/departments/getDepartmentVoiceMails', { department_id });
+    return response.data.calls;
+};
 
 export const getUnreadCallLogs = async (departmentId?: number): Promise<Communication[]> => {
   const url = departmentId

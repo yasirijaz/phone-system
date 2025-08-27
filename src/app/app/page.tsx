@@ -42,7 +42,7 @@ export default function AppUIPage() {
         const commsData = Array.isArray(communications) ? communications : [];
         
         setAllCommunications(commsData);
-        console.log(commsData,'commsData');
+        
         const unread = commsData.filter(c => c.is_read == false);
         setUnreadCommunications(unread);
         
@@ -128,13 +128,13 @@ export default function AppUIPage() {
                          {loading ? <p>Loading...</p> : <CallLog calls={getCalls(allCommunications).filter(c => c.call_status === 'missed' || c.call_status === 'no-answer' || c.call_status === 'busy' || c.call_status === 'canceled')} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="meetings" className="mt-6">
-                        <Card><CardContent className="p-6">Meeting recordings will appear here.</CardContent></Card>
+                         {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => !!c.recording_url)} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="voicemails" className="mt-6">
-                        {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => c.voice_mail != 'null')} onMakeCall={(number) => handleMakeCall(number)} />}
+                        {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => !!c.voice_mail)} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="recordings" className="mt-6">
-                        {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => c.recording_url != 'null')} onMakeCall={(number) => handleMakeCall(number)} />}
+                        {loading ? <p>Loading...</p> : <CallLog calls={allCommunications.filter(c => !!c.recording_url)} onMakeCall={(number) => handleMakeCall(number)} />}
                       </TabsContent>
                       <TabsContent value="messages" className="mt-6">
                         {loading ? <p>Loading...</p> : <CallLog calls={getMessages(allCommunications)} onMakeCall={(number) => handleMakeCall(number)} />}

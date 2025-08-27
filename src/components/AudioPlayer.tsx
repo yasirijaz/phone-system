@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { Play, Pause } from "lucide-react";
 import { Button } from './ui/button';
 
-const AudioPlayer = ({ src }: { src: string }) => {
+const AudioPlayer = ({ src, type }: { src: string, type: string }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -51,7 +51,7 @@ const AudioPlayer = ({ src }: { src: string }) => {
         </Button>
       
       <audio ref={audioRef} src={`${process.env.NEXT_PUBLIC_API_URL}/api/twilio/recordings/stream?url=${encodeURIComponent(src)}`}  className="hidden" preload="none" />
-      <span className="text-xs text-muted-foreground">Play Recording</span>
+      <span className="text-xs text-muted-foreground">Play {type}</span>
     </div>
   );
 };
