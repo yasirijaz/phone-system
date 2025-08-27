@@ -23,6 +23,7 @@ export interface Communication {
   is_read?: boolean;
   is_starred?: boolean;
   recording_url?: string | null;
+  voice_mail?: string | null;
   created_at: string;
   updated_at?: string;
   to_name?: Partial<Contact> | null;
