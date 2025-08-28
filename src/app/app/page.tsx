@@ -10,7 +10,7 @@ import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
-import { getCommunications, getInboxCalls } from "@/services/callLogService";
+import { getCommunications } from "@/services/callLogService";
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
@@ -41,9 +41,9 @@ export default function AppUIPage() {
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState<TabName>('all');
-  const [data, setData] = useState<Record<TabName, PaginatedCommunicationsResponse | null>>({
-    all: null, unread: null, calls: null, missed: null, meetings: null,
-    voicemails: null, recordings: null, messages: null, starred: null
+  const [data, setData] = useState<Record<TabName, Communication[]>>({
+    all: [], unread: [], calls: [], missed: [], meetings: [],
+    voicemails: [], recordings: [], messages: [], starred: []
   });
   const [pagination, setPagination] = useState<Record<TabName, PaginationState>>({
     all: { ...initialPaginationState }, unread: { ...initialPaginationState }, calls: { ...initialPaginationState },
@@ -56,17 +56,18 @@ export default function AppUIPage() {
 
   const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10) => {
     if (!user) return;
+
     setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
     
     try {
-        let response: PaginatedCommunicationsResponse;
-        if (tab === 'all') {
-            response = await getCommunications(page, limit);
-        } else {
-            response = await getInboxCalls(tab, page, limit);
+        let filters: Record<string, any> = { page, limit };
+        if (tab !== 'all') {
+            filters.type = tab;
         }
+
+        const response = await getCommunications(filters);
         
-        setData(prev => ({ ...prev, [tab]: response }));
+        setData(prev => ({ ...prev, [tab]: response.results }));
         setPagination(prev => ({
             ...prev,
             [tab]: {
@@ -123,7 +124,7 @@ export default function AppUIPage() {
     
     return (
       <Card>
-        <CallLog calls={currentData?.results || []} onMakeCall={handleMakeCall} />
+        <CallLog calls={currentData || []} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
         <PaginationControls
           {...currentPagination}
           onPageChange={handlePageChange}

@@ -24,7 +24,7 @@ export default function PaginationControls({
   onLimitChange,
   isLoading,
 }: PaginationControlsProps) {
-  if (totalPages <= 1 && totalRecords <= limit) return null;
+  if (totalRecords === 0) return null;
 
   return (
     <CardFooter className="flex items-center justify-between pt-4">
