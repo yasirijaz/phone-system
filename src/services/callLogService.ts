@@ -17,7 +17,7 @@ export const getCommunicationThreads = async (departmentId?: number): Promise<Co
         ? `/api/communications/threads/${departmentId}` 
         : '/api/communications/threads';
     const response = await axios.get(url);
-    return response.data.threads;
+    return response.data.data;
 };
 
 export const getCommunicationThread = async (from: string, to: string): Promise<Communication[]> => {
@@ -62,7 +62,7 @@ export const getUnreadCallLogs = async (departmentId?: number): Promise<Communic
     : `/api/call-logs/unread`;
 
   const response = await axios.get(url);
-  return response.data.call_logs;
+  return response.data.data;
 };
 
 export const markRead = async (id: string): Promise<void> => {
