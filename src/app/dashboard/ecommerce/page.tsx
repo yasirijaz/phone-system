@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import type { Communication, Department, PhoneNumber, Contact } from '@/types';
+import type { Communication, Department, PhoneNumber, Contact, PaginatedCommunicationsResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PlusCircle, Search, Phone, UserCheck, Zap, ArrowUp, ArrowDown, Users, Clock, MoreHorizontal, Calendar, AreaChart, BarChart as BarChartIcon, MessageSquare, Video } from 'lucide-react';
@@ -16,6 +16,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, 
 import { useToast } from '@/hooks/use-toast';
 import { getCommunications } from '@/services/callLogService';
 import AppHeader from '@/components/app-header';
+import PaginationControls from '@/components/pagination-controls';
 
 const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: string, value: string, icon: React.ElementType, trend: string, trendType: 'up' | 'down' }) => (
     <Card>
@@ -130,10 +131,54 @@ export default function EcommerceDashboard() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [communications, setCommunications] = useState<Communication[]>([]);
+  const [allCommunications, setAllCommunications] = useState<Communication[]>([]);
   const { toast } = useToast();
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerNumber, setDialerNumber] = useState('');
   
+  const [pagination, setPagination] = useState({
+      currentPage: 1,
+      totalPages: 1,
+      totalRecords: 0,
+      limit: 5,
+      loading: true,
+  });
+
+  const fetchCommunications = useCallback(async (page: number = 1, limit: number = 5) => {
+    if (!user) return;
+
+    setPagination(prev => ({ ...prev, loading: true }));
+    
+    try {
+        const response = await getCommunications({ page, limit });
+        setCommunications(response.results);
+        setPagination(prev => ({
+            ...prev,
+            currentPage: response.page_no,
+            totalPages: response.TotalPages,
+            totalRecords: response.TotalRecords,
+            limit: limit,
+            loading: false
+        }));
+    } catch (error) {
+        toast({ title: "Error", description: "Failed to load communication history.", variant: "destructive" });
+        setPagination(prev => ({ ...prev, loading: false }));
+    }
+  }, [user, toast]);
+
+  useEffect(() => {
+    fetchCommunications(pagination.currentPage, pagination.limit);
+  }, []);
+
+  const handlePageChange = (page: number) => {
+      fetchCommunications(page, pagination.limit);
+  };
+
+  const handleLimitChange = (limit: number) => {
+      fetchCommunications(1, limit);
+  };
+
+
   useEffect(() => {
     if(user?.role_id === 1) {
       router.replace('/companies');
@@ -141,27 +186,27 @@ export default function EcommerceDashboard() {
   }, [user, router]);
   
   useEffect(() => {
-    const fetchCommunications = async () => {
+    const fetchAllCommunications = async () => {
       try {
-        const fetchedComms = await getCommunications();
-        setCommunications(Array.isArray(fetchedComms) ? fetchedComms : []);
+        const fetchedComms = await getCommunications({limit: 1000}); // fetch a large number for stats
+        setAllCommunications(fetchedComms.results || []);
       } catch (error) {
-        toast({ title: "Error", description: "Failed to load communication history.", variant: "destructive" });
+        toast({ title: "Error", description: "Failed to load communication statistics.", variant: "destructive" });
       }
     };
     if (user) {
-      fetchCommunications();
+      fetchAllCommunications();
     }
   }, [user, toast]);
   
   const { totalCalls, totalDuration, mostFrequentContact } = useMemo(() => {
-    if (communications.length === 0) {
+    if (allCommunications.length === 0) {
       return { totalCalls: 0, totalDuration: 0, mostFrequentContact: 'N/A' };
     }
 
-    const totalDuration = communications.reduce((acc, call) => acc + (parseInt(call.duration, 10) || 0), 0);
+    const totalDuration = allCommunications.reduce((acc, call) => acc + (parseInt(call.duration, 10) || 0), 0);
 
-    const contactCounts = communications.reduce((acc, call) => {
+    const contactCounts = allCommunications.reduce((acc, call) => {
       const contact = call.direction === 'inbound' ? (call.from_name?.name || call.from) : (call.to_name?.name || call.to);
       acc[contact] = (acc[contact] || 0) + 1;
       return acc;
@@ -172,11 +217,11 @@ export default function EcommerceDashboard() {
       : 'N/A';
 
     return {
-      totalCalls: communications.length,
+      totalCalls: allCommunications.length,
       totalDuration,
       mostFrequentContact,
     };
-  }, [communications]);
+  }, [allCommunications]);
 
   if(user?.role_id === 1) {
     return null; // or a loading spinner, as redirection is happening
@@ -203,12 +248,12 @@ export default function EcommerceDashboard() {
             
             <div className="grid grid-cols-12 gap-4 md:gap-6 2xl:gap-7.5">
                 <div className="col-span-12">
-                     <MonthlyCallsChart calls={communications} />
+                     <MonthlyCallsChart calls={allCommunications} />
                 </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:gap-6">
-                <StatisticsChart calls={communications} />
+                <StatisticsChart calls={allCommunications} />
             </div>
             
             <Card>
@@ -218,11 +263,17 @@ export default function EcommerceDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <CallLog calls={communications.slice(0, 5)} onMakeCall={(number) => {
+                <CallLog calls={communications} onMakeCall={(number) => {
                   setDialerNumber(number.replace(/^\+1/, ""));
                   setDialerOpen(true);
                 }} />
               </CardContent>
+              <PaginationControls
+                {...pagination}
+                onPageChange={handlePageChange}
+                onLimitChange={handleLimitChange}
+                isLoading={pagination.loading}
+              />
             </Card>
           </main>
         </div>
