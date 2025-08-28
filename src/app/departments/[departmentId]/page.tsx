@@ -7,67 +7,39 @@ import type { Communication, Department, PhoneNumber, User, PaginatedCommunicati
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
-import { getCommunications, getDepartmentNewCalls, getDepartmentMissedCalls, getDepartmentRecordings, getDepartmentVoiceMails } from "@/services/callLogService";
+import { getCommunications } from "@/services/callLogService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { getDepartmentUsers, getDepartments, updateDndStatus, getDndStatus } from "@/services/departmentService";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import PaginationControls from "@/components/pagination-controls";
 
 
-const PaginationControls = ({
-  currentPage,
-  totalPages,
-  totalRecords,
-  onPageChange,
-  isLoading,
-}: {
-  currentPage: number;
-  totalPages: number;
-  totalRecords: number;
-  onPageChange: (page: number) => void;
-  isLoading: boolean;
-}) => {
-  if (totalRecords === 0) return null;
+type TabName = 'all' | 'unread' | 'calls' | 'messages' | 'operators' | 'missed' | 'voicemails' | 'recordings';
 
-  return (
-    <CardFooter className="flex items-center justify-between pt-4">
-        <div className="text-sm text-muted-foreground">
-            Page {currentPage} of {totalPages} ({totalRecords} records)
-        </div>
-        <div className="flex items-center gap-2">
-            <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onPageChange(currentPage - 1)}
-                disabled={currentPage === 1 || isLoading}
-            >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
-            </Button>
-            <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onPageChange(currentPage + 1)}
-                disabled={currentPage === totalPages || isLoading}
-            >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-        </div>
-    </CardFooter>
-  );
+type PaginationState = {
+    currentPage: number;
+    totalPages: number;
+    totalRecords: number;
+    limit: number;
+    loading: boolean;
 };
 
+const initialPaginationState: PaginationState = {
+    currentPage: 1,
+    totalPages: 1,
+    totalRecords: 0,
+    limit: 10,
+    loading: true,
+};
 
 export default function DepartmentDetailPage() {
   const { user, logout } = useAuth();
@@ -77,75 +49,69 @@ export default function DepartmentDetailPage() {
   const departmentId = Number(params.departmentId);
 
   const [department, setDepartment] = useState<Department | null>(null);
-  const [allCalls, setAllCalls] = useState<PaginatedCommunicationsResponse | null>(null);
-  const [newCalls, setNewCalls] = useState<PaginatedCommunicationsResponse | null>(null);
-  const [missedCalls, setMissedCalls] = useState<PaginatedCommunicationsResponse | null>(null);
-  const [recordings, setRecordings] = useState<PaginatedCommunicationsResponse | null>(null);
-  const [voicemails, setVoicemails] = useState<PaginatedCommunicationsResponse | null>(null);
-  const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
+  const [data, setData] = useState<Record<TabName, Communication[]>>({
+    all: [], unread: [], calls: [], messages: [], operators: [],
+    missed: [], voicemails: [], recordings: []
+  });
   const [operators, setOperators] = useState<User[]>([]);
   
-  const [paginationState, setPaginationState] = useState({
-      all: { currentPage: 1, totalPages: 1, totalRecords: 0, loading: true },
-      new: { currentPage: 1, totalPages: 1, totalRecords: 0, loading: true },
-      missed: { currentPage: 1, totalPages: 1, totalRecords: 0, loading: true },
-      voicemails: { currentPage: 1, totalPages: 1, totalRecords: 0, loading: true },
-      recordings: { currentPage: 1, totalPages: 1, totalRecords: 0, loading: true },
+  const [pagination, setPagination] = useState<Record<TabName, PaginationState>>({
+    all: { ...initialPaginationState }, unread: { ...initialPaginationState }, calls: { ...initialPaginationState },
+    messages: { ...initialPaginationState }, operators: { ...initialPaginationState }, missed: { ...initialPaginationState }, 
+    voicemails: { ...initialPaginationState }, recordings: { ...initialPaginationState },
   });
 
   const [dndStatus, setDndStatus] = useState(false);
   const [dndLoading, setDndLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState<TabName>("all");
 
-   const fetchDataForTab = useCallback(async (tab: string, page: number = 1) => {
-        if (!user || !departmentId) return;
+  const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10) => {
+    if (!user || !departmentId) return;
 
-        setPaginationState(prev => ({ ...prev, [tab]: { ...prev[tab as keyof typeof prev], loading: true } }));
-        
-        try {
-            let response;
-            switch(tab) {
-                case 'all':
-                    response = await getCommunications(departmentId, page);
-                    setAllCalls(response);
-                    break;
-                case 'new':
-                    response = await getDepartmentNewCalls(departmentId, page);
-                    setNewCalls(response);
-                    break;
-                case 'missed':
-                    response = await getDepartmentMissedCalls(departmentId, page);
-                    setMissedCalls(response);
-                    break;
-                case 'voicemails':
-                    response = await getDepartmentVoiceMails(departmentId, page);
-                    setVoicemails(response);
-                    break;
-                case 'recordings':
-                    response = await getDepartmentRecordings(departmentId, page);
-                    setRecordings(response);
-                    break;
-                default:
-                    return;
-            }
-             setPaginationState(prev => ({
-                ...prev,
-                [tab]: {
-                    currentPage: response.page_no,
-                    totalPages: response.TotalPages,
-                    totalRecords: response.TotalRecords,
-                    loading: false,
-                }
-            }));
-        } catch (error) {
-            toast({ title: `Error fetching ${tab} calls`, description: "Failed to load data for this tab.", variant: "destructive" });
-            setPaginationState(prev => ({ ...prev, [tab]: { ...prev[tab as keyof typeof prev], loading: false } }));
+    if (tab === 'operators') {
+      try {
+        setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
+        const operatorsResponse = await getDepartmentUsers(user.company_id!, departmentId);
+        setOperators(Array.isArray(operatorsResponse.users) ? operatorsResponse.users : []);
+        // Note: Operator list is not paginated from the API yet.
+        setPagination(prev => ({ ...prev, [tab]: { ...initialPaginationState, loading: false, totalRecords: operators.length, totalPages: 1 } }));
+      } catch (error) {
+        toast({ title: "Error fetching operators", description: "Failed to load data for this tab.", variant: "destructive" });
+        setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: false } }));
+      }
+      return;
+    }
+
+    setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
+    
+    try {
+        let filters: Record<string, any> = { page, limit, department_id: departmentId };
+        if (tab !== 'all') {
+            filters.type = tab;
         }
-    }, [user, departmentId, toast]);
 
-    useEffect(() => {
-        fetchDataForTab(activeTab, 1);
-    }, [activeTab, fetchDataForTab]);
+        const response = await getCommunications(filters);
+        
+        setData(prev => ({ ...prev, [tab]: response.results }));
+        setPagination(prev => ({
+            ...prev,
+            [tab]: {
+                currentPage: response.page_no,
+                totalPages: response.TotalPages,
+                totalRecords: response.TotalRecords,
+                limit: limit,
+                loading: false
+            }
+        }));
+    } catch (error) {
+        toast({ title: `Error fetching ${tab}`, description: "Failed to load data for this tab.", variant: "destructive" });
+        setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: false } }));
+    }
+  }, [user, departmentId, toast]);
+
+  useEffect(() => {
+    fetchCommunicationData(activeTab, pagination[activeTab].currentPage, pagination[activeTab].limit);
+  }, [activeTab]);
 
   useEffect(() => {
     const fetchInitialDepartmentData = async () => {
@@ -155,15 +121,10 @@ export default function DepartmentDetailPage() {
             const currentDept = depts.find(d => d.id === departmentId);
             setDepartment(currentDept || null);
             
-            const [numbers, dnd, operatorsResponse] = await Promise.all([
-                getPhoneNumbers(departmentId),
+            const [dnd] = await Promise.all([
                 getDndStatus(departmentId, user.id),
-                getDepartmentUsers(user.company_id, departmentId),
             ]);
-            
-            setPhoneNumbers(numbers);
             setDndStatus(dnd.is_dnd);
-            setOperators(Array.isArray(operatorsResponse.users) ? operatorsResponse.users : []);
         } catch (error) {
              toast({ title: "Error", description: "Failed to load initial department data.", variant: "destructive" });
         }
@@ -171,8 +132,12 @@ export default function DepartmentDetailPage() {
     fetchInitialDepartmentData();
   }, [user, departmentId, toast]);
   
-  const handlePageChange = (tab: string, page: number) => {
-      fetchDataForTab(tab, page);
+  const handlePageChange = (page: number) => {
+      fetchCommunicationData(activeTab, page, pagination[activeTab].limit);
+  };
+
+  const handleLimitChange = (limit: number) => {
+      fetchCommunicationData(activeTab, 1, limit);
   };
 
   const handleMakeCall = async (number: string) => {
@@ -203,8 +168,6 @@ export default function DepartmentDetailPage() {
         setDndLoading(false);
     }
   };
-
-  const departmentPhoneNumber = phoneNumbers.length > 0 ? phoneNumbers[0].phone_no : 'No number assigned';
   
   const getRoleName = (roleId?: number) => {
     switch (roleId) {
@@ -213,7 +176,23 @@ export default function DepartmentDetailPage() {
         case 3: return 'User';
         default: return 'Unknown';
     }
-  }
+  };
+
+  const renderTabContent = (tabName: TabName) => {
+    const currentData = data[tabName];
+    const currentPagination = pagination[tabName];
+    
+    return (
+      <Card>
+        <CallLog calls={currentData || []} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
+        <PaginationControls
+          {...currentPagination}
+          onPageChange={handlePageChange}
+          onLimitChange={handleLimitChange}
+        />
+      </Card>
+    );
+  };
 
   return (
     <SidebarProvider>
@@ -232,7 +211,7 @@ export default function DepartmentDetailPage() {
                     <div className="flex items-center justify-between mb-6">
                         <div>
                           <h1 className="text-2xl font-bold">{department?.name || 'Department'}</h1>
-                          <p className="text-sm text-muted-foreground">{departmentPhoneNumber}</p>
+                          <p className="text-sm text-muted-foreground">{department?.name}</p>
                         </div>
                         <div className="flex items-center space-x-2">
                             <Label htmlFor="dnd-switch">DO NOT DISTURB</Label>
@@ -244,26 +223,22 @@ export default function DepartmentDetailPage() {
                             />
                         </div>
                     </div>
-                    <Tabs defaultValue="all" onValueChange={setActiveTab}>
+                    <Tabs defaultValue="all" onValueChange={(value) => setActiveTab(value as TabName)}>
                       <TabsList>
                         <TabsTrigger value="all">All</TabsTrigger>
-                        <TabsTrigger value="new">New</TabsTrigger>
-                        <TabsTrigger value="hold-queue">Hold Queue</TabsTrigger>
+                        <TabsTrigger value="unread">Unread</TabsTrigger>
+                        <TabsTrigger value="calls">Calls</TabsTrigger>
+                        <TabsTrigger value="messages">Messages</TabsTrigger>
                         <TabsTrigger value="operators">Operators</TabsTrigger>
                         <TabsTrigger value="missed">Missed</TabsTrigger>
                         <TabsTrigger value="voicemails">Voicemails</TabsTrigger>
                         <TabsTrigger value="recordings">Recordings</TabsTrigger>
                       </TabsList>
-                      <TabsContent value="all" className="mt-6">
-                        <Card>
-                            <CallLog calls={allCalls?.results || []} onMakeCall={(number) => handleMakeCall(number)} />
-                            <PaginationControls {...paginationState.all} onPageChange={(page) => handlePageChange('all', page)} isLoading={paginationState.all.loading}/>
-                        </Card>
-                      </TabsContent>
-                      <TabsContent value="hold-queue" className="mt-6">
-                         <Card><CardContent className="p-6 text-center text-muted-foreground">No Record Found</CardContent></Card>
-                      </TabsContent>
-                       <TabsContent value="operators" className="mt-6">
+                      <TabsContent value="all" className="mt-6">{renderTabContent('all')}</TabsContent>
+                      <TabsContent value="unread" className="mt-6">{renderTabContent('unread')}</TabsContent>
+                      <TabsContent value="calls" className="mt-6">{renderTabContent('calls')}</TabsContent>
+                      <TabsContent value="messages" className="mt-6">{renderTabContent('messages')}</TabsContent>
+                      <TabsContent value="operators" className="mt-6">
                          <Card>
                             <CardContent className="p-0">
                                 <Table>
@@ -305,32 +280,12 @@ export default function DepartmentDetailPage() {
                                     </TableBody>
                                 </Table>
                             </CardContent>
+                            <PaginationControls {...pagination.operators} onPageChange={handlePageChange} onLimitChange={handleLimitChange} />
                          </Card>
                       </TabsContent>
-                       <TabsContent value="new" className="mt-6">
-                         <Card>
-                            <CallLog calls={newCalls?.results || []} onMakeCall={(number) => handleMakeCall(number)} />
-                            <PaginationControls {...paginationState.new} onPageChange={(page) => handlePageChange('new', page)} isLoading={paginationState.new.loading}/>
-                         </Card>
-                      </TabsContent>
-                       <TabsContent value="missed" className="mt-6">
-                         <Card>
-                            <CallLog calls={missedCalls?.results || []} onMakeCall={(number) => handleMakeCall(number)} />
-                            <PaginationControls {...paginationState.missed} onPageChange={(page) => handlePageChange('missed', page)} isLoading={paginationState.missed.loading}/>
-                         </Card>
-                      </TabsContent>
-                       <TabsContent value="voicemails" className="mt-6">
-                         <Card>
-                            <CallLog calls={voicemails?.results || []} onMakeCall={(number) => handleMakeCall(number)} />
-                            <PaginationControls {...paginationState.voicemails} onPageChange={(page) => handlePageChange('voicemails', page)} isLoading={paginationState.voicemails.loading}/>
-                         </Card>
-                      </TabsContent>
-                       <TabsContent value="recordings" className="mt-6">
-                         <Card>
-                             <CallLog calls={recordings?.results || []} onMakeCall={(number) => handleMakeCall(number)} />
-                             <PaginationControls {...paginationState.recordings} onPageChange={(page) => handlePageChange('recordings', page)} isLoading={paginationState.recordings.loading}/>
-                         </Card>
-                      </TabsContent>
+                       <TabsContent value="missed" className="mt-6">{renderTabContent('missed')}</TabsContent>
+                       <TabsContent value="voicemails" className="mt-6">{renderTabContent('voicemails')}</TabsContent>
+                       <TabsContent value="recordings" className="mt-6">{renderTabContent('recordings')}</TabsContent>
                     </Tabs>
                   </main>
                 </div>
@@ -339,3 +294,5 @@ export default function DepartmentDetailPage() {
     </SidebarProvider>
   );
 }
+
+    
