@@ -9,7 +9,7 @@ export const getCommunications = async (departmentId?: number, page: number = 1)
     : `/api/communications/threads?page=${page}`;
 
   const response = await axios.get(url);
-  return response.data.threads;
+  return response.data.data;
 };
 
 export const getCommunicationThreads = async (departmentId?: number): Promise<Communication[]> => {
