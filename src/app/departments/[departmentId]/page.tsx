@@ -54,6 +54,7 @@ export default function DepartmentDetailPage() {
     missed: [], voicemails: [], recordings: []
   });
   const [operators, setOperators] = useState<User[]>([]);
+  const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   
   const [pagination, setPagination] = useState<Record<TabName, PaginationState>>({
     all: { ...initialPaginationState }, unread: { ...initialPaginationState }, calls: { ...initialPaginationState },
@@ -121,9 +122,12 @@ export default function DepartmentDetailPage() {
             const currentDept = depts.find(d => d.id === departmentId);
             setDepartment(currentDept || null);
             
-            const [dnd] = await Promise.all([
+            const [numbers, dnd] = await Promise.all([
+                getPhoneNumbers(departmentId),
                 getDndStatus(departmentId, user.id),
             ]);
+            
+            setPhoneNumbers(numbers);
             setDndStatus(dnd.is_dnd);
         } catch (error) {
              toast({ title: "Error", description: "Failed to load initial department data.", variant: "destructive" });
@@ -169,6 +173,8 @@ export default function DepartmentDetailPage() {
     }
   };
   
+  const departmentPhoneNumber = phoneNumbers.length > 0 ? phoneNumbers[0].phone_no : 'No number assigned';
+
   const getRoleName = (roleId?: number) => {
     switch (roleId) {
         case 1: return 'Super Admin';
@@ -211,7 +217,7 @@ export default function DepartmentDetailPage() {
                     <div className="flex items-center justify-between mb-6">
                         <div>
                           <h1 className="text-2xl font-bold">{department?.name || 'Department'}</h1>
-                          <p className="text-sm text-muted-foreground">{department?.name}</p>
+                          <p className="text-sm text-muted-foreground">{departmentPhoneNumber}</p>
                         </div>
                         <div className="flex items-center space-x-2">
                             <Label htmlFor="dnd-switch">DO NOT DISTURB</Label>
