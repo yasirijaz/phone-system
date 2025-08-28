@@ -140,7 +140,7 @@ export default function EcommerceDashboard() {
       currentPage: 1,
       totalPages: 1,
       totalRecords: 0,
-      limit: 5,
+      limit: 10,
       loading: true,
   });
 
