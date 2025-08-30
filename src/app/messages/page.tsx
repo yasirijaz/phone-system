@@ -115,7 +115,7 @@ export default function MessagesPage() {
         await sendSms(selectedFromNumber, recipient, messageBody);
         toast({ title: "Success", description: "Message sent successfully." });
         setMessageBody(""); // Clear message box on success
-        router.push(`/conversations/${encodeURIComponent(recipient)}`);
+        router.push(`/conversations/${encodeURIComponent(selectedFromNumber)}/${encodeURIComponent(recipient)}`);
     } catch (error: any) {
         const errorMessage = error.response?.data?.message || "Failed to send message.";
         toast({ title: "Error", description: errorMessage, variant: "destructive" });
