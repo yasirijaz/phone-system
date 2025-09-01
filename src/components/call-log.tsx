@@ -99,79 +99,81 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Co
   }
   
   const CardContent = () => (
-    <div className="flex items-start gap-4">
-        <Avatar>
-            <AvatarImage src={`https://placehold.co/100x100.png?text=${contactInitial}`} alt={contactName} />
-            <AvatarFallback>{contactInitial}</AvatarFallback>
-        </Avatar>
+     <div className="flex items-start gap-4 mx-4">
         <div className="flex-1">
-            <div className={`p-4 rounded-lg border ${cardBg}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                       {renderIcon()}
-                       <span>{(comm.latest_type || comm.type || '').charAt(0).toUpperCase() + (comm.latest_type || comm.type || '').slice(1)}</span>
-                       {comm.latest_type === 'call' ? getStatusBadge(comm.call_status) : getStatusBadge(comm.status)}
-                       {(comm.latest_type || comm.type) === 'call' && comm.duration && <span>({comm.duration} min)</span>}
-                  </div>
-                   <div className="flex items-center">
-                        {hasAssignments && !isClickable && (
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="ghost" size="icon">
-                                        <Info className="h-4 w-4" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-80">
-                                    <div className="grid gap-1">
-                                        <div className="space-y-1">
-                                            <h4 className="font-medium leading-none">Task Assignments</h4>
-                                            <p className="text-sm text-muted-foreground">
-                                                Status of assigned workers for this call.
-                                            </p>
-                                        </div>
-                                        <div className="grid gap-1">
-                                            {comm.task_assignments?.map((assignment: any) => (
-                                                <div key={assignment.worker_sid} className="flex items-center justify-between">
-                                                    <span>{assignment.user?.name || assignment.worker_name || 'Unknown Worker'}</span>
-                                                    <Badge variant={assignment.status === 'completed' ? 'default' : 'destructive'}>{assignment.status}</Badge>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
-                        )}
-                        <Button variant="ghost" size="icon" onClick={handleCallClick}>
-                            <PhoneIcon className="h-4 w-4" />
-                        </Button>
-                   </div>
-                </div>
-                <div className="text-sm mt-2 space-y-1 text-muted-foreground">
-                    <p className="text-foreground"><strong>From:</strong> {comm.from_name?.name || comm.from}</p>
-                    <p><strong>To:</strong> {comm.to_name?.name || comm.to}</p>
-                    {(comm.latest_type || comm.type) === 'sms' && <p className="pt-2 text-foreground">{comm.body}</p>}
-                </div>
-                 {isInProgress && isAdmin && (
-                    <div className="mt-4 flex gap-2 border-t pt-2">
-                        <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true, coach: true })}>
-                            <Ear className="mr-2 h-4 w-4" />
-                            Silently Listen
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true, coach: false })}>
-                            <Mic className="mr-2 h-4 w-4" />
-                            Barge In
-                        </Button>
+            <div className={`p-4 rounded-lg border ${cardBg} flex items-start gap-4`}>
+                <Avatar>
+                    <AvatarImage src={`https://placehold.co/100x100.png?text=${contactInitial}`} alt={contactName} />
+                    <AvatarFallback>{contactInitial}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                        {renderIcon()}
+                        <span>{(comm.latest_type || comm.type || '').charAt(0).toUpperCase() + (comm.latest_type || comm.type || '').slice(1)}</span>
+                        {comm.latest_type === 'call' ? getStatusBadge(comm.call_status) : getStatusBadge(comm.status)}
+                        {(comm.latest_type || comm.type) === 'call' && comm.duration && <span>({comm.duration} min)</span>}
                     </div>
-                 )}
-                  {!!comm.recording_url && (
-                    <AudioPlayer src={comm.recording_url} type= 'Recording' />
+                    <div className="flex items-center">
+                          {hasAssignments && !isClickable && (
+                              <Popover>
+                                  <PopoverTrigger asChild>
+                                      <Button variant="ghost" size="icon">
+                                          <Info className="h-4 w-4" />
+                                      </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-80">
+                                      <div className="grid gap-1">
+                                          <div className="space-y-1">
+                                              <h4 className="font-medium leading-none">Task Assignments</h4>
+                                              <p className="text-sm text-muted-foreground">
+                                                  Status of assigned workers for this call.
+                                              </p>
+                                          </div>
+                                          <div className="grid gap-1">
+                                              {comm.task_assignments?.map((assignment: any) => (
+                                                  <div key={assignment.worker_sid} className="flex items-center justify-between">
+                                                      <span>{assignment.user?.name || assignment.worker_name || 'Unknown Worker'}</span>
+                                                      <Badge variant={assignment.status === 'completed' ? 'default' : 'destructive'}>{assignment.status}</Badge>
+                                                  </div>
+                                              ))}
+                                          </div>
+                                      </div>
+                                  </PopoverContent>
+                              </Popover>
+                          )}
+                          <Button variant="ghost" size="icon" onClick={handleCallClick}>
+                              <PhoneIcon className="h-4 w-4" />
+                          </Button>
+                    </div>
+                  </div>
+                  <div className="text-sm mt-2 space-y-1 text-muted-foreground">
+                      <p className="text-foreground"><strong>From:</strong> {comm.from_name?.name || comm.from}</p>
+                      <p><strong>To:</strong> {comm.to_name?.name || comm.to}</p>
+                      {(comm.latest_type || comm.type) === 'sms' && <p className="pt-2 text-foreground">{comm.body}</p>}
+                  </div>
+                  {isInProgress && isAdmin && (
+                      <div className="mt-4 flex gap-2 border-t pt-2">
+                          <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true, coach: true })}>
+                              <Ear className="mr-2 h-4 w-4" />
+                              Silently Listen
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true, coach: false })}>
+                              <Mic className="mr-2 h-4 w-4" />
+                              Barge In
+                          </Button>
+                      </div>
                   )}
+                    {!!comm.recording_url && (
+                      <AudioPlayer src={comm.recording_url} type= 'Recording' />
+                    )}
 
-                  {!!comm.voice_mail && (
-                    <AudioPlayer src={comm.voice_mail} type= 'VoiceMail' />
-                  )}
+                    {!!comm.voice_mail && (
+                      <AudioPlayer src={comm.voice_mail} type= 'VoiceMail' />
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1 pt-2">{format(parseISO(comm.created_at || comm.latest_created_at!), 'p')}</p>
+                </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{format(parseISO(comm.created_at || comm.latest_created_at!), 'p')}</p>
         </div>
     </div>
   );
@@ -182,12 +184,12 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Co
     const queryString = source === 'unread' ? `?source=unread` : '';
     return (
         <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="block">
-            <CardContent />
+            <CardContent className="p-0" />
         </Link>
     );
   }
 
-  return <CardContent />;
+  return <CardContent className="p-0" />;
 }
 
 export default function CallLog({ calls: communications, onMakeCall, isClickable = true, source }: CallLogProps) {
