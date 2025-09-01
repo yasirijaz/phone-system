@@ -17,7 +17,7 @@ import AppHeader from "@/components/app-header";
 import { events } from '@/lib/events';
 import PaginationControls from "@/components/pagination-controls";
 
-type TabName = 'all' | 'unread' | 'calls' | 'missed' | 'meetings' | 'voicemails' | 'recordings' | 'messages' | 'starred';
+type TabName = 'all' | 'unread' | 'calls' | 'missed' | 'meetings' | 'voicemails' | 'recordings' | 'messages' | 'starred' | 'spam' | 'unlogged';
 
 type PaginationState = {
     currentPage: number;
@@ -43,12 +43,13 @@ export default function AppUIPage() {
   const [activeTab, setActiveTab] = useState<TabName>('all');
   const [data, setData] = useState<Record<TabName, Communication[]>>({
     all: [], unread: [], calls: [], missed: [], meetings: [],
-    voicemails: [], recordings: [], messages: [], starred: []
+    voicemails: [], recordings: [], messages: [], starred: [], spam: [], unlogged: []
   });
   const [pagination, setPagination] = useState<Record<TabName, PaginationState>>({
     all: { ...initialPaginationState }, unread: { ...initialPaginationState }, calls: { ...initialPaginationState },
     missed: { ...initialPaginationState }, meetings: { ...initialPaginationState }, voicemails: { ...initialPaginationState },
     recordings: { ...initialPaginationState }, messages: { ...initialPaginationState }, starred: { ...initialPaginationState },
+    spam: { ...initialPaginationState }, unlogged: { ...initialPaginationState },
   });
 
   const [dialerOpen, setDialerOpen] = useState(false);
@@ -86,7 +87,7 @@ export default function AppUIPage() {
 
   useEffect(() => {
     fetchCommunicationData(activeTab, pagination[activeTab].currentPage, pagination[activeTab].limit);
-  }, [activeTab]);
+  }, [activeTab, fetchCommunicationData]);
 
   const handlePageChange = (page: number) => {
       fetchCommunicationData(activeTab, page, pagination[activeTab].limit);
