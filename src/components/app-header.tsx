@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { Department, PhoneNumber, Contact, User } from "@/types";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
@@ -25,7 +25,6 @@ import ActiveCallBar from "./active-call-modal";
 import type { Call } from '@twilio/voice-sdk';
 import { ScrollArea } from "./ui/scroll-area";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
 import { events } from "@/lib/events";
 
 interface AppHeaderProps {
