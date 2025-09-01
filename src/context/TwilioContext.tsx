@@ -60,7 +60,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const audio = new Audio('/sounds/reservation.mp3');
 
   const refreshCallListing = useCallback(() => {
-    console.log('Emitting refreshCalls event');
+    console.log('About to emit refreshCalls');
     events.emit('refreshCalls');
   }, []);
 
@@ -84,6 +84,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
             console.log('WebSocket message received:', data);
             const { task_type, method_type } = data;
             if (method_type === 'refresh_listing') {
+              console.log('Emitting refreshCalls now');
               refreshCallListing();
             }
           } catch (e) {
