@@ -25,6 +25,8 @@ import ActiveCallBar from "./active-call-modal";
 import type { Call } from '@twilio/voice-sdk';
 import { ScrollArea } from "./ui/scroll-area";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { events } from "@/lib/events";
 
 interface AppHeaderProps {
     user: User | null;
@@ -79,11 +81,62 @@ export default function AppHeader({
     // Search state
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchValue, setSearchValue] = useState("");
+    const socketRef = useRef<WebSocket | null>(null);
     
     useEffect(() => {
         connectTwilio();
     }, [connectTwilio]);
     
+    useEffect(() => {
+        if (!user) {
+        if (socketRef.current) {
+            socketRef.current.close();
+            socketRef.current = null;
+        }
+        return;
+        }
+        if (socketRef.current) return;
+
+        const WS_URL = `wss://socket.windshieldhub.com?user_id=${user.id}`;
+        const newSocket = new WebSocket(WS_URL);
+
+        socketRef.current = newSocket;
+
+        newSocket.onopen = () => {
+            console.log("WebSocket connection established in AppHeader");
+        };
+
+        newSocket.onmessage = (evt) => {
+        try {
+            const data = JSON.parse(evt.data);
+            console.log("WebSocket message received:", data);
+            if (data.method_type === "refresh_listing") {
+                console.log("Emitting refreshCalls");
+                events.emit("refreshCalls");
+            }
+        } catch (e) {
+            console.warn("Non-JSON message:", evt.data);
+        }
+        };
+
+        newSocket.onerror = () => {
+        try {
+            newSocket.close();
+        } catch {}
+        };
+
+        newSocket.onclose = () => {
+            console.log("WebSocket closed in AppHeader");
+        };
+
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.close();
+                socketRef.current = null;
+            }
+        };
+    }, [user]);
+
     const handleDepartmentChange = useCallback(async (departmentId: string) => {
         setSelectedDepartmentId(departmentId);
         if (!departmentId) {
