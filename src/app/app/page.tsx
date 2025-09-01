@@ -96,18 +96,15 @@ export default function AppUIPage() {
       fetchCommunicationData(activeTab, 1, limit);
   };
   
-  useEffect(() => {
-    const handleRefresh = () => {
-        console.log('Refresh event received, fetching new communication data...');
-        fetchCommunicationData(activeTab, pagination[activeTab].currentPage, pagination[activeTab].limit);
-    };
-
-    events.on('refreshCalls', handleRefresh);
-
-    return () => {
-        events.off('refreshCalls', handleRefresh);
-    };
+  const handleRefresh = useCallback(() => {
+    console.log('Refresh event received, fetching new communication data...');
+    fetchCommunicationData(activeTab, pagination[activeTab].currentPage, pagination[activeTab].limit);
   }, [fetchCommunicationData, activeTab, pagination]);
+
+  useEffect(() => {
+    events.on('refreshCalls', handleRefresh);
+    return () => events.off('refreshCalls', handleRefresh);
+  }, [handleRefresh]);
 
   const handleMakeCall = async (number: string) => {
      if (!device) {
