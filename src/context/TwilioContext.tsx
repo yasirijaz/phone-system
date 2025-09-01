@@ -65,8 +65,16 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    socketRef.current = null;
-    if (user && !socketRef.current) {
+      if (!user) {
+        // Close if user logs out
+        if (socketRef.current) {
+          socketRef.current.close();
+          socketRef.current = null;
+        }
+        return;
+      }
+      if (socketRef.current) return;
+
       const WS_URL = `wss://socket.windshieldhub.com?user_id=${user.id}`;
       const newSocket = new WebSocket(WS_URL);
 
@@ -101,11 +109,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         newSocket.onclose = () => {
           
         };
-      
-    } else if (!user && socketRef.current) {
-        socketRef.current.close();
-        socketRef.current = null;
-    }
+
+        return () => {
+          if (socketRef.current) {
+            socketRef.current.close();
+            socketRef.current = null;
+          }
+        };
   }, [user, refreshCallListing]);
 
   useEffect(() => {

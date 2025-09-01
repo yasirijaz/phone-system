@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getCommunications } from '@/services/callLogService';
 import AppHeader from '@/components/app-header';
 import PaginationControls from '@/components/pagination-controls';
+import { events } from '@/lib/events';
 
 const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: string, value: string, icon: React.ElementType, trend: string, trendType: 'up' | 'down' }) => (
     <Card>
@@ -178,6 +179,18 @@ export default function EcommerceDashboard() {
       fetchCommunications(1, limit);
   };
 
+
+  const handleRefreshCalls = useCallback(() => {
+    console.log("🔄 Refresh event received, reloading communications...");
+    fetchCommunications(pagination.currentPage, pagination.limit);
+  }, [fetchCommunications, pagination.currentPage, pagination.limit, toast]);
+
+  useEffect(() => {
+    events.on("refreshCalls", handleRefreshCalls);
+    return () => {
+      events.off("refreshCalls", handleRefreshCalls);
+    };
+  }, [handleRefreshCalls]);
 
   useEffect(() => {
     if(user?.role_id === 1) {
