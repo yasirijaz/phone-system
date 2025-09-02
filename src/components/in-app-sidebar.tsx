@@ -9,30 +9,46 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { getUserDepartments } from '@/services/userService';
+import { getCommunications } from '@/services/callLogService';
 import type { Department } from '@/types';
 import { Badge } from './ui/badge';
+
+interface DepartmentWithUnread extends Department {
+    unread_count: number;
+}
 
 export function InAppSidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departments, setDepartments] = useState<DepartmentWithUnread[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
-        const fetchDepartments = async () => {
+        const fetchDepartmentsAndCounts = async () => {
             try {
                 setLoading(true);
                 const userDepts = await getUserDepartments(user.id);
-                setDepartments(Array.isArray(userDepts) ? userDepts : []);
+                const deptsArray = Array.isArray(userDepts) ? userDepts : [];
+
+                const deptsWithCounts = await Promise.all(
+                    deptsArray.map(async (dept) => {
+                        const comms = await getCommunications({ department_id: dept.id, type: 'unread', limit: 1000 });
+                        const unreadCount = comms.results.filter(c => !c.is_read).length;
+                        return { ...dept, unread_count: unreadCount };
+                    })
+                );
+                
+                setDepartments(deptsWithCounts);
+
             } catch (error) {
-                console.error("Failed to fetch user departments", error);
+                console.error("Failed to fetch user departments or unread counts", error);
                 setDepartments([]);
             } finally {
                 setLoading(false);
             }
         };
-        fetchDepartments();
+        fetchDepartmentsAndCounts();
     }
   }, [user]);
 
