@@ -26,6 +26,7 @@ import type { Call } from '@twilio/voice-sdk';
 import { ScrollArea } from "./ui/scroll-area";
 import { useRouter } from "next/navigation";
 import { events } from "@/lib/events";
+import { ToastAction } from "./ui/toast";
 
 interface AppHeaderProps {
     user: User | null;
@@ -113,6 +114,20 @@ export default function AppHeader({
                 console.log("Emitting refreshCalls");
                 events.emit("refreshCalls");
             }
+             if (data.method_type === "show_sms_notification" && data.data) {
+                const { from, to, body } = data.data;
+                const navigateToConversation = () => {
+                    router.push(`/conversations/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
+                };
+
+                toast({
+                    title: `New Message from ${from}`,
+                    description: body,
+                    action: <ToastAction altText="View" onClick={navigateToConversation}>View</ToastAction>,
+                    onClick: navigateToConversation,
+                    className: "cursor-pointer"
+                });
+            }
         } catch (e) {
             console.warn("Non-JSON message:", evt.data);
         }
@@ -134,7 +149,7 @@ export default function AppHeader({
                 socketRef.current = null;
             }
         };
-    }, [user]);
+    }, [user, toast, router]);
 
     const handleDepartmentChange = useCallback(async (departmentId: string) => {
         setSelectedDepartmentId(departmentId);
