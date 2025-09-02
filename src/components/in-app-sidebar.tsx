@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { getUserDepartments } from '@/services/userService';
 import type { Department } from '@/types';
+import { Badge } from './ui/badge';
 
 export function InAppSidebar() {
   const pathname = usePathname();
@@ -102,9 +103,14 @@ export function InAppSidebar() {
                     departments.map((dept) => (
                         <SidebarMenuItem key={dept.id}>
                             <SidebarMenuButton asChild isActive={pathname === `/departments/${dept.id}`}>
-                                <Link href={`/departments/${dept.id}`}>
-                                    <Building className="h-4 w-4" />
-                                    <span>{dept.name}</span>
+                                <Link href={`/departments/${dept.id}`} className="flex justify-between items-center w-full">
+                                    <div className="flex items-center gap-2">
+                                        <Building className="h-4 w-4" />
+                                        <span>{dept.name}</span>
+                                    </div>
+                                    {dept.unread_count > 0 && (
+                                        <Badge className="h-5">{dept.unread_count}</Badge>
+                                    )}
                                 </Link>
                             </SidebarMenuButton>
                         </SidebarMenuItem>

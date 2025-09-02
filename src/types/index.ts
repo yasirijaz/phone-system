@@ -96,6 +96,7 @@ export interface Department {
   workflow_sid?: string;
   created_at?: string;
   updated_at?: string;
+  unread_count: number;
 }
 
 export interface PhoneNumber {
