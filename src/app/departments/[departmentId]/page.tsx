@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import PaginationControls from "@/components/pagination-controls";
-
+import { events } from '@/lib/events';
 
 type TabName = 'all' | 'unread' | 'calls' | 'messages' | 'operators' | 'missed' | 'voicemails' | 'recordings';
 
@@ -143,6 +143,15 @@ export default function DepartmentDetailPage() {
   const handleLimitChange = (limit: number) => {
       fetchCommunicationData(activeTab, 1, limit);
   };
+
+  const handleRefresh = useCallback(() => {
+    fetchCommunicationData(activeTab, pagination[activeTab].currentPage, pagination[activeTab].limit);
+  }, [fetchCommunicationData, activeTab, pagination]);
+
+  useEffect(() => {
+    events.on('refreshCalls', handleRefresh);
+    return () => events.off('refreshCalls', handleRefresh);
+  }, [handleRefresh]);
 
   const handleMakeCall = async (number: string) => {
      if (!device) {
