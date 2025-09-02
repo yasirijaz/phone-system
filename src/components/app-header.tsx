@@ -82,6 +82,14 @@ export default function AppHeader({
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchValue, setSearchValue] = useState("");
     const socketRef = useRef<WebSocket | null>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    
+    useEffect(() => {
+        // Initialize the audio element once.
+        if (typeof window !== 'undefined' && !audioRef.current) {
+            audioRef.current = new Audio('/sounds/reservation.mp3');
+        }
+    }, []);
     
     useEffect(() => {
         connectTwilio();
@@ -115,6 +123,9 @@ export default function AppHeader({
                 events.emit("refreshCalls");
             }
              if (data.method_type === "show_sms_notification" && data.data) {
+                if (audioRef.current) {
+                    audioRef.current.play().catch(e => console.error("Error playing notification sound:", e));
+                }
                 const { from, to, body } = data.data;
                 const navigateToConversation = () => {
                     router.push(`/conversations/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
