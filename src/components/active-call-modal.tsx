@@ -15,7 +15,7 @@ import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
-import { allParticipant, removeParticipant, addParticipant, holdParticipant, recordConference } from '@/services/twilioService';
+import { allParticipant, removeParticipant, addParticipant, holdParticipant } from '@/services/twilioService';
 import { getDepartmentSettings } from '@/services/departmentSettingsService';
 import { getCompanySettings } from '@/services/companySettingsService';
 import { getCallLogsBySid } from '@/services/callLogService';
@@ -193,20 +193,6 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     }
   };
 
-  const toggleRecord = async () => {
-    if (!conferenceSid) return;
-    const newRecordingState = !isRecording;
-    const action = newRecordingState ? 'start' : 'stop';
-    try {
-        await recordConference(conferenceSid, action);
-        setIsRecording(newRecordingState);
-        toast({ title: `Recording ${action === 'start' ? 'started' : 'stopped'}` });
-    } catch (err) {
-        toast({ title: "Error", description: `Failed to ${action} recording.`, variant: 'destructive' });
-    }
-  };
-
-
   const handleAddParticipant = async () => {
     if (!selectedParticipant && !dialerNumber) {
       toast({ title: "Error", description: "Please select a user or enter a number.", variant: 'destructive' });
@@ -300,12 +286,6 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                 <ActionButton icon={isMuted ? MicOff : Mic} label="Mute" onClick={toggleMute} isActive={isMuted} />
                 <ActionButton icon={isOnHold ? Play : Pause} label="Hold" onClick={toggleHold} isActive={isOnHold} />
                 <ActionButton icon={PhoneForwarded} label="Transfer" />
-                <div className="relative">
-                    {isAdmin && <span className="absolute -top-2 right-1/2 translate-x-1/2 text-white bg-red-500 text-[10px] px-2 py-0.5 rounded-full">Admin</span>}
-                    {companySettings?.call_settings?.record_calls && (
-                      <ActionButton icon={isRecording ? Disc : Circle} label={isRecording ? "Recording" : "Record"} onClick={toggleRecord} isActive={isRecording} />
-                    )}
-                </div>
                 <Dialog open={isKeypadModalOpen} onOpenChange={setIsKeypadModalOpen}>
                     <DialogTrigger asChild>
                          <ActionButton icon={Grip} label="Keypad" />
