@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, Users, Trash2, Delete, Disc } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Users, Trash2, Delete } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
 import type { User, Contact, DepartmentSettings, CompanySettings } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -15,7 +15,7 @@ import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
-import { allParticipant, removeParticipant, addParticipant, holdParticipant, recordConference } from '@/services/twilioService';
+import { allParticipant, removeParticipant, addParticipant, holdParticipant } from '@/services/twilioService';
 import { getDepartmentSettings } from '@/services/departmentSettingsService';
 import { getCompanySettings } from '@/services/companySettingsService';
 import { getCallLogsBySid } from '@/services/callLogService';
@@ -194,19 +194,6 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     }
   };
 
-  const toggleRecord = async () => {
-    if (!conferenceSid) return;
-    const newRecordingState = !isRecording;
-    const action = newRecordingState ? 'start' : 'stop';
-    try {
-        await recordConference(conferenceSid, action);
-        setIsRecording(newRecordingState);
-        toast({ title: `Recording ${newRecordingState ? 'Started' : 'Stopped'}` });
-    } catch (error) {
-        toast({ title: "Error", description: `Failed to ${action} recording.`, variant: 'destructive' });
-    }
-  };
-
   const handleAddParticipant = async () => {
     if (!selectedParticipant && !dialerNumber) {
       toast({ title: "Error", description: "Please select a user or enter a number.", variant: 'destructive' });
@@ -332,7 +319,6 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                         </div>
                     </DialogContent>
                 </Dialog>
-                <ActionButton icon={Disc} label="Record" onClick={toggleRecord} isActive={isRecording} />
                 <Dialog open={isAddParticipantModalOpen} onOpenChange={(open) => { setIsAddParticipantModalOpen(open); if (!open) setIsTransferring(false); }}>
                     <DialogTrigger asChild>
                          <ActionButton icon={UserPlus} label="Add" />
