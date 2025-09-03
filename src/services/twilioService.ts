@@ -51,3 +51,20 @@ export const sendSms = async (from: string, to: string, body: string): Promise<a
     });
     return response.data;
 };
+
+export const holdParticipant = async (conferenceSid: string, callSid: string, hold: boolean): Promise<any> => {
+    const response = await axios.post('/api/twilio/hold', {
+        conference_sid: conferenceSid,
+        call_sid: callSid,
+        hold: hold,
+    });
+    return response.data;
+};
+
+export const recordConference = async (conferenceSid: string, action: 'start' | 'stop'): Promise<any> => {
+    const response = await axios.post('/api/twilio/record', {
+        conference_sid: conferenceSid,
+        action: action,
+    });
+    return response.data;
+};

@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, Users, Trash2, Delete } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, Users, Trash2, Delete, Disc } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
 import type { User, Contact, DepartmentSettings, CompanySettings } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -15,7 +15,7 @@ import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
-import { allParticipant, removeParticipant, addParticipant } from '@/services/twilioService';
+import { allParticipant, removeParticipant, addParticipant, holdParticipant, recordConference } from '@/services/twilioService';
 import { getDepartmentSettings } from '@/services/departmentSettingsService';
 import { getCompanySettings } from '@/services/companySettingsService';
 import { getCallLogsBySid } from '@/services/callLogService';
@@ -53,6 +53,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   const [displayName, setDisplayName] = useState(contactName);
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [isAddParticipantModalOpen, setIsAddParticipantModalOpen] = useState(false);
   const [isKeypadModalOpen, setIsKeypadModalOpen] = useState(false);
   const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
@@ -179,11 +180,32 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   };
   
   const toggleHold = async () => {
-    if (!connection) return;
+    if (!connection || !conferenceSid) return;
     const hold = !isOnHold;
-    setIsOnHold(hold);
-    toast({ title: hold ? "Call on Hold" : "Call Resumed"});
+    const callSidToHold = connection.parameters.CallSid;
+    
+    try {
+        await holdParticipant(conferenceSid, callSidToHold, hold);
+        setIsOnHold(hold);
+        toast({ title: hold ? "Call on Hold" : "Call Resumed"});
+    } catch (err) {
+        toast({ title: "Error", description: "Failed to toggle hold status.", variant: 'destructive' });
+    }
   };
+
+  const toggleRecord = async () => {
+    if (!conferenceSid) return;
+    const newRecordingState = !isRecording;
+    const action = newRecordingState ? 'start' : 'stop';
+    try {
+        await recordConference(conferenceSid, action);
+        setIsRecording(newRecordingState);
+        toast({ title: `Recording ${action === 'start' ? 'started' : 'stopped'}` });
+    } catch (err) {
+        toast({ title: "Error", description: `Failed to ${action} recording.`, variant: 'destructive' });
+    }
+  };
+
 
   const handleAddParticipant = async () => {
     if (!selectedParticipant && !dialerNumber) {
@@ -281,7 +303,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                 <div className="relative">
                     {isAdmin && <span className="absolute -top-2 right-1/2 translate-x-1/2 text-white bg-red-500 text-[10px] px-2 py-0.5 rounded-full">Admin</span>}
                     {companySettings?.call_settings?.record_calls && (
-                      <ActionButton icon={Circle} label="Record" />
+                      <ActionButton icon={isRecording ? Disc : Circle} label={isRecording ? "Recording" : "Record"} onClick={toggleRecord} isActive={isRecording} />
                     )}
                 </div>
                 <Dialog open={isKeypadModalOpen} onOpenChange={setIsKeypadModalOpen}>
@@ -405,6 +427,3 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     </div>
   );
 }
-
-
-      
