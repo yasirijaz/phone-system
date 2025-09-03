@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, Users, Trash2, Delete, Disc } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, Users, Trash2, Delete, Disc, Record } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
 import type { User, Contact, DepartmentSettings, CompanySettings } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -15,7 +15,7 @@ import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
-import { allParticipant, removeParticipant, addParticipant, holdParticipant } from '@/services/twilioService';
+import { allParticipant, removeParticipant, addParticipant, holdParticipant, recordConference } from '@/services/twilioService';
 import { getDepartmentSettings } from '@/services/departmentSettingsService';
 import { getCompanySettings } from '@/services/companySettingsService';
 import { getCallLogsBySid } from '@/services/callLogService';
@@ -61,6 +61,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   const [dialerNumber, setDialerNumber] = useState('');
   const [departmentSettings, setDepartmentSettings] = useState<DepartmentSettings | null>(null);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
+  const [isTransferring, setIsTransferring] = useState(false);
   
   const dialpadKeys = [
     '1', '2', '3',
@@ -193,6 +194,19 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     }
   };
 
+  const toggleRecord = async () => {
+    if (!conferenceSid) return;
+    const newRecordingState = !isRecording;
+    const action = newRecordingState ? 'start' : 'stop';
+    try {
+        await recordConference(conferenceSid, action);
+        setIsRecording(newRecordingState);
+        toast({ title: `Recording ${newRecordingState ? 'Started' : 'Stopped'}` });
+    } catch (error) {
+        toast({ title: "Error", description: `Failed to ${action} recording.`, variant: 'destructive' });
+    }
+  };
+
   const handleAddParticipant = async () => {
     if (!selectedParticipant && !dialerNumber) {
       toast({ title: "Error", description: "Please select a user or enter a number.", variant: 'destructive' });
@@ -217,9 +231,18 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
         const userId = selectedParticipant || undefined;
         await addParticipant(conferenceSid, twilioNumber, userId, phoneNumber);
         toast({ title: "Success", description: "Participant added to the conference." });
+
+        if (isTransferring) {
+            const myCallSid = connection.parameters.CallSid;
+            await removeParticipant(conferenceSid, myCallSid);
+            toast({ title: "Transfer complete", description: "You have been removed from the call." });
+            onHangUp(); // This should close the active call bar
+        }
+
         setIsAddParticipantModalOpen(false);
         setDialerNumber('');
         setSelectedParticipant('');
+        setIsTransferring(false);
     } catch (err) {
        toast({ title: "Error", description: "Failed to add participant.", variant: 'destructive' });
     } finally {
@@ -236,6 +259,11 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     } catch (error) {
       toast({ title: "Error", description: "Failed to remove participant.", variant: 'destructive' });
     }
+  };
+
+  const handleTransferClick = () => {
+    setIsTransferring(true);
+    setIsAddParticipantModalOpen(true);
   };
 
 
@@ -285,7 +313,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
             <div className="flex items-center gap-4">
                 <ActionButton icon={isMuted ? MicOff : Mic} label="Mute" onClick={toggleMute} isActive={isMuted} />
                 <ActionButton icon={isOnHold ? Play : Pause} label="Hold" onClick={toggleHold} isActive={isOnHold} />
-                <ActionButton icon={PhoneForwarded} label="Transfer" />
+                <ActionButton icon={PhoneForwarded} label="Transfer" onClick={handleTransferClick} />
                 <Dialog open={isKeypadModalOpen} onOpenChange={setIsKeypadModalOpen}>
                     <DialogTrigger asChild>
                          <ActionButton icon={Grip} label="Keypad" />
@@ -304,7 +332,8 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                         </div>
                     </DialogContent>
                 </Dialog>
-                <Dialog open={isAddParticipantModalOpen} onOpenChange={setIsAddParticipantModalOpen}>
+                <ActionButton icon={Record} label="Record" onClick={toggleRecord} isActive={isRecording} />
+                <Dialog open={isAddParticipantModalOpen} onOpenChange={(open) => { setIsAddParticipantModalOpen(open); if (!open) setIsTransferring(false); }}>
                     <DialogTrigger asChild>
                          <ActionButton icon={UserPlus} label="Add" />
                     </DialogTrigger>
@@ -407,3 +436,5 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     </div>
   );
 }
+
+    
