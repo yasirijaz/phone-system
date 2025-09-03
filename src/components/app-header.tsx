@@ -87,7 +87,7 @@ export default function AppHeader({
     useEffect(() => {
         // Initialize the audio element once.
         if (typeof window !== 'undefined' && !audioRef.current) {
-            audioRef.current = new Audio('/sounds/reservation.mp3');
+            audioRef.current = new Audio('/sounds/message.mp3');
         }
     }, []);
     
