@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, Users, Trash2, Delete, Disc, Record } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Circle, Users, Trash2, Delete, Disc } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
 import type { User, Contact, DepartmentSettings, CompanySettings } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -332,7 +332,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                         </div>
                     </DialogContent>
                 </Dialog>
-                <ActionButton icon={Record} label="Record" onClick={toggleRecord} isActive={isRecording} />
+                <ActionButton icon={Disc} label="Record" onClick={toggleRecord} isActive={isRecording} />
                 <Dialog open={isAddParticipantModalOpen} onOpenChange={(open) => { setIsAddParticipantModalOpen(open); if (!open) setIsTransferring(false); }}>
                     <DialogTrigger asChild>
                          <ActionButton icon={UserPlus} label="Add" />
@@ -436,5 +436,3 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     </div>
   );
 }
-
-    
