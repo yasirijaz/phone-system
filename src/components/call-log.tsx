@@ -159,7 +159,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Co
                               <Ear className="mr-2 h-4 w-4" />
                               Silently Listen
                           </Button>
-                          <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true, coach: false })}>
+                          <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: false, coach: true })}>
                               <Mic className="mr-2 h-4 w-4" />
                               Barge In
                           </Button>
