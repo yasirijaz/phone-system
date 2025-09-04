@@ -146,7 +146,7 @@ export default function AppHeader({
 
         newSocket.onerror = () => {
         try {
-            newSocket.close();
+            // newSocket.close();
         } catch {}
         };
 
