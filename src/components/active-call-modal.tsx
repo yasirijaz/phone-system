@@ -205,7 +205,9 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
         return;
     }
 
-    const twilioNumber = connection.direction === 'INCOMING' ? connection.parameters.From : connection.parameters.To;
+    const savedFromNumber = localStorage.getItem("twilioFromNumber");
+
+    const twilioNumber = connection.direction === 'INCOMING' ? connection.parameters.To : savedFromNumber;
 
     if (!twilioNumber) {
       toast({ title: "Error", description: "Could not determine a valid Twilio number for this call.", variant: 'destructive' });
@@ -220,10 +222,17 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
         toast({ title: "Success", description: "Participant added to the conference." });
 
         if (isTransferring) {
+          setTimeout(async () => {
             const myCallSid = connection.parameters.CallSid;
             await removeParticipant(conferenceSid, myCallSid);
-            toast({ title: "Transfer complete", description: "You have been removed from the call." });
-            onHangUp(); // This should close the active call bar
+            toast({
+              title: "Transfer complete",
+              description: "You have been removed from the call."
+            });
+
+            onHangUp();
+            
+          }, 60 * 1000); // 1 minute = 60,000 ms
         }
 
         setIsAddParticipantModalOpen(false);

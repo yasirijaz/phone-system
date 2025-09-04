@@ -236,6 +236,7 @@ export default function AppHeader({
                 params.From = fromNumber;
                 params.direction = "outbound";
                 setFromNumber(fromNumber);
+                localStorage.setItem("twilioFromNumber", fromNumber);
             }
             const connection = await device.connect({ params });
             setDialerOpen(false);

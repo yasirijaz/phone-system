@@ -52,6 +52,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Co
   const handleJoinCall = async (e: React.MouseEvent, options: { silent?: boolean, coach?: boolean }) => {
     e.stopPropagation();
     e.preventDefault();
+ 
     if (!user || !comm.conference_sid) {
       toast({ title: "Error", description: "Cannot join call. Required information is missing.", variant: "destructive" });
       return;
