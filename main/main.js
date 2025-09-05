@@ -23,9 +23,7 @@ const createWindow = () => {
   });
 
   if (app.isPackaged) {
-    appServe(win).then(() => {  
-      win.loadURL("https://phone.windshieldhub.com");
-    });
+    win.loadURL("https://phone.windshieldhub.com");
   } else {
     win.loadURL("https://phone.windshieldhub.com");
     win.webContents.openDevTools();
