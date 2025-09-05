@@ -85,6 +85,10 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
           }
 
           if (currentCallSid) {
+            if (matchingCall?.conference_sid) {
+                setConferenceSid(matchingCall.conference_sid);
+            }
+
             if (matchingCall?.department_id) {
               const deptSettings = await getDepartmentSettings(matchingCall.department_id);
               setDepartmentSettings(deptSettings);
