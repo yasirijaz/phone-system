@@ -109,6 +109,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       const handleIncomingCall = (conn: Call) => {
         console.log('Incoming call received:', conn);
         
+        const incomingConferenceSid = conn.customParameters.get('conferenceSid');
+        if (incomingConferenceSid) {
+          console.log('Found conferenceSid in incoming call parameters:', incomingConferenceSid);
+          setConferenceSid(incomingConferenceSid);
+        }
+
         setConnection(conn);
         const autoAccept = conn.customParameters.get('autoAccept');
         if(autoAccept && autoAccept === '0') {
@@ -120,7 +126,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         conn.on('disconnect', () => {
           console.log('Call disconnected.');
           setConnection(null);
-          setConferenceSid(null);
+          //setConferenceSid(null);
           setFromNumber(null);
         });
 
@@ -142,7 +148,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       newDevice.on('disconnect', () => {
         console.log('Call disconnected (device event).');
         setConnection(null);
-        setConferenceSid(null);
+        //setConferenceSid(null);
         setFromNumber(null);
       });
 

@@ -42,7 +42,7 @@ const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { ico
 
 export default function ActiveCallBar({ isOpen, contactName, onHangUp, connection, conferenceSid }: ActiveCallBarProps) {
   const { user: authUser } = useAuth();
-  const { fromNumber } = useTwilio();
+  const { fromNumber, setConferenceSid } = useTwilio();
   const [duration, setDuration] = useState(0);
   const [selectedParticipant, setSelectedParticipant] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -218,8 +218,12 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     try {
         const phoneNumber = dialerNumber ? `+1${dialerNumber.replace(/\D/g, '')}` : undefined;
         const userId = selectedParticipant || undefined;
-        await addParticipant(conferenceSid, twilioNumber, userId, phoneNumber);
-        toast({ title: "Success", description: "Participant added to the conference." });
+        
+        const response = await addParticipant(conferenceSid, twilioNumber, userId, phoneNumber);
+
+        if (response?.data?.conference_sid) {
+          setConferenceSid(response.data.conference_sid);
+        }
 
         if (isTransferring) {
           setTimeout(async () => {
