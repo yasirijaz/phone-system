@@ -7,6 +7,39 @@
   "license": "MIT",
   "description": "A Next.js and Electron application",
   "type": "module",
+  "build": {
+    "appId": "com.example.callsync",
+    "productName": "CallSync",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main/**/*",
+      "build/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "publish": [
+      {
+        "provider": "s3",
+        "bucket": "YOUR_BUCKET_NAME",
+        "region": "YOUR_AWS_REGION"
+      }
+    ],
+    "publishPolicy": "always",
+    "win": {
+      "target": ["nsis"],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "artifactName": "${productName}-${version}-mac.${ext}"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "artifactName": "${productName}-${version}.${ext}"
+    }
+  },
   "scripts": {
     "build:electron": "set ELECTRON_BUILD=true next build",
     "electron": "electron .",
@@ -22,6 +55,7 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
+    "electron-updater": "^6.3.9",
     "@genkit-ai/googleai": "^1.13.0",
     "@genkit-ai/next": "^1.13.0",
     "@hookform/resolvers": "^4.1.3",
