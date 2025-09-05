@@ -1,6 +1,13 @@
-const { app, BrowserWindow } = require('electron');
-const serve = 'electron-serve';
-const path = require('path');
+import { app, BrowserWindow } from 'electron';
+
+// const serve = 'electron-serve';
+import serve from 'electron-serve';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// __dirname is not defined in ES modules; recreate it
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const appServe = app.isPackaged ? serve({
   directory: path.join(__dirname, "../out")
@@ -17,10 +24,10 @@ const createWindow = () => {
 
   if (app.isPackaged) {
     appServe(win).then(() => {  
-      win.loadURL("app://-");
+      win.loadURL("https://phone.windshieldhub.com");
     });
   } else {
-    win.loadURL("http://localhost:3000");
+    win.loadURL("https://phone.windshieldhub.com");
     win.webContents.openDevTools();
     win.webContents.on("did-fail-load", (e, code, desc) => {
       win.webContents.reloadIgnoringCache();
