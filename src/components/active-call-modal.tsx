@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Users, Trash2, Delete } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Users, Trash2, Delete, Disc } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
 import type { User, Contact, DepartmentSettings, CompanySettings } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -53,7 +53,6 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   const [displayName, setDisplayName] = useState(contactName);
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [isAddParticipantModalOpen, setIsAddParticipantModalOpen] = useState(false);
   const [isKeypadModalOpen, setIsKeypadModalOpen] = useState(false);
   const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
@@ -223,7 +222,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
         const phoneNumber = dialerNumber ? `+1${dialerNumber.replace(/\D/g, '')}` : undefined;
         const userId = selectedParticipant || undefined;
         
-        const response = await addParticipant(conferenceSid, twilioNumber, userId, phoneNumber);
+        const response = await addParticipant(conferenceSid, twilioNumber, userId, phoneNumber, { conferenceSid: conferenceSid });
 
         if (response?.data?.conference_sid) {
           setConferenceSid(response.data.conference_sid);
@@ -310,7 +309,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                 </Avatar>
                 <div>
                     <p className="font-semibold text-lg truncate max-w-[200px]">{displayName}</p>
-                    <p className="text-sm text-muted-foreground">{contactName} &bull; {formatTime(duration)}</p>
+                    <p className="text-sm text-muted-foreground truncate max-w-[200px]">{contactName} &bull; {formatTime(duration)}</p>
                 </div>
             </div>
 
