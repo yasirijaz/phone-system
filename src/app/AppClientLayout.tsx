@@ -23,8 +23,9 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   const { user } = useAuth();
 
   const isIncomingCall = connection && (connection.status() === 'pending' || connection.status() === 'ringing');
-  const isActiveCall = connection && connection.status() === 'open';
-
+  // An active call is one that is 'open' or one associated with an accepted reservation that is now in progress.
+  const isActiveCall = connection && (connection.status() === 'open' || (incomingReservation && connection.parameters.CallSid === incomingReservation.sid));
+  
   const callerName = connection?.parameters?.FriendlyName || "Unknown Caller";
   const callerNumber = connection?.parameters?.From || "";
   

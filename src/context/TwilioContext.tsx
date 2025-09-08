@@ -261,8 +261,29 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   };
 
   const acceptReservation = (reservation: Reservation) => {
-     audio.pause();
+    audio.pause();
     console.log('accepting reservation', reservation);
+
+    // Simulate an active call immediately for UI purposes
+    const fakeCall = {
+        parameters: {
+            CallSid: reservation.sid,
+            From: reservation.task.attributes.from,
+            To: reservation.task.attributes.to,
+            FriendlyName: reservation.task.attributes.callerName || 'Conference Call'
+        },
+        status: () => 'open' as const, // Simulate an open call
+        disconnect: () => rejectReservation(reservation),
+        on: () => {}, // Mock event listeners
+        removeListener: () => {},
+        isMuted: () => false,
+        mute: () => {}
+    } as unknown as Call;
+
+    setConnection(fakeCall);
+    setShowReservationModal(false);
+    setIncomingReservation(null);
+
     const attributes = reservation.task?.attributes;
     if (attributes.do_nothing) {
       console.log('Reservation is set to do nothing.');
@@ -277,6 +298,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           to: attributes.to,
         }
       )
+      return;
     }
     const conferenceCallback = process.env.NEXT_PUBLIC_API_URL + '/api/twilio/conference-callback';
     const recordingCallback = process.env.NEXT_PUBLIC_API_URL + '/api/twilio/recording-callback';
@@ -289,7 +311,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       statusCallback: conferenceCallback,
       statusCallbackMethod: 'POST',
       statusCallbackEvent: 'start,end,join,leave',
-      conferenceRecord: 'record-from-start',
       endConferenceOnExit: true,
       startConferenceOnEnter: true,
       transcribe: false,
