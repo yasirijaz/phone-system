@@ -1,12 +1,27 @@
 {
   "name": "CallSync",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "main": "main/main.js",
   "author": "Yasir",
   "license": "MIT",
-  "description": "A Next.js and Electron application",
+  "description": "A phone sytem for everyday use",
   "type": "module",
+  
+  "scripts": {
+    "build:electron": "set ELECTRON_BUILD=true next build",
+    "electron": "electron .",
+    "electron-dev": "NODE_ENV=development electron .",
+    "dist": "node -r dotenv/config ./node_modules/electron-builder/out/cli/cli.js --publish always",
+    "dev": "next dev --turbopack",
+    "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
+    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "patch-package"
+  },
   "build": {
     "appId": "com.example.callsync",
     "productName": "CallSync",
@@ -23,10 +38,11 @@
       {
         "provider": "s3",
         "bucket": "wsh-pub-upload",
-        "region": "us-west-2"
+        "region": "us-west-2",
+        "path": "/${productName}/${version}/",
+        "acl": null
       }
     ],
-    "publishPolicy": "always",
     "win": {
       "target": ["nsis"],
       "artifactName": "${productName}-Setup-${version}.${ext}"
@@ -39,20 +55,6 @@
       "target": ["AppImage"],
       "artifactName": "${productName}-${version}.${ext}"
     }
-  },
-  "scripts": {
-    "build:electron": "set ELECTRON_BUILD=true next build",
-    "electron": "electron .",
-    "electron-dev": "NODE_ENV=development electron .",
-    "dist": "npm run build:electron && electron-builder",
-    "dev": "next dev --turbopack",
-    "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "postinstall": "patch-package"
   },
   "dependencies": {
     "electron-updater": "^6.3.9",
