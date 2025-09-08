@@ -5,6 +5,7 @@ import serve from 'electron-serve';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import dotenv from 'dotenv';
 
 // __dirname is not defined in ES modules; recreate it
 const __filename = fileURLToPath(import.meta.url);
@@ -14,28 +15,57 @@ const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const { autoUpdater } = require('electron-updater');
 
+// Load environment variables early (supports dev via root .env)
+// Try project root .env relative to this file; fall back to default resolution
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
+dotenv.config();
+
 // Simple logger wrapper (avoid extra deps)
 const log = {
   info: (...args) => console.log('[auto-updater]', ...args),
   error: (...args) => console.error('[auto-updater]', ...args),
 };
-
+ const s3Bucket = process.env.UPDATE_S3_BUCKET;
+ console.log('asdasdasd',s3Bucket);
 function setupAutoUpdater() {
   if (!app.isPackaged) {
     log.info('Skipping auto-update in development');
     return;
   }
 
-  // Optional: allow setting a custom feed at runtime (e.g., S3 static host URL)
-  // Example: UPDATE_FEED_URL=https://my-bucket.s3.amazonaws.com/updates/latest
-  const customFeed = process.env.UPDATE_FEED_URL;
-  if (customFeed) {
+  // Prefer S3 public bucket if provided via env
+  // Required: UPDATE_S3_BUCKET; Optional: UPDATE_S3_REGION, UPDATE_S3_ENDPOINT, UPDATE_S3_PREFIX, UPDATE_CHANNEL
+  const s3Bucket = process.env.UPDATE_S3_BUCKET;
+  const s3Region = process.env.UPDATE_S3_REGION || 'us-east-1';
+  const s3Endpoint = process.env.UPDATE_S3_ENDPOINT || undefined; // e.g. https://s3.amazonaws.com or custom domain
+  const s3Path = process.env.UPDATE_S3_PREFIX || undefined; // optional folder prefix within the bucket
+  const s3Channel = process.env.UPDATE_CHANNEL || 'latest';
+ 
+  if (s3Bucket) {
     try {
-      // Use generic provider that points at an S3/static website URL with release assets
-      autoUpdater.setFeedURL({ provider: 'generic', url: customFeed });
-      log.info('Using custom update feed URL:', customFeed);
+      autoUpdater.setFeedURL({
+        provider: 's3',
+        bucket: s3Bucket,
+        region: s3Region,
+        endpoint: s3Endpoint,
+        path: s3Path,
+        channel: s3Channel,
+      });
+      log.info('Using S3 update feed:', `bucket=${s3Bucket}`, `region=${s3Region}`, s3Path ? `path=${s3Path}` : 'path=<root>', `channel=${s3Channel}`);
     } catch (e) {
-      log.error('Failed setting custom feed URL:', e);
+      log.error('Failed setting S3 feed:', e);
+    }
+  } else {
+    // Fallback: allow a generic static URL (e.g., S3 static website or CDN) via UPDATE_FEED_URL
+    // Example: UPDATE_FEED_URL=https://my-bucket.s3.amazonaws.com/updates
+    const customFeed = process.env.UPDATE_FEED_URL;
+    if (customFeed) {
+      try {
+        autoUpdater.setFeedURL({ provider: 'generic', url: customFeed, channel: s3Channel });
+        log.info('Using custom update feed URL:', customFeed);
+      } catch (e) {
+        log.error('Failed setting custom feed URL:', e);
+      }
     }
   }
 
