@@ -290,7 +290,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       statusCallbackMethod: 'POST',
       statusCallbackEvent: 'start,end,join,leave',
       conferenceRecord: 'record-from-start',
-      endConferenceOnExit: false,
+      endConferenceOnExit: true,
       startConferenceOnEnter: true,
       transcribe: false,
       recordingStatusCallback: recordingCallback,
