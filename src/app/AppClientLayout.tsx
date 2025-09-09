@@ -6,6 +6,7 @@ import IncomingCallModal from '@/components/incoming-call-modal';
 import ActiveCallBar from '@/components/active-call-modal';
 import { useAuth } from '@/context/AuthContext';
 import ReservationModal from '@/components/reservation-modal';
+import { useEffect } from 'react';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const {
@@ -21,6 +22,13 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   } = useTwilio();
 
   const { user } = useAuth();
+   useEffect(() => {
+    window.api.receive('log:info', recieveFromMain);
+  }, []);
+
+  const recieveFromMain = async (data:any) => {
+    console.log('Received data from Main:', data)
+  }
 
   const isIncomingCall = connection && (connection.status() === 'pending' || connection.status() === 'ringing');
   // An active call is one that is 'open' or one associated with an accepted reservation that is now in progress.
