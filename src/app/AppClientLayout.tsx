@@ -24,8 +24,13 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
 
   const { user } = useAuth();
    useEffect(() => {
-    window.api.receive('log', recieveFromMain);
+    if(window.api)
+      window.api.receive('log', recieveFromMain);
   }, []);
+
+
+  
+
 
   const recieveFromMain = async (data:any) => {
     console.log('Received data from Main:', data)
