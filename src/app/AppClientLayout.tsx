@@ -7,6 +7,7 @@ import ActiveCallBar from '@/components/active-call-modal';
 import { useAuth } from '@/context/AuthContext';
 import ReservationModal from '@/components/reservation-modal';
 import { useEffect } from 'react';
+import { toast } from '@/hooks/use-toast';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const {
@@ -23,11 +24,15 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
 
   const { user } = useAuth();
    useEffect(() => {
-    window.api.receive('log:info', recieveFromMain);
+    window.api.receive('log', recieveFromMain);
   }, []);
 
   const recieveFromMain = async (data:any) => {
     console.log('Received data from Main:', data)
+    toast({
+      title: "Notification from Main",
+      description: JSON.stringify(data),
+    });
   }
 
   const isIncomingCall = connection && (connection.status() === 'pending' || connection.status() === 'ringing');
