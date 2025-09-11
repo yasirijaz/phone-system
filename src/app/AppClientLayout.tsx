@@ -8,6 +8,8 @@ import { useAuth } from '@/context/AuthContext';
 import ReservationModal from '@/components/reservation-modal';
 import { useEffect, useState } from 'react';
 import { toast } from '@/hooks/use-toast';
+import UpdateProgress from '@/components/update-progress';
+import ReconnectPrompt from '@/components/reconnect-prompt';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const {
@@ -19,29 +21,25 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     incomingReservation,
     showReservationModal,
     acceptReservation,
-    rejectReservation
+    rejectReservation,
+    reconnectInfo,
+    reconnectCall,
+    dismissReconnect
   } = useTwilio();
 
   // set update status state
-  const [updateStatus, setUpdateStatus] = useState<any>(null);
+  const [updateMessage, setUpdateMessage] = useState<string>("");
   const { user } = useAuth();
    useEffect(() => {
     if(window.api)
       window.api.receive('updatelog', handleUpdates);
   }, []);
 
+  const handleUpdates = (data:any) => {
+    console.log('Received updates from Main:', data);
+    setUpdateMessage(String(data));
+  };
 
-  
-
-
-  const handleUpdates = async (data:any) => {
-    console.log('Received updates from Main:', data)
-    setUpdateStatus(data);
-    toast({
-      title: "Update",
-      description: JSON.stringify(data),
-    });
-  }
 
   const recieveFromMain = async (data:any) => {
     console.log('Received data from Main:', data)
@@ -62,7 +60,6 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      {updateStatus}
       {children}
       <IncomingCallModal
         isOpen={!!isIncomingCall}
@@ -86,6 +83,8 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         onAccept={acceptReservation}
         onReject={rejectReservation}
       />
+      {reconnectInfo && <ReconnectPrompt onReconnect={reconnectCall} onDismiss={dismissReconnect} />}
+      <UpdateProgress message={updateMessage} />
     </>
   );
 }
