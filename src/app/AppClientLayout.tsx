@@ -6,7 +6,7 @@ import IncomingCallModal from '@/components/incoming-call-modal';
 import ActiveCallBar from '@/components/active-call-modal';
 import { useAuth } from '@/context/AuthContext';
 import ReservationModal from '@/components/reservation-modal';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from '@/hooks/use-toast';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
@@ -22,15 +22,26 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     rejectReservation
   } = useTwilio();
 
+  // set update status state
+  const [updateStatus, setUpdateStatus] = useState<any>(null);
   const { user } = useAuth();
    useEffect(() => {
     if(window.api)
-      window.api.receive('log', recieveFromMain);
+      window.api.receive('updatelog', handleUpdates);
   }, []);
 
 
   
 
+
+  const handleUpdates = async (data:any) => {
+    console.log('Received updates from Main:', data)
+    setUpdateStatus(data);
+    toast({
+      title: "Update",
+      description: JSON.stringify(data),
+    });
+  }
 
   const recieveFromMain = async (data:any) => {
     console.log('Received data from Main:', data)
@@ -51,6 +62,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
 
   return (
     <>
+      {updateStatus}
       {children}
       <IncomingCallModal
         isOpen={!!isIncomingCall}

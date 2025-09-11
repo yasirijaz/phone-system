@@ -1,6 +1,6 @@
 {
   "name": "CallSync",
-  "version": "0.1.4",
+  "version": "0.1.2",
   "private": true,
   "main": "main/main.js",
   "author": "Yasir",
@@ -22,6 +22,11 @@
     "typecheck": "tsc --noEmit",
     "postinstall": "patch-package"
   },
+  "repository": "https://github.com/yasirijaz/phone-system",
+  "publish": {
+    "provider": "github",
+    "releaseType": "release"
+  },
   "build": {
     "appId": "com.example.callsync",
     "productName": "CallSync",
@@ -36,11 +41,10 @@
     "asar": true,
     "publish": [
       {
-        "provider": "s3",
-        "bucket": "wsh-pub-upload",
-        "region": "us-west-2",
-        "path": "/${productName}/${version}/",
-        "acl": null
+        "provider": "github",
+        "owner": "yasirijaz",
+        "repo": "phone-system",
+        "releaseType": "release"
       }
     ],
     "win": {

@@ -21,6 +21,7 @@ let isdev = true;
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 dotenv.config();
 
+
 // Simple logger wrapper (avoid extra deps) and broadcast to renderer
 function sendToRenderer(name,args) {
     console.log('[auto-updater]', args);
@@ -36,60 +37,22 @@ function sendToRenderer(name,args) {
 }
 function setupAutoUpdater() {
   if (!app.isPackaged) {
-    sendToRenderer('log','Skipping auto-update in development');
+    sendToRenderer('updatelog','Skipping auto-update in development');
     return;
   }
 
-  // Prefer S3 public bucket if provided via env
-  // Required: UPDATE_S3_BUCKET; Optional: UPDATE_S3_REGION, UPDATE_S3_ENDPOINT, UPDATE_S3_PREFIX, UPDATE_CHANNEL
-  const s3Bucket = process.env.UPDATE_S3_BUCKET;
-  const s3Region = process.env.UPDATE_S3_REGION || 'us-east-1';
-  const s3Endpoint = process.env.UPDATE_S3_ENDPOINT || undefined; // e.g. https://s3.amazonaws.com or custom domain
-  const s3Path = process.env.UPDATE_S3_PREFIX || undefined; // optional folder prefix within the bucket
-  const s3Channel = process.env.UPDATE_CHANNEL || 'latest';
- 
-  if (s3Bucket) {
-    try {
-      autoUpdater.setFeedURL({
-        provider: 's3',
-        bucket: s3Bucket,
-        region: s3Region,
-        endpoint: s3Endpoint,
-        path: s3Path,
-        channel: s3Channel,
-      });
-      sendToRenderer('log','Using S3 update feed: `bucket=${s3Bucket}` `region=${s3Region}` s3Path ? `path=${s3Path}`');
-    } catch (e) {
-      sendToRenderer('log','Failed setting S3 feed:', e);
-    }
-  } else {
-    // Fallback: allow a generic static URL (e.g., S3 static website or CDN) via UPDATE_FEED_URL
-    // Example: UPDATE_FEED_URL=https://my-bucket.s3.amazonaws.com/updates
-    const customFeed = process.env.UPDATE_FEED_URL;
-    if (customFeed) {
-      try {
-        autoUpdater.setFeedURL({ provider: 'generic', url: customFeed, channel: s3Channel });
-        sendToRenderer('log','Using custom update feed URL:', customFeed);
-      } catch (e) {
-        sendToRenderer('log','Failed setting custom feed URL:', e);
-      }
-    }
-  }
-
-  // Recommended: publish config for S3 is embedded by electron-builder at build time
-  // via package.json > build.publish. When present, no need to setFeedURL at runtime.
 
   // Event hooks for visibility
-  autoUpdater.on('checking-for-update', () => sendToRenderer('log','Checking for updates...'));
-  autoUpdater.on('update-available', (info) => sendToRenderer('log','Update available:', info && info.version));
-  autoUpdater.on('update-not-available', () => sendToRenderer('log','No updates available'));
-  autoUpdater.on('error', (err) => sendToRenderer('log','Updater error:', err));
+  autoUpdater.on('checking-for-update', () => sendToRenderer('updatelog','Checking for updates...'));
+  autoUpdater.on('update-available', (info) => sendToRenderer('updatelog','Update available:'+ info +'&&'+ info.version));
+  autoUpdater.on('update-not-available', () => sendToRenderer('updatelog','No updates available'));
+  autoUpdater.on('error', (err) => sendToRenderer('updatelog','Updater error:'+ err));
   autoUpdater.on('download-progress', (p) => {
     const pct = (p && p.percent != null) ? p.percent.toFixed(1) : 'N/A';
-    sendToRenderer('log',`Download progress: ${pct}%`);
+    sendToRenderer('updatelog',`Download progress: ${pct}%`);
   });
   autoUpdater.on('update-downloaded', () => {
-    sendToRenderer('log','Update downloaded; quitting and installing...');
+    sendToRenderer('updatelog','Update downloaded; quitting and installing...');
     // Install on next tick to avoid blocking the event loop
     setImmediate(() => autoUpdater.quitAndInstall());
   });
@@ -100,7 +63,7 @@ function setupAutoUpdater() {
   autoUpdater.allowPrerelease = Boolean(process.env.APP_ALLOW_PRERELEASE);
 
   // Use notify helper to show native notification (when supported)
-  autoUpdater.checkForUpdatesAndNotify().catch((e) => sendToRenderer('log','checkForUpdates failed:', e));
+  autoUpdater.checkForUpdatesAndNotify().catch((e) => sendToRenderer('updatelog','checkForUpdates failed:'+ e));
 }
 
 const appServe = app.isPackaged ? serve({
@@ -152,7 +115,7 @@ function createAppMenu() {
             try {
               // Trigger a manual update check
               autoUpdater.checkForUpdatesAndNotify();
-              sendToRenderer('log','Checking for updates...');
+              sendToRenderer('updatelog','Checking for updates...');
             } catch (e) {
               dialog.showErrorBox('Update Error', String(e));
             }
