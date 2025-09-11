@@ -22,9 +22,6 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     showReservationModal,
     acceptReservation,
     rejectReservation,
-    reconnectInfo,
-    reconnectCall,
-    dismissReconnect
   } = useTwilio();
 
   // set update status state
@@ -83,7 +80,6 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         onAccept={acceptReservation}
         onReject={rejectReservation}
       />
-      {reconnectInfo && <ReconnectPrompt onReconnect={reconnectCall} onDismiss={dismissReconnect} />}
       <UpdateProgress message={updateMessage} />
     </>
   );
