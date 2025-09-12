@@ -13,10 +13,10 @@ contextBridge.exposeInMainWorld(
   'api', {
     send: (channel, data) => {
       // whitelist channels
-      let validChannels = ['navigate'];
+      let validChannels = ['navigate','check-for-updates'];
       if (validChannels.includes(channel)) {
+        ipcRenderer.send(channel, data);
       }
-      ipcRenderer.send(channel, data);
     },
     receive: (channel, func) => {
       let validChannels = ['request-data-from-renderer','log','updatelog'];

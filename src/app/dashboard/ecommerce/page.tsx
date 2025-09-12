@@ -18,6 +18,7 @@ import { getCommunications } from '@/services/callLogService';
 import AppHeader from '@/components/app-header';
 import PaginationControls from '@/components/pagination-controls';
 import { events } from '@/lib/events';
+import { isElectron } from '@/lib/is-electron';
 
 const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: string, value: string, icon: React.ElementType, trend: string, trendType: 'up' | 'down' }) => (
     <Card>
@@ -131,6 +132,7 @@ const StatisticsChart = ({ calls }: { calls: Partial<Communication>[] }) => {
 export default function EcommerceDashboard() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const inElectron = isElectron();
   const [communications, setCommunications] = useState<Communication[]>([]);
   const [allCommunications, setAllCommunications] = useState<Communication[]>([]);
   const { toast } = useToast();
@@ -193,10 +195,16 @@ export default function EcommerceDashboard() {
   }, [handleRefreshCalls]);
 
   useEffect(() => {
-    if(user?.role_id === 1) {
+    if (user?.role_id === 1) {
       router.replace('/companies');
     }
   }, [user, router]);
+
+  useEffect(() => {
+    if (inElectron) {
+      router.replace('/app');
+    }
+  }, [inElectron, router]);
   
   useEffect(() => {
     const fetchAllCommunications = async () => {
@@ -236,7 +244,7 @@ export default function EcommerceDashboard() {
     };
   }, [allCommunications]);
 
-  if(user?.role_id === 1) {
+  if (user?.role_id === 1 || inElectron) {
     return null; // or a loading spinner, as redirection is happening
   }
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
 
 // const serve = 'electron-serve';
 import serve from 'electron-serve';
@@ -35,6 +35,12 @@ function sendToRenderer(name,args) {
       console.log('hereee')
     }
 }
+
+ipcMain.on('check-for-updates', (event) => {
+  autoUpdater.checkForUpdatesAndNotify();
+  sendToRenderer('updatelog','Checking for updates...');
+});
+
 function setupAutoUpdater() {
   if (!app.isPackaged) {
     sendToRenderer('updatelog','Skipping auto-update in development');

@@ -21,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
+import { isElectron } from '@/lib/is-electron';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 export function AppSidebar() {
@@ -28,6 +29,7 @@ export function AppSidebar() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [isDashboardOpen, setIsDashboardOpen] = useState(pathname.startsWith('/dashboard'));
+  const inElectron = isElectron();
 
   const handleLogout = () => {
     logout();
@@ -67,33 +69,35 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <Collapsible open={isDashboardOpen} onOpenChange={setIsDashboardOpen}>
-                <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                         <SidebarMenuButton tooltip="Dashboard" className="justify-between">
-                            <div className="flex items-center gap-2">
-                                <LayoutGrid />
-                                <span>Dashboard</span>
-                            </div>
-                            <ChevronDown className={`h-4 w-4 transition-transform group-data-[collapsible=icon]:hidden ${isDashboardOpen ? 'rotate-180' : ''}`} />
-                        </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                </SidebarMenuItem>
-                 <CollapsibleContent>
-                    <SidebarMenuSub>
-                       <SidebarMenuItem>
-                            <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/ecommerce'}>
-                               <Link href="/dashboard/ecommerce">eCommerce</Link>
-                            </SidebarMenuSubButton>
-                        </SidebarMenuItem>
+              {!inElectron && (
+                <Collapsible open={isDashboardOpen} onOpenChange={setIsDashboardOpen}>
+                  <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                           <SidebarMenuButton tooltip="Dashboard" className="justify-between">
+                              <div className="flex items-center gap-2">
+                                  <LayoutGrid />
+                                  <span>Dashboard</span>
+                              </div>
+                              <ChevronDown className={`h-4 w-4 transition-transform group-data-[collapsible=icon]:hidden ${isDashboardOpen ? 'rotate-180' : ''}`} />
+                          </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                  </SidebarMenuItem>
+                   <CollapsibleContent>
+                      <SidebarMenuSub>
                          <SidebarMenuItem>
-                            <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/calls'}>
-                               <Link href="/dashboard/calls">Calls</Link>
-                            </SidebarMenuSubButton>
-                        </SidebarMenuItem>
-                    </SidebarMenuSub>
-                 </CollapsibleContent>
-              </Collapsible>
+                              <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/ecommerce'}>
+                                 <Link href="/dashboard/ecommerce">eCommerce</Link>
+                              </SidebarMenuSubButton>
+                          </SidebarMenuItem>
+                           <SidebarMenuItem>
+                              <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/calls'}>
+                                 <Link href="/dashboard/calls">Calls</Link>
+                              </SidebarMenuSubButton>
+                          </SidebarMenuItem>
+                      </SidebarMenuSub>
+                   </CollapsibleContent>
+                </Collapsible>
+              )}
                <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === '/departments'} tooltip="Departments">
                   <Link href="/departments">

@@ -1,6 +1,7 @@
 {
   "name": "callsync",
-  "version": "0.1.4",
+  "productName": "CallSync",
+  "version": "0.1.5",
   "private": true,
   "main": "main/main.js",
   "author": "Yasir",

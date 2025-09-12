@@ -17,6 +17,8 @@ import AppHeader from '@/components/app-header';
 import { getCommunications } from '@/services/callLogService';
 import { useToast } from '@/hooks/use-toast';
 import { subDays, subHours, subMonths, format, startOfHour, startOfDay, startOfMonth } from 'date-fns';
+import { isElectron } from '@/lib/is-electron';
+import { useRouter } from 'next/navigation';
 
 
 const StatCard = ({ title, value, percentage, change, icon: Icon, changeType }: { title: string, value: string, percentage: string, change: string, icon: React.ElementType, changeType: 'up' | 'down' }) => (
@@ -342,6 +344,16 @@ const DemographicCard = () => (
 
 export default function CallsDashboard() {
   const { user, logout } = useAuth();
+  const router = useRouter();
+  const inElectron = isElectron();
+  
+  useEffect(() => {
+    if (inElectron) {
+      router.replace('/app');
+    }
+  }, [inElectron, router]);
+  
+  if (inElectron) return null;
   const [communications, setCommunications] = useState<Communication[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');

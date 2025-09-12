@@ -12,6 +12,7 @@ import { getUserDepartments } from '@/services/userService';
 import { getCommunications } from '@/services/callLogService';
 import type { Department } from '@/types';
 import { Badge } from './ui/badge';
+import { isElectron } from '@/lib/is-electron';
 
 interface DepartmentWithUnread extends Department {
     unread_count: number;
@@ -22,6 +23,7 @@ export function InAppSidebar() {
   const { user } = useAuth();
   const [departments, setDepartments] = useState<DepartmentWithUnread[]>([]);
   const [loading, setLoading] = useState(true);
+  const inElectron = isElectron();
 
   useEffect(() => {
     if (user) {
@@ -66,14 +68,16 @@ export function InAppSidebar() {
       <SidebarContent>
         <SidebarGroup>
             <SidebarMenu>
-                <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard')}>
-                        <Link href="/dashboard/ecommerce">
-                            <LayoutGrid />
-                            <span>Dashboard</span>
-                        </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
+                {!inElectron && (
+                  <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard')}>
+                          <Link href="/dashboard/ecommerce">
+                              <LayoutGrid />
+                              <span>Dashboard</span>
+                          </Link>
+                      </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname === '/app'}>
                         <Link href="/app">

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DownloadCloud, CheckCircle, XCircle } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
 
 interface UpdateProgressProps {
     message: string;
@@ -14,20 +15,29 @@ export default function UpdateProgress({ message }: UpdateProgressProps) {
     const [status, setStatus] = useState<'idle' | 'checking' | 'downloading' | 'downloaded' | 'error' | 'not-available'>('idle');
     const [progress, setProgress] = useState(0);
     const [version, setVersion] = useState<string | null>(null);
+    const { toast } = useToast();
 
     useEffect(() => {
         if (!message) {
             setStatus('idle');
             return;
-        };
+        }
 
         if (message.startsWith('Checking for updates...')) {
             setStatus('checking');
+            toast({
+                title: 'Checking for Updates',
+                description: 'Please wait while we check for the latest version.',
+            });
         } else if (message.startsWith('Update available:')) {
             const versionMatch = message.match(/&&([\d.]+)/);
-            if(versionMatch) {
+            if (versionMatch) {
                 setVersion(versionMatch[1]);
             }
+            toast({
+                title: 'Update Available',
+                description: versionMatch ? `Version v${versionMatch[1]} found. Starting download...` : 'A new version is available. Starting download...',
+            });
         } else if (message.startsWith('Download progress:')) {
             const progressMatch = message.match(/(\d+\.?\d*)/);
             if (progressMatch) {
@@ -36,50 +46,53 @@ export default function UpdateProgress({ message }: UpdateProgressProps) {
             }
         } else if (message.startsWith('Update downloaded;')) {
             setStatus('downloaded');
+            toast({
+                title: 'Update Ready',
+                description: 'The application will restart to install the update shortly.',
+            });
         } else if (message.startsWith('Updater error:')) {
             setStatus('error');
+            const detail = message.replace('Updater error:', '').trim();
+            toast({
+                title: 'Update Error',
+                description: detail || 'Something went wrong. Please try again later.',
+                variant: 'destructive',
+            });
         } else if (message.startsWith('No updates available')) {
             setStatus('not-available');
-             setTimeout(() => setStatus('idle'), 3000);
+            toast({
+                title: 'Up to Date',
+                description: 'You are running the latest version.',
+            });
+            setTimeout(() => setStatus('idle'), 3000);
+        } else if (message.startsWith('Skipping auto-update in development')) {
+            setStatus('idle');
+            toast({
+                title: 'Auto-update Disabled',
+                description: 'Skipping auto-update in development.',
+            });
+        } else if (message.startsWith('checkForUpdates failed:')) {
+            setStatus('error');
+            const detail = message.replace('checkForUpdates failed:', '').trim();
+            toast({
+                title: 'Update Check Failed',
+                description: detail || 'Unable to check for updates.',
+                variant: 'destructive',
+            });
         }
 
-    }, [message]);
+    }, [message, toast]);
 
-    if (status === 'idle') {
-        return null;
-    }
+    // Only show the alert UI while actively downloading; use toasts for all others
+    if (status !== 'downloading') return null;
 
     const renderContent = () => {
         switch (status) {
-            case 'checking':
-                return {
-                    icon: <DownloadCloud className="h-4 w-4" />,
-                    title: 'Checking for Updates',
-                    description: 'Please wait while we check for the latest version.'
-                };
             case 'downloading':
                  return {
                     icon: <DownloadCloud className="h-4 w-4" />,
                     title: `Downloading Update ${version ? `v${version}` : ''}`,
                     description: <Progress value={progress} className="mt-2" />,
-                };
-            case 'downloaded':
-                 return {
-                    icon: <CheckCircle className="h-4 w-4 text-green-500" />,
-                    title: 'Update Ready',
-                    description: 'The application will restart to install the update shortly.',
-                };
-            case 'error':
-                 return {
-                    icon: <XCircle className="h-4 w-4 text-destructive" />,
-                    title: 'Update Error',
-                    description: 'Something went wrong. Please try again later.',
-                };
-            case 'not-available':
-                 return {
-                    icon: <CheckCircle className="h-4 w-4 text-green-500" />,
-                    title: 'Up to Date',
-                    description: 'You are running the latest version.',
                 };
             default:
                 return null;
