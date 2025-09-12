@@ -13,10 +13,10 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuShortcut } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, MessageSquare, Video, Settings, LogOut } from "lucide-react";
+import { Search, Phone, MessageSquare, Video, Settings, LogOut, MoreVertical } from "lucide-react";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
@@ -316,6 +316,14 @@ export default function AppHeader({
         'Unavailable': 'bg-yellow-500',
         'Offline': 'bg-red-500',
     };
+    
+    const handleCheckForUpdates = () => {
+        if(window.electronAPI) {
+            window.electronAPI.send('check-for-updates');
+        } else {
+            toast({ title: "Not available", description: "This feature is only available in the desktop app."});
+        }
+    }
 
 
     return (
@@ -436,6 +444,29 @@ export default function AppHeader({
                             <DropdownMenuItem onClick={logout}>
                                 <LogOut className="mr-2" />
                                 <span>Logout</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                           <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-5 w-5" />
+                           </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                             <DropdownMenuItem>
+                                <span>Version</span>
+                                <DropdownMenuShortcut>0.1.2</DropdownMenuShortcut>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleCheckForUpdates}>
+                                <span>Check for updates</span>
+                            </DropdownMenuItem>
+                             <DropdownMenuSeparator />
+                            <DropdownMenuItem>
+                                <span>Feedback</span>
+                            </DropdownMenuItem>
+                             <DropdownMenuItem>
+                                <span>Help</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
