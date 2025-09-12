@@ -13,10 +13,10 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, MessageSquare, Video, Settings, LogOut } from "lucide-react";
+import { Search, Phone, MessageSquare, Video, Settings, LogOut, Moon } from "lucide-react";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
@@ -27,6 +27,10 @@ import { ScrollArea } from "./ui/scroll-area";
 import { useRouter } from "next/navigation";
 import { events } from "@/lib/events";
 import { ToastAction } from "./ui/toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Label } from "./ui/label";
+import { Switch } from "./ui/switch";
+import { cn } from "@/lib/utils";
 
 interface AppHeaderProps {
     user: User | null;
@@ -60,6 +64,7 @@ export default function AppHeader({
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [loadingDepartments, setLoadingDepartments] = useState(true);
     const [loadingNumbers, setLoadingNumbers] = useState(false);
+    const [isDnd, setIsDnd] = useState(false);
     
     // Internal state for uncontrolled usage
     const [internalDialerOpen, setInternalDialerOpen] = useState(false);
@@ -230,7 +235,7 @@ export default function AppHeader({
         }
     
         try {
-            const params: { To: string, From?: string, direction?: string, autoAccept?: string } = { To: number };
+            const params: { To: string, From?: string, conferenceSid?: string, direction?: string, autoAccept?: string } = { To: number };
             if (fromNumber) {
                 params.autoAccept = "0";
                 params.From = fromNumber;
@@ -307,6 +312,12 @@ export default function AppHeader({
       )
     : [];
 
+    const statusClasses = {
+        'Available': 'bg-green-500',
+        'Unavailable': 'bg-yellow-500',
+        'Offline': 'bg-red-500',
+    };
+
 
     return (
         <>
@@ -347,20 +358,6 @@ export default function AppHeader({
                 </div>
                 <div className="flex items-center gap-4">
                      <TwilioStatusIndicator />
-                     <select
-                        value={activityName || ''}
-                        onChange={(e) => toggleActivity(e.target.value)}
-                        className={`text-xs px-2 py-1 rounded border ${
-                            activityName === 'Available' ? 'bg-green-500 text-white' :
-                            activityName === 'Unavailable' ? 'bg-yellow-500 text-white' :
-                            activityName === 'Offline' ? 'bg-red-500 text-white' :
-                            'bg-gray-200 text-black'
-                        }`}
-                        >
-                        <option value="Available">Available</option>
-                        <option value="Unavailable">Unavailable</option>
-                        <option value="Offline">Offline</option>
-                    </select>
                      <Dialer
                         onMakeCall={handleMakeCall}
                         departments={departments}
@@ -396,16 +393,55 @@ export default function AppHeader({
                                     <AvatarImage src={`https://placehold.co/100x100.png?text=${userInitial}`} alt={user?.name} />
                                     <AvatarFallback>{userInitial}</AvatarFallback>
                                 </Avatar>
+                                 {activityName && (
+                                    <span className={cn("absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-background", statusClasses[activityName as keyof typeof statusClasses] || 'bg-gray-500')} />
+                                )}
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="w-64 p-4">
+                            <div className="flex items-center gap-3 mb-4">
+                                <Avatar className="h-12 w-12">
+                                     <AvatarImage src={`https://placehold.co/100x100.png?text=${userInitial}`} alt={user?.name} />
+                                     <AvatarFallback>{userInitial}</AvatarFallback>
+                                     {activityName && (
+                                        <span className={cn("absolute bottom-0 right-0 block h-3 w-3 rounded-full ring-2 ring-background", statusClasses[activityName as keyof typeof statusClasses] || 'bg-gray-500')} />
+                                    )}
+                                </Avatar>
+                                <div>
+                                    <p className="font-semibold">{user?.name}</p>
+                                    <p className="text-sm text-muted-foreground">{activityName}</p>
+                                </div>
+                            </div>
+
+                             <div className="space-y-2 mb-4">
+                                <Label htmlFor="status-select" className="text-xs text-muted-foreground">Update your status</Label>
+                                 <Select value={activityName || ''} onValueChange={(value) => toggleActivity(value)}>
+                                    <SelectTrigger id="status-select">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Available">Available</SelectItem>
+                                        <SelectItem value="Unavailable">Unavailable</SelectItem>
+                                        <SelectItem value="Offline">Offline</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            
+                            <div className="flex items-center justify-between mb-4">
+                                <Label htmlFor="dnd-switch" className="flex items-center gap-2 text-sm">
+                                    <Moon className="h-4 w-4" />
+                                    Do not disturb
+                                </Label>
+                                <Switch id="dnd-switch" checked={isDnd} onCheckedChange={setIsDnd} />
+                            </div>
+
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem asChild>
                                 <Link href="/profile">
                                     <Settings className="mr-2" />
                                     <span>Profile</span>
                                 </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={logout}>
                                 <LogOut className="mr-2" />
                                 <span>Logout</span>
@@ -441,3 +477,5 @@ export default function AppHeader({
         </>
     );
 }
+
+    
