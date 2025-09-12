@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, MessageSquare, Video, Settings, LogOut, Moon } from "lucide-react";
+import { Search, Phone, MessageSquare, Video, Settings, LogOut } from "lucide-react";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
@@ -64,7 +64,6 @@ export default function AppHeader({
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [loadingDepartments, setLoadingDepartments] = useState(true);
     const [loadingNumbers, setLoadingNumbers] = useState(false);
-    const [isDnd, setIsDnd] = useState(false);
     
     // Internal state for uncontrolled usage
     const [internalDialerOpen, setInternalDialerOpen] = useState(false);
@@ -427,14 +426,6 @@ export default function AppHeader({
                                 </Select>
                             </div>
                             
-                            <div className="flex items-center justify-between mb-4">
-                                <Label htmlFor="dnd-switch" className="flex items-center gap-2 text-sm">
-                                    <Moon className="h-4 w-4" />
-                                    Do not disturb
-                                </Label>
-                                <Switch id="dnd-switch" checked={isDnd} onCheckedChange={setIsDnd} />
-                            </div>
-
                             <DropdownMenuSeparator />
                             <DropdownMenuItem asChild>
                                 <Link href="/profile">
