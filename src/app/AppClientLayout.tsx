@@ -46,9 +46,10 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     });
   }
 
-  const isIncomingCall = connection && (connection.status() === 'pending' || connection.status() === 'ringing');
-  // An active call is one that is 'open' or one associated with an accepted reservation that is now in progress.
-  const isActiveCall = connection && (connection.status() === 'open' || (incomingReservation && connection.parameters.CallSid === incomingReservation.sid));
+  const callStatus = connection?.status ? connection.status() : undefined;
+  const isIncomingCall = !!connection && (callStatus === 'pending' || callStatus === 'ringing');
+  // Consider active when we have a connection and it's not in a ringing/pending/closed state.
+  const isActiveCall = !!connection && !['pending', 'ringing', 'closed'].includes(String(callStatus || ''));
   
   const callerName = connection?.parameters?.FriendlyName || "Unknown Caller";
   const callerNumber = connection?.parameters?.From || "";

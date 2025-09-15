@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog, screen } from 'electron';
 
 // const serve = 'electron-serve';
 import serve from 'electron-serve';
@@ -15,6 +15,8 @@ const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const { autoUpdater } = require('electron-updater');
 let Mainwindow
+let notificationWindow;
+let pendingCallInfo = null;
 let isdev = true;
 // Load environment variables early (supports dev via root .env)
 // Try project root .env relative to this file; fall back to default resolution
@@ -96,6 +98,35 @@ const createWindow = () => {
     });
   }
   Mainwindow = win;
+  // If a call is pending, show overlay only while minimized
+  win.on('minimize', () => {
+    console.log('minimuze',pendingCallInfo);
+    if (pendingCallInfo) {
+      // Recreate minimized overlay using the existing route
+      destroyNotificationWindow();
+      notificationWindow = new BrowserWindow({
+        width: 300,
+        height: 300,
+        frame: false,
+        alwaysOnTop: true,
+        webPreferences: {
+          preload: path.join(__dirname, "preload.js"),
+          nodeIntegration: false,
+          contextIsolation: true,
+        }
+      });
+      const url = app.isPackaged
+        ? `https://phone.windshieldhub.com/incoming-call-notification?from=${encodeURIComponent(pendingCallInfo.from || '')}&callerName=${encodeURIComponent(pendingCallInfo.callerName || '')}`
+        : `http://localhost:3000/incoming-call-notification?from=${encodeURIComponent(pendingCallInfo.from || '')}&callerName=${encodeURIComponent(pendingCallInfo.callerName || '')}`;
+      notificationWindow.loadURL(url);
+    }
+  });
+  const hideOverlay = () => {
+    destroyNotificationWindow();
+  };
+  win.on('restore', hideOverlay);
+  win.on('show', hideOverlay);
+  win.on('focus', hideOverlay);
 }
 
 function createAppMenu() {
@@ -166,51 +197,74 @@ app.on("ready", () => {
     setupAutoUpdater();
 });
 
-let notificationWindow;
 
-ipcMain.on('incoming-call', (event, callInfo) => {
-  if (notificationWindow) {
+
+
+function destroyNotificationWindow() {
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
     notificationWindow.close();
   }
+  notificationWindow = null;
+}
 
-  notificationWindow = new BrowserWindow({
-    width: 300,
-    height: 200,
-    frame: false,
-    alwaysOnTop: true,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-      nodeIntegration: false,
-      contextIsolation: true,
-    }
-  });
+ipcMain.on('incoming-call', (event, callInfo) => {
+  pendingCallInfo = callInfo || null;
+  if (Mainwindow && Mainwindow.isMinimized()) {
+    destroyNotificationWindow();
+    notificationWindow = new BrowserWindow({
+      width: 300,
+      height: 300,
+      frame: false,
+      alwaysOnTop: true,
+      webPreferences: {
+        preload: path.join(__dirname, "preload.js"),
+        nodeIntegration: false,
+        contextIsolation: true,
+      }
+    });
 
-  const url = app.isPackaged
-    ? `https://phone.windshieldhub.com/incoming-call-notification?from=${encodeURIComponent(callInfo.from)}&callerName=${encodeURIComponent(callInfo.callerName)}`
-    : `http://localhost:3000/incoming-call-notification?from=${encodeURIComponent(callInfo.from)}&callerName=${encodeURIComponent(callInfo.callerName)}`;
+    const url = app.isPackaged
+      ? `https://phone.windshieldhub.com/incoming-call-notification?from=${encodeURIComponent(callInfo.from)}&callerName=${encodeURIComponent(callInfo.callerName)}`
+      : `http://localhost:3000/incoming-call-notification?from=${encodeURIComponent(callInfo.from)}&callerName=${encodeURIComponent(callInfo.callerName)}`;
 
-  notificationWindow.loadURL(url);
-
-  notificationWindow.on('closed', () => {
-    notificationWindow = null;
-  });
+    notificationWindow.loadURL(url);
+  } else {
+    // main window is visible/focused; ensure overlay is not shown
+    destroyNotificationWindow();
+  }
 });
 
 ipcMain.on('accept-call', () => {
-  console.log(notificationWindow,'notificationWindow')
+  destroyNotificationWindow();
+  pendingCallInfo = null;
   if (Mainwindow) {
     Mainwindow.webContents.send('call-accepted');
-  }
-  if (notificationWindow) {
-    notificationWindow.close();
   }
 });
 
 ipcMain.on('reject-call', () => {
+  destroyNotificationWindow();
+  pendingCallInfo = null;
   if (Mainwindow) {
     Mainwindow.webContents.send('call-rejected');
   }
-  if (notificationWindow) {
-    notificationWindow.close();
-  }
+});
+
+ipcMain.on('successfully-accepted-call', () => {
+  console.log('successfully',pendingCallInfo);
+  Mainwindow.show();
+  Mainwindow.focus();
+  destroyNotificationWindow();
+  pendingCallInfo = null;
+});
+ipcMain.on('successfully-rejected-call', () => {
+  console.log('rejected',pendingCallInfo);
+  destroyNotificationWindow();
+  pendingCallInfo = null;
+});
+
+// Renderer can request overlay dismissal when reservation clears
+ipcMain.on('dismiss-incoming-overlay', () => {
+  destroyNotificationWindow();
+  pendingCallInfo = null;
 });

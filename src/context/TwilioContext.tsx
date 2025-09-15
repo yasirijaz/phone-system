@@ -35,6 +35,15 @@ interface TwilioContextType {
   setConferenceSid: (sid: string | null) => void;
 }
 
+declare global {
+  interface Window {
+    electronAPI?: {
+      send: (channel: string, data?: any) => void;
+      on: (channel: string, func: (...args: any[]) => void) => (() => void) | undefined;
+    };
+  }
+}
+
 const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
 
 export function TwilioProvider({ children }: { children: ReactNode }) {
@@ -171,7 +180,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       newWorker.on('reservationCreated', (reservation: Reservation) => {
         console.log('Reservation created:', reservation);
         setIncomingReservation(reservation);
-        setShowReservationModal(!isElectron());
+        setShowReservationModal(true);
         incomingReservationRef.current = reservation;
         // play ringtone or notification sound here
         // play in loop until accepted or rejected
@@ -223,6 +232,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
             if (confSid) setConferenceSid(confSid);
             if (fromNum) setFromNumber(fromNum);
 
+            if (typeof window !== 'undefined' && window.electronAPI) {
+              window.electronAPI.send('successfully-accepted-call');
+            }
+
           }, 500);
         });
 
@@ -235,7 +248,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
         reservation.on('rescinded', () => { console.log('Reservation rescinded'); clearReservation(); });
         reservation.on('timeout', () => { console.log('Reservation timed out.'); clearReservation(); });
-        reservation.on('rejected', () => { console.log('Reservation rejected.'); clearReservation(); });
+        reservation.on('rejected', () => { console.log('Reservation rejected.'); clearReservation();  
+          if (typeof window !== 'undefined' && window.electronAPI) {
+            window.electronAPI.send('successfully-rejected-call');
+          }
+
+        });
         reservation.on('canceled', () => { console.log('Reservation canceled.'); clearReservation(); });
         reservation.on('completed', () => { console.log('Reservation completed.'); clearReservation(); });
       });
@@ -257,6 +275,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       if (res) {
         try {
           acceptReservation(res);
+          
         } catch (e) {
           console.error('Failed to accept reservation from IPC:', e);
         }
@@ -268,6 +287,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       if (res) {
         try {
           rejectReservation(res);
+          
         } catch (e) {
           console.error('Failed to reject reservation from IPC:', e);
         }
