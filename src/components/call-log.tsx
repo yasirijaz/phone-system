@@ -20,7 +20,7 @@ interface CallLogProps {
   source?: string;
 }
 
-function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Communication, onMakeCall: (number: string) => void, isClickable: boolean, source?: string }) {
+function CommunicationCard({ comm, onMakeCall, isClickable, source, type }: { comm: Communication, onMakeCall: (number: string) => void, isClickable: boolean, source?: string, type?: string }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const isAdmin = user?.role_id === 1 || user?.role_id === 2;
@@ -33,15 +33,14 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Co
 
   const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
   const isInProgress = comm.call_status === 'in_progress';
-  
+
   const cardBg = isInProgress
     ? 'bg-orange-300 border-orange-300 dark:bg-orange-950/20 dark:border-orange-800'
     : isMissed
     ? 'bg-red-50 dark:bg-red-950/20'
     : 'bg-background';
 
-  const contactDisplayNumber = comm.direction === 'inbound' ? comm.from : comm.to;
-  
+  const contactDisplayNumber = (comm.direction === 'inbound' || type === 'sms') ? comm.from : comm.to;
   const handleCallClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -100,7 +99,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Co
   }
   
   const CardContent = () => (
-     <div className="flex items-start gap-4 mx-4">
+     <div className="flex items-start gap-4 mx-4 mb-3">
         <div className="flex-1">
             <div className={`p-4 rounded-lg border ${cardBg} flex items-start gap-4`}>
                 <Avatar>
@@ -225,7 +224,7 @@ export default function CallLog({ calls: communications, onMakeCall, isClickable
             </div>
              <div className="space-y-4">
                 {commsForDay.map((comm) => (
-                    <CommunicationCard comm={comm} key={comm.id || `${comm.from}-${comm.to}`} onMakeCall={onMakeCall} isClickable={isClickable} source={source} />
+                    <CommunicationCard comm={comm} key={comm.id || `${comm.from}-${comm.to}`} onMakeCall={onMakeCall} isClickable={isClickable} source={source} type={comm.latest_type} />
                 ))}
              </div>
         </div>

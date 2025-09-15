@@ -55,6 +55,9 @@ export default function DepartmentDetailPage() {
   });
   const [operators, setOperators] = useState<User[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
+
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [dialerNumber, setDialerNumber] = useState('');
   
   const [pagination, setPagination] = useState<Record<TabName, PaginationState>>({
     all: { ...initialPaginationState }, unread: { ...initialPaginationState }, calls: { ...initialPaginationState },
@@ -158,6 +161,9 @@ export default function DepartmentDetailPage() {
         toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});
         return;
     }
+
+    setDialerNumber(number.replace(/^\+1/, ""));
+    setDialerOpen(true);
   };
   
   const handleDndChange = async (checked: boolean) => {
@@ -219,7 +225,8 @@ export default function DepartmentDetailPage() {
                 <div className="flex flex-1 flex-col">
                   <AppHeader 
                     user={user} 
-                    logout={logout} 
+                    logout={logout}
+                    dialerOpen={dialerOpen} dialerInitialValue={dialerNumber} onDialerOpenChange={() => setDialerOpen(!dialerOpen)}
                   />
 
                   <main className="flex-1 p-6 overflow-y-auto">

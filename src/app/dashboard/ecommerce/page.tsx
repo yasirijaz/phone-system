@@ -257,7 +257,7 @@ export default function EcommerceDashboard() {
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <AppHeader user={user} logout={logout} />
+          <AppHeader user={user} logout={logout} dialerOpen={dialerOpen} dialerInitialValue={dialerNumber} onDialerOpenChange={() => setDialerOpen(!dialerOpen)} />
 
           <main className="flex-1 p-4 md:p-8 space-y-8">
              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4 2xl:gap-7.5">

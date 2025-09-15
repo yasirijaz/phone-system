@@ -209,7 +209,7 @@ export default function ConversationDetailPage() {
                         </main>
                         <footer className="p-4 border-t bg-background space-y-2">
                              <div className="grid grid-cols-2 gap-2">
-                                <Select onValueChange={handleDepartmentChange} value={selectedDepartmentId} disabled={loadingDepartments}>
+                                <Select onValueChange={handleDepartmentChange} value={selectedDepartmentId} disabled={loadingDepartments || allComms.length > 0}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select Department" />
                                     </SelectTrigger>
@@ -221,7 +221,7 @@ export default function ConversationDetailPage() {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                 <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
+                                 <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId || allComms.length > 0}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select Number" />
                                     </SelectTrigger>

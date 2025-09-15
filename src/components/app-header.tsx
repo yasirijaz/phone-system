@@ -101,70 +101,86 @@ export default function AppHeader({
     
     useEffect(() => {
         if (!user) {
-        if (socketRef.current) {
-            socketRef.current.close();
-            socketRef.current = null;
-        }
-        return;
-        }
-        if (socketRef.current) return;
-
-        const WS_URL = `wss://socket.windshieldhub.com?user_id=${user.id}`;
-        const newSocket = new WebSocket(WS_URL);
-
-        socketRef.current = newSocket;
-
-        newSocket.onopen = () => {
-            console.log("WebSocket connection established in AppHeader");
-        };
-
-        newSocket.onmessage = (evt) => {
-        try {
-            const data = JSON.parse(evt.data);
-            console.log("WebSocket message received:", data);
-            if (data.method_type === "refresh_listing") {
-                console.log("Emitting refreshCalls");
-                events.emit("refreshCalls");
-            }
-             if (data.method_type === "show_sms_notification" && data.data) {
-                if (audioRef.current) {
-                    audioRef.current.play().catch(e => console.error("Error playing notification sound:", e));
-                }
-                const { from, to, body } = data.data;
-                const navigateToConversation = () => {
-                    router.push(`/conversations/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
-                };
-
-                toast({
-                    title: `New Message from ${from}`,
-                    description: body,
-                    action: <ToastAction altText="View" onClick={navigateToConversation}>View</ToastAction>,
-                    onClick: navigateToConversation,
-                    className: "cursor-pointer"
-                });
-            }
-        } catch (e) {
-            console.warn("Non-JSON message:", evt.data);
-        }
-        };
-
-        newSocket.onerror = () => {
-        try {
-            // newSocket.close();
-        } catch {}
-        };
-
-        newSocket.onclose = () => {
-            console.log("WebSocket closed in AppHeader");
-        };
-
-        return () => {
             if (socketRef.current) {
                 socketRef.current.close();
                 socketRef.current = null;
             }
+            return;
+        }
+
+        let reconnectTimer:any;
+
+        const connectSocket = () => {
+            if (socketRef.current) return;
+
+            const WS_URL = `wss://socket.windshieldhub.com?user_id=${user.id}`;
+            const newSocket = new WebSocket(WS_URL);
+            socketRef.current = newSocket;
+
+            newSocket.onopen = () => {
+                console.log("✅ WebSocket connection established in AppHeader");
+            };
+
+            newSocket.onmessage = (evt) => {
+            try {
+                const data = JSON.parse(evt.data);
+                console.log("📩 WebSocket message received:", data);
+
+                if (data.method_type === "refresh_listing") {
+                    events.emit("refreshCalls");
+                }
+
+                if (data.method_type === "show_sms_notification" && data.data) {
+                    if (audioRef.current) {
+                        audioRef.current.play().catch(e =>
+                        console.error("Error playing notification sound:", e)
+                        );
+                    }
+                    const { from, to, body } = data.data;
+                    const navigateToConversation = () => {
+                        router.push(`/conversations/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
+                    };
+
+                    toast({
+                        title: `New Message from ${from}`,
+                        description: body,
+                        action: (
+                        <ToastAction altText="View" onClick={navigateToConversation}>
+                            View
+                        </ToastAction>
+                        ),
+                        onClick: navigateToConversation,
+                        className: "cursor-pointer"
+                    });
+                }
+            } catch (e) {
+                console.warn("⚠️ Non-JSON message:", evt.data);
+            }
+            };
+
+            newSocket.onerror = (err) => {
+                console.error("❌ WebSocket error:", err);
+            };
+
+            newSocket.onclose = () => {
+                console.log("⚠️ WebSocket closed, retrying in 10s...");
+                socketRef.current = null;
+                reconnectTimer = setTimeout(connectSocket, 10000);
+            };
+        };
+
+        connectSocket();
+
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.onclose = null;
+                socketRef.current.close();
+                socketRef.current = null;
+            }
+            clearTimeout(reconnectTimer);
         };
     }, [user, toast, router]);
+
 
     const handleDepartmentChange = useCallback(async (departmentId: string) => {
         setSelectedDepartmentId(departmentId);
