@@ -39,14 +39,15 @@ export default function IncomingCallModal({ isOpen, onClose, callerName, callerN
                 </div>
             </div>
           <div className="text-center mt-4">
-            <p className="text-3xl font-bold">
-              {callerName?.toLowerCase().startsWith("client:")
-                ? callerName.length > 20
-                  ? callerName.substring(0, 20) + "..."
-                  : callerName
-                : callerName}
+            <p className="text-3xl font-bold">{callerName}</p>
+            <p className="text-neutral-300">
+                {callerNumber?.toLowerCase().startsWith("client:")
+                  ? callerNumber.length > 20
+                    ? callerNumber.substring(0, 20) + "..."
+                    : callerNumber
+                  : callerNumber
+                }
             </p>
-            <p className="text-neutral-300">{callerNumber}</p>
           </div>
         </div>
 
