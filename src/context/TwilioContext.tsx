@@ -8,6 +8,7 @@ import type { Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
 import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { isElectron } from '@/lib/is-electron';
 
 interface TwilioContextType {
   device: Device | null;
@@ -53,6 +54,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [twilio, setTwilio] = useState<any>(null);
   const [activityName, setActivityName] = useState<string | null>(null);
   const audio = new Audio('/sounds/reservation.mp3');
+  const incomingReservationRef = useRef<Reservation | null>(null);
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -169,11 +171,23 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       newWorker.on('reservationCreated', (reservation: Reservation) => {
         console.log('Reservation created:', reservation);
         setIncomingReservation(reservation);
-        setShowReservationModal(true);
+        setShowReservationModal(!isElectron());
+        incomingReservationRef.current = reservation;
         // play ringtone or notification sound here
         // play in loop until accepted or rejected
         audio.loop = true;
         audio.play();
+        // Inform Electron main to show native/mini window notification
+        try {
+          if (isElectron() && window.electronAPI) {
+            const attrs: any = reservation.task?.attributes || {};
+            const from = attrs.contact_name || attrs.callerName || attrs.from || '';
+            const callerName = attrs.callerName || attrs.contact_name || '';
+            window.electronAPI.send('incoming-call', { from, callerName });
+          }
+        } catch (e) {
+          console.warn('Failed to send incoming-call IPC:', e);
+        }
 
         const attributes = reservation.task?.attributes;
         if (attributes.do_nothing) {
@@ -216,6 +230,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
            audio.pause();
           setIncomingReservation(null);
           setShowReservationModal(false);
+          incomingReservationRef.current = null;
         };
 
         reservation.on('rescinded', () => { console.log('Reservation rescinded'); clearReservation(); });
@@ -232,6 +247,38 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       setIsConnecting(false);
     }
   }, [twilio, user, isConnecting, toast]);
+
+  // Listen for accept/reject actions coming back from Electron main
+  useEffect(() => {
+    if (!isElectron() || !window.electronAPI) return;
+
+    const offAccepted = window.electronAPI.on('call-accepted', () => {
+      const res = incomingReservationRef.current;
+      if (res) {
+        try {
+          acceptReservation(res);
+        } catch (e) {
+          console.error('Failed to accept reservation from IPC:', e);
+        }
+      }
+    });
+
+    const offRejected = window.electronAPI.on('call-rejected', () => {
+      const res = incomingReservationRef.current;
+      if (res) {
+        try {
+          rejectReservation(res);
+        } catch (e) {
+          console.error('Failed to reject reservation from IPC:', e);
+        }
+      }
+    });
+
+    return () => {
+      try { offAccepted && offAccepted(); } catch {}
+      try { offRejected && offRejected(); } catch {}
+    };
+  }, []);
 
   const acceptCall = () => {
     if (connection) {

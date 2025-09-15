@@ -166,8 +166,51 @@ app.on("ready", () => {
     setupAutoUpdater();
 });
 
-app.on("window-all-closed", () => {
-    if(process.platform !== "darwin"){
-        app.quit();
+let notificationWindow;
+
+ipcMain.on('incoming-call', (event, callInfo) => {
+  if (notificationWindow) {
+    notificationWindow.close();
+  }
+
+  notificationWindow = new BrowserWindow({
+    width: 300,
+    height: 200,
+    frame: false,
+    alwaysOnTop: true,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      nodeIntegration: false,
+      contextIsolation: true,
     }
+  });
+
+  const url = app.isPackaged
+    ? `https://phone.windshieldhub.com/incoming-call-notification?from=${encodeURIComponent(callInfo.from)}&callerName=${encodeURIComponent(callInfo.callerName)}`
+    : `http://localhost:3000/incoming-call-notification?from=${encodeURIComponent(callInfo.from)}&callerName=${encodeURIComponent(callInfo.callerName)}`;
+
+  notificationWindow.loadURL(url);
+
+  notificationWindow.on('closed', () => {
+    notificationWindow = null;
+  });
+});
+
+ipcMain.on('accept-call', () => {
+  console.log(notificationWindow,'notificationWindow')
+  if (Mainwindow) {
+    Mainwindow.webContents.send('call-accepted');
+  }
+  if (notificationWindow) {
+    notificationWindow.close();
+  }
+});
+
+ipcMain.on('reject-call', () => {
+  if (Mainwindow) {
+    Mainwindow.webContents.send('call-rejected');
+  }
+  if (notificationWindow) {
+    notificationWindow.close();
+  }
 });
