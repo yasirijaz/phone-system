@@ -99,7 +99,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source, type }: { co
   }
   
   const CardContent = () => (
-     <div className="flex items-start gap-4 mx-4 mb-3">
+     <div className="flex items-start gap-4 mx-4 mb-3 p-0">
         <div className="flex-1">
             <div className={`p-4 rounded-lg border ${cardBg} flex items-start gap-4`}>
                 <Avatar>
@@ -184,12 +184,12 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source, type }: { co
     const queryString = source === 'unread' ? `?source=unread` : '';
     return (
         <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="block">
-            <CardContent className="p-0" />
+            <CardContent />
         </Link>
     );
   }
 
-  return <CardContent className="p-0" />;
+  return <CardContent />;
 }
 
 export default function CallLog({ calls: communications, onMakeCall, isClickable = true, source }: CallLogProps) {

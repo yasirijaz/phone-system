@@ -81,7 +81,7 @@ export default function ConversationDetailPage() {
 
             try {
                 const isAdmin = user.role_id === 1 || user.role_id === 2;
-                 const fetchedDepts = await (isAdmin && user.company_id
+                const fetchedDepts = await (isAdmin && user.company_id
                     ? getDepartments(user.company_id)
                     : getUserDepartments(user.id));
                 const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
