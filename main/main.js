@@ -207,6 +207,12 @@ function destroyNotificationWindow() {
   notificationWindow = null;
 }
 
+ipcMain.on('incoming-sms', (event, sms) => {
+  pendingCallInfo = callInfo || null;
+  Mainwindow.show();
+  Mainwindow.focus();
+});
+
 ipcMain.on('incoming-call', (event, callInfo) => {
   pendingCallInfo = callInfo || null;
   if (Mainwindow && Mainwindow.isMinimized()) {

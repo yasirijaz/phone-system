@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import { cn } from "@/lib/utils";
+import { isElectron } from '@/lib/is-electron';
 
 interface AppHeaderProps {
     user: User | null;
@@ -135,6 +136,9 @@ export default function AppHeader({
                         audioRef.current.play().catch(e =>
                         console.error("Error playing notification sound:", e)
                         );
+                        if (isElectron() && window.electronAPI) {
+                            window.electronAPI.send('incoming-sms',data.data);
+                        }
                     }
                     const { from, to, body } = data.data;
                     const navigateToConversation = () => {
