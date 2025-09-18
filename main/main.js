@@ -19,6 +19,9 @@ let notificationWindow;
 let pendingCallInfo = null;
 let isdev = false;
 let updateReady = false;
+let updateCheckTimer = null;
+let isCheckingUpdates = false;
+let lastCheckSource = null; // 'manual' | 'periodic' | 'startup' | null
 // Load environment variables early (supports dev via root .env)
 // Try project root .env relative to this file; fall back to default resolution
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
@@ -40,8 +43,12 @@ function sendToRenderer(name,args) {
 }
 
 ipcMain.on('check-for-updates', (event) => {
-  autoUpdater.checkForUpdatesAndNotify();
+  lastCheckSource = 'manual';
   sendToRenderer('updatelog','Checking for updates...');
+  isCheckingUpdates = true;
+  autoUpdater.checkForUpdatesAndNotify()
+    .catch((e) => sendToRenderer('updatelog','Manual check error: '+ e))
+    .finally(() => { isCheckingUpdates = false; });
 });
 
 function setupAutoUpdater() {
@@ -54,7 +61,11 @@ function setupAutoUpdater() {
   // Event hooks for visibility
   autoUpdater.on('checking-for-update', () => sendToRenderer('updatelog','Checking for updates...'));
   autoUpdater.on('update-available', (info) => sendToRenderer('updatelog','Update available:'+ info +'&&'+ info.version));
-  autoUpdater.on('update-not-available', () => sendToRenderer('updatelog','No updates available'));
+  autoUpdater.on('update-not-available', () => {
+    if (lastCheckSource === 'manual') {
+      sendToRenderer('updatelog','No updates available');
+    }
+  });
   autoUpdater.on('error', (err) => sendToRenderer('updatelog','Updater error:'+ err));
   autoUpdater.on('download-progress', (p) => {
     const pct = (p && p.percent != null) ? p.percent.toFixed(1) : 'N/A';
@@ -62,6 +73,10 @@ function setupAutoUpdater() {
   });
   autoUpdater.on('update-downloaded', (info) => {
     updateReady = true;
+    if (updateCheckTimer) {
+      clearInterval(updateCheckTimer);
+      updateCheckTimer = null;
+    }
     // Notify renderers so UI can show restart option
     sendToRenderer('update-ready', { version: info?.version });
     sendToRenderer('updatelog','Update downloaded');
@@ -96,7 +111,23 @@ function setupAutoUpdater() {
   autoUpdater.allowPrerelease = Boolean(process.env.APP_ALLOW_PRERELEASE);
 
   // Use notify helper to show native notification (when supported)
+  lastCheckSource = 'startup';
   autoUpdater.checkForUpdatesAndNotify().catch((e) => sendToRenderer('updatelog','checkForUpdates failed:'+ e));
+
+  // Periodically check for updates (packaged only)
+  const minutes = parseInt(process.env.APP_UPDATE_INTERVAL_MINUTES || '360', 10);
+  const intervalMs = Math.max(10, isNaN(minutes) ? 360 : minutes) * 60 * 1000; // minimum 10 minutes
+  if (updateCheckTimer) clearInterval(updateCheckTimer);
+  updateCheckTimer = setInterval(() => {
+    if (updateReady) return; // stop once update is downloaded
+    if (isCheckingUpdates) return;
+    isCheckingUpdates = true;
+    // sendToRenderer('updatelog','Periodic update check...');
+    lastCheckSource = 'periodic';
+    autoUpdater.checkForUpdatesAndNotify()
+      .catch((e) => sendToRenderer('updatelog','Periodic check failed: '+ e))
+      .finally(() => { isCheckingUpdates = false; });
+  }, intervalMs);
 }
 
 const appServe = app.isPackaged ? serve({
@@ -224,6 +255,13 @@ app.on("ready", () => {
     setTimeout(() => {
       sendToRenderer('app-info', { version: app.getVersion(), updateReady });
     }, 1000);
+});
+
+app.on('before-quit', () => {
+  if (updateCheckTimer) {
+    clearInterval(updateCheckTimer);
+    updateCheckTimer = null;
+  }
 });
 
 

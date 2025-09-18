@@ -517,6 +517,20 @@ export default function AppHeader({
                            </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            {!isElectron() && (
+                              <>
+                                <DropdownMenuItem asChild>
+                                  <a
+                                    href={process.env.NEXT_PUBLIC_DOWNLOAD_URL ?? 'https://phone-api.windshieldhub.com/api/download/latest'}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    <span>Download app</span>
+                                  </a>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                              </>
+                            )}
                              <DropdownMenuItem>
                                 <span>Version</span>
                                 <DropdownMenuShortcut>{appVersion ?? 'web'}</DropdownMenuShortcut>
