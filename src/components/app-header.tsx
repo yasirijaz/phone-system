@@ -506,8 +506,14 @@ export default function AppHeader({
                     </DropdownMenu>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                           <Button variant="ghost" size="icon">
+                           <Button variant="ghost" size="icon" className="relative" aria-label={updateReady ? 'Update ready — restart available' : 'More options'}>
                                 <MoreVertical className="h-5 w-5" />
+                                {updateReady && (
+                                  <span
+                                    className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-background animate-pulse"
+                                    aria-hidden="true"
+                                  />
+                                )}
                            </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -520,9 +526,11 @@ export default function AppHeader({
                                 <span className="text-amber-600 font-medium">Restart to update</span>
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onClick={handleCheckForUpdates}>
+                            {!updateReady && (
+                              <DropdownMenuItem onClick={handleCheckForUpdates}>
                                 <span>Check for updates</span>
-                            </DropdownMenuItem>
+                             </DropdownMenuItem>
+                            )}
                              <DropdownMenuSeparator />
                             <DropdownMenuItem>
                                 <span>Feedback</span>
