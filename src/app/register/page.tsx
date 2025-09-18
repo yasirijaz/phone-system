@@ -112,8 +112,8 @@ export default function RegisterPage() {
         <div className="w-full max-w-md space-y-8">
             <div>
                  <Link href="/" className="flex items-center gap-2 mb-6">
-                    <Logo className="h-8 w-8 text-primary" />
-                    <span className="font-bold text-2xl">CallSync</span>
+                    <Logo className="h-8 w-16" />
+                    <span className="font-bold text-2xl">by Windshield Hub</span>
                 </Link>
                 <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
                     Create an account
@@ -157,7 +157,7 @@ export default function RegisterPage() {
                             <Label htmlFor="subdomain">Company Domain</Label>
                             <div className="flex items-center">
                               <Input id="subdomain" type="text" placeholder="your-company" required {...register('subdomain')} className="rounded-r-none focus:z-10" />
-                              <span className="inline-flex items-center px-3 text-sm text-gray-500 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400 h-10">.callsync.com</span>
+                              <span className="inline-flex items-center px-3 text-sm text-gray-500 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400 h-10">.windshieldhub.com</span>
                             </div>
                              {errors.subdomain && <p className="text-sm text-destructive mt-1">{errors.subdomain.message as string}</p>}
                          </div>
@@ -215,3 +215,5 @@ export default function RegisterPage() {
     </div>
   );
 }
+
+    

@@ -64,7 +64,8 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <Logo className="mx-auto h-12 w-12 text-primary" />
+          <Logo className="mx-auto h-12 w-24" />
+          <span className="text-xl font-bold text-foreground">by Windshield Hub</span>
           <CardTitle className="mt-4 text-2xl">Forgot Password</CardTitle>
           <CardDescription>
             Enter your email and we'll send you a link to reset your password.
@@ -100,3 +101,5 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
+
+    

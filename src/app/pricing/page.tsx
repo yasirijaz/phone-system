@@ -125,8 +125,8 @@ export default function PricingPage() {
     <div className="flex flex-col min-h-screen bg-background dark:bg-gray-900">
       <header className="px-4 lg:px-6 h-14 flex items-center border-b sticky top-0 bg-background/95 z-50">
          <Link href="/" className="flex items-center justify-center gap-2">
-           <Logo className="h-6 w-6 text-primary" />
-           <span className="font-bold text-lg">CallSync</span>
+           <Logo className="h-6 w-12" />
+           <span className="font-bold text-lg">by Windshield Hub</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <Link href="/login" className="text-sm font-medium hover:underline underline-offset-4">Login</Link>
@@ -160,7 +160,7 @@ export default function PricingPage() {
       </main>
 
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
-        <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} CallSync. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} by Windshield Hub. All rights reserved.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
           <Link className="text-xs hover:underline underline-offset-4" href="#">
             Terms of Service
@@ -198,3 +198,5 @@ export default function PricingPage() {
     </div>
   );
 }
+
+    

@@ -76,7 +76,8 @@ export default function ResetPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <Logo className="mx-auto h-12 w-12 text-primary" />
+          <Logo className="mx-auto h-12 w-24" />
+          <span className="text-xl font-bold text-foreground">by Windshield Hub</span>
           <CardTitle className="mt-4 text-2xl">Reset Password</CardTitle>
           <CardDescription>
             Enter your new password below.
@@ -128,3 +129,5 @@ export default function ResetPasswordPage() {
     </div>
   );
 }
+
+    

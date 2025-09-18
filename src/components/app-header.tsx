@@ -32,6 +32,7 @@ import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import { cn } from "@/lib/utils";
 import { isElectron } from '@/lib/is-electron';
+import { Logo } from "./icons";
 
 type AppInfo = { version?: string; updateReady?: boolean };
 
@@ -583,5 +584,7 @@ export default function AppHeader({
         </>
     );
 }
+
+    
 
     

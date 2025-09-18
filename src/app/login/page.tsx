@@ -44,9 +44,10 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <Logo className="mx-auto h-12 w-12 text-primary" />
+          <Logo className="mx-auto h-12 w-24" />
+          <span className="text-xl font-bold text-foreground">by Windshield Hub</span>
           <CardTitle className="mt-4 text-2xl">Welcome Back!</CardTitle>
-          <CardDescription>Sign in to continue to CallSync</CardDescription>
+          <CardDescription>Sign in to continue</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -93,3 +94,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    

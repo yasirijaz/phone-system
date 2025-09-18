@@ -50,7 +50,7 @@ export function AppSidebar() {
         <div className="flex items-center gap-2">
           <Logo className="h-8 w-8 text-primary" />
           <span className="text-xl font-bold text-foreground group-data-[collapsible=icon]:hidden">
-            CallSync
+            by Windshield Hub
           </span>
         </div>
       </SidebarHeader>
@@ -211,3 +211,5 @@ export function AppSidebar() {
     </>
   );
 }
+
+    
