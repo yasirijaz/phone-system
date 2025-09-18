@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/sidebar';
 import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog, Package, CreditCard, AppWindow, UploadCloud } from 'lucide-react';
 import { Button } from './ui/button';
-import { Logo } from './icons';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
@@ -47,11 +47,16 @@ export function AppSidebar() {
   return (
     <>
       <SidebarHeader>
-        <div className="flex items-center gap-2">
-          <Logo className="h-8 w-8 text-primary" />
-          <span className="text-xl font-bold text-foreground group-data-[collapsible=icon]:hidden">
-            CallSync
-          </span>
+        <div className="flex items-center justify-center px-2 py-2">
+          <Image
+            src="/logo.png"
+            alt="CallSync"
+            width={180}
+            height={48}
+            className="h-12 w-auto"
+            priority
+            sizes="(max-width: 768px) 140px, 180px"
+          />
         </div>
       </SidebarHeader>
       

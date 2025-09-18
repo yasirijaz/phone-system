@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup, SidebarGroupLabel } from '@/components/ui/sidebar';
 import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building } from 'lucide-react';
-import { Logo } from './icons';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -57,11 +57,16 @@ export function InAppSidebar() {
   return (
     <>
       <SidebarHeader>
-        <div className="flex items-center gap-2">
-          <Logo className="h-8 w-8 text-primary" />
-          <span className="text-xl font-bold text-foreground group-data-[collapsible=icon]:hidden">
-            CallSync
-          </span>
+        <div className="flex items-center justify-center px-2 py-2">
+          <Image
+            src="/logo.png"
+            alt="CallSync"
+            width={180}
+            height={48}
+            className="h-12 w-auto"
+            priority
+            sizes="(max-width: 768px) 140px, 180px"
+          />
         </div>
       </SidebarHeader>
       
