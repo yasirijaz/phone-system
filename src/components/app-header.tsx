@@ -33,6 +33,8 @@ import { Switch } from "./ui/switch";
 import { cn } from "@/lib/utils";
 import { isElectron } from '@/lib/is-electron';
 
+type AppInfo = { version?: string; updateReady?: boolean };
+
 interface AppHeaderProps {
     user: User | null;
     logout: () => void;
@@ -88,6 +90,10 @@ export default function AppHeader({
     const [searchValue, setSearchValue] = useState("");
     const socketRef = useRef<WebSocket | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    // Electron app info
+    const [appVersion, setAppVersion] = useState<string | null>(null);
+    const [updateReady, setUpdateReady] = useState<boolean>(false);
     
     useEffect(() => {
         // Initialize the audio element once.
@@ -99,6 +105,27 @@ export default function AppHeader({
     useEffect(() => {
         connectTwilio();
     }, [connectTwilio]);
+
+    // Fetch app version/update status from Electron (if present)
+    useEffect(() => {
+        if (!isElectron()) return;
+        const w = window as any;
+        const api = w?.api;
+        if (api?.getAppInfo) {
+            api.getAppInfo().then((info: AppInfo) => {
+                if (info?.version) setAppVersion(info.version);
+                if (info?.updateReady) setUpdateReady(Boolean(info.updateReady));
+            }).catch(() => {});
+        }
+        // Listen for update ready broadcast
+        const off = api?.onUpdateReady ? api.onUpdateReady((_payload: any) => {
+            setUpdateReady(true);
+        }) : undefined;
+        return () => {
+            if (typeof off === 'function') off();
+            if (api?.remove) api.remove('update-ready');
+        };
+    }, []);
     
     useEffect(() => {
         if (!user) {
@@ -345,6 +372,16 @@ export default function AppHeader({
         }
     }
 
+    const handleRestartToUpdate = () => {
+        const w = window as any;
+        const api = w?.api;
+        if (api?.restartToUpdate) {
+            api.restartToUpdate();
+        } else {
+            toast({ title: "Restart not available", description: "This action is only available in the desktop app."});
+        }
+    }
+
 
     return (
         <>
@@ -476,8 +513,13 @@ export default function AppHeader({
                         <DropdownMenuContent align="end">
                              <DropdownMenuItem>
                                 <span>Version</span>
-                                <DropdownMenuShortcut>0.1.2</DropdownMenuShortcut>
+                                <DropdownMenuShortcut>{appVersion ?? 'web'}</DropdownMenuShortcut>
                             </DropdownMenuItem>
+                            {updateReady && (
+                              <DropdownMenuItem onClick={handleRestartToUpdate}>
+                                <span className="text-amber-600 font-medium">Restart to update</span>
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={handleCheckForUpdates}>
                                 <span>Check for updates</span>
                             </DropdownMenuItem>

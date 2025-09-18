@@ -17,7 +17,8 @@ const { autoUpdater } = require('electron-updater');
 let Mainwindow
 let notificationWindow;
 let pendingCallInfo = null;
-let isdev = true;
+let isdev = false;
+let updateReady = false;
 // Load environment variables early (supports dev via root .env)
 // Try project root .env relative to this file; fall back to default resolution
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
@@ -59,10 +60,34 @@ function setupAutoUpdater() {
     const pct = (p && p.percent != null) ? p.percent.toFixed(1) : 'N/A';
     sendToRenderer('updatelog',`Download progress: ${pct}%`);
   });
-  autoUpdater.on('update-downloaded', () => {
-    sendToRenderer('updatelog','Update downloaded; quitting and installing...');
-    // Install on next tick to avoid blocking the event loop
-    setImmediate(() => autoUpdater.quitAndInstall());
+  autoUpdater.on('update-downloaded', (info) => {
+    updateReady = true;
+    // Notify renderers so UI can show restart option
+    sendToRenderer('update-ready', { version: info?.version });
+    sendToRenderer('updatelog','Update downloaded');
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0] || null;
+    dialog.showMessageBox(win, {
+      type: 'info',
+      title: 'Update Ready',
+      message: 'A new version has been downloaded.',
+      detail: `Version ${info?.version || ''} is ready to install. Restart now to apply the update, or choose Later to continue and install on next restart.`,
+      buttons: ['Restart Now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    }).then(({ response }) => {
+      if (response === 0) {
+        sendToRenderer('updatelog','User chose to restart now; installing update...');
+        // Install on next tick to avoid blocking the event loop
+        setImmediate(() => autoUpdater.quitAndInstall());
+      } else {
+        sendToRenderer('updatelog','User chose to install later');
+        // With autoInstallOnAppQuit=true, the update will install when the app quits
+      }
+    }).catch((e) => {
+      sendToRenderer('updatelog','Failed to show update dialog: '+ e);
+      // Fallback: do not auto-install if dialog fails; user can quit later
+    });
   });
 
   // Start the update flow
@@ -90,7 +115,7 @@ const createWindow = () => {
   if (app.isPackaged) {
     win.loadURL("https://phone.windshieldhub.com");
   } else {
-    win.loadURL("http://localhost:3000");
+    win.loadURL("http://localhost:3001");
     // win.loadURL("http://127.0.0.1:3000");
     win.webContents.openDevTools();
     win.webContents.on("did-fail-load", (e, code, desc) => {
@@ -195,6 +220,10 @@ app.on("ready", () => {
     createWindow();
     createAppMenu();
     setupAutoUpdater();
+    // optional: after a short delay, broadcast initial app info
+    setTimeout(() => {
+      sendToRenderer('app-info', { version: app.getVersion(), updateReady });
+    }, 1000);
 });
 
 
@@ -245,6 +274,23 @@ ipcMain.on('accept-call', () => {
   pendingCallInfo = null;
   if (Mainwindow) {
     Mainwindow.webContents.send('call-accepted');
+  }
+});
+
+// Expose version and update status to renderer
+ipcMain.handle('get-app-info', async () => {
+  try {
+    return { version: app.getVersion(), updateReady };
+  } catch (_) {
+    return { version: 'unknown', updateReady };
+  }
+});
+
+// Allow renderer to trigger restart to install update
+ipcMain.on('restart-to-update', () => {
+  if (updateReady) {
+    sendToRenderer('updatelog','Renderer requested restart to install update');
+    setImmediate(() => autoUpdater.quitAndInstall());
   }
 });
 
