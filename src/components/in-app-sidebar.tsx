@@ -13,6 +13,7 @@ import { getCommunications } from '@/services/callLogService';
 import type { Department } from '@/types';
 import { Badge } from './ui/badge';
 import { isElectron } from '@/lib/is-electron';
+import { events } from '@/lib/events';
 
 interface DepartmentWithUnread extends Department {
     unread_count: number;
@@ -26,32 +27,41 @@ export function InAppSidebar() {
   const inElectron = isElectron();
 
   useEffect(() => {
-    if (user) {
-        const fetchDepartmentsAndCounts = async () => {
-            try {
-                setLoading(true);
-                const userDepts = await getUserDepartments(user.id);
-                const deptsArray = Array.isArray(userDepts) ? userDepts : [];
+    if (!user) return;
 
-                const deptsWithCounts = await Promise.all(
-                    deptsArray.map(async (dept) => {
-                        const comms = await getCommunications({ department_id: dept.id, type: 'unread', limit: 1000 });
-                        const unreadCount = comms.results.filter(c => !c.is_read).length;
-                        return { ...dept, unread_count: unreadCount };
-                    })
-                );
-                
-                setDepartments(deptsWithCounts);
+    let mounted = true;
 
-            } catch (error) {
-                console.error("Failed to fetch user departments or unread counts", error);
-                setDepartments([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchDepartmentsAndCounts();
-    }
+    const fetchDepartmentsAndCounts = async () => {
+      try {
+        setLoading(true);
+        const userDepts = await getUserDepartments(user.id);
+        const deptsArray = Array.isArray(userDepts) ? userDepts : [];
+
+        const deptsWithCounts = await Promise.all(
+          deptsArray.map(async (dept) => {
+            const comms = await getCommunications({ department_id: dept.id, type: 'unread', limit: 1000 });
+            const unreadCount = comms.results.filter(c => !c.is_read).length;
+            return { ...dept, unread_count: unreadCount };
+          })
+        );
+
+        if (mounted) setDepartments(deptsWithCounts);
+      } catch (error) {
+        console.error("Failed to fetch user departments or unread counts", error);
+        if (mounted) setDepartments([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    fetchDepartmentsAndCounts();
+
+    const refreshHandler = () => fetchDepartmentsAndCounts();
+    events.on('refreshDepartmentsUnread', refreshHandler);
+    return () => {
+      mounted = false;
+      events.off('refreshDepartmentsUnread', refreshHandler);
+    };
   }, [user]);
 
   return (

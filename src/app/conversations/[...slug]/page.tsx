@@ -101,9 +101,13 @@ export default function ConversationDetailPage() {
                 const logs = await getCommunicationThread(from, to);
                 const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                 setAllComms(sortedLogs);
-                
-                if (searchParams.get('source') === 'unread') {
+                // If any record in the thread is unread (is_read === 0 or false),
+                // mark the entire thread as read.
+                const hasUnread = sortedLogs.some((l: any) => l?.is_read === 0 || l?.is_read === false);
+                if (hasUnread) {
                     await markThreadAsRead(from, to);
+                    // Immediately update sidebar department unread badges
+                    try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
                 }
                 
                 if (sortedLogs.length > 0) {
