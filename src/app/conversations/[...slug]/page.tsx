@@ -103,22 +103,83 @@ export default function ConversationDetailPage() {
                     setContactName(name);
 
                     // Pre-select department and number
-                    if (latestComm.department_id) {
-                        const initialDeptId = String(latestComm.department_id);
-                        setSelectedDepartmentId(initialDeptId);
-                        await handleDepartmentChange(initialDeptId); // This will fetch numbers
-                        
-                        // Determine the correct "from" number for sending
-                        const userNumber = latestComm.direction === 'inbound' ? latestComm.to : latestComm.from;
-                        setSelectedFromNumber(userNumber);
+                    // Prefer the department from the latest communication. If missing,
+                    // derive department by locating which department owns the from-number
+                    // used in this conversation. If multiple numbers exist in that
+                    // department, prefer the last number used by our side in the thread.
+                    const lastUsedOurNumber = latestComm.direction === 'inbound' ? latestComm.to : latestComm.from;
 
-                    } else if (depts.length > 0) {
-                        await handleDepartmentChange(String(depts[0].id));
+                    let resolvedDeptId: string | null = latestComm.department_id
+                        ? String(latestComm.department_id)
+                        : null;
+
+                    // Helper: find department id by phone number across user's departments
+                    const findDepartmentIdByNumber = async (phone: string): Promise<string | null> => {
+                        for (const d of depts) {
+                            try {
+                                const nums = await getPhoneNumbers(d.id);
+                                if (nums.some(n => n.phone_no === phone)) {
+                                    return String(d.id);
+                                }
+                            } catch (e) {
+                                // ignore and continue
+                            }
+                        }
+                        return null;
+                    };
+
+                    if (!resolvedDeptId && depts.length > 0) {
+                        // Try resolve by the last used our number first
+                        resolvedDeptId = await findDepartmentIdByNumber(lastUsedOurNumber);
+                        // Fallback: try the slug 'from' param (expected to be our number)
+                        if (!resolvedDeptId) {
+                            resolvedDeptId = await findDepartmentIdByNumber(from);
+                        }
+                        // Final fallback: default to first available department
+                        if (!resolvedDeptId) {
+                            resolvedDeptId = String(depts[0].id);
+                        }
+                    }
+
+                    if (resolvedDeptId) {
+                        setSelectedDepartmentId(resolvedDeptId);
+                        await handleDepartmentChange(resolvedDeptId); // fetch numbers for that dept
+
+                        // If our last used number belongs to this department, select it;
+                        // otherwise keep the current selection from handleDepartmentChange.
+                        try {
+                            const nums = await getPhoneNumbers(Number(resolvedDeptId));
+                            if (nums.some(n => n.phone_no === lastUsedOurNumber)) {
+                                setSelectedFromNumber(lastUsedOurNumber);
+                            }
+                        } catch (_) {
+                            // ignore lookup errors
+                        }
                     }
                 } else {
                      setContactName(to); // Fallback
+                     // No history yet: choose department based on slug 'from' number if possible
                      if (depts.length > 0) {
-                        await handleDepartmentChange(String(depts[0].id));
+                        // Attempt to resolve department by the from number
+                        let deptId: string | null = null;
+                        for (const d of depts) {
+                            try {
+                                const nums = await getPhoneNumbers(d.id);
+                                if (nums.some(n => n.phone_no === from)) {
+                                    deptId = String(d.id);
+                                    break;
+                                }
+                            } catch (_) {}
+                        }
+                        const finalDeptId = deptId ?? String(depts[0].id);
+                        await handleDepartmentChange(finalDeptId);
+                        // If 'from' is one of the numbers in that department, preselect it
+                        try {
+                            const nums = await getPhoneNumbers(Number(finalDeptId));
+                            if (nums.some(n => n.phone_no === from)) {
+                                setSelectedFromNumber(from);
+                            }
+                        } catch (_) {}
                     }
                 }
 
