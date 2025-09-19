@@ -168,6 +168,10 @@ export default function AppHeader({
                         }
                     }
                     const { from, to, body } = data.data;
+                    // Notify any open conversation detail page to refresh
+                    try {
+                        events.emit("refreshConversation", { from, to });
+                    } catch (_) {}
                     const navigateToConversation = () => {
                         router.push(`/conversations/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
                     };

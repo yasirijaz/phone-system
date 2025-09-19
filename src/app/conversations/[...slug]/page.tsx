@@ -20,6 +20,7 @@ import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import { sendSms } from "@/services/twilioService";
+import { events } from "@/lib/events";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -45,6 +46,16 @@ export default function ConversationDetailPage() {
     
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from, to] = slug.map(part => decodeURIComponent(part));
+
+    const refreshThread = useCallback(async () => {
+        try {
+            const logs = await getCommunicationThread(from, to);
+            const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            setAllComms(sortedLogs);
+        } catch (e) {
+            console.error('Failed to refresh conversation thread', e);
+        }
+    }, [from, to]);
 
      const handleDepartmentChange = useCallback(async (departmentId: string) => {
         setSelectedDepartmentId(departmentId);
@@ -196,6 +207,19 @@ export default function ConversationDetailPage() {
             fetchInitialData();
         }
     }, [user, from, to, toast, handleDepartmentChange, searchParams]);
+
+    useEffect(() => {
+        const handler = (payload: { from: string; to: string }) => {
+            const matches = (payload.from === from && payload.to === to) || (payload.from === to && payload.to === from);
+            if (matches) {
+                refreshThread();
+            }
+        };
+        events.on('refreshConversation', handler);
+        return () => {
+            events.off('refreshConversation', handler);
+        };
+    }, [from, to, refreshThread]);
     
     useEffect(() => {
         if (messagesEndRef.current) {
