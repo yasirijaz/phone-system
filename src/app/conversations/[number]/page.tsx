@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useTwilio } from "@/context/TwilioContext";
 import { useToast } from "@/hooks/use-toast";
 import AppHeader from "@/components/app-header";
+import { events } from "@/lib/events";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -30,6 +31,18 @@ export default function ConversationDetailPage() {
     
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from, to] = slug.map(part => decodeURIComponent(part));
+
+    const refreshThread = useCallback(async () => {
+        try {
+            const logs = await getCommunicationThread(from, to);
+            const sortedLogs = logs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            setAllComms(sortedLogs);
+        } catch (error) {
+            console.error("Failed to fetch communication logs", error);
+        } finally {
+            setLoading(false);
+        }
+    }, [from, to]);
 
     useEffect(() => {
         const fetchAndFilterComms = async () => {
@@ -58,7 +71,20 @@ export default function ConversationDetailPage() {
         };
 
         fetchAndFilterComms();
-    }, [user, from, to]);
+    }, [user, from, to, refreshThread]);
+
+    useEffect(() => {
+        const handler = (payload: { from: string; to: string }) => {
+            const matches = (payload.from === from && payload.to === to) || (payload.from === to && payload.to === from);
+            if (matches) {
+                refreshThread();
+            }
+        };
+        events.on('refreshConversation', handler);
+        return () => {
+            events.off('refreshConversation', handler);
+        };
+    }, [from, to, refreshThread]);
 
     const handleMakeCall = async (number: string) => {
         if (!device || !isDeviceReady) {

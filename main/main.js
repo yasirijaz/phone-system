@@ -275,7 +275,6 @@ function destroyNotificationWindow() {
 }
 
 ipcMain.on('incoming-sms', (event, sms) => {
-  pendingCallInfo = callInfo || null;
   Mainwindow.show();
   Mainwindow.focus();
 });

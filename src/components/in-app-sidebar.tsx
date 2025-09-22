@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup, SidebarGroupLabel } from '@/components/ui/sidebar';
 import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building } from 'lucide-react';
-import { Logo } from './icons';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -13,6 +13,7 @@ import { getCommunications } from '@/services/callLogService';
 import type { Department } from '@/types';
 import { Badge } from './ui/badge';
 import { isElectron } from '@/lib/is-electron';
+import { events } from '@/lib/events';
 
 interface DepartmentWithUnread extends Department {
     unread_count: number;
@@ -26,42 +27,56 @@ export function InAppSidebar() {
   const inElectron = isElectron();
 
   useEffect(() => {
-    if (user) {
-        const fetchDepartmentsAndCounts = async () => {
-            try {
-                setLoading(true);
-                const userDepts = await getUserDepartments(user.id);
-                const deptsArray = Array.isArray(userDepts) ? userDepts : [];
+    if (!user) return;
 
-                const deptsWithCounts = await Promise.all(
-                    deptsArray.map(async (dept) => {
-                        const comms = await getCommunications({ department_id: dept.id, type: 'unread', limit: 1000 });
-                        const unreadCount = comms.results.filter(c => !c.is_read).length;
-                        return { ...dept, unread_count: unreadCount };
-                    })
-                );
-                
-                setDepartments(deptsWithCounts);
+    let mounted = true;
 
-            } catch (error) {
-                console.error("Failed to fetch user departments or unread counts", error);
-                setDepartments([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchDepartmentsAndCounts();
-    }
+    const fetchDepartmentsAndCounts = async () => {
+      try {
+        setLoading(true);
+        const userDepts = await getUserDepartments(user.id);
+        const deptsArray = Array.isArray(userDepts) ? userDepts : [];
+
+        const deptsWithCounts = await Promise.all(
+          deptsArray.map(async (dept) => {
+            const comms = await getCommunications({ department_id: dept.id, type: 'unread', limit: 1000 });
+            const unreadCount = comms.results.filter(c => !c.is_read).length;
+            return { ...dept, unread_count: unreadCount };
+          })
+        );
+
+        if (mounted) setDepartments(deptsWithCounts);
+      } catch (error) {
+        console.error("Failed to fetch user departments or unread counts", error);
+        if (mounted) setDepartments([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    fetchDepartmentsAndCounts();
+
+    const refreshHandler = () => fetchDepartmentsAndCounts();
+    events.on('refreshDepartmentsUnread', refreshHandler);
+    return () => {
+      mounted = false;
+      events.off('refreshDepartmentsUnread', refreshHandler);
+    };
   }, [user]);
 
   return (
     <>
       <SidebarHeader>
-        <div className="flex items-center gap-2">
-          <Logo className="h-8 w-8 text-primary" />
-          <span className="text-xl font-bold text-foreground group-data-[collapsible=icon]:hidden">
-            by Windshield Hub
-          </span>
+        <div className="flex items-center justify-center px-2 py-2">
+          <Image
+            src="/logo.png"
+            alt="CallSync"
+            width={180}
+            height={48}
+            className="h-12 w-auto"
+            priority
+            sizes="(max-width: 768px) 140px, 180px"
+          />
         </div>
       </SidebarHeader>
       
@@ -146,5 +161,3 @@ export function InAppSidebar() {
     </>
   );
 }
-
-    

@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuShortcut } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, MessageSquare, Video, Settings, LogOut, MoreVertical } from "lucide-react";
+import { Search, Phone, MessageSquare, Video, Settings, LogOut, MoreVertical, RefreshCw } from "lucide-react";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
@@ -169,6 +169,10 @@ export default function AppHeader({
                         }
                     }
                     const { from, to, body } = data.data;
+                    // Notify any open conversation detail page to refresh
+                    try {
+                        events.emit("refreshConversation", { from, to });
+                    } catch (_) {}
                     const navigateToConversation = () => {
                         router.push(`/conversations/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
                     };
@@ -422,7 +426,20 @@ export default function AppHeader({
                      )}
                 </div>
                 <div className="flex items-center gap-4">
-                     <TwilioStatusIndicator />
+                    <TwilioStatusIndicator />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Reload app"
+                      title="Reload app"
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.location.reload();
+                        }
+                      }}
+                    >
+                      <RefreshCw className="h-5 w-5" />
+                    </Button>
                      <Dialer
                         onMakeCall={handleMakeCall}
                         departments={departments}

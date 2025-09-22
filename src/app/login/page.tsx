@@ -44,6 +44,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
+          <Logo className="mx-auto w-28 h-auto" />
           <Logo className="mx-auto h-12 w-24" />
           <span className="text-xl font-bold text-foreground">by Windshield Hub</span>
           <CardTitle className="mt-4 text-2xl">Welcome Back!</CardTitle>

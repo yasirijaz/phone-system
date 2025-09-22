@@ -1,6 +1,7 @@
 
 import axios from '@/lib/axios';
 import type { User, Assignment, Department } from '@/types';
+//import { cacheGet, cacheSet } from '@/lib/simpleCache';
 
 export const getUsersByCompany = async (companyId: number): Promise<{data: User[]}> => {
   const response = await axios.get(`/api/companies/${companyId}/users`);
@@ -38,8 +39,16 @@ export const removeUserFromDepartment = async (companyId: number, departmentId: 
 };
 
 export const getUserDepartments = async (userId: number): Promise<Department[]> => {
+    const cacheKey = `user:${userId}:departments`;
+    // const cached = cacheGet<Department[]>(cacheKey);
+    // if (cached) return cached;
+
     const response = await axios.get(`/api/users/${userId}/departments`);
-    return response.data.departments;
+    const departments: Department[] = response.data.departments;
+    
+    // Cache for 2 minutes
+    // cacheSet(cacheKey, departments, 2 * 60 * 1000);
+    return departments;
 };
 
     
