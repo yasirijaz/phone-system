@@ -195,11 +195,11 @@ export default function AppHeader({
             };
 
             newSocket.onerror = (err) => {
-                console.error("❌ WebSocket error:", err);
+                console.error("❌ WebSocket error occurred. Details will be in the 'onclose' event.");
             };
 
-            newSocket.onclose = () => {
-                console.log("⚠️ WebSocket closed, retrying in 10s...");
+            newSocket.onclose = (event) => {
+                console.log(`⚠️ WebSocket closed. Code: ${event.code}, Reason: ${event.reason}, Clean: ${event.wasClean}. Retrying in 10s...`);
                 socketRef.current = null;
                 reconnectTimer = setTimeout(connectSocket, 10000);
             };
