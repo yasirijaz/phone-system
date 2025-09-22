@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -6,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings, Mic, Volume2 } from 'lucide-react';
+import { Settings, Mic, Volume2, PhoneCall } from 'lucide-react';
 import { Progress } from './ui/progress';
 import { Input } from './ui/input';
 
@@ -21,12 +20,20 @@ export default function HardwareSettings() {
     const [selectedSpeaker, setSelectedSpeaker] = useState<string>('');
     const [selectedCamera, setSelectedCamera] = useState<string>('');
 
+    // Mic testing states
     const [isTestingMic, setIsTestingMic] = useState(false);
     const [micVolume, setMicVolume] = useState(0);
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const animationFrameRef = useRef<number | null>(null);
+
+    // Loopback test states
+    const [isMakingTestCall, setIsMakingTestCall] = useState(false);
+    const [testCallStatus, setTestCallStatus] = useState<string>('');
+    const recorderRef = useRef<MediaRecorder | null>(null);
+    const chunksRef = useRef<Blob[]>([]);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
 
     const getDevices = async () => {
         if (!navigator.mediaDevices?.enumerateDevices) {
@@ -36,16 +43,15 @@ export default function HardwareSettings() {
         }
         setDevicesLoading(true);
         try {
-            // Request permissions separately to avoid errors if one device is missing
             try {
                 await navigator.mediaDevices.getUserMedia({ audio: true });
             } catch (err) {
-                 console.warn("Could not get audio permissions:", err);
+                console.warn("Could not get audio permissions:", err);
             }
-             try {
+            try {
                 await navigator.mediaDevices.getUserMedia({ video: true });
             } catch (err) {
-                 console.warn("Could not get video permissions:", err);
+                console.warn("Could not get video permissions:", err);
             }
 
             const devices = await navigator.mediaDevices.enumerateDevices();
@@ -75,6 +81,7 @@ export default function HardwareSettings() {
         }
     }, [isOpen]);
 
+    // 🔹 Microphone Volume Test
     const startMicTest = async () => {
         if (isTestingMic) return;
         setIsTestingMic(true);
@@ -123,7 +130,55 @@ export default function HardwareSettings() {
     const toggleMicTest = () => {
         isTestingMic ? stopMicTest() : startMicTest();
     };
-    
+
+    // 🔹 Skype-like Loopback Test
+    const makeTestCall = async () => {
+        try {
+            setIsMakingTestCall(true);
+            setTestCallStatus("Recording your voice...");
+
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { deviceId: selectedMicrophone ? { exact: selectedMicrophone } : undefined } 
+            });
+
+            recorderRef.current = new MediaRecorder(stream);
+            chunksRef.current = [];
+
+            recorderRef.current.ondataavailable = (e) => chunksRef.current.push(e.data);
+
+            recorderRef.current.onstop = async () => {
+                const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+                chunksRef.current = [];
+
+                const audioURL = URL.createObjectURL(blob);
+                if (audioRef.current) {
+                    audioRef.current.src = audioURL;
+
+                    if (selectedSpeaker && (audioRef.current as any).setSinkId) {
+                        await (audioRef.current as any).setSinkId(selectedSpeaker);
+                    }
+
+                    setTestCallStatus("Playing back your recording...");
+                    await audioRef.current.play();
+                }
+
+                stream.getTracks().forEach(track => track.stop());
+                setTimeout(() => {
+                    setIsMakingTestCall(false);
+                    setTestCallStatus("");
+                }, 5000);
+            };
+
+            recorderRef.current.start();
+            setTimeout(() => recorderRef.current?.stop(), 3000); // record 3s
+
+        } catch (err) {
+            console.error("Error during test call:", err);
+            setIsMakingTestCall(false);
+            setTestCallStatus("Failed to make a test call.");
+        }
+    };
+
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
@@ -136,64 +191,100 @@ export default function HardwareSettings() {
                     <div className="space-y-1">
                         <h4 className="font-medium leading-none">Hardware Settings</h4>
                     </div>
+
+                    {/* Microphone */}
                     <div className="grid gap-2">
-                         <div className="flex justify-between items-center">
-                            <Label htmlFor="mic-select" className="flex items-center gap-2"><Mic className="h-4 w-4"/>Microphone</Label>
-                            <Button variant="link" size="sm" className="p-0 h-auto" onClick={toggleMicTest}>{isTestingMic ? 'Stop' : 'Test'}</Button>
+                        <div className="flex justify-between items-center">
+                            <Label htmlFor="mic-select" className="flex items-center gap-2">
+                                <Mic className="h-4 w-4"/>Microphone
+                            </Label>
+                            <Button variant="link" size="sm" className="p-0 h-auto" onClick={toggleMicTest}>
+                                {isTestingMic ? 'Stop' : 'Test'}
+                            </Button>
                         </div>
                         <Select value={selectedMicrophone} onValueChange={setSelectedMicrophone} disabled={isTestingMic}>
                             <SelectTrigger id="mic-select">
                                 <SelectValue placeholder="Select Microphone" />
                             </SelectTrigger>
                             <SelectContent>
-                                {audioInputDevices.map(device => (
-                                    <SelectItem key={device.deviceId} value={device.deviceId}>
-                                        {device.label || `Microphone ${audioInputDevices.indexOf(device) + 1}`}
+                                {audioInputDevices.map((device, idx) => (
+                                    <SelectItem 
+                                        key={device.deviceId || `mic-${idx}`} 
+                                        value={device.deviceId || `mic-${idx}`}
+                                    >
+                                        {device.label || `Microphone ${idx + 1}`}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                         {isTestingMic && <Progress value={micVolume} className="h-2 mt-1" />}
                     </div>
-                     <div className="grid gap-2">
+
+                    {/* Speaker */}
+                    <div className="grid gap-2">
                         <div className="flex justify-between items-center">
-                             <Label htmlFor="speaker-select" className="flex items-center gap-2"><Volume2 className="h-4 w-4"/>Speaker / Headset</Label>
+                            <Label htmlFor="speaker-select" className="flex items-center gap-2">
+                                <Volume2 className="h-4 w-4"/>Speaker / Headset
+                            </Label>
                         </div>
-                         <Select value={selectedSpeaker} onValueChange={setSelectedSpeaker}>
+                        <Select value={selectedSpeaker} onValueChange={setSelectedSpeaker}>
                             <SelectTrigger id="speaker-select">
                                 <SelectValue placeholder="Select Speaker" />
                             </SelectTrigger>
                             <SelectContent>
-                               {audioOutputDevices.map(device => (
-                                    <SelectItem key={device.deviceId} value={device.deviceId}>
-                                        {device.label || `Speaker ${audioOutputDevices.indexOf(device) + 1}`}
+                                {audioOutputDevices.map((device, idx) => (
+                                    <SelectItem 
+                                        key={device.deviceId || `mic-${idx}`} 
+                                        value={device.deviceId || `mic-${idx}`}
+                                    >
+                                        {device.label || `Speaker ${idx + 1}`}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
+
+                    {/* Camera */}
                     <div className="grid gap-2">
-                         <Label htmlFor="camera-select">Camera</Label>
-                         {devicesLoading ? (
-                             <Input disabled placeholder="Detecting cameras..." />
-                         ) : videoInputDevices.length > 0 ? (
+                        <Label htmlFor="camera-select">Camera</Label>
+                        {devicesLoading ? (
+                            <Input disabled placeholder="Detecting cameras..." />
+                        ) : videoInputDevices.length > 0 ? (
                             <Select value={selectedCamera} onValueChange={setSelectedCamera}>
                                 <SelectTrigger id="camera-select">
                                     <SelectValue placeholder="Select Camera" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {videoInputDevices.map(device => (
-                                        <SelectItem key={device.deviceId} value={device.deviceId}>
-                                            {device.label || `Camera ${videoInputDevices.indexOf(device) + 1}`}
+                                    {videoInputDevices.map((device, idx) => (
+                                        <SelectItem 
+                                            key={device.deviceId || `mic-${idx}`} 
+                                            value={device.deviceId || `mic-${idx}`}
+                                        >
+                                            {device.label || `Camera ${idx + 1}`}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                         ) : (
+                        ) : (
                             <Input disabled value="No camera devices found." />
-                         )}
+                        )}
                     </div>
-                     <div className="grid gap-2 mt-2">
+
+                    {/* Skype-style Test Call */}
+                    <div className="grid gap-2 mt-2">
+                        <Button 
+                            variant="outline" 
+                            className="flex items-center gap-2" 
+                            disabled={isMakingTestCall} 
+                            onClick={makeTestCall}
+                        >
+                            <PhoneCall className="h-4 w-4" /> {isMakingTestCall ? "Testing..." : "Make a test call"}
+                        </Button>
+                        {testCallStatus && <p className="text-sm text-muted-foreground">{testCallStatus}</p>}
+                        <audio ref={audioRef} />
+                    </div>
+
+                    <div className="grid gap-2 mt-2">
                         <Button variant="link" className="justify-start p-0 h-auto text-primary">Advanced hardware settings</Button>
                         <Button variant="link" className="justify-start p-0 h-auto text-primary">Customize notification & sounds</Button>
                     </div>
