@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -131,6 +132,19 @@ export default function HardwareSettings() {
         isTestingMic ? stopMicTest() : startMicTest();
     };
 
+    // 🔹 Speaker Test
+    const testSpeaker = async () => {
+        const testAudio = new Audio('/sounds/ringtone.mp3');
+        try {
+            if (selectedSpeaker && (testAudio as any).setSinkId) {
+                await (testAudio as any).setSinkId(selectedSpeaker);
+            }
+            testAudio.play();
+        } catch (err) {
+            console.error("Error testing speaker:", err);
+        }
+    };
+    
     // 🔹 Skype-like Loopback Test
     const makeTestCall = async () => {
         try {
@@ -226,6 +240,9 @@ export default function HardwareSettings() {
                             <Label htmlFor="speaker-select" className="flex items-center gap-2">
                                 <Volume2 className="h-4 w-4"/>Speaker / Headset
                             </Label>
+                             <Button variant="link" size="sm" className="p-0 h-auto" onClick={testSpeaker}>
+                                Test
+                            </Button>
                         </div>
                         <Select value={selectedSpeaker} onValueChange={setSelectedSpeaker}>
                             <SelectTrigger id="speaker-select">
@@ -293,3 +310,4 @@ export default function HardwareSettings() {
         </Popover>
     );
 }
+    
