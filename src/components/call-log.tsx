@@ -46,6 +46,15 @@ function CommunicationCard({
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const getInitials = (name: string) => {
+    if (!name) return '?';
+    const nameParts = name.split(' ').filter(Boolean);
+    if (nameParts.length > 1) {
+      return `${nameParts[0].charAt(0)}${nameParts[nameParts.length - 1].charAt(0)}`.toUpperCase();
+    }
+    return name.charAt(0).toUpperCase();
+  };
+
   const isMine = comm.direction === 'outbound' || (user && comm.user_id === user.id && comm.direction !== 'inbound');
 
   const findContact = (phone: string) => {
@@ -59,11 +68,11 @@ function CommunicationCard({
   const otherParty = {
       name: contact?.name || otherPartyNumber,
       number: otherPartyNumber,
-      initial: (contact?.name || otherPartyNumber || '?').charAt(0).toUpperCase()
+      initial: getInitials(contact?.name || otherPartyNumber)
   };
 
   const contactName = isFirstInGroup ? (isMine ? (user?.name || 'Me') : otherParty.name) : '';
-  const contactInitial = isMine ? (user?.name || 'Me').charAt(0).toUpperCase() : otherParty.initial;
+  const contactInitial = getInitials(isMine ? (user?.name || 'Me') : otherParty.name);
   const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
   
   const showAvatar = !isMine && isFirstInGroup;
@@ -73,8 +82,8 @@ function CommunicationCard({
       "p-3 max-w-[80%] break-words",
       isMine ? "bg-primary text-primary-foreground" : "bg-muted",
       isFirstInGroup && (isMine ? "rounded-t-lg rounded-bl-lg" : "rounded-t-lg rounded-br-lg"),
-      isLastInGroup && (isMine ? "rounded-b-lg rounded-bl-lg" : "rounded-b-lg rounded-br-lg"),
-      isMiddleOfGroup && (isMine ? "rounded-bl-lg" : "rounded-br-lg"),
+      isLastInGroup && !isFirstInGroup && (isMine ? "rounded-b-lg rounded-l-lg" : "rounded-b-lg rounded-r-lg"),
+      isMiddleOfGroup && (isMine ? "rounded-l-lg" : "rounded-r-lg"),
       !isFirstInGroup && !isLastInGroup && !isMiddleOfGroup && "rounded-lg" // single message in a group
     )}>
       <p className="text-sm">{c.body}</p>
@@ -95,15 +104,13 @@ function CommunicationCard({
         <div className={cn("flex items-start gap-3 p-3 rounded-lg w-full", isMine ? "bg-primary/10" : "bg-muted")}>
             <Icon className={cn("h-5 w-5 mt-1", isMissed ? "text-destructive" : "text-muted-foreground")} />
             <div className="flex-1 flex items-center justify-between text-sm space-y-1">
-                <div>
+                <div className="flex-1">
                     <div className="flex items-center justify-between">
                         <p className="font-semibold">{title}</p>
+                         <p className="text-muted-foreground text-xs">{duration} <span className="mx-1">&bull;</span> {endTime}</p>
                     </div>
                     <p className="text-muted-foreground text-xs">
                         {c.direction === 'inbound' ? 'Dialpad' : 'Other'} {fromNumberFormatted} &rarr; {c.direction === 'inbound' ? 'Other' : 'Dialpad'} {toNumberFormatted}
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                        {duration} <span className="mx-1">&bull;</span> {endTime}
                     </p>
                 </div>
                 {c.recording_url && (
