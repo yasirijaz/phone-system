@@ -39,10 +39,10 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
     const form = useForm<z.infer<typeof contactSchema>>({
         resolver: zodResolver(contactSchema),
         defaultValues: {
-            name: contact?.name || "",
-            email: contact?.email || "",
-            phone_no: contact?.phone_no || "",
-            phone_type: contact?.phone_type || "mobile",
+            name: "",
+            email: "",
+            phone_no: "",
+            phone_type: "mobile",
         }
     });
 
@@ -57,7 +57,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                 phone_type: contact.phone_type || 'mobile',
             });
         }
-    }, [contact, form, isSavedContact, isEditing]);
+    }, [contact, form, isSavedContact]);
     
     if (!contact) {
         return (
@@ -116,7 +116,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                                 {isSavedContact ? (
                                     <Button variant="outline" className="w-full">Edit contact</Button>
                                 ) : (
-                                     <Button className="w-full">
+                                     <Button className="w-full" onClick={() => form.reset({ name: '', email: '', phone_no: contact.phone_no, phone_type: 'mobile'})}>
                                         <PlusCircle className="mr-2 h-4 w-4" /> Add contact
                                     </Button>
                                 )}

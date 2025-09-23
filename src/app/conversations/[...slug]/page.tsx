@@ -55,6 +55,17 @@ export default function ConversationDetailPage() {
             const logs = await getCommunicationThread(from, to);
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);
+             if (sortedLogs.length > 0) {
+                const latestComm = sortedLogs[sortedLogs.length - 1];
+                const otherPartyIsFrom = latestComm.direction === 'inbound';
+                const contactData = otherPartyIsFrom ? latestComm.from_name : latestComm.to_name;
+                
+                setContact({
+                    ...contactData,
+                    phone_no: otherPartyIsFrom ? latestComm.from : latestComm.to,
+                    name: contactData?.name || (otherPartyIsFrom ? latestComm.from : latestComm.to)
+                });
+             }
         } catch (e) {
             console.error('Failed to refresh conversation thread', e);
         }
@@ -279,7 +290,7 @@ export default function ConversationDetailPage() {
                                             <p className="text-sm text-muted-foreground">{contact?.phone_no}</p>
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="icon" onClick={() => setIsProfileSidebarOpen(!isProfileSidebarOpen)} className="md:hidden">
+                                    <Button variant="ghost" size="icon" onClick={() => setIsProfileSidebarOpen(!isProfileSidebarOpen)}>
                                         {isProfileSidebarOpen ? <PanelRightClose /> : <PanelRightOpen />}
                                     </Button>
                                 </header>
@@ -328,7 +339,7 @@ export default function ConversationDetailPage() {
                                 </footer>
                             </div>
                             <aside className={cn("border-l bg-background overflow-y-auto transition-all duration-300", isProfileSidebarOpen ? "w-full md:w-1/3 lg:w-1/4" : "w-0 hidden")}>
-                                <ContactProfile contact={contact} onContactUpdate={() => refreshThread()} onCollapse={() => setIsProfileSidebarOpen(false)} />
+                                <ContactProfile contact={contact} onContactUpdate={refreshThread} onCollapse={() => setIsProfileSidebarOpen(false)} />
                             </aside>
                         </div>
                     </div>
