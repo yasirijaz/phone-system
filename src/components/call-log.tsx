@@ -107,11 +107,15 @@ function CommunicationCard({
                 <div className="flex-1">
                     <div className="flex items-center justify-between">
                         <p className="font-semibold">{title}</p>
-                         <p className="text-muted-foreground text-xs">{duration} <span className="mx-1">&bull;</span> {endTime}</p>
                     </div>
                     <p className="text-muted-foreground text-xs">
                         {c.direction === 'inbound' ? 'Dialpad' : 'Other'} {fromNumberFormatted} &rarr; {c.direction === 'inbound' ? 'Other' : 'Dialpad'} {toNumberFormatted}
                     </p>
+                    <div className="flex items-center text-xs text-muted-foreground mt-1">
+                        <span>{duration}</span>
+                        <span className="mx-2">&bull;</span>
+                        <span>{endTime}</span>
+                    </div>
                 </div>
                 {c.recording_url && (
                     <AudioPlayer src={c.recording_url} type="Recording" />
@@ -144,9 +148,9 @@ function CommunicationCard({
                             {contact ? mainPageAvatarInitial : <User className="h-5 w-5 text-muted-foreground" />}
                         </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 flex items-center gap-4">
-                        <p className={cn("font-semibold w-48 truncate", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
-                        <p className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
+                    <div className="flex-1 grid grid-cols-3 items-center gap-4">
+                        <p className={cn("font-semibold truncate", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
+                        <p className={cn("text-sm text-muted-foreground", !comm.is_read && "text-foreground")}>
                            {callInfo}
                         </p>
                     </div>
@@ -179,7 +183,7 @@ function CommunicationCard({
             )}
             {!showAvatar && !isMine && <div className="w-8" />}
 
-            <div className={cn("flex flex-col gap-1", isMine ? 'items-end' : 'items-start')}>
+            <div className={cn("flex flex-col gap-1 w-full", isMine ? 'items-end' : 'items-start')}>
                 {isFirstInGroup && comm.created_at && (
                     <p className={cn("text-xs text-muted-foreground", isMine ? "text-right" : "text-left", "px-1")}>
                         <span className="font-semibold">{contactName}</span> • {format(parseISO(comm.created_at), 'p')}
@@ -276,3 +280,4 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
     </div>
   );
 }
+
