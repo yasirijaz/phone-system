@@ -111,6 +111,7 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.2",
     "react-redux": "^9.1.2",
+    "react-resizable-panels": "^2.0.19",
     "recharts": "^2.15.1",
     "socket.io-client": "^4.7.5",
     "stripe": "^18.3.0",
