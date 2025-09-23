@@ -57,7 +57,7 @@ export function InAppSidebar() {
 
         const [userDepts, recentComms, contacts] = await Promise.all([
             getUserDepartments(user.id),
-            getCommunications({ limit: 20 }),
+            getCommunications({ limit: 50 }), // Fetch more to find unique contacts
             getContacts(user.company_id),
         ]);
         
@@ -73,24 +73,27 @@ export function InAppSidebar() {
         
         if (mounted) setDepartments(deptsWithCounts);
 
-        // Process recent communications
+        // Process recent communications to create a unique list of contacts
         const uniqueRecents: { [key: string]: RecentItem } = {};
+        const seenNumbers = new Set<string>();
+
         recentComms.results.forEach((comm: Communication) => {
             const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
             const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
-            const key = otherPartyNumber;
-            if (!uniqueRecents[key]) {
+
+            if (!seenNumbers.has(otherPartyNumber)) {
+                seenNumbers.add(otherPartyNumber);
                 const contact = contacts.find((c: Contact) => c.phone_no === otherPartyNumber);
                 const name = contact?.name || otherPartyNumber;
-                uniqueRecents[key] = {
-                    id: key,
+                uniqueRecents[otherPartyNumber] = {
+                    id: otherPartyNumber,
                     name: name,
                     href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}`,
                     initials: getInitials(name),
                 };
             }
         });
-
+        
         if (mounted) {
             setRecentItems(Object.values(uniqueRecents).slice(0, 10));
         }
