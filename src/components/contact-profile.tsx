@@ -12,12 +12,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import { ChevronDown, PlusCircle, Trash2, X, User, PanelRightClose } from 'lucide-react';
+import { ChevronDown, PlusCircle, Trash2, User, PanelRightOpen, PlayCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { createContact, updateContact, blockContact, unblockContact } from '@/services/contactService';
 import type { Contact } from '@/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
 interface ContactProfileProps {
     contact: any;
@@ -32,10 +33,14 @@ const contactSchema = z.object({
   phone_type: z.string().min(1, "Phone type is required."),
 });
 
+type BlockOption = 'voicemail' | 'spam' | 'block';
+
 export default function ContactProfile({ contact, onContactUpdate, onCollapse }: ContactProfileProps) {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isEditing, setIsEditing] = useState(false);
+    const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
+    const [selectedBlockOption, setSelectedBlockOption] = useState<BlockOption>('voicemail');
 
     const form = useForm<z.infer<typeof contactSchema>>({
         resolver: zodResolver(contactSchema),
@@ -97,19 +102,26 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
         }
     };
     
-    const handleBlockUnblock = async () => {
+    const handleBlock = async () => {
         if (!isSavedContact) return;
-
-        const isBlocked = contact.status === 'blocked';
-        const action = isBlocked ? unblockContact : blockContact;
-        const actionName = isBlocked ? 'Unblock' : 'Block';
-
         try {
-            await action(contact.id);
-            toast({ title: 'Success', description: `Contact has been ${actionName.toLowerCase()}ed.` });
+            await blockContact(contact.id, selectedBlockOption);
+            toast({ title: 'Success', description: `Contact has been blocked.` });
+            onContactUpdate();
+            setIsBlockDialogOpen(false);
+        } catch (error: any) {
+             toast({ title: 'Error', description: error.response?.data?.message || `Failed to block contact.`, variant: 'destructive' });
+        }
+    };
+    
+    const handleUnblock = async () => {
+        if (!isSavedContact) return;
+        try {
+            await unblockContact(contact.id);
+            toast({ title: 'Success', description: 'Contact has been unblocked.' });
             onContactUpdate();
         } catch (error: any) {
-            toast({ title: 'Error', description: error.response?.data?.message || `Failed to ${actionName.toLowerCase()} contact.`, variant: 'destructive' });
+             toast({ title: 'Error', description: error.response?.data?.message || `Failed to unblock contact.`, variant: 'destructive' });
         }
     };
 
@@ -118,7 +130,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
             <header className="flex items-center justify-between p-4 border-b">
                 <h2 className="font-semibold text-lg">Profile</h2>
                 <Button variant="ghost" size="icon" onClick={onCollapse}>
-                    <PanelRightClose className="h-5 w-5" />
+                    <PanelRightOpen className="h-5 w-5" />
                 </Button>
             </header>
             <div className="flex-1 p-4 space-y-6">
@@ -186,29 +198,69 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                             </DialogContent>
                         </Dialog>
                          {isSavedContact && (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" className="w-full">
-                                        {contact.status === 'blocked' ? 'Unblock Contact' : 'Block Contact'}
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            {contact.status === 'blocked'
-                                                ? 'This will allow the contact to call and message you again.'
-                                                : 'This will prevent the contact from calling or messaging you.'}
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleBlockUnblock}>
-                                            {contact.status === 'blocked' ? 'Unblock' : 'Block'}
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
+                             contact.status === 'blocked' ? (
+                                 <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="destructive" className="w-full">Unblock Contact</Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This will allow the contact to call and message you again.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={handleUnblock}>Unblock</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                             ) : (
+                                <Dialog open={isBlockDialogOpen} onOpenChange={setIsBlockDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button variant="destructive" className="w-full">Block Contact</Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-md">
+                                        <DialogHeader>
+                                            <DialogTitle>BLOCK {contact.phone_no}</DialogTitle>
+                                            <DialogDescription>
+                                                This will prevent this number from calling you or sending you messages.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <RadioGroup value={selectedBlockOption} onValueChange={(value: BlockOption) => setSelectedBlockOption(value)} className="space-y-4 py-4">
+                                            <Label className="flex items-start gap-4 p-4 rounded-md border has-[:checked]:border-primary">
+                                                <RadioGroupItem value="voicemail" />
+                                                <div className="grid gap-1.5 leading-normal">
+                                                    <span className="font-semibold">Send directly to voicemail</span>
+                                                    <span className="text-sm text-muted-foreground">Text and voicemail messages will appear in your inbox.</span>
+                                                </div>
+                                            </Label>
+                                            <Label className="flex items-start gap-4 p-4 rounded-md border has-[:checked]:border-primary">
+                                                <RadioGroupItem value="spam" />
+                                                <div className="grid gap-1.5 leading-normal">
+                                                     <span className="font-semibold">Mark as "Spam"</span>
+                                                     <span className="text-sm text-muted-foreground">Call will be sent directly to voicemail. Text and voicemail messages will be automatically moved to your inbox "Spam" folder.</span>
+                                                </div>
+                                            </Label>
+                                            <Label className="flex items-start gap-4 p-4 rounded-md border has-[:checked]:border-primary">
+                                                <RadioGroupItem value="block" />
+                                                <div className="grid gap-1.5 leading-normal">
+                                                     <span className="font-semibold">Block {contact.phone_no}</span>
+                                                     <span className="text-sm text-muted-foreground">Callers will hear a not-in-service message. Text and voicemail messages will not be allowed.</span>
+                                                      <Button variant="link" size="sm" className="p-0 h-auto justify-start text-primary">
+                                                        <PlayCircle className="mr-1 h-4 w-4" /> Preview not-in-service message
+                                                      </Button>
+                                                </div>
+                                            </Label>
+                                        </RadioGroup>
+                                        <DialogFooter>
+                                            <Button variant="secondary" onClick={() => setIsBlockDialogOpen(false)}>Cancel</Button>
+                                            <Button variant="destructive" onClick={handleBlock}>Block</Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                             )
                          )}
                     </div>
                 </div>
