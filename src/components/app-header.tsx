@@ -155,7 +155,7 @@ export default function AppHeader({
                 const data = JSON.parse(evt.data);
                 console.log("📩 WebSocket message received:", data);
 
-                if (data.method_type === "refresh_listing") {
+                if (data.method_type === "refresh_listing" || data.method_type === "status_change") {
                     events.emit("refreshCalls");
                 }
 
