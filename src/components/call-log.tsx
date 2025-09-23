@@ -1,7 +1,7 @@
 
 
 import type { Communication, Contact } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight } from 'lucide-react';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight, ChevronDown } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import AudioPlayer from './AudioPlayer';
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 interface CallLogProps {
   calls: Communication[];
@@ -123,37 +124,37 @@ function CommunicationCard({
        const from = encodeURIComponent(comm.direction === 'inbound' ? comm.to : comm.from);
        const to = encodeURIComponent(comm.direction === 'inbound' ? comm.from : comm.to);
        const queryString = source === 'unread' ? `?source=unread` : '';
+       
+       const callInfo = comm.type === 'call' 
+        ? `${comm.direction === 'inbound' ? 'Inbound' : 'Outbound'} / ${comm.duration || 0} min` 
+        : comm.body;
+
        return (
             <div className="flex items-center p-4 gap-4 hover:bg-muted/50 rounded-lg group">
                 <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="flex-1 flex items-center gap-4">
                     <Avatar className="h-10 w-10">
                         <AvatarFallback>{mainPageAvatarInitial}</AvatarFallback>
                     </Avatar>
-                    <div className="flex-1">
-                        <div className="flex justify-between items-center">
-                            <p className={cn("font-semibold", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
-                            {comm.created_at && (
-                                <p className={cn("text-xs text-muted-foreground", !comm.is_read && "text-primary font-semibold")}>
-                                    {format(parseISO(comm.created_at), 'MMM d')}
-                                </p>
-                            )}
-                        </div>
-                         <p className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
-                            {comm.type === 'sms' ? comm.body : `${comm.direction === 'inbound' ? 'Incoming' : 'Outgoing'} call`}
-                         </p>
+                    <div className="flex-1 flex items-center gap-4">
+                        <p className={cn("font-semibold w-48 truncate", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
+                        <p className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
+                           {callInfo}
+                        </p>
                     </div>
                 </Link>
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onMakeCall(mainPageContactNumber);
-                    }}
-                >
-                    <PhoneIcon className="h-5 w-5" />
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                         <Button variant="outline" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <PhoneIcon className="h-4 w-4" />
+                            <ChevronDown className="h-4 w-4 ml-1" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onMakeCall(mainPageContactNumber)}>
+                            Call {mainPageContactNumber}
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
        )
     }
