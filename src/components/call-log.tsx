@@ -80,7 +80,7 @@ function CommunicationCard({
     const endTime = c.created_at ? format(parseISO(c.created_at), 'p') : '';
 
     return (
-        <div className={cn("flex items-start gap-3 p-3 rounded-lg w-full max-w-md", isMine ? "bg-primary/10" : "bg-muted")}>
+        <div className={cn("flex items-start gap-3 p-3 rounded-lg w-full", isMine ? "bg-primary/10" : "bg-muted")}>
             <Icon className={cn("h-5 w-5 mt-1", isMissed ? "text-destructive" : "text-muted-foreground")} />
             <div className="flex-1 flex items-center justify-between text-sm space-y-1">
                 <div>
