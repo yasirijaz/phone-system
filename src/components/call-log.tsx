@@ -70,16 +70,26 @@ function CommunicationCard({
   );
 
   const renderCallBubble = (c: Communication) => {
-    const title = c.direction === 'inbound' ? 'Incoming Call' : 'Outgoing Call';
-    const Icon = c.direction === 'inbound' ? PhoneIncoming : PhoneOutgoing;
+    const title = isMine ? `You called ${otherParty.name}` : `${otherParty.name} called you`;
+    const Icon = isMine ? PhoneOutgoing : PhoneIncoming;
+
+    const fromNumberFormatted = c.from?.replace(/^\+1/, '');
+    const toNumberFormatted = c.to?.replace(/^\+1/, '');
+    
     const duration = c.duration ? `${c.duration} min` : 'Unanswered';
+    const endTime = c.created_at ? format(parseISO(c.created_at), 'p') : '';
 
     return (
-        <div className={cn("flex items-center gap-3 p-3 rounded-lg w-full max-w-sm", isMine ? "bg-primary/10" : "bg-muted")}>
-            <Icon className={cn("h-5 w-5", isMissed ? "text-destructive" : "text-muted-foreground")} />
-            <div className="flex-1 text-sm">
+        <div className={cn("flex items-start gap-3 p-3 rounded-lg w-full max-w-sm", isMine ? "bg-primary/10" : "bg-muted")}>
+            <Icon className={cn("h-5 w-5 mt-1", isMissed ? "text-destructive" : "text-muted-foreground")} />
+            <div className="flex-1 text-sm space-y-1">
                 <p className="font-semibold">{title}</p>
-                <p className="text-muted-foreground">{duration}</p>
+                <p className="text-muted-foreground text-xs">
+                    {c.direction === 'inbound' ? 'Dialpad' : 'Other'} {fromNumberFormatted} &rarr; {c.direction === 'inbound' ? 'Other' : 'Dialpad'} {toNumberFormatted}
+                </p>
+                <p className="text-muted-foreground text-xs">
+                    Lasted {duration} &bull; Ended at {endTime}
+                </p>
             </div>
         </div>
     );
