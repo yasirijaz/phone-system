@@ -34,7 +34,7 @@ const contactSchema = z.object({
   phone_type: z.string().min(1, "Phone type is required."),
 });
 
-type BlockOption = 'voicemail' | 'spam' | 'block';
+type BlockOption = 'voicemail' | 'spam' | 'hard';
 
 export default function ContactProfile({ contact, onContactUpdate, onCollapse }: ContactProfileProps) {
     const { user } = useAuth();
@@ -245,7 +245,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                                                 </div>
                                             </Label>
                                             <Label className="flex items-start gap-4 p-4 rounded-md border has-[:checked]:border-primary">
-                                                <RadioGroupItem value="block" />
+                                                <RadioGroupItem value="hard" />
                                                 <div className="grid gap-1.5 leading-normal">
                                                      <span className="font-semibold">Block {contact.phone_no}</span>
                                                      <span className="text-sm text-muted-foreground">Callers will hear a not-in-service message. Text and voicemail messages will not be allowed.</span>

@@ -29,8 +29,8 @@ export const deleteContact = async (id: number): Promise<void> => {
     await axios.delete(`/api/contacts/${id}`);
 };
 
-export const blockContact = async (id: number, block_type: 'voicemail' | 'spam' | 'block'): Promise<void> => {
-  await axios.post(`/api/contacts/${id}/block`, { block_type });
+export const blockContact = async (id: number, block_action: 'voicemail' | 'spam' | 'hard'): Promise<void> => {
+  await axios.post(`/api/contacts/${id}/block`, { block_action });
 };
 
 export const unblockContact = async (id: number): Promise<void> => {
