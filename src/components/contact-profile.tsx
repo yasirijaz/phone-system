@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import { ChevronDown, PlusCircle, Trash2, X, User, PanelRightClose } from 'lucide-react';
+import { ChevronDown, PlusCircle, Trash2, X, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { createContact, updateContact } from '@/services/contactService';
@@ -21,7 +21,6 @@ import type { Contact } from '@/types';
 interface ContactProfileProps {
     contact: any;
     onContactUpdate: () => void;
-    onToggleCollapse: () => void;
 }
 
 const contactSchema = z.object({
@@ -31,7 +30,7 @@ const contactSchema = z.object({
   phone_type: z.string().min(1, "Phone type is required."),
 });
 
-export default function ContactProfile({ contact, onContactUpdate, onToggleCollapse }: ContactProfileProps) {
+export default function ContactProfile({ contact, onContactUpdate }: ContactProfileProps) {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isEditing, setIsEditing] = useState(false);
@@ -76,11 +75,8 @@ export default function ContactProfile({ contact, onContactUpdate, onToggleColla
     
     return (
         <div className="h-full flex flex-col">
-            <header className="flex items-center justify-between p-4 border-b">
+            <header className="flex items-center p-4 border-b">
                 <h2 className="font-semibold text-lg">Profile</h2>
-                 <Button variant="ghost" size="icon" onClick={onToggleCollapse}>
-                    <PanelRightClose className="h-4 w-4" />
-                </Button>
             </header>
             <div className="flex-1 p-4 space-y-6">
                 <div className="flex items-center gap-4">
