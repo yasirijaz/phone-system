@@ -1,7 +1,7 @@
 
 
 import type { Communication, Contact } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video } from 'lucide-react';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -69,15 +69,37 @@ function CommunicationCard({
     </div>
   );
 
-  const renderCallBubble = (c: Communication) => (
-    <div className={cn("p-3 rounded-lg max-w-[80%] flex items-center gap-2", isMine ? "bg-blue-900 text-white" : "bg-gray-700 text-white")}>
-      {c.direction === 'inbound' ? <PhoneIncoming className="h-5 w-5 flex-shrink-0" /> : <PhoneOutgoing className="h-5 w-5 flex-shrink-0" />}
-      <div className="flex items-baseline gap-2 flex-wrap">
-        <p className="font-semibold whitespace-nowrap text-sm">{c.direction === 'inbound' ? 'Incoming Call' : 'Outgoing Call'}</p>
-        <p className="text-xs whitespace-nowrap">{c.duration ? `${c.duration} min` : 'Unanswered'}</p>
+  const renderCallBubble = (c: Communication) => {
+    const title = c.direction === 'inbound' ? `${otherParty.name} called you` : `You called ${otherParty.name}`;
+    const fromNumber = c.direction === 'inbound' ? c.from : c.to;
+    const fromName = findContact(fromNumber)?.name || fromNumber;
+    const toNumber = c.direction === 'inbound' ? c.to : c.from;
+    const toName = findContact(toNumber)?.name || (user?.name || 'Me');
+    const callEndedTime = c.updated_at ? format(parseISO(c.updated_at), 'p') : '';
+
+    return (
+      <div className={cn("p-4 rounded-lg max-w-sm w-full", isMine ? "bg-primary/10" : "bg-muted")}>
+          <div className="flex items-center justify-between mb-2">
+            <p className="font-semibold">{title}</p>
+          </div>
+          <div className="flex items-start gap-3">
+              <PhoneIcon className="h-5 w-5 mt-0.5 text-muted-foreground" />
+              <div className="flex-1 text-sm text-muted-foreground space-y-1">
+                  <p>{toName} → {fromName}</p>
+                  <p>
+                    {c.duration ? `Lasted ${c.duration} min` : 'Unanswered'}
+                    {callEndedTime && ` • Ended at ${callEndedTime}`}
+                  </p>
+              </div>
+          </div>
+          <div className="flex justify-end items-center gap-1 mt-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8"><Share2 className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8"><ExternalLink className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+          </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const CardContent = () => {
     // On the main listing page, we only want to show the external contact info
