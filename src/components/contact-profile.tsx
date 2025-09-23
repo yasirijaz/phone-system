@@ -19,6 +19,7 @@ import { createContact, updateContact, blockContact, unblockContact } from '@/se
 import type { Contact } from '@/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { Label } from './ui/label';
 
 interface ContactProfileProps {
     contact: any;
