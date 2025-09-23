@@ -28,3 +28,11 @@ export const updateContact = async (id: number, contactData: Partial<Omit<Contac
 export const deleteContact = async (id: number): Promise<void> => {
     await axios.delete(`/api/contacts/${id}`);
 };
+
+export const blockContact = async (id: number): Promise<void> => {
+  await axios.post(`/api/contacts/${id}/block`);
+};
+
+export const unblockContact = async (id: number): Promise<void> => {
+  await axios.post(`/api/contacts/${id}/unblock`);
+};

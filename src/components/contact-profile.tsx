@@ -15,8 +15,9 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { ChevronDown, PlusCircle, Trash2, X, User, PanelRightClose } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { createContact, updateContact } from '@/services/contactService';
+import { createContact, updateContact, blockContact, unblockContact } from '@/services/contactService';
 import type { Contact } from '@/types';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 
 interface ContactProfileProps {
     contact: any;
@@ -96,6 +97,22 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
         }
     };
     
+    const handleBlockUnblock = async () => {
+        if (!isSavedContact) return;
+
+        const isBlocked = contact.status === 'blocked';
+        const action = isBlocked ? unblockContact : blockContact;
+        const actionName = isBlocked ? 'Unblock' : 'Block';
+
+        try {
+            await action(contact.id);
+            toast({ title: 'Success', description: `Contact has been ${actionName.toLowerCase()}ed.` });
+            onContactUpdate();
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.response?.data?.message || `Failed to ${actionName.toLowerCase()} contact.`, variant: 'destructive' });
+        }
+    };
+
     return (
         <div className="h-full flex flex-col">
             <header className="flex items-center justify-between p-4 border-b">
@@ -168,7 +185,31 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                                 </Form>
                             </DialogContent>
                         </Dialog>
-                         {isSavedContact && <Button variant="destructive" className="w-full">Block contact</Button>}
+                         {isSavedContact && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive" className="w-full">
+                                        {contact.status === 'blocked' ? 'Unblock Contact' : 'Block Contact'}
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            {contact.status === 'blocked'
+                                                ? 'This will allow the contact to call and message you again.'
+                                                : 'This will prevent the contact from calling or messaging you.'}
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleBlockUnblock}>
+                                            {contact.status === 'blocked' ? 'Unblock' : 'Block'}
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                         )}
                     </div>
                 </div>
 

@@ -230,6 +230,7 @@ export interface Contact {
   email: string | null;
   phone_no: string;
   phone_type: string;
+  status?: 'active' | 'blocked';
 }
 
 export interface MediaFile {
