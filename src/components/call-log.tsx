@@ -1,4 +1,5 @@
 
+
 import type { Communication } from '@/types';
 import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
@@ -62,6 +63,12 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Co
     const type = comm.latest_type || comm.type;
     const iconClasses = "h-4 w-4";
 
+    if (isInProgress) {
+        return <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+        </span>;
+    }
     if (type === 'sms') {
       return <MessageSquare className={cn(iconClasses, "text-blue-500")} />;
     }
