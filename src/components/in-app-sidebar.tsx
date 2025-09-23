@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -55,9 +56,9 @@ export function InAppSidebar() {
         setLoading(true);
         if (!user.id || !user.company_id) return;
 
-        const [userDepts, recentComms, contacts] = await Promise.all([
+        const [userDepts, recentCommsResponse, contacts] = await Promise.all([
             getUserDepartments(user.id),
-            getCommunications({ limit: 50 }), // Fetch more to find unique contacts
+            getCommunications({ limit: 50 }),
             getContacts(user.company_id),
         ]);
         
@@ -65,34 +66,41 @@ export function InAppSidebar() {
 
         const deptsWithCounts = await Promise.all(
           deptsArray.map(async (dept) => {
-            const comms = await getCommunications({ department_id: dept.id, type: 'unread', limit: 1000 });
-            const unreadCount = comms.results.filter(c => !c.is_read).length;
-            return { ...dept, unread_count: unreadCount };
+            try {
+                const comms = await getCommunications({ department_id: dept.id, type: 'unread', limit: 1000 });
+                const unreadCount = Array.isArray(comms.results) ? comms.results.filter(c => !c.is_read).length : 0;
+                return { ...dept, unread_count: unreadCount };
+            } catch (e) {
+                console.error(`Failed to get unread count for department ${dept.id}`, e);
+                return { ...dept, unread_count: 0 };
+            }
           })
         );
         
         if (mounted) setDepartments(deptsWithCounts);
 
-        // Process recent communications to create a unique list of contacts
+        const recentComms = recentCommsResponse.results || [];
         const uniqueRecents: { [key: string]: RecentItem } = {};
         const seenNumbers = new Set<string>();
 
-        recentComms.results.forEach((comm: Communication) => {
-            const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
-            const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
+        if (Array.isArray(recentComms)) {
+            recentComms.forEach((comm: Communication) => {
+                const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
+                const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
 
-            if (!seenNumbers.has(otherPartyNumber)) {
-                seenNumbers.add(otherPartyNumber);
-                const contact = contacts.find((c: Contact) => c.phone_no === otherPartyNumber);
-                const name = contact?.name || otherPartyNumber;
-                uniqueRecents[otherPartyNumber] = {
-                    id: otherPartyNumber,
-                    name: name,
-                    href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}`,
-                    initials: getInitials(name),
-                };
-            }
-        });
+                if (!seenNumbers.has(otherPartyNumber)) {
+                    seenNumbers.add(otherPartyNumber);
+                    const contact = contacts.find((c: Contact) => c.phone_no === otherPartyNumber);
+                    const name = contact?.name || otherPartyNumber;
+                    uniqueRecents[otherPartyNumber] = {
+                        id: otherPartyNumber,
+                        name: name,
+                        href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}`,
+                        initials: getInitials(name),
+                    };
+                }
+            });
+        }
         
         if (mounted) {
             setRecentItems(Object.values(uniqueRecents).slice(0, 10));
