@@ -60,11 +60,11 @@ function CommunicationCard({
   );
 
   const renderCallBubble = (c: Communication) => (
-    <div className={cn("p-3 rounded-lg max-w-[80%] flex items-center gap-3", isMine ? "bg-blue-900 text-white" : "bg-gray-700 text-white")}>
-      {c.direction === 'inbound' ? <PhoneIncoming className="h-5 w-5" /> : <PhoneOutgoing className="h-5 w-5" />}
-      <div>
-        <p className="font-semibold">{c.direction === 'inbound' ? 'Incoming Call' : 'Outgoing Call'}</p>
-        <p className="text-xs">{c.duration ? `${c.duration} min` : 'Unanswered'}</p>
+    <div className={cn("p-3 rounded-lg max-w-[80%] flex items-center gap-2", isMine ? "bg-blue-900 text-white" : "bg-gray-700 text-white")}>
+      {c.direction === 'inbound' ? <PhoneIncoming className="h-5 w-5 flex-shrink-0" /> : <PhoneOutgoing className="h-5 w-5 flex-shrink-0" />}
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <p className="font-semibold whitespace-nowrap">{c.direction === 'inbound' ? 'Incoming Call' : 'Outgoing Call'}</p>
+        <p className="text-xs whitespace-nowrap">{c.duration ? `${c.duration} min` : 'Unanswered'}</p>
       </div>
     </div>
   );
@@ -79,9 +79,9 @@ function CommunicationCard({
          {!showAvatar && !isMine && <div className="w-8" />}
 
         <div className={cn("flex flex-col gap-1", isMine ? 'items-end' : 'items-start')}>
-             {isFirstInGroup && (
+             {isFirstInGroup && comm.created_at && (
                  <p className={cn("text-xs text-muted-foreground", isMine ? "text-right" : "text-left", "px-1")}>
-                     <span className="font-semibold">{contactName}</span> • {comm.created_at ? format(parseISO(comm.created_at), 'p') : ''}
+                     <span className="font-semibold">{contactName}</span> • {format(parseISO(comm.created_at), 'p')}
                 </p>
              )}
             {comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)}
