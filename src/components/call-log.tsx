@@ -84,8 +84,8 @@ function CommunicationCard({
        const to = encodeURIComponent(comm.direction === 'inbound' ? comm.from : comm.to);
        const queryString = source === 'unread' ? `?source=unread` : '';
        return (
-            <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="block hover:bg-muted/50 rounded-lg">
-                <div className="flex items-center p-4 gap-4">
+            <div className="flex items-center p-4 gap-4 hover:bg-muted/50 rounded-lg group">
+                <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="flex-1 flex items-center gap-4">
                     <Avatar className="h-10 w-10">
                         <AvatarFallback>{mainPageAvatarInitial}</AvatarFallback>
                     </Avatar>
@@ -102,8 +102,19 @@ function CommunicationCard({
                             {comm.type === 'sms' ? comm.body : `${comm.direction === 'inbound' ? 'Incoming' : 'Outgoing'} call`}
                          </p>
                     </div>
-                </div>
-            </Link>
+                </Link>
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onMakeCall(mainPageContactNumber);
+                    }}
+                >
+                    <PhoneIcon className="h-5 w-5" />
+                </Button>
+            </div>
        )
     }
 
