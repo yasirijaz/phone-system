@@ -3,38 +3,64 @@
 
 import { useState, useEffect } from 'react';
 import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup, SidebarGroupLabel } from '@/components/ui/sidebar';
-import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building } from 'lucide-react';
+import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, Clock } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { getUserDepartments } from '@/services/userService';
 import { getCommunications } from '@/services/callLogService';
-import type { Department } from '@/types';
+import type { Department, Communication, Contact } from '@/types';
 import { Badge } from './ui/badge';
 import { isElectron } from '@/lib/is-electron';
 import { events } from '@/lib/events';
+import { Avatar, AvatarFallback } from './ui/avatar';
+import { getContacts } from '@/services/contactService';
 
 interface DepartmentWithUnread extends Department {
     unread_count: number;
+}
+
+interface RecentItem {
+    id: string;
+    name: string;
+    href: string;
+    initials: string;
 }
 
 export function InAppSidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const [departments, setDepartments] = useState<DepartmentWithUnread[]>([]);
+  const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const inElectron = isElectron();
+
+  const getInitials = (name: string) => {
+    if (!name) return '?';
+    const nameParts = name.split(' ').filter(Boolean);
+    if (nameParts.length > 1) {
+      return `${nameParts[0].charAt(0)}${nameParts[nameParts.length - 1].charAt(0)}`.toUpperCase();
+    }
+    return name.charAt(0).toUpperCase();
+  };
 
   useEffect(() => {
     if (!user) return;
 
     let mounted = true;
 
-    const fetchDepartmentsAndCounts = async () => {
+    const fetchSidebarData = async () => {
       try {
         setLoading(true);
-        const userDepts = await getUserDepartments(user.id);
+        if (!user.id || !user.company_id) return;
+
+        const [userDepts, recentComms, contacts] = await Promise.all([
+            getUserDepartments(user.id),
+            getCommunications({ limit: 20 }),
+            getContacts(user.company_id),
+        ]);
+        
         const deptsArray = Array.isArray(userDepts) ? userDepts : [];
 
         const deptsWithCounts = await Promise.all(
@@ -44,23 +70,52 @@ export function InAppSidebar() {
             return { ...dept, unread_count: unreadCount };
           })
         );
-
+        
         if (mounted) setDepartments(deptsWithCounts);
+
+        // Process recent communications
+        const uniqueRecents: { [key: string]: RecentItem } = {};
+        recentComms.results.forEach((comm: Communication) => {
+            const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
+            const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
+            const key = otherPartyNumber;
+            if (!uniqueRecents[key]) {
+                const contact = contacts.find((c: Contact) => c.phone_no === otherPartyNumber);
+                const name = contact?.name || otherPartyNumber;
+                uniqueRecents[key] = {
+                    id: key,
+                    name: name,
+                    href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}`,
+                    initials: getInitials(name),
+                };
+            }
+        });
+
+        if (mounted) {
+            setRecentItems(Object.values(uniqueRecents).slice(0, 10));
+        }
+
       } catch (error) {
-        console.error("Failed to fetch user departments or unread counts", error);
-        if (mounted) setDepartments([]);
+        console.error("Failed to fetch sidebar data", error);
+        if (mounted) {
+            setDepartments([]);
+            setRecentItems([]);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
     };
 
-    fetchDepartmentsAndCounts();
+    fetchSidebarData();
 
-    const refreshHandler = () => fetchDepartmentsAndCounts();
+    const refreshHandler = () => fetchSidebarData();
     events.on('refreshDepartmentsUnread', refreshHandler);
+    events.on('refreshCalls', refreshHandler);
+
     return () => {
       mounted = false;
       events.off('refreshDepartmentsUnread', refreshHandler);
+      events.off('refreshCalls', refreshHandler);
     };
   }, [user]);
 
@@ -153,6 +208,35 @@ export function InAppSidebar() {
                 ) : (
                      <SidebarMenuItem>
                         <SidebarMenuButton disabled>No departments</SidebarMenuButton>
+                    </SidebarMenuItem>
+                )}
+            </SidebarMenu>
+        </SidebarGroup>
+         <SidebarGroup>
+            <SidebarGroupLabel>Recents</SidebarGroupLabel>
+            <SidebarMenu>
+                 {loading ? (
+                    <SidebarMenuItem>
+                        <SidebarMenuButton disabled>Loading...</SidebarMenuButton>
+                    </SidebarMenuItem>
+                ) : recentItems.length > 0 ? (
+                    recentItems.map((item) => (
+                        <SidebarMenuItem key={item.id}>
+                            <SidebarMenuButton asChild isActive={pathname.includes(item.href)}>
+                                <Link href={item.href} className="flex justify-between items-center w-full">
+                                    <div className="flex items-center gap-2">
+                                        <Avatar className="h-5 w-5 text-xs">
+                                            <AvatarFallback>{item.initials}</AvatarFallback>
+                                        </Avatar>
+                                        <span className="truncate">{item.name}</span>
+                                    </div>
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    ))
+                ) : (
+                     <SidebarMenuItem>
+                        <SidebarMenuButton disabled>No recent activity</SidebarMenuButton>
                     </SidebarMenuItem>
                 )}
             </SidebarMenu>
