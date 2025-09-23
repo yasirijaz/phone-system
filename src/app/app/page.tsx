@@ -17,6 +17,8 @@ import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
 import { events } from '@/lib/events';
 import PaginationControls from "@/components/pagination-controls";
+import { cacheGet, cacheSet } from "@/lib/simpleCache";
+import { useRef } from "react";
 
 type TabName = 'all' | 'unread' | 'calls' | 'missed' | 'meetings' | 'voicemails' | 'recordings' | 'messages' | 'starred' | 'spam' | 'unlogged';
 
@@ -56,6 +58,7 @@ export default function AppUIPage() {
 
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerInitialValue, setDialerInitialValue] = useState('');
+  const inFlightRequestsRef = useRef<Map<string, Promise<PaginatedCommunicationsResponse>>>(new Map());
 
   const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10) => {
     if (!user) return;
@@ -67,11 +70,35 @@ export default function AppUIPage() {
         if (tab !== 'all') {
             filters.type = tab;
         }
+        const cacheKey = `comm:${tab}:${page}:${limit}`;
+        const cached = cacheGet<PaginatedCommunicationsResponse>(cacheKey);
+        const contactsKey = user.company_id ? `contacts:${user.company_id}` : undefined;
+        const cachedContacts = contactsKey ? cacheGet<Contact[]>(contactsKey) : [];
 
-        const [response, contactsResponse] = await Promise.all([
-          getCommunications(filters),
-          user.company_id ? getContacts(user.company_id) : Promise.resolve([])
-        ]);
+        let response: PaginatedCommunicationsResponse;
+        if (cached) {
+          response = cached;
+        } else {
+          // de-dupe in-flight identical requests
+          let inFlight = inFlightRequestsRef.current.get(cacheKey);
+          if (!inFlight) {
+            inFlight = getCommunications(filters);
+            inFlightRequestsRef.current.set(cacheKey, inFlight);
+          }
+          response = await inFlight.finally(() => {
+            inFlightRequestsRef.current.delete(cacheKey);
+          });
+          // cache results briefly to prevent double fetches on quick state churn
+          cacheSet(cacheKey, response, 10_000);
+        }
+
+        let contactsResponse: Contact[] = [];
+        if (Array.isArray(cachedContacts) && cachedContacts.length > 0) {
+          contactsResponse = cachedContacts;
+        } else if (user.company_id) {
+          contactsResponse = await getContacts(user.company_id);
+          cacheSet(`contacts:${user.company_id}`, contactsResponse, 5 * 60_000);
+        }
         
         setData(prev => ({ ...prev, [tab]: response.results }));
         setContacts(Array.isArray(contactsResponse) ? contactsResponse : []);

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from 'next/navigation';
 import { getCommunicationThread, markThreadAsRead } from "@/services/callLogService";
 import type { Communication, Department, PhoneNumber } from "@/types";
@@ -17,6 +17,7 @@ import { useTwilio } from "@/context/TwilioContext";
 import { useToast } from "@/hooks/use-toast";
 import AppHeader from "@/components/app-header";
 import { events } from "@/lib/events";
+import { cacheGet, cacheSet } from "@/lib/simpleCache";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -28,17 +29,35 @@ export default function ConversationDetailPage() {
     const [allComms, setAllComms] = useState<Communication[]>([]);
     const [loading, setLoading] = useState(true);
     const [contactName, setContactName] = useState('');
+    const inFlightRef = useRef<Map<string, Promise<Communication[]>>>(new Map());
     
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from, to] = slug.map(part => decodeURIComponent(part));
 
-    const refreshThread = useCallback(async () => {
+    const refreshThread = useCallback(async (): Promise<Communication[]> => {
         try {
-            const logs = await getCommunicationThread(from, to);
+            const cacheKey = `thread:${from}:${to}`;
+            const cached = cacheGet<Communication[]>(cacheKey);
+            let logs: Communication[];
+            if (cached) {
+                logs = cached;
+            } else {
+                let inFlight = inFlightRef.current.get(cacheKey);
+                if (!inFlight) {
+                    inFlight = getCommunicationThread(from, to);
+                    inFlightRef.current.set(cacheKey, inFlight);
+                }
+                logs = await inFlight.finally(() => {
+                    inFlightRef.current.delete(cacheKey);
+                });
+                cacheSet(cacheKey, logs, 10_000);
+            }
             const sortedLogs = logs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
             setAllComms(sortedLogs);
+            return sortedLogs;
         } catch (error) {
             console.error("Failed to fetch communication logs", error);
+            return [];
         } finally {
             setLoading(false);
         }
@@ -49,21 +68,16 @@ export default function ConversationDetailPage() {
             if (!user || !from || !to) return;
             setLoading(true);
             try {
-                const logs = await getCommunicationThread(from, to);
-                const sortedLogs = logs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-                setAllComms(sortedLogs);
+                const logs = await refreshThread();
+                const latest = logs[0];
+                const computedName = latest
+                    ? (latest.direction === 'inbound' 
+                        ? (latest.from_name?.name || from) 
+                        : (latest.to_name?.name || to))
+                    : to;
+                setContactName(computedName);
 
-                if (sortedLogs.length > 0) {
-                    const latestComm = sortedLogs[0];
-                    const name = latestComm.direction === 'inbound' 
-                        ? (latestComm.from_name?.name || from) 
-                        : (latestComm.to_name?.name || to);
-                    setContactName(name);
-                } else {
-                    setContactName(to);
-                }
-
-                const hasUnread = sortedLogs.some((l: any) => l?.is_read === 0 || l?.is_read === false);
+                const hasUnread = logs.some((l: any) => l?.is_read === 0 || l?.is_read === false);
                 if (hasUnread) {
                     await markThreadAsRead(from, to);
                     try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
@@ -77,7 +91,9 @@ export default function ConversationDetailPage() {
         };
 
         fetchAndFilterComms();
-    }, [user, from, to, refreshThread]);
+        // only when params or user change
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, from, to]);
 
     useEffect(() => {
         const handler = (payload: { from: string; to: string }) => {
