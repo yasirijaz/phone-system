@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -45,6 +45,19 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
             phone_type: contact?.phone_type || "mobile",
         }
     });
+
+    const isSavedContact = !!contact?.id;
+
+    useEffect(() => {
+        if (contact) {
+            form.reset({
+                name: isSavedContact ? contact.name : '',
+                email: contact.email || '',
+                phone_no: contact.phone_no || '',
+                phone_type: contact.phone_type || 'mobile',
+            });
+        }
+    }, [contact, form, isSavedContact, isEditing]);
     
     if (!contact) {
         return (
@@ -54,7 +67,6 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
         );
     }
     
-    const isSavedContact = !!contact?.id;
     const contactInitial = contact.name ? contact.name.charAt(0).toUpperCase() : '?';
 
     const handleFormSubmit = async (values: z.infer<typeof contactSchema>) => {
@@ -122,7 +134,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                                         <FormItem><FormLabel>Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="e.g. john@example.com" {...field} /></FormControl><FormMessage /></FormItem>
                                         )}/>
                                         <FormField control={form.control} name="phone_no" render={({ field }) => (
-                                        <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+1234567890" {...field} /></FormControl><FormMessage /></FormItem>
+                                        <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+1234567890" {...field}  /></FormControl><FormMessage /></FormItem>
                                         )}/>
                                         <FormField control={form.control} name="phone_type" render={({ field }) => (
                                         <FormItem>
