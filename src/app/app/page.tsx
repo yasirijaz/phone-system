@@ -121,7 +121,7 @@ export default function AppUIPage() {
     const currentPagination = pagination[tabName];
     
     return (
-      <Card>
+      <Card className="overflow-hidden">
         <CallLog calls={currentData || []} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
         <PaginationControls
           {...currentPagination}

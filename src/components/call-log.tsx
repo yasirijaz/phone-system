@@ -1,7 +1,7 @@
 
-import type { Communication, User } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Play, Pause } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import type { Communication } from '@/types';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video } from 'lucide-react';
+import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Button } from './ui/button';
@@ -12,6 +12,7 @@ import { addParticipant } from '@/services/twilioService';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import AudioPlayer from './AudioPlayer';
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 interface CallLogProps {
   calls: Communication[];
@@ -20,10 +21,9 @@ interface CallLogProps {
   source?: string;
 }
 
-function CommunicationCard({ comm, onMakeCall, isClickable, source, type }: { comm: Communication, onMakeCall: (number: string) => void, isClickable: boolean, source?: string, type?: string }) {
+function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Communication, onMakeCall: (number: string) => void, isClickable: boolean, source?: string }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const isAdmin = user?.role_id === 1 || user?.role_id === 2;
 
   const contactName = comm.direction === 'inbound' 
                         ? (comm.from_name?.name || comm.user?.name || comm.from) 
@@ -34,20 +34,13 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source, type }: { co
   const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
   const isInProgress = comm.call_status === 'in_progress';
 
-  const cardBg = isInProgress
-    ? 'bg-orange-300 border-orange-300 dark:bg-orange-950/20 dark:border-orange-800'
-    : isMissed
-    ? 'bg-red-50 dark:bg-red-950/20'
-    : 'bg-background';
-
-  const contactDisplayNumber = (comm.direction === 'inbound' || type === 'sms') ? comm.from : comm.to;
+  const contactDisplayNumber = (comm.direction === 'inbound' || (comm.latest_type || comm.type) === 'sms') ? comm.from : comm.to;
   const handleCallClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     onMakeCall(contactDisplayNumber);
   }
 
-  
   const handleJoinCall = async (e: React.MouseEvent, options: { silent?: boolean, coach?: boolean }) => {
     e.stopPropagation();
     e.preventDefault();
@@ -65,122 +58,63 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source, type }: { co
     }
   }
 
-
-  const getStatusBadge = (status?: string) => {
-    if (!status) return null;
-    switch (status) {
-        case 'completed': return <Badge variant="default">Completed</Badge>;
-        case 'in_progress':
-        return (
-          <Badge className="bg-orange-600 text-white font-semibold flex items-center gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            In Progress
-          </Badge>
-        );
-        case 'ringing': return <Badge variant="outline">Ringing</Badge>;
-        case 'missed':
-        case 'no-answer':
-        case 'busy':
-        case 'canceled':
-            return <Badge variant="destructive">Missed</Badge>;
-        default:
-            return <Badge variant="secondary">{status}</Badge>;
-    }
-  }
-  
-  const hasAssignments = Array.isArray(comm.task_assignments) && comm.task_assignments.length > 0;
-
   const renderIcon = () => {
     const type = comm.latest_type || comm.type;
-    if (type === 'sms') {
-      return <MessageSquare className="h-4 w-4" />;
-    }
-    return comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />;
-  }
-  
-  const CardContent = () => (
-     <div className="flex items-start gap-4 mx-4 mb-3 p-0">
-        <div className="flex-1">
-            <div className={`p-4 rounded-lg border ${cardBg} flex items-start gap-4`}>
-                <Avatar>
-                    <AvatarImage src={`https://placehold.co/100x100.png?text=${contactInitial}`} alt={contactName} />
-                    <AvatarFallback>{contactInitial}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                        {renderIcon()}
-                        <span>{(comm.latest_type || comm.type || '').charAt(0).toUpperCase() + (comm.latest_type || comm.type || '').slice(1)}</span>
-                        {comm.latest_type === 'call' ? getStatusBadge(comm.call_status) : getStatusBadge(comm.status)}
-                        {(comm.latest_type || comm.type) === 'call' && comm.duration && <span>({comm.duration} min)</span>}
-                    </div>
-                    <div className="flex items-center">
-                          {hasAssignments && !isClickable && (
-                              <Popover>
-                                  <PopoverTrigger asChild>
-                                      <Button variant="ghost" size="icon">
-                                          <Info className="h-4 w-4" />
-                                      </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-80">
-                                      <div className="grid gap-1">
-                                          <div className="space-y-1">
-                                              <h4 className="font-medium leading-none">Task Assignments</h4>
-                                              <p className="text-sm text-muted-foreground">
-                                                  Status of assigned workers for this call.
-                                              </p>
-                                          </div>
-                                          <div className="grid gap-1">
-                                              {comm.task_assignments?.map((assignment: any) => (
-                                                  <div key={assignment.worker_sid} className="flex items-center justify-between">
-                                                      <span>{assignment.user?.name || assignment.worker_name || 'Unknown Worker'}</span>
-                                                      <Badge variant={assignment.status === 'completed' ? 'default' : 'destructive'}>{assignment.status}</Badge>
-                                                  </div>
-                                              ))}
-                                          </div>
-                                      </div>
-                                  </PopoverContent>
-                              </Popover>
-                          )}
-                          <Button variant="ghost" size="icon" onClick={handleCallClick}>
-                              <PhoneIcon className="h-4 w-4" />
-                          </Button>
-                    </div>
-                  </div>
-                  <div className="text-sm mt-2 space-y-1 text-muted-foreground">
-                      <p className="text-foreground"><strong>From:</strong> {comm.from_name?.name || comm.from}</p>
-                      <p><strong>To:</strong> {comm.to_name?.name || comm.to}</p>
-                      {(comm.latest_type || comm.type) === 'sms' && <p className="pt-2 text-foreground">{comm.body}</p>}
-                  </div>
-                  {isInProgress && isAdmin && (
-                      <div className="mt-4 flex gap-2 border-t pt-2">
-                          <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true, coach: true })}>
-                              <Ear className="mr-2 h-4 w-4" />
-                              Silently Listen
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: false, coach: true })}>
-                              <Mic className="mr-2 h-4 w-4" />
-                              Barge In
-                          </Button>
-                      </div>
-                  )}
-                    {!!comm.recording_url && (
-                      <AudioPlayer src={comm.recording_url} type= 'Recording' />
-                    )}
+    const iconClasses = "h-4 w-4";
 
-                    {!!comm.voice_mail && (
-                      <AudioPlayer src={comm.voice_mail} type= 'VoiceMail' />
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1 pt-2">{format(parseISO(comm.created_at || comm.latest_created_at!), 'p')}</p>
+    if (type === 'sms') {
+      return <MessageSquare className={cn(iconClasses, "text-blue-500")} />;
+    }
+    if(isMissed) {
+        return comm.direction === 'inbound' ? <PhoneIncoming className={cn(iconClasses, "text-red-500")} /> : <PhoneOutgoing className={cn(iconClasses, "text-red-500")} />;
+    }
+    return comm.direction === 'inbound' ? <PhoneIncoming className={cn(iconClasses, "text-gray-500")} /> : <PhoneOutgoing className={cn(iconClasses, "text-gray-500")} />;
+  }
+
+  const renderTimestamp = () => {
+      const date = parseISO(comm.created_at || comm.latest_created_at!);
+      if(isToday(date)) return format(date, 'p');
+      if(isYesterday(date)) return 'Yesterday';
+      return format(date, 'd MMM');
+  }
+
+  const CardContent = () => (
+     <div className={cn(
+            "flex items-center gap-4 px-4 py-3 hover:bg-muted/50",
+            (comm.is_read === false || comm.is_read === 0) && "bg-primary/5 border-l-2 border-primary"
+        )}>
+        <Avatar className="h-9 w-9">
+            <AvatarImage src={`https://placehold.co/100x100.png?text=${contactInitial}`} alt={contactName} />
+            <AvatarFallback>{contactInitial}</AvatarFallback>
+        </Avatar>
+        <div className="flex-1 overflow-hidden">
+            <div className="flex justify-between items-center">
+                <p className={cn("font-semibold truncate", isMissed && "text-red-500")}>{contactName}</p>
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                    <span>{renderTimestamp()}</span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCallClick}>
+                        <PhoneIcon className="h-4 w-4" />
+                    </Button>
                 </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground truncate">
+                {renderIcon()}
+                <span className="truncate">
+                    {(comm.latest_type || comm.type) === 'sms' 
+                        ? comm.body 
+                        : `${comm.direction === 'inbound' ? 'Incoming' : 'Outgoing'} call ${comm.duration ? `(${comm.duration} min)` : ''}`
+                    }
+                </span>
+                 {!!comm.recording_url && <AudioPlayer src={comm.recording_url} type='Recording' />}
+                 {!!comm.voice_mail && <AudioPlayer src={comm.voice_mail} type='VoiceMail' />}
             </div>
         </div>
     </div>
   );
 
   if (isClickable) {
-    const from = encodeURIComponent(comm.from);
-    const to = encodeURIComponent(comm.to);
+    const from = encodeURIComponent(comm.direction === 'inbound' ? comm.to : comm.from);
+    const to = encodeURIComponent(comm.direction === 'inbound' ? comm.from : comm.to);
     const queryString = source === 'unread' ? `?source=unread` : '';
     return (
         <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="block">
@@ -195,7 +129,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source, type }: { co
 export default function CallLog({ calls: communications, onMakeCall, isClickable = true, source }: CallLogProps) {
   if (communications.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 border-2 border-dashed rounded-lg">
+      <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 border-2 border-dashed rounded-lg m-6">
         <p className="text-lg font-medium">No activity yet</p>
         <p>Your history with this contact will appear here.</p>
       </div>
@@ -214,17 +148,17 @@ export default function CallLog({ calls: communications, onMakeCall, isClickable
     }, {} as Record<string, Communication[]>);
 
   return (
-    <div className="space-y-6">
+    <div>
       {Object.entries(groupedCommunications).map(([date, commsForDay]) => (
         <div key={date}>
-            <div className="flex items-center justify-center my-4">
+            <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm flex items-center justify-center my-2">
                 <div className="text-xs text-muted-foreground bg-secondary px-3 py-1 rounded-full">
                     {format(parseISO(date), 'EEEE, d MMM yyyy')}
                 </div>
             </div>
-             <div className="space-y-4">
+             <div>
                 {commsForDay.map((comm) => (
-                    <CommunicationCard comm={comm} key={comm.id || `${comm.from}-${comm.to}`} onMakeCall={onMakeCall} isClickable={isClickable} source={source} type={comm.latest_type} />
+                    <CommunicationCard comm={comm} key={comm.id || `${comm.from}-${comm.to}`} onMakeCall={onMakeCall} isClickable={isClickable} source={source} />
                 ))}
              </div>
         </div>
