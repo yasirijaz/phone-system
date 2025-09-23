@@ -266,12 +266,6 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                     </div>
                 </div>
 
-                <div className="space-y-4 pt-4 border-t">
-                    <Button variant="outline" className="w-full justify-start">
-                        <PlusCircle className="mr-2 h-4 w-4" /> Add number
-                    </Button>
-                </div>
-
             </div>
         </div>
     );
