@@ -1,7 +1,7 @@
 
 
 import type { Communication, Contact } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight, ChevronDown } from 'lucide-react';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight, ChevronDown, User } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -133,7 +133,9 @@ function CommunicationCard({
             <div className="flex items-center p-4 gap-4 hover:bg-muted/50 rounded-lg group">
                 <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="flex-1 flex items-center gap-4">
                     <Avatar className="h-10 w-10">
-                        <AvatarFallback>{mainPageAvatarInitial}</AvatarFallback>
+                        <AvatarFallback>
+                            {contact ? mainPageAvatarInitial : <User className="h-5 w-5 text-muted-foreground" />}
+                        </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 flex items-center gap-4">
                         <p className={cn("font-semibold w-48 truncate", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
@@ -163,7 +165,9 @@ function CommunicationCard({
         <div className={cn("flex items-start gap-3", isMine ? "justify-end" : "justify-start", !isFirstInGroup && "py-0.5", isFirstInGroup && "pt-2")}>
             {showAvatar && (
                 <Avatar className="h-8 w-8">
-                    <AvatarFallback>{contactInitial}</AvatarFallback>
+                    <AvatarFallback>
+                        {contact ? contactInitial : <User className="h-4 w-4 text-muted-foreground" />}
+                    </AvatarFallback>
                 </Avatar>
             )}
             {!showAvatar && !isMine && <div className="w-8" />}
@@ -213,10 +217,10 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
     )
   }
   
-  const groupedCommunications = communications
-    .filter(comm => comm.created_at || comm.latest_created_at) // Filter out items with no created_at date
+  const groupedByDay = communications
+    .filter(comm => comm.created_at) // Filter out items with no created_at date
     .reduce((acc, comm) => {
-      const date = format(parseISO(comm.created_at || comm.latest_created_at!), 'yyyy-MM-dd');
+      const date = format(parseISO(comm.created_at), 'yyyy-MM-dd');
       if (!acc[date]) {
           acc[date] = [];
       }
@@ -226,7 +230,7 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
 
   return (
     <div className="p-4 space-y-4">
-      {Object.entries(groupedCommunications).map(([date, commsForDay]) => (
+      {Object.entries(groupedByDay).map(([date, commsForDay]) => (
         <div key={date}>
             <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm flex items-center justify-center my-2">
                 <div className="text-xs text-muted-foreground bg-secondary px-3 py-1 rounded-full">
@@ -238,12 +242,12 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                     const prevComm = index > 0 ? commsForDay[index - 1] : null;
                     const nextComm = index < commsForDay.length - 1 ? commsForDay[index + 1] : null;
 
-                    const isSmsGroupStart = !prevComm || prevComm.type !== 'sms' || comm.type !== 'sms' || prevComm.direction !== comm.direction;
-                    const isSmsGroupEnd = !nextComm || nextComm.type !== 'sms' || comm.type !== 'sms' || nextComm.direction !== comm.direction;
+                    const isSameSenderAsPrev = prevComm && prevComm.direction === comm.direction;
+                    const isSameSenderAsNext = nextComm && nextComm.direction === comm.direction;
 
-                    const isFirstInGroup = comm.type !== 'sms' || isSmsGroupStart;
-                    const isLastInGroup = comm.type !== 'sms' || isSmsGroupEnd;
-                    const isMiddleOfGroup = !isFirstInGroup && !isLastInGroup;
+                    const isFirstInGroup = !isSameSenderAsPrev;
+                    const isLastInGroup = !isSameSenderAsNext;
+                    const isMiddleOfGroup = isSameSenderAsPrev && isSameSenderAsNext;
 
                     return (
                         <CommunicationCard 
