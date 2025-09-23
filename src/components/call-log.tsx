@@ -71,7 +71,6 @@ function CommunicationCard({
       number: otherPartyNumber,
       initial: getInitials(contact?.name || otherPartyNumber)
   };
-
   const contactName = isFirstInGroup ? (isMine ? (user?.name || 'Me') : otherParty.name) : '';
   const contactInitial = getInitials(isMine ? (user?.name || 'Me') : otherParty.name);
   const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
@@ -136,10 +135,10 @@ function CommunicationCard({
        const from = encodeURIComponent(comm.direction === 'inbound' ? comm.to : comm.from);
        const to = encodeURIComponent(comm.direction === 'inbound' ? comm.from : comm.to);
        const queryString = source === 'unread' ? `?source=unread` : '';
-       
-       const callInfo = comm.type === 'call' 
+       console.log('comm',comm);
+       const callInfo = comm.latest_type === 'call' || comm.type === 'sms'
         ? `${comm.direction === 'inbound' ? 'Inbound' : 'Outbound'} / ${comm.duration || 0} min` 
-        : comm.body;
+        : comm.direction + ' / ' + comm.body;
 
        return (
             <div className="flex items-center p-4 gap-4 hover:bg-muted/50 group border-b">
