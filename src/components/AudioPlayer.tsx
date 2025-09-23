@@ -45,13 +45,12 @@ const AudioPlayer = ({ src, type }: { src: string, type: string }) => {
   }, []);
 
   return (
-    <div className="mt-2 flex items-center gap-2">
+    <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" onClick={togglePlay}>
             {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </Button>
       
       <audio ref={audioRef} src={`${process.env.NEXT_PUBLIC_API_URL}/api/twilio/recordings/stream?url=${encodeURIComponent(src)}`}  className="hidden" preload="none" />
-      <span className="text-xs text-muted-foreground">Play {type}</span>
     </div>
   );
 };
