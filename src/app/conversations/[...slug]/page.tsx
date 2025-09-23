@@ -52,18 +52,21 @@ export default function ConversationDetailPage() {
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from, to] = slug.map(part => decodeURIComponent(part));
 
-    const findContact = (phone: string) => {
-        if(!contacts || contacts.length === 0) return null;
-        return contacts.find(c => c.phone_no === phone);
+    const findContact = (phone: string, contactList: Contact[]) => {
+        if(!contactList || contactList.length === 0) return null;
+        return contactList.find(c => c.phone_no === phone);
     };
 
     const refreshThread = useCallback(async () => {
+        if (!user) return;
         try {
             const [logs, fetchedContacts] = await Promise.all([
                 getCommunicationThread(from, to),
-                user?.company_id ? getContacts(user.company_id) : Promise.resolve([])
+                user.company_id ? getContacts(user.company_id) : Promise.resolve([])
             ]);
-            setContacts(Array.isArray(fetchedContacts) ? fetchedContacts : []);
+            
+            const contactList = Array.isArray(fetchedContacts) ? fetchedContacts : [];
+            setContacts(contactList);
 
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);
@@ -71,13 +74,21 @@ export default function ConversationDetailPage() {
              if (sortedLogs.length > 0) {
                 const latestComm = sortedLogs[sortedLogs.length - 1];
                 const otherPartyNumber = latestComm.direction === 'inbound' ? latestComm.from : latestComm.to;
-                const foundContact = findContact(otherPartyNumber);
+                const foundContact = findContact(otherPartyNumber, contactList);
                 
                 setContact({
                     ...(foundContact || {}),
                     phone_no: otherPartyNumber,
                     name: foundContact?.name || otherPartyNumber
                 });
+             } else {
+                 const otherPartyNumber = to;
+                 const foundContact = findContact(otherPartyNumber, contactList);
+                 setContact({
+                    ...(foundContact || {}),
+                    phone_no: otherPartyNumber,
+                    name: foundContact?.name || otherPartyNumber
+                 });
              }
         } catch (e) {
             console.error('Failed to refresh conversation thread', e);
@@ -197,7 +208,7 @@ export default function ConversationDetailPage() {
                         let deptId: string | null = null;
                         for (const d of depts) {
                             try {
-                                const nums = await getPhoneNumbers(d.id);
+                                const nums = await getPhoneNumbers(Number(d.id));
                                 if (nums.some(n => n.phone_no === from)) {
                                     deptId = String(d.id);
                                     break;
