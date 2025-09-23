@@ -22,13 +22,27 @@ interface CallLogProps {
   source?: string;
 }
 
-function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Communication, onMakeCall: (number: string) => void, isClickable: boolean, source?: string }) {
+function CommunicationCard({ 
+    comm, 
+    onMakeCall, 
+    isClickable, 
+    source, 
+    isFirstInGroup 
+}: { 
+    comm: Communication, 
+    onMakeCall: (number: string) => void, 
+    isClickable: boolean, 
+    source?: string,
+    isFirstInGroup: boolean
+}) {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const contactName = comm.direction === 'inbound' 
-                        ? (comm.from_name?.name || comm.user?.name || comm.from) 
-                        : (comm.to_name?.name || comm.user?.name || comm.to);
+  const isMine = comm.direction === 'outbound' || (user && comm.user_id === user.id && comm.direction !== 'inbound');
+
+  const contactName = isMine 
+    ? (user?.name || 'Me')
+    : (comm.from_name?.name || comm.user?.name || comm.from);
                         
   const contactInitial = contactName ? contactName.charAt(0).toUpperCase() : '?';
 
@@ -36,85 +50,41 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Co
   const isInProgress = comm.call_status === 'in_progress';
 
   const contactDisplayNumber = (comm.direction === 'inbound' || (comm.latest_type || comm.type) === 'sms') ? comm.from : comm.to;
-  const handleCallClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onMakeCall(contactDisplayNumber);
-  }
+  
+  const showAvatar = !isMine && isFirstInGroup;
 
-  const handleJoinCall = async (e: React.MouseEvent, options: { silent?: boolean, coach?: boolean }) => {
-    e.stopPropagation();
-    e.preventDefault();
- 
-    if (!user || !comm.conference_sid) {
-      toast({ title: "Error", description: "Cannot join call. Required information is missing.", variant: "destructive" });
-      return;
-    }
-    
-    try {
-      await addParticipant(comm.conference_sid, comm.from, String(user.id), undefined, { coach: true, silent: options.silent });
-      toast({ title: "Success", description: "You have joined the call." });
-    } catch(error) {
-       toast({ title: "Error", description: "Failed to join the call.", variant: "destructive" });
-    }
-  }
+  const renderMessageBubble = (c: Communication) => (
+    <div className={cn("p-3 rounded-lg max-w-[80%]", isMine ? "bg-primary text-primary-foreground" : "bg-muted")}>
+      <p>{c.body}</p>
+    </div>
+  );
 
-  const renderIcon = () => {
-    const type = comm.latest_type || comm.type;
-    const iconClasses = "h-4 w-4";
-
-    if (isInProgress) {
-        return <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-        </span>;
-    }
-    if (type === 'sms') {
-      return <MessageSquare className={cn(iconClasses, "text-blue-500")} />;
-    }
-    if(isMissed) {
-        return comm.direction === 'inbound' ? <PhoneIncoming className={cn(iconClasses, "text-red-500")} /> : <PhoneOutgoing className={cn(iconClasses, "text-red-500")} />;
-    }
-    return comm.direction === 'inbound' ? <PhoneIncoming className={cn(iconClasses, "text-gray-500")} /> : <PhoneOutgoing className={cn(iconClasses, "text-gray-500")} />;
-  }
-
-  const renderTimestamp = () => {
-      const date = parseISO(comm.created_at || comm.latest_created_at!);
-      if(isToday(date)) return format(date, 'p');
-      if(isYesterday(date)) return 'Yesterday';
-      return format(date, 'd MMM');
-  }
+  const renderCallBubble = (c: Communication) => (
+    <div className={cn("p-3 rounded-lg max-w-[80%] flex items-center gap-2", isMine ? "bg-blue-900 text-white" : "bg-gray-700 text-white")}>
+      {c.direction === 'inbound' ? <PhoneIncoming className="h-5 w-5 flex-shrink-0" /> : <PhoneOutgoing className="h-5 w-5 flex-shrink-0" />}
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <p className="font-semibold whitespace-nowrap text-sm">{c.direction === 'inbound' ? 'Incoming Call' : 'Outgoing Call'}</p>
+        <p className="text-xs whitespace-nowrap">{c.duration ? `${c.duration} min` : 'Unanswered'}</p>
+      </div>
+    </div>
+  );
 
   const CardContent = () => (
-     <div className={cn(
-            "flex items-center gap-4 px-4 py-3 hover:bg-muted/50",
-            (comm.is_read === false || comm.is_read === 0) && "bg-primary/5 border-l-2 border-primary"
-        )}>
-        <Avatar className="h-9 w-9">
-            <AvatarImage src={`https://placehold.co/100x100.png?text=${contactInitial}`} alt={contactName} />
-            <AvatarFallback>{contactInitial}</AvatarFallback>
-        </Avatar>
-        <div className="flex-1 overflow-hidden">
-            <div className="flex justify-between items-center">
-                <p className={cn("font-semibold truncate", isMissed && "text-red-500")}>{contactName}</p>
-                <div className="text-xs text-muted-foreground flex items-center gap-2">
-                    <span>{renderTimestamp()}</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCallClick}>
-                        <PhoneIcon className="h-4 w-4" />
-                    </Button>
-                </div>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground truncate">
-                {renderIcon()}
-                <span className="truncate">
-                    {(comm.latest_type || comm.type) === 'sms' 
-                        ? comm.body 
-                        : `${comm.direction === 'inbound' ? 'Incoming' : 'Outgoing'} call ${comm.duration ? `(${comm.duration} min)` : ''}`
-                    }
-                </span>
-                 {!!comm.recording_url && <AudioPlayer src={comm.recording_url} type='Recording' />}
-                 {!!comm.voice_mail && <AudioPlayer src={comm.voice_mail} type='VoiceMail' />}
-            </div>
+     <div className={cn("flex items-start gap-3 p-2", isMine ? "justify-end" : "justify-start")}>
+        {showAvatar && (
+            <Avatar className="h-8 w-8">
+                <AvatarFallback>{contactInitial}</AvatarFallback>
+            </Avatar>
+        )}
+         {!showAvatar && !isMine && <div className="w-8" />}
+
+        <div className={cn("flex flex-col gap-1", isMine ? 'items-end' : 'items-start')}>
+             {isFirstInGroup && comm.created_at && (
+                 <p className={cn("text-xs text-muted-foreground", isMine ? "text-right" : "text-left", "px-1")}>
+                     <span className="font-semibold">{contactName}</span> • {format(parseISO(comm.created_at), 'p')}
+                </p>
+             )}
+            {comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)}
         </div>
     </div>
   );
@@ -136,7 +106,7 @@ function CommunicationCard({ comm, onMakeCall, isClickable, source }: { comm: Co
 export default function CallLog({ calls: communications, onMakeCall, isClickable = true, source }: CallLogProps) {
   if (communications.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 border-2 border-dashed rounded-lg m-6">
+      <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 border-2 border-dashed rounded-lg m-6 p-4">
         <p className="text-lg font-medium">No activity yet</p>
         <p>Your history with this contact will appear here.</p>
       </div>
@@ -155,7 +125,7 @@ export default function CallLog({ calls: communications, onMakeCall, isClickable
     }, {} as Record<string, Communication[]>);
 
   return (
-    <div>
+    <div className="p-4 space-y-4">
       {Object.entries(groupedCommunications).map(([date, commsForDay]) => (
         <div key={date}>
             <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm flex items-center justify-center my-2">
@@ -163,10 +133,26 @@ export default function CallLog({ calls: communications, onMakeCall, isClickable
                     {format(parseISO(date), 'EEEE, d MMM yyyy')}
                 </div>
             </div>
-             <div>
-                {commsForDay.map((comm) => (
-                    <CommunicationCard comm={comm} key={comm.id || `${comm.from}-${comm.to}`} onMakeCall={onMakeCall} isClickable={isClickable} source={source} />
-                ))}
+             <div className="space-y-1">
+                {commsForDay.map((comm, index) => {
+                    const prevComm = index > 0 ? commsForDay[index - 1] : null;
+                    
+                    const isFirstInGroup = !prevComm || 
+                                           prevComm.type !== 'sms' || 
+                                           comm.type !== 'sms' ||
+                                           prevComm.direction !== comm.direction;
+
+                    return (
+                        <CommunicationCard 
+                            comm={comm} 
+                            key={comm.id || `${comm.from}-${comm.to}-${index}`} 
+                            onMakeCall={onMakeCall} 
+                            isClickable={isClickable} 
+                            source={source}
+                            isFirstInGroup={isFirstInGroup}
+                        />
+                    )
+                })}
              </div>
         </div>
       ))}
