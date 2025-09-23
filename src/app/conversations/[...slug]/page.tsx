@@ -21,6 +21,7 @@ import { getUserDepartments } from "@/services/userService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import { sendSms } from "@/services/twilioService";
 import { events } from "@/lib/events";
+import ContactProfile from "@/components/contact-profile";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -32,7 +33,7 @@ export default function ConversationDetailPage() {
 
     const [allComms, setAllComms] = useState<Communication[]>([]);
     const [loading, setLoading] = useState(true);
-    const [contactName, setContactName] = useState('');
+    const [contact, setContact] = useState<any>(null);
     const [messageBody, setMessageBody] = useState('');
     const [isSending, setIsSending] = useState(false);
     
@@ -101,34 +102,30 @@ export default function ConversationDetailPage() {
                 const logs = await getCommunicationThread(from, to);
                 const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                 setAllComms(sortedLogs);
-                // If any record in the thread is unread (is_read === 0 or false),
-                // mark the entire thread as read.
+
                 const hasUnread = sortedLogs.some((l: any) => l?.is_read === 0 || l?.is_read === false);
                 if (hasUnread) {
                     await markThreadAsRead(from, to);
-                    // Immediately update sidebar department unread badges
                     try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
                 }
                 
                 if (sortedLogs.length > 0) {
                     const latestComm = sortedLogs[sortedLogs.length - 1];
-                    const name = latestComm.direction === 'inbound' 
-                        ? (latestComm.from_name?.name || from) 
-                        : (latestComm.to_name?.name || to);
-                    setContactName(name);
+                    const otherPartyIsFrom = latestComm.direction === 'inbound';
+                    const contactData = otherPartyIsFrom ? latestComm.from_name : latestComm.to_name;
+                    
+                    setContact({
+                        ...contactData,
+                        phone_no: otherPartyIsFrom ? latestComm.from : latestComm.to,
+                        name: contactData?.name || (otherPartyIsFrom ? latestComm.from : latestComm.to)
+                    });
 
-                    // Pre-select department and number
-                    // Prefer the department from the latest communication. If missing,
-                    // derive department by locating which department owns the from-number
-                    // used in this conversation. If multiple numbers exist in that
-                    // department, prefer the last number used by our side in the thread.
                     const lastUsedOurNumber = latestComm.direction === 'inbound' ? latestComm.to : latestComm.from;
 
                     let resolvedDeptId: string | null = latestComm.department_id
                         ? String(latestComm.department_id)
                         : null;
 
-                    // Helper: find department id by phone number across user's departments
                     const findDepartmentIdByNumber = async (phone: string): Promise<string | null> => {
                         for (const d of depts) {
                             try {
@@ -136,21 +133,16 @@ export default function ConversationDetailPage() {
                                 if (nums.some(n => n.phone_no === phone)) {
                                     return String(d.id);
                                 }
-                            } catch (e) {
-                                // ignore and continue
-                            }
+                            } catch (e) {}
                         }
                         return null;
                     };
 
                     if (!resolvedDeptId && depts.length > 0) {
-                        // Try resolve by the last used our number first
                         resolvedDeptId = await findDepartmentIdByNumber(lastUsedOurNumber);
-                        // Fallback: try the slug 'from' param (expected to be our number)
                         if (!resolvedDeptId) {
                             resolvedDeptId = await findDepartmentIdByNumber(from);
                         }
-                        // Final fallback: default to first available department
                         if (!resolvedDeptId) {
                             resolvedDeptId = String(depts[0].id);
                         }
@@ -158,24 +150,18 @@ export default function ConversationDetailPage() {
 
                     if (resolvedDeptId) {
                         setSelectedDepartmentId(resolvedDeptId);
-                        await handleDepartmentChange(resolvedDeptId); // fetch numbers for that dept
+                        await handleDepartmentChange(resolvedDeptId); 
 
-                        // If our last used number belongs to this department, select it;
-                        // otherwise keep the current selection from handleDepartmentChange.
                         try {
                             const nums = await getPhoneNumbers(Number(resolvedDeptId));
                             if (nums.some(n => n.phone_no === lastUsedOurNumber)) {
                                 setSelectedFromNumber(lastUsedOurNumber);
                             }
-                        } catch (_) {
-                            // ignore lookup errors
-                        }
+                        } catch (_) {}
                     }
                 } else {
-                     setContactName(to); // Fallback
-                     // No history yet: choose department based on slug 'from' number if possible
+                     setContact({ phone_no: to, name: to });
                      if (depts.length > 0) {
-                        // Attempt to resolve department by the from number
                         let deptId: string | null = null;
                         for (const d of depts) {
                             try {
@@ -188,7 +174,6 @@ export default function ConversationDetailPage() {
                         }
                         const finalDeptId = deptId ?? String(depts[0].id);
                         await handleDepartmentChange(finalDeptId);
-                        // If 'from' is one of the numbers in that department, preselect it
                         try {
                             const nums = await getPhoneNumbers(Number(finalDeptId));
                             if (nums.some(n => n.phone_no === from)) {
@@ -241,7 +226,7 @@ export default function ConversationDetailPage() {
     };
 
     const handleSendMessage = async () => {
-        const recipient = contactName === from ? to : from;
+        const recipient = contact?.phone_no;
         if (!selectedFromNumber) {
             toast({ title: "Error", description: "Please select a 'from' number.", variant: "destructive" });
             return;
@@ -259,7 +244,6 @@ export default function ConversationDetailPage() {
             await sendSms(selectedFromNumber, recipient, messageBody);
             toast({ title: "Success", description: "Message sent successfully." });
             setMessageBody("");
-            // Refresh conversation
             const logs = await getCommunicationThread(from, to);
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);
@@ -278,8 +262,8 @@ export default function ConversationDetailPage() {
                 <InAppSidebar />
             </Sidebar>
             <SidebarInset>
-                <div className="flex h-screen w-full bg-background text-foreground">
-                    <div className="flex flex-1 flex-col">
+                 <div className="grid grid-cols-[1fr_auto] h-screen w-full">
+                    <div className="flex flex-col bg-background text-foreground">
                          <AppHeader user={user} logout={logout} />
                          <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
                             <div className="flex items-center gap-4">
@@ -287,8 +271,8 @@ export default function ConversationDetailPage() {
                                     <ArrowLeft />
                                 </Button>
                                 <div className="relative flex-1">
-                                    <h1 className="text-xl font-bold">{contactName}</h1>
-                                     <p className="text-sm text-muted-foreground">{contactName === from ? to : from}</p>
+                                    <h1 className="text-xl font-bold">{contact?.name}</h1>
+                                     <p className="text-sm text-muted-foreground">{contact?.phone_no}</p>
                                 </div>
                             </div>
                         </header>
@@ -336,6 +320,9 @@ export default function ConversationDetailPage() {
                             </div>
                         </footer>
                     </div>
+                    <aside className="w-80 border-l bg-background">
+                        <ContactProfile contact={contact} onContactUpdate={() => refreshThread()} />
+                    </aside>
                 </div>
             </SidebarInset>
         </SidebarProvider>

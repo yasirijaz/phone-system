@@ -1,0 +1,164 @@
+
+"use client";
+
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Avatar, AvatarFallback } from './ui/avatar';
+import { ChevronDown, PlusCircle, Trash2, X, User } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
+import { createContact, updateContact } from '@/services/contactService';
+import type { Contact } from '@/types';
+
+interface ContactProfileProps {
+    contact: any;
+    onContactUpdate: () => void;
+}
+
+const contactSchema = z.object({
+  name: z.string().min(2, "Name is required."),
+  email: z.string().email("Invalid email address.").optional().or(z.literal('')),
+  phone_no: z.string().min(10, "Phone number is required."),
+  phone_type: z.string().min(1, "Phone type is required."),
+});
+
+export default function ContactProfile({ contact, onContactUpdate }: ContactProfileProps) {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [isEditing, setIsEditing] = useState(false);
+
+    const form = useForm<z.infer<typeof contactSchema>>({
+        resolver: zodResolver(contactSchema),
+        defaultValues: {
+            name: contact?.name || "",
+            email: contact?.email || "",
+            phone_no: contact?.phone_no || "",
+            phone_type: contact?.phone_type || "mobile",
+        }
+    });
+    
+    if (!contact) {
+        return (
+            <div className="h-full flex items-center justify-center text-muted-foreground">
+                <p>Select a conversation to see details.</p>
+            </div>
+        );
+    }
+    
+    const isSavedContact = !!contact?.id;
+    const contactInitial = contact.name ? contact.name.charAt(0).toUpperCase() : '?';
+
+    const handleFormSubmit = async (values: z.infer<typeof contactSchema>) => {
+        if (!user?.company_id) return;
+        try {
+            if (isSavedContact) {
+                await updateContact(contact.id, { ...values, company_id: user.company_id });
+                toast({ title: 'Success', description: 'Contact updated.' });
+            } else {
+                await createContact({ ...values, company_id: user.company_id });
+                toast({ title: 'Success', description: 'Contact created.' });
+            }
+            onContactUpdate();
+            setIsEditing(false);
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.response?.data?.message || 'Failed to save contact.', variant: 'destructive' });
+        }
+    };
+    
+    return (
+        <div className="h-full flex flex-col">
+            <header className="flex items-center justify-between p-4 border-b">
+                <h2 className="font-semibold text-lg">Profile</h2>
+                <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon"><X className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon"><User className="h-4 w-4" /></Button>
+                </div>
+            </header>
+            <div className="flex-1 p-4 space-y-6">
+                <div className="flex items-center gap-4">
+                    <Avatar className="h-12 w-12 text-xl">
+                        <AvatarFallback>{contactInitial}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 flex items-center justify-between">
+                         <h3 className="text-xl font-bold">{contact.name}</h3>
+                         <Button variant="ghost" size="icon"><ChevronDown className="h-5 w-5" /></Button>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                     <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">{contact.phone_type || 'Other'}</span>
+                        <span>{contact.phone_no}</span>
+                    </div>
+                     <div className="flex justify-between gap-2">
+                        <Dialog open={isEditing} onOpenChange={setIsEditing}>
+                            <DialogTrigger asChild>
+                                {isSavedContact ? (
+                                    <Button variant="outline" className="w-full">Edit contact</Button>
+                                ) : (
+                                     <Button className="w-full">
+                                        <PlusCircle className="mr-2 h-4 w-4" /> Add contact
+                                    </Button>
+                                )}
+                            </DialogTrigger>
+                             <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>{isSavedContact ? 'Edit' : 'Add'} Contact</DialogTitle>
+                                </DialogHeader>
+                                <Form {...form}>
+                                    <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+                                        <FormField control={form.control} name="name" render={({ field }) => (
+                                        <FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="e.g. John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                                        )}/>
+                                        <FormField control={form.control} name="email" render={({ field }) => (
+                                        <FormItem><FormLabel>Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="e.g. john@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                                        )}/>
+                                        <FormField control={form.control} name="phone_no" render={({ field }) => (
+                                        <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+1234567890" {...field} disabled /></FormControl><FormMessage /></FormItem>
+                                        )}/>
+                                        <FormField control={form.control} name="phone_type" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Phone Type</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="mobile">Mobile</SelectItem>
+                                                <SelectItem value="work">Work</SelectItem>
+                                                <SelectItem value="home">Home</SelectItem>
+                                            </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )}/>
+                                        <DialogFooter>
+                                            <Button type="button" variant="secondary" onClick={() => setIsEditing(false)}>Cancel</Button>
+                                            <Button type="submit">Save Contact</Button>
+                                        </DialogFooter>
+                                    </form>
+                                </Form>
+                            </DialogContent>
+                        </Dialog>
+                         {isSavedContact && <Button variant="destructive" className="w-full">Block contact</Button>}
+                    </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t">
+                    <Button variant="outline" className="w-full justify-start">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add number
+                    </Button>
+                </div>
+
+            </div>
+        </div>
+    );
+}
+
