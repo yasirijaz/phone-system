@@ -7,7 +7,7 @@ import { getCommunicationThread, markThreadAsRead } from "@/services/callLogServ
 import type { Communication, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Send, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
@@ -22,6 +22,7 @@ import { getPhoneNumbers } from "@/services/phoneNumberService";
 import { sendSms } from "@/services/twilioService";
 import { events } from "@/lib/events";
 import ContactProfile from "@/components/contact-profile";
+import { cn } from "@/lib/utils";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -44,6 +45,7 @@ export default function ConversationDetailPage() {
     const [loadingDepartments, setLoadingDepartments] = useState(true);
     const [loadingNumbers, setLoadingNumbers] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(true);
     
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from, to] = slug.map(part => decodeURIComponent(part));
@@ -265,9 +267,9 @@ export default function ConversationDetailPage() {
                  <div className="flex h-screen w-full bg-background text-foreground">
                     <div className="flex-1 flex flex-col">
                         <AppHeader user={user} logout={logout} />
-                        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 overflow-hidden">
-                            <div className="md:col-span-2 lg:col-span-3 flex flex-col h-full bg-background text-foreground overflow-hidden">
-                                <header className="flex-shrink-0 flex items-center h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
+                        <div className="flex-1 flex overflow-hidden">
+                            <div className={cn("flex flex-col h-full bg-background text-foreground overflow-hidden transition-all duration-300", isProfileSidebarOpen ? "w-full md:w-2/3 lg:w-3/4" : "w-full")}>
+                                <header className="flex-shrink-0 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
                                     <div className="flex items-center gap-4">
                                         <Button variant="ghost" size="icon" onClick={() => router.back()}>
                                             <ArrowLeft />
@@ -277,6 +279,9 @@ export default function ConversationDetailPage() {
                                             <p className="text-sm text-muted-foreground">{contact?.phone_no}</p>
                                         </div>
                                     </div>
+                                    <Button variant="ghost" size="icon" onClick={() => setIsProfileSidebarOpen(!isProfileSidebarOpen)} className="md:hidden">
+                                        {isProfileSidebarOpen ? <PanelRightClose /> : <PanelRightOpen />}
+                                    </Button>
                                 </header>
                                 <main className="flex-1 overflow-y-auto">
                                 {loading ? <p className="p-4">Loading...</p> : <CallLog calls={allComms} onMakeCall={handleMakeCall} isClickable={false} />}
@@ -322,8 +327,8 @@ export default function ConversationDetailPage() {
                                     </div>
                                 </footer>
                             </div>
-                            <aside className="hidden md:block border-l bg-background overflow-y-auto">
-                                <ContactProfile contact={contact} onContactUpdate={() => refreshThread()} />
+                            <aside className={cn("border-l bg-background overflow-y-auto transition-all duration-300", isProfileSidebarOpen ? "w-full md:w-1/3 lg:w-1/4" : "w-0 hidden")}>
+                                <ContactProfile contact={contact} onContactUpdate={() => refreshThread()} onCollapse={() => setIsProfileSidebarOpen(false)} />
                             </aside>
                         </div>
                     </div>
