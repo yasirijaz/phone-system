@@ -90,6 +90,9 @@ function CommunicationCard({
                 <p className="text-muted-foreground text-xs">
                     Lasted {duration} &bull; Ended at {endTime}
                 </p>
+                {c.recording_url && (
+                   <AudioPlayer src={c.recording_url} type="Recording" />
+                )}
             </div>
         </div>
     );
