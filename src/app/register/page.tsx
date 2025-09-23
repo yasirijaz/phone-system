@@ -112,8 +112,7 @@ export default function RegisterPage() {
         <div className="w-full max-w-md space-y-8">
             <div>
                  <Link href="/" className="flex items-center gap-2 mb-6">
-                    <Logo className="h-8 w-16" />
-                    <span className="font-bold text-2xl">by Windshield Hub</span>
+                    <Logo className="h-8 w-24" />
                 </Link>
                 <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
                     Create an account
