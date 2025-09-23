@@ -78,7 +78,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
         <div className="h-full flex flex-col">
             <header className="flex items-center justify-between p-4 border-b">
                 <h2 className="font-semibold text-lg">Profile</h2>
-                <Button variant="ghost" size="icon" onClick={onCollapse} className="md:hidden">
+                <Button variant="ghost" size="icon" onClick={onCollapse}>
                     <PanelRightClose className="h-5 w-5" />
                 </Button>
             </header>
@@ -122,7 +122,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                                         <FormItem><FormLabel>Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="e.g. john@example.com" {...field} /></FormControl><FormMessage /></FormItem>
                                         )}/>
                                         <FormField control={form.control} name="phone_no" render={({ field }) => (
-                                        <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+1234567890" {...field} disabled /></FormControl><FormMessage /></FormItem>
+                                        <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+1234567890" {...field} /></FormControl><FormMessage /></FormItem>
                                         )}/>
                                         <FormField control={form.control} name="phone_type" render={({ field }) => (
                                         <FormItem>
