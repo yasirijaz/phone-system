@@ -65,7 +65,7 @@ function CommunicationCard({
 
   const renderMessageBubble = (c: Communication) => (
     <div className={cn("p-3 rounded-lg max-w-[80%]", isMine ? "bg-primary text-primary-foreground" : "bg-muted")}>
-      <p>{c.body}</p>
+      <p className="text-sm">{c.body}</p>
     </div>
   );
 
