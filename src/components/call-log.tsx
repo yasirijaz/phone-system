@@ -82,21 +82,19 @@ function CommunicationCard({
     return (
         <div className={cn("flex items-start gap-3 p-3 rounded-lg w-full max-w-sm", isMine ? "bg-primary/10" : "bg-muted")}>
             <Icon className={cn("h-5 w-5 mt-1", isMissed ? "text-destructive" : "text-muted-foreground")} />
-            <div className="flex-1 text-sm space-y-1">
-                <div className="flex justify-between items-center">
+            <div className="flex-1 flex items-center justify-between text-sm space-y-1">
+                <div>
                     <p className="font-semibold">{title}</p>
+                    <p className="text-muted-foreground text-xs">
+                        {c.direction === 'inbound' ? 'Dialpad' : 'Other'} {fromNumberFormatted} &rarr; {c.direction === 'inbound' ? 'Other' : 'Dialpad'} {toNumberFormatted}
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                        {duration} <span className="mx-1">&bull;</span> {endTime}
+                    </p>
                 </div>
-                <p className="text-muted-foreground text-xs">
-                    {c.direction === 'inbound' ? 'Dialpad' : 'Other'} {fromNumberFormatted} &rarr; {c.direction === 'inbound' ? 'Other' : 'Dialpad'} {toNumberFormatted}
-                </p>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
-                  {c.recording_url && (
+                {c.recording_url && (
                     <AudioPlayer src={c.recording_url} type="Recording" />
-                  )}
-                   <p>
-                      {duration} <span className="mx-1">&bull;</span> {endTime}
-                   </p>
-                </div>
+                )}
             </div>
         </div>
     );
