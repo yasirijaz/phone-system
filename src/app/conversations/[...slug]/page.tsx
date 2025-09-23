@@ -262,67 +262,69 @@ export default function ConversationDetailPage() {
                 <InAppSidebar />
             </Sidebar>
             <SidebarInset>
-                 <div className="grid grid-cols-[1fr_auto] h-screen w-full">
-                    <div className="flex flex-col bg-background text-foreground">
-                         <AppHeader user={user} logout={logout} />
-                         <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
-                            <div className="flex items-center gap-4">
-                                <Button variant="ghost" size="icon" onClick={() => router.back()}>
-                                    <ArrowLeft />
-                                </Button>
-                                <div className="relative flex-1">
-                                    <h1 className="text-xl font-bold">{contact?.name}</h1>
-                                     <p className="text-sm text-muted-foreground">{contact?.phone_no}</p>
+                <div className="flex flex-col h-screen">
+                    <AppHeader user={user} logout={logout} />
+                    <div className="flex-1 grid grid-cols-[1fr_auto] overflow-hidden">
+                        <div className="flex flex-col bg-background text-foreground overflow-hidden">
+                            <header className="flex-shrink-0 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
+                                <div className="flex items-center gap-4">
+                                    <Button variant="ghost" size="icon" onClick={() => router.back()}>
+                                        <ArrowLeft />
+                                    </Button>
+                                    <div className="relative flex-1">
+                                        <h1 className="text-xl font-bold">{contact?.name}</h1>
+                                        <p className="text-sm text-muted-foreground">{contact?.phone_no}</p>
+                                    </div>
                                 </div>
-                            </div>
-                        </header>
-                         <main className="flex-1 overflow-y-auto">
-                           {loading ? <p>Loading...</p> : <CallLog calls={allComms} onMakeCall={handleMakeCall} isClickable={false} />}
-                           <div ref={messagesEndRef} />
-                        </main>
-                        <footer className="p-4 border-t bg-background space-y-2">
-                             <div className="grid grid-cols-2 gap-2">
-                                <Select onValueChange={handleDepartmentChange} value={selectedDepartmentId} disabled={loadingDepartments || allComms.length > 0}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Department" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {departments.map((dept) => (
-                                            <SelectItem key={dept.id} value={String(dept.id)}>
-                                                {dept.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                 <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId || allComms.length > 0}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Number" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                         {phoneNumbers.map((num) => (
-                                            <SelectItem key={num.id} value={num.phone_no}>
-                                                {num.phone_no} ({num.label})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="relative">
-                                <Textarea 
-                                    placeholder="Write Your Message..."
-                                    className="pr-10"
-                                    value={messageBody}
-                                    onChange={(e) => setMessageBody(e.target.value)}
-                                />
-                                <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2" onClick={handleSendMessage} disabled={isSending}>
-                                    {isSending ? '...' : <Send className="h-5 w-5"/>}
-                                </Button>
-                            </div>
-                        </footer>
+                            </header>
+                            <main className="flex-1 overflow-y-auto">
+                               {loading ? <p className="p-4">Loading...</p> : <CallLog calls={allComms} onMakeCall={handleMakeCall} isClickable={false} />}
+                               <div ref={messagesEndRef} />
+                            </main>
+                            <footer className="flex-shrink-0 p-4 border-t bg-background space-y-2">
+                                 <div className="grid grid-cols-2 gap-2">
+                                    <Select onValueChange={handleDepartmentChange} value={selectedDepartmentId} disabled={loadingDepartments || allComms.length > 0}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select Department" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {departments.map((dept) => (
+                                                <SelectItem key={dept.id} value={String(dept.id)}>
+                                                    {dept.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                     <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId || allComms.length > 0}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select Number" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                             {phoneNumbers.map((num) => (
+                                                <SelectItem key={num.id} value={num.phone_no}>
+                                                    {num.phone_no} ({num.label})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="relative">
+                                    <Textarea 
+                                        placeholder="Write Your Message..."
+                                        className="pr-10"
+                                        value={messageBody}
+                                        onChange={(e) => setMessageBody(e.target.value)}
+                                    />
+                                    <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2" onClick={handleSendMessage} disabled={isSending}>
+                                        {isSending ? '...' : <Send className="h-5 w-5"/>}
+                                    </Button>
+                                </div>
+                            </footer>
+                        </div>
+                        <aside className="w-80 border-l bg-background overflow-y-auto">
+                            <ContactProfile contact={contact} onContactUpdate={() => refreshThread()} />
+                        </aside>
                     </div>
-                    <aside className="w-80 border-l bg-background">
-                        <ContactProfile contact={contact} onContactUpdate={() => refreshThread()} />
-                    </aside>
                 </div>
             </SidebarInset>
         </SidebarProvider>
