@@ -141,7 +141,7 @@ function CommunicationCard({
         : comm.body;
 
        return (
-            <div className="flex items-center p-4 gap-4 hover:bg-muted/50 rounded-lg group">
+            <div className="flex items-center p-4 gap-4 hover:bg-muted/50 group border-b">
                 <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="flex-1 flex items-center gap-4">
                     <Avatar className="h-10 w-10">
                         <AvatarFallback>
