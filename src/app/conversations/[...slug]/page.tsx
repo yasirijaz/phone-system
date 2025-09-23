@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { getCommunicationThread, markThreadAsRead } from "@/services/callLogService";
+import { getCommunicationThread, markRead } from "@/services/callLogService";
 import type { Communication, Contact, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -145,10 +145,12 @@ export default function ConversationDetailPage() {
                 
                 const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                 setAllComms(sortedLogs);
-
-                const hasUnread = sortedLogs.some((l: any) => l?.is_read === 0 || l?.is_read === false);
-                if (hasUnread) {
-                    await markThreadAsRead(from, to);
+                
+                const unreadLogs = sortedLogs.filter(l => !l.is_read);
+                if (unreadLogs.length > 0) {
+                    await Promise.all(
+                        unreadLogs.map(log => markRead(String(log.id), log.type))
+                    );
                     try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
                 }
                 

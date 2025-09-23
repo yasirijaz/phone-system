@@ -63,8 +63,9 @@ export const getUnreadCallLogs = async (departmentId?: number): Promise<Communic
   return response.data.data;
 };
 
-export const markRead = async (id: string): Promise<void> => {
-  await axios.post(`/api/call-logs/${id}/mark-read`);
+export const markRead = async (id: string, type: 'call' | 'sms'): Promise<void> => {
+    const endpoint = type === 'call' ? 'call-logs' : 'sms-logs';
+    await axios.post(`/api/${endpoint}/${id}/mark-read`);
 };
 
 export const markThreadAsRead = async (from: string, to: string): Promise<void> => {
@@ -82,3 +83,4 @@ export const unstarCall = async (id: string): Promise<void> => {
     
 
     
+
