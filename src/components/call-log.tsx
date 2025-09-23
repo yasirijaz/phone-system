@@ -97,7 +97,7 @@ function CommunicationCard({
     const fromNumberFormatted = c.from?.replace(/^\+1/, '');
     const toNumberFormatted = c.to?.replace(/^\+1/, '');
     
-    const duration = c.duration ? `${c.duration} min` : 'Unanswered';
+    const duration = c.duration ? `${c.duration} seconds` : 'Unanswered';
     const endTime = c.created_at ? format(parseISO(c.created_at), 'p') : '';
 
     return (
@@ -137,7 +137,7 @@ function CommunicationCard({
        const queryString = source === 'unread' ? `?source=unread` : '';
        console.log('comm',comm);
        const callInfo = comm.latest_type === 'call' || comm.type === 'sms'
-        ? `${comm.direction === 'inbound' ? 'Inbound' : 'Outbound'} / ${comm.duration || 0} min` 
+        ? `${comm.direction === 'inbound' ? 'Inbound' : 'Outbound'} / ${comm.duration} seconds` 
         : comm.direction + ' / ' + comm.body;
 
        return (
