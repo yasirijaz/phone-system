@@ -18,7 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 interface CallLogProps {
   calls: Communication[];
-  contacts: Contact[];
+  contacts?: Contact[];
   onMakeCall: (number: string) => void;
   isClickable?: boolean;
   source?: string;
@@ -35,7 +35,7 @@ function CommunicationCard({
     isMiddleOfGroup
 }: { 
     comm: Communication, 
-    contacts: Contact[],
+    contacts?: Contact[],
     onMakeCall: (number: string) => void, 
     isClickable: boolean, 
     source?: string,
@@ -58,6 +58,7 @@ function CommunicationCard({
   const isMine = comm.direction === 'outbound' || (user && comm.user_id === user.id && comm.direction !== 'inbound');
 
   const findContact = (phone: string) => {
+    if (!contacts) return null;
     return contacts.find(c => c.phone_no === phone);
   };
   
@@ -280,4 +281,3 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
     </div>
   );
 }
-

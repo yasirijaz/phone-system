@@ -19,6 +19,7 @@ import AppHeader from '@/components/app-header';
 import PaginationControls from '@/components/pagination-controls';
 import { events } from '@/lib/events';
 import { isElectron } from '@/lib/is-electron';
+import { getContacts } from '@/services/contactService';
 
 const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: string, value: string, icon: React.ElementType, trend: string, trendType: 'up' | 'down' }) => (
     <Card>
@@ -135,6 +136,7 @@ export default function EcommerceDashboard() {
   const inElectron = isElectron();
   const [communications, setCommunications] = useState<Communication[]>([]);
   const [allCommunications, setAllCommunications] = useState<Communication[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const { toast } = useToast();
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerNumber, setDialerNumber] = useState('');
@@ -153,8 +155,13 @@ export default function EcommerceDashboard() {
     setPagination(prev => ({ ...prev, loading: true }));
     
     try {
-        const response = await getCommunications({ page, limit });
+        const [response, contactsResponse] = await Promise.all([
+          getCommunications({ page, limit }),
+          user.company_id ? getContacts(user.company_id) : Promise.resolve([])
+        ]);
+
         setCommunications(response.results);
+        setContacts(contactsResponse || []);
         setPagination(prev => ({
             ...prev,
             currentPage: response.page_no,
@@ -225,11 +232,14 @@ export default function EcommerceDashboard() {
       return { totalCalls: 0, totalDuration: 0, mostFrequentContact: 'N/A' };
     }
 
-    const totalDuration = allCommunications.reduce((acc, call) => acc + (parseInt(call.duration, 10) || 0), 0);
+    const totalDuration = allCommunications.reduce((acc, call) => acc + (parseInt(call.duration || '0', 10)), 0);
 
     const contactCounts = allCommunications.reduce((acc, call) => {
-      const contact = call.direction === 'inbound' ? (call.from_name?.name || call.from) : (call.to_name?.name || call.to);
-      acc[contact] = (acc[contact] || 0) + 1;
+      const contactIdentifier = call.direction === 'inbound' ? call.from : call.to;
+      const contactInfo = contacts.find(c => c.phone_no === contactIdentifier);
+      const contactName = contactInfo?.name || contactIdentifier;
+
+      acc[contactName] = (acc[contactName] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
@@ -242,7 +252,7 @@ export default function EcommerceDashboard() {
       totalDuration,
       mostFrequentContact,
     };
-  }, [allCommunications]);
+  }, [allCommunications, contacts]);
 
   if (user?.role_id === 1 || inElectron) {
     return null; // or a loading spinner, as redirection is happening
@@ -284,7 +294,7 @@ export default function EcommerceDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <CallLog calls={communications} onMakeCall={(number) => {
+                <CallLog calls={communications} contacts={contacts} onMakeCall={(number) => {
                   setDialerNumber(number.replace(/^\+1/, ""));
                   setDialerOpen(true);
                 }} />

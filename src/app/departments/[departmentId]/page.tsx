@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from 'next/navigation';
-import type { Communication, Department, PhoneNumber, User, PaginatedCommunicationsResponse } from "@/types";
+import type { Communication, Department, PhoneNumber, User, PaginatedCommunicationsResponse, Contact } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,7 @@ import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { getDepartmentUsers, getDepartments, updateDndStatus, getDndStatus } from "@/services/departmentService";
+import { getContacts } from "@/services/contactService";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -42,7 +43,7 @@ const initialPaginationState: PaginationState = {
 };
 
 export default function DepartmentDetailPage() {
-  const { user, logout } = useAuth();
+  const { user, logout }_ = useAuth();
   const { device } = useTwilio();
   const { toast } = useToast();
   const params = useParams();
@@ -55,6 +56,7 @@ export default function DepartmentDetailPage() {
   });
   const [operators, setOperators] = useState<User[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
 
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerNumber, setDialerNumber] = useState('');
@@ -94,9 +96,13 @@ export default function DepartmentDetailPage() {
             filters.type = tab;
         }
 
-        const response = await getCommunications(filters);
+        const [response, contactsResponse] = await Promise.all([
+          getCommunications(filters),
+          user.company_id ? getContacts(user.company_id) : Promise.resolve([])
+        ]);
         
         setData(prev => ({ ...prev, [tab]: response.results }));
+        setContacts(contactsResponse || []);
         setPagination(prev => ({
             ...prev,
             [tab]: {
@@ -205,7 +211,7 @@ export default function DepartmentDetailPage() {
     
     return (
       <Card>
-        <CallLog calls={currentData || []} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
+        <CallLog calls={currentData || []} contacts={contacts} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
         <PaginationControls
           {...currentPagination}
           onPageChange={handlePageChange}
@@ -316,5 +322,3 @@ export default function DepartmentDetailPage() {
     </SidebarProvider>
   );
 }
-
-    
