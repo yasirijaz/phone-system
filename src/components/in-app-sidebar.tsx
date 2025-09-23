@@ -59,7 +59,7 @@ export function InAppSidebar() {
 
         const [userDepts, recentCommsResponse, contacts] = await Promise.all([
             getUserDepartments(user.id),
-            getCommunications({ limit: 100 }), // Fetch more to get a good list of recents
+            getCommunications({ limit: 100 }),
             getContacts(user.company_id),
         ]);
         
