@@ -46,7 +46,7 @@ const AudioPlayer = ({ src, type }: { src: string, type: string }) => {
 
   return (
     <div className="flex items-center gap-2">
-        <Button variant="outline" size="icon" onClick={togglePlay}>
+        <Button variant="outline" size="icon" onClick={togglePlay} className="ml-2">
             {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </Button>
       
