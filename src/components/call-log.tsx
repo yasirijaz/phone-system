@@ -29,14 +29,18 @@ function CommunicationCard({
     onMakeCall, 
     isClickable, 
     source, 
-    isFirstInGroup 
+    isFirstInGroup,
+    isLastInGroup,
+    isMiddleOfGroup
 }: { 
     comm: Communication, 
     contacts: Contact[],
     onMakeCall: (number: string) => void, 
     isClickable: boolean, 
     source?: string,
-    isFirstInGroup: boolean
+    isFirstInGroup: boolean,
+    isLastInGroup: boolean,
+    isMiddleOfGroup: boolean
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -64,7 +68,14 @@ function CommunicationCard({
   const showAvatar = !isMine && isFirstInGroup;
 
   const renderMessageBubble = (c: Communication) => (
-    <div className={cn("p-3 rounded-lg max-w-[80%]", isMine ? "bg-primary text-primary-foreground" : "bg-muted")}>
+     <div className={cn(
+      "p-3 max-w-[80%] break-words",
+      isMine ? "bg-primary text-primary-foreground" : "bg-muted",
+      isFirstInGroup && (isMine ? "rounded-t-lg rounded-bl-lg" : "rounded-t-lg rounded-br-lg"),
+      isLastInGroup && (isMine ? "rounded-b-lg rounded-bl-lg" : "rounded-b-lg rounded-br-lg"),
+      isMiddleOfGroup && (isMine ? "rounded-bl-lg" : "rounded-br-lg"),
+      !isFirstInGroup && !isLastInGroup && !isMiddleOfGroup && "rounded-lg" // single message in a group
+    )}>
       <p className="text-sm">{c.body}</p>
     </div>
   );
@@ -148,7 +159,7 @@ function CommunicationCard({
     }
 
     return (
-        <div className={cn("flex items-start gap-3 p-2", isMine ? "justify-end" : "justify-start")}>
+        <div className={cn("flex items-start gap-3", isMine ? "justify-end" : "justify-start", !isFirstInGroup && "py-0.5", isFirstInGroup && "pt-2")}>
             {showAvatar && (
                 <Avatar className="h-8 w-8">
                     <AvatarFallback>{contactInitial}</AvatarFallback>
@@ -184,7 +195,7 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
   if(isClickable) {
     return (
         <div className="space-y-1">
-            {communications.map((comm) => (
+            {communications.map((comm, index) => (
                 <CommunicationCard
                     comm={comm}
                     contacts={contacts}
@@ -193,6 +204,8 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                     isClickable={isClickable}
                     source={source}
                     isFirstInGroup={true}
+                    isLastInGroup={true}
+                    isMiddleOfGroup={false}
                 />
             ))}
         </div>
@@ -219,14 +232,17 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                     {format(parseISO(date), 'EEEE, d MMM yyyy')}
                 </div>
             </div>
-             <div className="space-y-1">
+             <div className="space-y-0">
                 {commsForDay.map((comm, index) => {
                     const prevComm = index > 0 ? commsForDay[index - 1] : null;
-                    
-                    const isFirstInGroup = !prevComm || 
-                                           prevComm.type !== 'sms' || 
-                                           comm.type !== 'sms' ||
-                                           prevComm.direction !== comm.direction;
+                    const nextComm = index < commsForDay.length - 1 ? commsForDay[index + 1] : null;
+
+                    const isSmsGroupStart = !prevComm || prevComm.type !== 'sms' || comm.type !== 'sms' || prevComm.direction !== comm.direction;
+                    const isSmsGroupEnd = !nextComm || nextComm.type !== 'sms' || comm.type !== 'sms' || nextComm.direction !== comm.direction;
+
+                    const isFirstInGroup = comm.type !== 'sms' || isSmsGroupStart;
+                    const isLastInGroup = comm.type !== 'sms' || isSmsGroupEnd;
+                    const isMiddleOfGroup = !isFirstInGroup && !isLastInGroup;
 
                     return (
                         <CommunicationCard 
@@ -237,6 +253,8 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                             isClickable={isClickable} 
                             source={source}
                             isFirstInGroup={isFirstInGroup}
+                            isLastInGroup={isLastInGroup}
+                            isMiddleOfGroup={isMiddleOfGroup}
                         />
                     )
                 })}
