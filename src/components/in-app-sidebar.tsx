@@ -27,6 +27,7 @@ interface RecentItem {
     name: string;
     href: string;
     initials: string;
+    unread_count: number;
 }
 
 export function InAppSidebar() {
@@ -58,7 +59,7 @@ export function InAppSidebar() {
 
         const [userDepts, recentCommsResponse, contacts] = await Promise.all([
             getUserDepartments(user.id),
-            getCommunications({ limit: 50 }),
+            getCommunications({ limit: 100 }), // Fetch more to get a good list of recents
             getContacts(user.company_id),
         ]);
         
@@ -79,28 +80,33 @@ export function InAppSidebar() {
         
         if (mounted) setDepartments(deptsWithCounts);
 
-        const recentComms = recentCommsResponse.results || [];
+        const recentComms = Array.isArray(recentCommsResponse.results) ? recentCommsResponse.results : [];
         const uniqueRecents: { [key: string]: RecentItem } = {};
-        const seenNumbers = new Set<string>();
 
-        if (Array.isArray(recentComms)) {
-            recentComms.forEach((comm: Communication) => {
-                const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
-                const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
+        recentComms.forEach((comm: Communication) => {
+            const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
+            const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
 
-                if (!seenNumbers.has(otherPartyNumber)) {
-                    seenNumbers.add(otherPartyNumber);
-                    const contact = contacts.find((c: Contact) => c.phone_no === otherPartyNumber);
-                    const name = contact?.name || otherPartyNumber;
-                    uniqueRecents[otherPartyNumber] = {
-                        id: otherPartyNumber,
-                        name: name,
-                        href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}`,
-                        initials: getInitials(name),
-                    };
-                }
-            });
-        }
+            if (!uniqueRecents[otherPartyNumber]) {
+                const contact = contacts.find((c: Contact) => c.phone_no === otherPartyNumber);
+                const name = contact?.name || otherPartyNumber;
+                uniqueRecents[otherPartyNumber] = {
+                    id: otherPartyNumber,
+                    name: name,
+                    href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}`,
+                    initials: getInitials(name),
+                    unread_count: 0
+                };
+            }
+        });
+
+        // Now count unread for each unique recent contact
+        Object.keys(uniqueRecents).forEach(number => {
+            const unreadCount = recentComms.filter(
+                c => (c.direction === 'inbound' ? c.from : c.to) === number && !c.is_read
+            ).length;
+            uniqueRecents[number].unread_count = unreadCount;
+        });
         
         if (mounted) {
             setRecentItems(Object.values(uniqueRecents).slice(0, 10));
@@ -241,6 +247,9 @@ export function InAppSidebar() {
                                         </Avatar>
                                         <span className="truncate">{item.name}</span>
                                     </div>
+                                     {item.unread_count > 0 && (
+                                        <Badge className="h-5">{item.unread_count}</Badge>
+                                    )}
                                 </Link>
                             </SidebarMenuButton>
                         </SidebarMenuItem>
