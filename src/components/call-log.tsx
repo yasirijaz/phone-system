@@ -63,7 +63,7 @@ function CommunicationCard({
     <div className={cn("p-3 rounded-lg max-w-[80%] flex items-center gap-2", isMine ? "bg-blue-900 text-white" : "bg-gray-700 text-white")}>
       {c.direction === 'inbound' ? <PhoneIncoming className="h-5 w-5 flex-shrink-0" /> : <PhoneOutgoing className="h-5 w-5 flex-shrink-0" />}
       <div className="flex items-baseline gap-2 flex-wrap">
-        <p className="font-semibold whitespace-nowrap">{c.direction === 'inbound' ? 'Incoming Call' : 'Outgoing Call'}</p>
+        <p className="font-semibold whitespace-nowrap text-sm">{c.direction === 'inbound' ? 'Incoming Call' : 'Outgoing Call'}</p>
         <p className="text-xs whitespace-nowrap">{c.duration ? `${c.duration} min` : 'Unanswered'}</p>
       </div>
     </div>
