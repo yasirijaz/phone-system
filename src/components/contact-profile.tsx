@@ -59,6 +59,16 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
         }
     }, [contact, form, isSavedContact]);
     
+    const handleAddClick = () => {
+        form.reset({
+            name: '',
+            email: '',
+            phone_no: contact.phone_no,
+            phone_type: 'mobile',
+        });
+        setIsEditing(true);
+    };
+    
     if (!contact) {
         return (
             <div className="h-full flex items-center justify-center text-muted-foreground">
@@ -114,9 +124,9 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                         <Dialog open={isEditing} onOpenChange={setIsEditing}>
                             <DialogTrigger asChild>
                                 {isSavedContact ? (
-                                    <Button variant="outline" className="w-full">Edit contact</Button>
+                                    <Button variant="outline" className="w-full" onClick={() => setIsEditing(true)}>Edit contact</Button>
                                 ) : (
-                                     <Button className="w-full" onClick={() => form.reset({ name: '', email: '', phone_no: contact.phone_no, phone_type: 'mobile'})}>
+                                     <Button className="w-full" onClick={handleAddClick}>
                                         <PlusCircle className="mr-2 h-4 w-4" /> Add contact
                                     </Button>
                                 )}

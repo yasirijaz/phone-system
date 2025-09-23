@@ -1,6 +1,6 @@
 
 
-import type { Communication } from '@/types';
+import type { Communication, Contact } from '@/types';
 import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import Link from 'next/link';
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 
 interface CallLogProps {
   calls: Communication[];
+  contacts: Contact[];
   onMakeCall: (number: string) => void;
   isClickable?: boolean;
   source?: string;
@@ -24,12 +25,14 @@ interface CallLogProps {
 
 function CommunicationCard({ 
     comm, 
+    contacts,
     onMakeCall, 
     isClickable, 
     source, 
     isFirstInGroup 
 }: { 
     comm: Communication, 
+    contacts: Contact[],
     onMakeCall: (number: string) => void, 
     isClickable: boolean, 
     source?: string,
@@ -40,15 +43,18 @@ function CommunicationCard({
 
   const isMine = comm.direction === 'outbound' || (user && comm.user_id === user.id && comm.direction !== 'inbound');
 
+  const findContact = (phone: string) => {
+    return contacts.find(c => c.phone_no === phone);
+  };
+  
   // Always show the other party
-  const otherParty = isMine ? {
-      name: comm.to_name?.name || comm.to,
-      number: comm.to,
-      initial: (comm.to_name?.name || comm.to || '?').charAt(0).toUpperCase()
-  } : {
-      name: comm.from_name?.name || comm.from,
-      number: comm.from,
-      initial: (comm.from_name?.name || comm.from || '?').charAt(0).toUpperCase()
+  const otherPartyNumber = isMine ? comm.to : comm.from;
+  const contact = findContact(otherPartyNumber);
+  
+  const otherParty = {
+      name: contact?.name || otherPartyNumber,
+      number: otherPartyNumber,
+      initial: (contact?.name || otherPartyNumber || '?').charAt(0).toUpperCase()
   };
 
   const contactName = isFirstInGroup ? (isMine ? (user?.name || 'Me') : otherParty.name) : '';
@@ -142,7 +148,7 @@ function CommunicationCard({
   return <CardContent />;
 }
 
-export default function CallLog({ calls: communications, onMakeCall, isClickable = true, source }: CallLogProps) {
+export default function CallLog({ calls: communications, contacts, onMakeCall, isClickable = true, source }: CallLogProps) {
   if (communications.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 border-2 border-dashed rounded-lg m-6 p-4">
@@ -158,6 +164,7 @@ export default function CallLog({ calls: communications, onMakeCall, isClickable
             {communications.map((comm) => (
                 <CommunicationCard
                     comm={comm}
+                    contacts={contacts}
                     key={comm.id || `${comm.from}-${comm.to}`}
                     onMakeCall={onMakeCall}
                     isClickable={isClickable}
@@ -201,6 +208,7 @@ export default function CallLog({ calls: communications, onMakeCall, isClickable
                     return (
                         <CommunicationCard 
                             comm={comm} 
+                            contacts={contacts}
                             key={comm.id || `${comm.from}-${comm.to}-${index}`} 
                             onMakeCall={onMakeCall} 
                             isClickable={isClickable} 

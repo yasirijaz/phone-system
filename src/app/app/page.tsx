@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
-import type { Communication, PaginatedCommunicationsResponse } from "@/types";
+import type { Communication, Contact, PaginatedCommunicationsResponse } from "@/types";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
 import { getCommunications } from "@/services/callLogService";
+import { getContacts } from "@/services/contactService";
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
@@ -45,6 +46,7 @@ export default function AppUIPage() {
     all: [], unread: [], calls: [], missed: [], meetings: [],
     voicemails: [], recordings: [], messages: [], starred: [], spam: [], unlogged: []
   });
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [pagination, setPagination] = useState<Record<TabName, PaginationState>>({
     all: { ...initialPaginationState }, unread: { ...initialPaginationState }, calls: { ...initialPaginationState },
     missed: { ...initialPaginationState }, meetings: { ...initialPaginationState }, voicemails: { ...initialPaginationState },
@@ -66,9 +68,13 @@ export default function AppUIPage() {
             filters.type = tab;
         }
 
-        const response = await getCommunications(filters);
+        const [response, contactsResponse] = await Promise.all([
+          getCommunications(filters),
+          user.company_id ? getContacts(user.company_id) : Promise.resolve([])
+        ]);
         
         setData(prev => ({ ...prev, [tab]: response.results }));
+        setContacts(Array.isArray(contactsResponse) ? contactsResponse : []);
         setPagination(prev => ({
             ...prev,
             [tab]: {
@@ -122,7 +128,7 @@ export default function AppUIPage() {
     
     return (
       <Card className="overflow-hidden">
-        <CallLog calls={currentData || []} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
+        <CallLog calls={currentData || []} contacts={contacts} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
         <PaginationControls
           {...currentPagination}
           onPageChange={handlePageChange}

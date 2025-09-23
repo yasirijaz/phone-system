@@ -4,10 +4,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { getCommunicationThread, markThreadAsRead } from "@/services/callLogService";
-import type { Communication, Department, PhoneNumber } from "@/types";
+import type { Communication, Contact, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Send, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, Send, PanelRightClose, PanelRightOpen, User } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
@@ -20,6 +20,7 @@ import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import { sendSms } from "@/services/twilioService";
+import { getContacts } from "@/services/contactService";
 import { events } from "@/lib/events";
 import ContactProfile from "@/components/contact-profile";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ export default function ConversationDetailPage() {
     const [isSending, setIsSending] = useState(false);
     
     const [departments, setDepartments] = useState<Department[]>([]);
+    const [contacts, setContacts] = useState<Contact[]>([]);
     const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
     const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
     const [selectedFromNumber, setSelectedFromNumber] = useState<string>('');
@@ -50,26 +52,37 @@ export default function ConversationDetailPage() {
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from, to] = slug.map(part => decodeURIComponent(part));
 
+    const findContact = (phone: string) => {
+        if(!contacts || contacts.length === 0) return null;
+        return contacts.find(c => c.phone_no === phone);
+    };
+
     const refreshThread = useCallback(async () => {
         try {
-            const logs = await getCommunicationThread(from, to);
+            const [logs, fetchedContacts] = await Promise.all([
+                getCommunicationThread(from, to),
+                user?.company_id ? getContacts(user.company_id) : Promise.resolve([])
+            ]);
+            setContacts(Array.isArray(fetchedContacts) ? fetchedContacts : []);
+
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);
+
              if (sortedLogs.length > 0) {
                 const latestComm = sortedLogs[sortedLogs.length - 1];
-                const otherPartyIsFrom = latestComm.direction === 'inbound';
-                const contactData = otherPartyIsFrom ? latestComm.from_name : latestComm.to_name;
+                const otherPartyNumber = latestComm.direction === 'inbound' ? latestComm.from : latestComm.to;
+                const foundContact = findContact(otherPartyNumber);
                 
                 setContact({
-                    ...contactData,
-                    phone_no: otherPartyIsFrom ? latestComm.from : latestComm.to,
-                    name: contactData?.name || (otherPartyIsFrom ? latestComm.from : latestComm.to)
+                    ...(foundContact || {}),
+                    phone_no: otherPartyNumber,
+                    name: foundContact?.name || otherPartyNumber
                 });
              }
         } catch (e) {
             console.error('Failed to refresh conversation thread', e);
         }
-    }, [from, to]);
+    }, [from, to, user]);
 
      const handleDepartmentChange = useCallback(async (departmentId: string) => {
         setSelectedDepartmentId(departmentId);
@@ -106,13 +119,19 @@ export default function ConversationDetailPage() {
 
             try {
                 const isAdmin = user.role_id === 1 || user.role_id === 2;
-                const fetchedDepts = await (isAdmin && user.company_id
-                    ? getDepartments(user.company_id)
-                    : getUserDepartments(user.id));
+                const [fetchedDepts, fetchedContacts, logs] = await Promise.all([
+                    isAdmin && user.company_id
+                        ? getDepartments(user.company_id)
+                        : getUserDepartments(user.id),
+                    user.company_id ? getContacts(user.company_id) : Promise.resolve([]),
+                    getCommunicationThread(from, to)
+                ]);
                 const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
                 setDepartments(depts);
+
+                const contactList = Array.isArray(fetchedContacts) ? fetchedContacts : [];
+                setContacts(contactList);
                 
-                const logs = await getCommunicationThread(from, to);
                 const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                 setAllComms(sortedLogs);
 
@@ -124,13 +143,13 @@ export default function ConversationDetailPage() {
                 
                 if (sortedLogs.length > 0) {
                     const latestComm = sortedLogs[sortedLogs.length - 1];
-                    const otherPartyIsFrom = latestComm.direction === 'inbound';
-                    const contactData = otherPartyIsFrom ? latestComm.from_name : latestComm.to_name;
+                    const otherPartyNumber = latestComm.direction === 'inbound' ? latestComm.from : latestComm.to;
+                    const foundContact = contactList.find(c => c.phone_no === otherPartyNumber);
                     
                     setContact({
-                        ...contactData,
-                        phone_no: otherPartyIsFrom ? latestComm.from : latestComm.to,
-                        name: contactData?.name || (otherPartyIsFrom ? latestComm.from : latestComm.to)
+                        ...(foundContact || {}),
+                        phone_no: otherPartyNumber,
+                        name: foundContact?.name || otherPartyNumber
                     });
 
                     const lastUsedOurNumber = latestComm.direction === 'inbound' ? latestComm.to : latestComm.from;
@@ -291,11 +310,11 @@ export default function ConversationDetailPage() {
                                         </div>
                                     </div>
                                     <Button variant="ghost" size="icon" onClick={() => setIsProfileSidebarOpen(!isProfileSidebarOpen)}>
-                                        {isProfileSidebarOpen ? <PanelRightClose /> : <PanelRightOpen />}
+                                        {isProfileSidebarOpen ? <PanelRightClose /> : <User />}
                                     </Button>
                                 </header>
                                 <main className="flex-1 overflow-y-auto">
-                                {loading ? <p className="p-4">Loading...</p> : <CallLog calls={allComms} onMakeCall={handleMakeCall} isClickable={false} />}
+                                {loading ? <p className="p-4">Loading...</p> : <CallLog calls={allComms} contacts={contacts} onMakeCall={handleMakeCall} isClickable={false} />}
                                 <div ref={messagesEndRef} />
                                 </main>
                                 <footer className="flex-shrink-0 p-4 border-t bg-background space-y-2">
