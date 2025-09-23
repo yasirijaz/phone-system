@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from 'next/navigation';
-import { getCommunicationThread } from "@/services/callLogService";
+import { getCommunicationThread, markThreadAsRead } from "@/services/callLogService";
 import type { Communication, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,12 @@ export default function ConversationDetailPage() {
                     setContactName(name);
                 } else {
                     setContactName(to);
+                }
+
+                const hasUnread = sortedLogs.some((l: any) => l?.is_read === 0 || l?.is_read === false);
+                if (hasUnread) {
+                    await markThreadAsRead(from, to);
+                    try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
                 }
 
             } catch (error) {
