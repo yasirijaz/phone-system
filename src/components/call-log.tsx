@@ -40,16 +40,20 @@ function CommunicationCard({
 
   const isMine = comm.direction === 'outbound' || (user && comm.user_id === user.id && comm.direction !== 'inbound');
 
-  const contactName = isMine 
-    ? (user?.name || 'Me')
-    : (comm.from_name?.name || comm.user?.name || comm.from);
-                        
-  const contactInitial = contactName ? contactName.charAt(0).toUpperCase() : '?';
+  // Always show the other party
+  const otherParty = isMine ? {
+      name: comm.to_name?.name || comm.to,
+      number: comm.to,
+      initial: (comm.to_name?.name || comm.to || '?').charAt(0).toUpperCase()
+  } : {
+      name: comm.from_name?.name || comm.from,
+      number: comm.from,
+      initial: (comm.from_name?.name || comm.from || '?').charAt(0).toUpperCase()
+  };
 
+  const contactName = isFirstInGroup ? (isMine ? (user?.name || 'Me') : otherParty.name) : '';
+  const contactInitial = isMine ? (user?.name || 'Me').charAt(0).toUpperCase() : otherParty.initial;
   const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
-  const isInProgress = comm.call_status === 'in_progress';
-
-  const contactDisplayNumber = (comm.direction === 'inbound' || (comm.latest_type || comm.type) === 'sms') ? comm.from : comm.to;
   
   const showAvatar = !isMine && isFirstInGroup;
 
@@ -69,36 +73,60 @@ function CommunicationCard({
     </div>
   );
 
-  const CardContent = () => (
-     <div className={cn("flex items-start gap-3 p-2", isMine ? "justify-end" : "justify-start")}>
-        {showAvatar && (
-            <Avatar className="h-8 w-8">
-                <AvatarFallback>{contactInitial}</AvatarFallback>
-            </Avatar>
-        )}
-         {!showAvatar && !isMine && <div className="w-8" />}
+  const CardContent = () => {
+    // On the main listing page, we only want to show the external contact info
+    const mainPageContactName = otherParty.name;
+    const mainPageContactNumber = otherParty.number;
+    const mainPageAvatarInitial = otherParty.initial;
 
-        <div className={cn("flex flex-col gap-1", isMine ? 'items-end' : 'items-start')}>
-             {isFirstInGroup && comm.created_at && (
-                 <p className={cn("text-xs text-muted-foreground", isMine ? "text-right" : "text-left", "px-1")}>
-                     <span className="font-semibold">{contactName}</span> • {format(parseISO(comm.created_at), 'p')}
-                </p>
-             )}
-            {comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)}
-        </div>
-    </div>
-  );
+    if (isClickable) {
+       const from = encodeURIComponent(comm.direction === 'inbound' ? comm.to : comm.from);
+       const to = encodeURIComponent(comm.direction === 'inbound' ? comm.from : comm.to);
+       const queryString = source === 'unread' ? `?source=unread` : '';
+       return (
+            <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="block hover:bg-muted/50 rounded-lg">
+                <div className="flex items-center p-4 gap-4">
+                    <Avatar className="h-10 w-10">
+                        <AvatarFallback>{mainPageAvatarInitial}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                        <div className="flex justify-between items-center">
+                            <p className={cn("font-semibold", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
+                            {comm.created_at && (
+                                <p className={cn("text-xs text-muted-foreground", !comm.is_read && "text-primary font-semibold")}>
+                                    {format(parseISO(comm.created_at), 'MMM d')}
+                                </p>
+                            )}
+                        </div>
+                         <p className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
+                            {comm.type === 'sms' ? comm.body : `${comm.direction === 'inbound' ? 'Incoming' : 'Outgoing'} call`}
+                         </p>
+                    </div>
+                </div>
+            </Link>
+       )
+    }
 
-  if (isClickable) {
-    const from = encodeURIComponent(comm.direction === 'inbound' ? comm.to : comm.from);
-    const to = encodeURIComponent(comm.direction === 'inbound' ? comm.from : comm.to);
-    const queryString = source === 'unread' ? `?source=unread` : '';
     return (
-        <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="block">
-            <CardContent />
-        </Link>
-    );
-  }
+        <div className={cn("flex items-start gap-3 p-2", isMine ? "justify-end" : "justify-start")}>
+            {showAvatar && (
+                <Avatar className="h-8 w-8">
+                    <AvatarFallback>{contactInitial}</AvatarFallback>
+                </Avatar>
+            )}
+            {!showAvatar && !isMine && <div className="w-8" />}
+
+            <div className={cn("flex flex-col gap-1", isMine ? 'items-end' : 'items-start')}>
+                {isFirstInGroup && comm.created_at && (
+                    <p className={cn("text-xs text-muted-foreground", isMine ? "text-right" : "text-left", "px-1")}>
+                        <span className="font-semibold">{contactName}</span> • {format(parseISO(comm.created_at), 'p')}
+                    </p>
+                )}
+                {comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)}
+            </div>
+        </div>
+    )
+  };
 
   return <CardContent />;
 }
@@ -111,6 +139,23 @@ export default function CallLog({ calls: communications, onMakeCall, isClickable
         <p>Your history with this contact will appear here.</p>
       </div>
     );
+  }
+
+  if(isClickable) {
+    return (
+        <div className="space-y-1">
+            {communications.map((comm) => (
+                <CommunicationCard
+                    comm={comm}
+                    key={comm.id || `${comm.from}-${comm.to}`}
+                    onMakeCall={onMakeCall}
+                    isClickable={isClickable}
+                    source={source}
+                    isFirstInGroup={true}
+                />
+            ))}
+        </div>
+    )
   }
   
   const groupedCommunications = communications
