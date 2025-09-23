@@ -146,7 +146,7 @@ export default function ConversationDetailPage() {
                 const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                 setAllComms(sortedLogs);
                 
-                const unreadLogs = sortedLogs.filter(l => !l.is_read);
+                const unreadLogs = sortedLogs.filter(l => l.id && (l.is_read === false || l.is_read === 0));
                 if (unreadLogs.length > 0) {
                     await Promise.all(
                         unreadLogs.map(log => markRead(String(log.id), log.type))

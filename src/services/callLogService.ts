@@ -64,6 +64,10 @@ export const getUnreadCallLogs = async (departmentId?: number): Promise<Communic
 };
 
 export const markRead = async (id: string, type: 'call' | 'sms'): Promise<void> => {
+    if (!id || (type !== 'call' && type !== 'sms')) {
+        console.warn("markRead: Invalid id or type provided.", { id, type });
+        return;
+    }
     const endpoint = type === 'call' ? 'call-logs' : 'sms-logs';
     await axios.post(`/api/${endpoint}/${id}/mark-read`);
 };
@@ -83,4 +87,5 @@ export const unstarCall = async (id: string): Promise<void> => {
     
 
     
+
 
