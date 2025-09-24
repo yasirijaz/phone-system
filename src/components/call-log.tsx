@@ -11,14 +11,12 @@ import { Badge } from './ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { addParticipant } from '@/services/twilioService';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import AudioPlayer from './AudioPlayer';
 import { markCommunicationField } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import AudioPlayer from './AudioPlayer';
-import { ChevronDown } from 'lucide-react';
 
 interface CallLogProps {
   calls: Communication[];
