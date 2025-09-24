@@ -48,7 +48,7 @@ export default function ConversationDetailPage() {
     const [loadingDepartments, setLoadingDepartments] = useState(true);
     const [loadingNumbers, setLoadingNumbers] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(true);
+    const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
     
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from, to] = slug.map(part => decodeURIComponent(part));
@@ -391,5 +391,3 @@ export default function ConversationDetailPage() {
         </SidebarProvider>
     );
 }
-
-    
