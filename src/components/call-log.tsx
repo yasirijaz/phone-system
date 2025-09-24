@@ -1,20 +1,16 @@
 
 
 import type { Communication, Contact } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight, ChevronDown, User } from 'lucide-react';
-import { format, parseISO, isToday, isYesterday } from 'date-fns';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, User } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Avatar, AvatarFallback } from './ui/avatar';
 import { Button } from './ui/button';
 import { useAuth } from '@/context/AuthContext';
-import { Badge } from './ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { addParticipant } from '@/services/twilioService';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import AudioPlayer from './AudioPlayer';
-import React from 'react';
 import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import AudioPlayer from './AudioPlayer';
+import { ChevronDown } from 'lucide-react';
 
 interface CallLogProps {
   calls: Communication[];
@@ -44,7 +40,6 @@ function CommunicationCard({
     isMiddleOfGroup: boolean | null
 }) {
   const { user } = useAuth();
-  const { toast } = useToast();
 
   const getInitials = (name: string) => {
     if (!name) return '?';
@@ -58,11 +53,10 @@ function CommunicationCard({
   const isMine = comm.direction === 'outbound' || (user && comm.user_id === user.id && comm.direction !== 'inbound');
 
   const findContact = (phone: string) => {
-    if (!contacts) return null;
+    if (!contacts || contacts.length === 0) return null;
     return contacts.find(c => c.phone_no === phone);
   };
   
-  // Always show the other party
   const otherPartyNumber = isMine ? comm.to : comm.from;
   const contact = findContact(otherPartyNumber);
   
@@ -84,7 +78,7 @@ function CommunicationCard({
       isFirstInGroup && (isMine ? "rounded-t-lg rounded-bl-lg" : "rounded-t-lg rounded-br-lg"),
       isLastInGroup && !isFirstInGroup && (isMine ? "rounded-b-lg rounded-l-lg" : "rounded-b-lg rounded-r-lg"),
       isMiddleOfGroup && (isMine ? "rounded-l-lg" : "rounded-r-lg"),
-      !isFirstInGroup && !isLastInGroup && !isMiddleOfGroup && "rounded-lg" // single message in a group
+      !isFirstInGroup && !isLastInGroup && !isMiddleOfGroup && "rounded-lg"
     )}>
       <p className="text-sm">{c.body}</p>
     </div>
@@ -126,7 +120,6 @@ function CommunicationCard({
   };
 
   const CardContent = () => {
-    // On the main listing page, we only want to show the external contact info
     const mainPageContactName = otherParty.name;
     const mainPageContactNumber = otherParty.number;
     const mainPageAvatarInitial = otherParty.initial;
@@ -136,13 +129,13 @@ function CommunicationCard({
        const to = encodeURIComponent(comm.direction === 'inbound' ? comm.from : comm.to);
        const queryString = source === 'unread' ? `?source=unread` : '';
   
-       const callInfo = comm.latest_type === 'call' || comm.type === 'sms'
-        ? `${comm.direction === 'inbound' ? 'Inbound' : 'Outbound'} / ${comm.duration} seconds` 
-        : comm.direction + ' / ' + comm.body;
+       const callInfo = (comm.latest_type === 'call' || comm.type === 'sms')
+        ? `${comm.direction === 'inbound' ? 'Inbound' : 'Outbound'} / ${comm.duration || '0'} seconds` 
+        : (comm.direction || '') + ' / ' + (comm.body || '');
 
        return (
             <div className="flex items-center p-4 gap-4 hover:bg-muted/50 group border-b">
-                <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="flex-1 flex items-center gap-4">
+                <Link href={`/conversations/${from}/${to}${queryString}`} className="flex-1 flex items-center gap-4">
                     <Avatar className="h-10 w-10">
                         <AvatarFallback>
                             {contact ? mainPageAvatarInitial : <User className="h-5 w-5 text-muted-foreground" />}
@@ -150,7 +143,7 @@ function CommunicationCard({
                     </Avatar>
                     <div className="flex-1 grid grid-cols-3 items-center gap-4">
                         <p className={cn("font-semibold truncate", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
-                        <p className={cn("text-sm text-muted-foreground", !comm.is_read && "text-foreground")}>
+                         <p className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
                            {callInfo}
                         </p>
                     </div>
@@ -199,14 +192,18 @@ function CommunicationCard({
 }
 
 export default function CallLog({ calls: communications, contacts, onMakeCall, isClickable = true, source }: CallLogProps) {
-  if (communications.length === 0) {
+  if (!communications || communications.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 border-2 border-dashed rounded-lg m-6 p-4">
         <p className="text-lg font-medium">No activity yet</p>
-        <p>Your history with this contact will appear here.</p>
+        <p>Your history will appear here.</p>
       </div>
     );
   }
+
+  const generateKey = (comm: Communication, index: number): string => {
+    return `${comm.id || ''}-${comm.type || ''}-${comm.call_sid || ''}-${comm.created_at || ''}-${index}`;
+  };
 
   if(isClickable) {
     return (
@@ -215,7 +212,7 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                 <CommunicationCard
                     comm={comm}
                     contacts={contacts}
-                    key={`${comm.type}-${comm.id}` || `${comm.from}-${comm.to}`}
+                    key={generateKey(comm, index)}
                     onMakeCall={onMakeCall}
                     isClickable={isClickable}
                     source={source}
@@ -229,7 +226,7 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
   }
   
   const groupedByDay = communications
-    .filter(comm => comm.created_at) // Filter out items with no created_at date
+    .filter(comm => comm.created_at)
     .reduce((acc, comm) => {
       const date = format(parseISO(comm.created_at), 'yyyy-MM-dd');
       if (!acc[date]) {
@@ -264,7 +261,7 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                         <CommunicationCard 
                             comm={comm} 
                             contacts={contacts}
-                            key={`${comm.type}-${comm.id}` || `${comm.from}-${comm.to}-${index}`} 
+                            key={generateKey(comm, index)}
                             onMakeCall={onMakeCall} 
                             isClickable={isClickable} 
                             source={source}
