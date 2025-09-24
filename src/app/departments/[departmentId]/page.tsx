@@ -43,7 +43,7 @@ const initialPaginationState: PaginationState = {
 };
 
 export default function DepartmentDetailPage() {
-  const { user, logout }_ = useAuth();
+  const { user, logout } = useAuth();
   const { device } = useTwilio();
   const { toast } = useToast();
   const params = useParams();
