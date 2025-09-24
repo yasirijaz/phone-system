@@ -135,7 +135,7 @@ function CommunicationCard({
        const from = encodeURIComponent(comm.direction === 'inbound' ? comm.to : comm.from);
        const to = encodeURIComponent(comm.direction === 'inbound' ? comm.from : comm.to);
        const queryString = source === 'unread' ? `?source=unread` : '';
-       console.log('comm',comm);
+  
        const callInfo = comm.latest_type === 'call' || comm.type === 'sms'
         ? `${comm.direction === 'inbound' ? 'Inbound' : 'Outbound'} / ${comm.duration} seconds` 
         : comm.direction + ' / ' + comm.body;
