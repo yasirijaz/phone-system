@@ -4,7 +4,11 @@ import axios from '@/lib/axios';
 import type { Communication, PaginatedCommunicationsResponse } from '@/types';
 
 export const getCommunications = async (filters: Record<string, any> = {}): Promise<PaginatedCommunicationsResponse> => {
-  const params = new URLSearchParams(filters);
+  const safeFilters: Record<string, any> = { ...filters };
+  const requestedLimit = Number(safeFilters.limit ?? 10);
+  const cappedLimit = isNaN(requestedLimit) ? 10 : Math.min(requestedLimit, 50);
+  safeFilters.limit = cappedLimit;
+  const params = new URLSearchParams(safeFilters);
   const response = await axios.get(`/api/communications/threads?${params.toString()}`);
   return response.data.data;
 };
@@ -13,8 +17,10 @@ export const getCommunicationThreads = async (type: string, page: number = 1, li
     const url = departmentId 
         ? `/api/communications/threads/${departmentId}` 
         : '/api/communications/threads';
+    const requestedLimit = Number(limit ?? 10);
+    const cappedLimit = isNaN(requestedLimit) ? 10 : Math.min(requestedLimit, 50);
     const response = await axios.get(url, {
-        params: { type, page, limit }
+        params: { type, page, limit: cappedLimit }
     });
     return response.data.data;
 };
