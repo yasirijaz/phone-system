@@ -1,12 +1,20 @@
 
 
 import type { Communication, Contact } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, User } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight, ChevronDown, User, Star } from 'lucide-react';
+import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Button } from './ui/button';
 import { useAuth } from '@/context/AuthContext';
+import { Badge } from './ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { addParticipant } from '@/services/twilioService';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import AudioPlayer from './AudioPlayer';
+import { markCommunicationField } from '@/services/callLogService';
+import { events } from '@/lib/events';
+import React from 'react';
 import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import AudioPlayer from './AudioPlayer';
@@ -40,6 +48,32 @@ function CommunicationCard({
     isMiddleOfGroup: boolean | null
 }) {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [isTogglingStar, setIsTogglingStar] = React.useState(false);
+  const [localStarred, setLocalStarred] = React.useState<boolean>(!!comm.is_starred);
+
+  React.useEffect(() => {
+    setLocalStarred(!!comm.is_starred);
+  }, [comm.id, comm.is_starred]);
+
+  const handleToggleStar = async () => {
+    if (!comm?.id) return;
+    const next = !localStarred;
+    setIsTogglingStar(true);
+    setLocalStarred(next);
+    try {
+      await markCommunicationField(comm.id, comm.type, 'is_starred', next);
+      // Emit targeted conversation refresh so detail page re-fetches the thread
+      const threadFrom = comm.direction === 'inbound' ? comm.to : comm.from;
+      const threadTo = comm.direction === 'inbound' ? comm.from : comm.to;
+      try { events.emit('refreshConversation', { from: threadFrom, to: threadTo }); } catch (_) {}
+    } catch (e) {
+      setLocalStarred(!next);
+      toast({ title: 'Failed', description: 'Could not update star. Try again.', variant: 'destructive' });
+    } finally {
+      setIsTogglingStar(false);
+    }
+  };
 
   const getInitials = (name: string) => {
     if (!name) return '?';
@@ -133,9 +167,9 @@ function CommunicationCard({
         ? `${comm.direction === 'inbound' ? 'Inbound' : 'Outbound'} / ${comm.duration || '0'} seconds` 
         : (comm.direction || '') + ' / ' + (comm.body || '');
 
-       return (
-            <div className="flex items-center p-4 gap-4 hover:bg-muted/50 group border-b">
-                <Link href={`/conversations/${from}/${to}${queryString}`} className="flex-1 flex items-center gap-4">
+      return (
+           <div className="flex items-center p-4 gap-4 hover:bg-muted/50 group border-b">
+                <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="flex-1 flex items-center gap-4">
                     <Avatar className="h-10 w-10">
                         <AvatarFallback>
                             {contact ? mainPageAvatarInitial : <User className="h-5 w-5 text-muted-foreground" />}
@@ -182,7 +216,26 @@ function CommunicationCard({
                         <span className="font-semibold">{contactName}</span> • {format(parseISO(comm.created_at), 'p')}
                     </p>
                 )}
-                {comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)}
+                <div className={cn("flex items-center gap-2", isMine ? 'flex-row-reverse' : 'flex-row')}>
+                    {comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        className="h-7 w-7"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleToggleStar(); }}
+                        disabled={isTogglingStar}
+                        aria-label={localStarred ? 'Unstar' : 'Star'}
+                        aria-pressed={localStarred}
+                        title={localStarred ? 'Unstar' : 'Star'}
+                    >
+                        {isTogglingStar ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Star className={cn("h-4 w-4", localStarred ? "text-yellow-500" : "text-muted-foreground")} fill={localStarred ? 'currentColor' : 'none'} />
+                        )}
+                    </Button>
+                </div>
             </div>
         </div>
     )
@@ -208,19 +261,22 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
   if(isClickable) {
     return (
         <div className="space-y-1">
-            {communications.map((comm, index) => (
-                <CommunicationCard
-                    comm={comm}
-                    contacts={contacts}
-                    key={generateKey(comm, index)}
-                    onMakeCall={onMakeCall}
-                    isClickable={isClickable}
-                    source={source}
-                    isFirstInGroup={true}
-                    isLastInGroup={true}
-                    isMiddleOfGroup={false}
-                />
-            ))}
+            {communications.map((comm, index) => {
+                const stableKey = comm.id ? `${comm.type || 'unknown'}-${comm.id}` : `${comm.type || 'unknown'}-${comm.from || 'na'}-${comm.to || 'na'}-${comm.created_at || 't'}-${index}`;
+                return (
+                    <CommunicationCard
+                        comm={comm}
+                        contacts={contacts}
+                        key={stableKey}
+                        onMakeCall={onMakeCall}
+                        isClickable={isClickable}
+                        source={source}
+                        isFirstInGroup={true}
+                        isLastInGroup={true}
+                        isMiddleOfGroup={false}
+                    />
+                )
+            })}
         </div>
     )
   }
@@ -257,11 +313,13 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                     const isLastInGroup = !isSameSenderAsNext;
                     const isMiddleOfGroup = isSameSenderAsPrev && isSameSenderAsNext;
 
+                    const stableKey = comm.id ? `${comm.type || 'unknown'}-${comm.id}` : `${comm.type || 'unknown'}-${comm.from || 'na'}-${comm.to || 'na'}-${comm.created_at || 't'}-${index}`;
+
                     return (
                         <CommunicationCard 
                             comm={comm} 
                             contacts={contacts}
-                            key={generateKey(comm, index)}
+                            key={stableKey} 
                             onMakeCall={onMakeCall} 
                             isClickable={isClickable} 
                             source={source}

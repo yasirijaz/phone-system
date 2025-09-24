@@ -82,6 +82,22 @@ export const markThreadAsRead = async (from: string, to: string): Promise<void> 
   await axios.post(`/api/communications/thread/mark-read`, { from, to });
 };
 
+type MarkField = 'is_starred' | 'is_spam';
+
+export const markCommunicationField = async (
+  id: number | string,
+  type: 'sms' | 'call',
+  field: MarkField,
+  value: boolean
+): Promise<void> => {
+  await axios.post(`/api/communications/mark-log`, {
+    id: Number(id),
+    type,
+    field,
+    value,
+  });
+};
+
 export const starCall = async (id: string): Promise<void> => {
   await axios.post(`/api/call-logs/${id}/star`);
 };
