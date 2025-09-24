@@ -203,7 +203,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                              contact.status === 'blocked' ? (
                                  <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                        <Button variant="destructive" className="w-full">Unblock Contact</Button>
+                                        <Button variant="outline" className="w-full">Unblock Contact</Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                         <AlertDialogHeader>
