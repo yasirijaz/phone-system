@@ -41,7 +41,7 @@ function CommunicationCard({
     source?: string,
     isFirstInGroup: boolean,
     isLastInGroup: boolean,
-    isMiddleOfGroup: boolean
+    isMiddleOfGroup: boolean | null
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -215,7 +215,7 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                 <CommunicationCard
                     comm={comm}
                     contacts={contacts}
-                    key={comm.id || `${comm.from}-${comm.to}`}
+                    key={`${comm.type}-${comm.id}` || `${comm.from}-${comm.to}`}
                     onMakeCall={onMakeCall}
                     isClickable={isClickable}
                     source={source}
@@ -264,7 +264,7 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                         <CommunicationCard 
                             comm={comm} 
                             contacts={contacts}
-                            key={comm.id || `${comm.from}-${comm.to}-${index}`} 
+                            key={`${comm.type}-${comm.id}` || `${comm.from}-${comm.to}-${index}`} 
                             onMakeCall={onMakeCall} 
                             isClickable={isClickable} 
                             source={source}
