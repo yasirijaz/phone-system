@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -70,6 +71,7 @@ export default function AppUIPage() {
         if (tab !== 'all') {
             filters.type = tab;
         }
+
         const cacheKey = `comm:${tab}:${page}:${limit}`;
         const cached = cacheGet<PaginatedCommunicationsResponse>(cacheKey);
         const contactsKey = user.company_id ? `contacts:${user.company_id}` : undefined;
@@ -217,3 +219,4 @@ export default function AppUIPage() {
     </SidebarProvider>
   );
 }
+
