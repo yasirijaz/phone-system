@@ -11,7 +11,7 @@ import { Badge } from './ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { addParticipant } from '@/services/twilioService';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { markCommunicationField } from '@/services/callLogService';
+import { markCommunicationField, markRead } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -48,25 +48,52 @@ function CommunicationCard({
   const { user } = useAuth();
   const { toast } = useToast();
   const [isTogglingStar, setIsTogglingStar] = React.useState(false);
-  const [localStarred, setLocalStarred] = React.useState<boolean>(!!comm.is_starred);
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  const [isRead, setIsRead] = React.useState(!!comm.is_read);
 
   React.useEffect(() => {
-    setLocalStarred(!!comm.is_starred);
-  }, [comm.id, comm.is_starred]);
+    setIsRead(!!comm.is_read);
+  }, [comm.is_read, comm.id]);
+
+  React.useEffect(() => {
+    if (!cardRef.current || isRead || isClickable) {
+        return;
+    }
+
+    const observer = new IntersectionObserver(
+        ([entry]) => {
+            if (entry.isIntersecting) {
+                if (comm.id && comm.type) {
+                  setIsRead(true);
+                  markRead(String(comm.id), comm.type)
+                    .then(() => {
+                      try { events.emit('refreshDepartmentsUnread'); } catch(_) {}
+                    })
+                    .catch(() => setIsRead(false)); // revert on failure
+                }
+                observer.disconnect();
+            }
+        },
+        { threshold: 0.5 }
+    );
+    
+    observer.observe(cardRef.current);
+
+    return () => {
+        observer.disconnect();
+    };
+  }, [comm.id, comm.type, isRead, isClickable]);
 
   const handleToggleStar = async () => {
     if (!comm?.id) return;
-    const next = !localStarred;
+    const next = !comm.is_starred;
     setIsTogglingStar(true);
-    setLocalStarred(next);
     try {
       await markCommunicationField(comm.id, comm.type, 'is_starred', next);
-      // Emit targeted conversation refresh so detail page re-fetches the thread
       const threadFrom = comm.direction === 'inbound' ? comm.to : comm.from;
       const threadTo = comm.direction === 'inbound' ? comm.from : comm.to;
       try { events.emit('refreshConversation', { from: threadFrom, to: threadTo }); } catch (_) {}
     } catch (e) {
-      setLocalStarred(!next);
       toast({ title: 'Failed', description: 'Could not update star. Try again.', variant: 'destructive' });
     } finally {
       setIsTogglingStar(false);
@@ -198,7 +225,7 @@ function CommunicationCard({
     }
 
     return (
-        <div className={cn("flex items-start gap-3", isMine ? "justify-end" : "justify-start", !isFirstInGroup && "py-0.5", isFirstInGroup && "pt-2")}>
+        <div ref={cardRef} data-is-read={isRead ? '1' : '0'} className={cn("flex items-start gap-3", isMine ? "justify-end" : "justify-start", !isFirstInGroup && "py-0.5", isFirstInGroup && "pt-2")}>
             {showAvatar && (
                 <Avatar className="h-8 w-8">
                     <AvatarFallback>
@@ -223,14 +250,14 @@ function CommunicationCard({
                         className="h-7 w-7"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleToggleStar(); }}
                         disabled={isTogglingStar}
-                        aria-label={localStarred ? 'Unstar' : 'Star'}
-                        aria-pressed={localStarred}
-                        title={localStarred ? 'Unstar' : 'Star'}
+                        aria-label={comm.is_starred ? 'Unstar' : 'Star'}
+                        aria-pressed={comm.is_starred}
+                        title={comm.is_starred ? 'Unstar' : 'Star'}
                     >
                         {isTogglingStar ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <Star className={cn("h-4 w-4", localStarred ? "text-yellow-500" : "text-muted-foreground")} fill={localStarred ? 'currentColor' : 'none'} />
+                          <Star className={cn("h-4 w-4", comm.is_starred ? "text-yellow-500" : "text-muted-foreground")} fill={comm.is_starred ? 'currentColor' : 'none'} />
                         )}
                     </Button>
                 </div>
@@ -260,7 +287,7 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
     return (
         <div className="space-y-1">
             {communications.map((comm, index) => {
-                const stableKey = comm.id ? `${comm.type || 'unknown'}-${comm.id}` : `${comm.type || 'unknown'}-${comm.from || 'na'}-${comm.to || 'na'}-${comm.created_at || 't'}-${index}`;
+                const stableKey = generateKey(comm, index);
                 return (
                     <CommunicationCard
                         comm={comm}
@@ -311,7 +338,7 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                     const isLastInGroup = !isSameSenderAsNext;
                     const isMiddleOfGroup = isSameSenderAsPrev && isSameSenderAsNext;
 
-                    const stableKey = comm.id ? `${comm.type || 'unknown'}-${comm.id}` : `${comm.type || 'unknown'}-${comm.from || 'na'}-${comm.to || 'na'}-${comm.created_at || 't'}-${index}`;
+                    const stableKey = generateKey(comm, index);
 
                     return (
                         <CommunicationCard 
@@ -333,3 +360,4 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
     </div>
   );
 }
+
