@@ -210,7 +210,7 @@ function CommunicationCard({
         if (comm.type === 'sms' || comm.latest_type === 'sms') {
           return (
             <div className="flex items-center gap-1">
-              {comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />}
+              {comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4 text-green-500" /> : <PhoneOutgoing className="h-4 w-4 text-blue-500" />}
               {comm.body}
             </div>
           );
@@ -218,7 +218,7 @@ function CommunicationCard({
         if (comm.type === 'call' || comm.latest_type === 'call') {
           return (
             <div className="flex items-center gap-1">
-              {comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />}
+              {comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4 text-green-500" /> : <PhoneOutgoing className="h-4 w-4 text-blue-500" />}
               {comm.duration || '0'} seconds
             </div>
           );
@@ -414,5 +414,6 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
     </div>
   );
 }
+
 
 
