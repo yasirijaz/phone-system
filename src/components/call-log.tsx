@@ -51,10 +51,15 @@ function CommunicationCard({
   const [isTogglingStar, setIsTogglingStar] = React.useState(false);
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [isRead, setIsRead] = React.useState(!!comm.is_read);
+  const [localStarred, setLocalStarred] = React.useState(!!comm.is_starred);
 
   React.useEffect(() => {
     setIsRead(!!comm.is_read);
   }, [comm.is_read, comm.id]);
+
+  React.useEffect(() => {
+    setLocalStarred(!!comm.is_starred);
+  }, [comm.is_starred, comm.id]);
 
   React.useEffect(() => {
     if (!cardRef.current || isRead || isClickable) {
@@ -87,13 +92,12 @@ function CommunicationCard({
 
   const handleToggleStar = async () => {
     if (!comm?.id) return;
-    const next = !comm.is_starred;
+    const next = !localStarred;
     setIsTogglingStar(true);
     try {
       await markCommunicationField(comm.id, comm.type, 'is_starred', next);
-      const threadFrom = comm.direction === 'inbound' ? comm.to : comm.from;
-      const threadTo = comm.direction === 'inbound' ? comm.from : comm.to;
-      try { events.emit('refreshConversation', { from: threadFrom, to: threadTo }); } catch (_) {}
+      setLocalStarred(next);
+      toast({ title: 'Success', description: `Communication ${next ? 'starred' : 'unstarred'}.` });
     } catch (e) {
       toast({ title: 'Failed', description: 'Could not update star. Try again.', variant: 'destructive' });
     } finally {
@@ -236,9 +240,9 @@ function CommunicationCard({
                     </Avatar>
                     <div className="flex-1 grid grid-cols-3 items-center gap-4">
                         <p className={cn("font-semibold truncate", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
-                         <p className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
+                         <div className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
                            {getCallInfo()}
-                        </p>
+                        </div>
                         {isInProgress && (
                             <p>
                                 <span className="relative flex h-3 w-3">
@@ -304,14 +308,14 @@ function CommunicationCard({
                         className="h-7 w-7"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleToggleStar(); }}
                         disabled={isTogglingStar}
-                        aria-label={comm.is_starred ? 'Unstar' : 'Star'}
-                        aria-pressed={comm.is_starred}
-                        title={comm.is_starred ? 'Unstar' : 'Star'}
+                        aria-label={localStarred ? 'Unstar' : 'Star'}
+                        aria-pressed={localStarred}
+                        title={localStarred ? 'Unstar' : 'Star'}
                     >
                         {isTogglingStar ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <Star className={cn("h-4 w-4", comm.is_starred ? "text-yellow-500" : "text-muted-foreground")} fill={comm.is_starred ? 'currentColor' : 'none'} />
+                          <Star className={cn("h-4 w-4", localStarred ? "text-yellow-500" : "text-muted-foreground")} fill={localStarred ? 'currentColor' : 'none'} />
                         )}
                     </Button>
                 </div>
@@ -414,6 +418,5 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
     </div>
   );
 }
-
 
 
