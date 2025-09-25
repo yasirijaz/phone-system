@@ -46,6 +46,7 @@ function CommunicationCard({
     isMiddleOfGroup: boolean | null
 }) {
   const { user } = useAuth();
+  const isAdmin = user?.role_id === 1 || user?.role_id === 2;
   const { toast } = useToast();
   const [isTogglingStar, setIsTogglingStar] = React.useState(false);
   const cardRef = React.useRef<HTMLDivElement>(null);
@@ -109,6 +110,22 @@ function CommunicationCard({
     return name.charAt(0).toUpperCase();
   };
 
+  const handleJoinCall = async (e: React.MouseEvent, options: { silent?: boolean, coach?: boolean }) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!user || !comm.conference_sid) {
+      toast({ title: "Error", description: "Cannot join call. Required information is missing.", variant: "destructive" });
+      return;
+    }
+    
+    try {
+      await addParticipant(comm.conference_sid, comm.from, String(user.id), undefined, { coach: true, silent: options.silent });
+      toast({ title: "Success", description: "You have joined the call." });
+    } catch(error) {
+       toast({ title: "Error", description: "Failed to join the call.", variant: "destructive" });
+    }
+  }
+
   const isMine = comm.direction === 'outbound' || (user && comm.user_id === user.id && comm.direction !== 'inbound');
 
   const findContact = (phone: string) => {
@@ -127,7 +144,8 @@ function CommunicationCard({
   const contactName = isFirstInGroup ? (isMine ? (user?.name || 'Me') : otherParty.name) : '';
   const contactInitial = getInitials(isMine ? (user?.name || 'Me') : otherParty.name);
   const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
-  
+  const isInProgress = comm.call_status === 'in_progress';
+
   const showAvatar = !isMine && isFirstInGroup;
 
   const renderMessageBubble = (c: Communication) => (
@@ -205,7 +223,27 @@ function CommunicationCard({
                          <p className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
                            {callInfo}
                         </p>
+                        {isInProgress && (
+                            <p>
+                                <span className="relative flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                                </span>
+                            </p>
+                        )}
                     </div>
+                    {isInProgress && isAdmin && (
+                        <div className="mt-4">
+                            <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true })}>
+                                <Ear className="mr-2 h-4 w-4" />
+                                Silently Listen
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: false })}>
+                                <Mic className="mr-2 h-4 w-4" />
+                                Barge In
+                            </Button>
+                        </div>
+                    )}
                 </Link>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
