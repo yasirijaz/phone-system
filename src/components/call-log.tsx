@@ -206,9 +206,25 @@ function CommunicationCard({
        const to = encodeURIComponent(comm.direction === 'inbound' ? comm.from : comm.to);
        const queryString = source === 'unread' ? `?source=unread` : '';
   
-       const callInfo = (comm.latest_type === 'call' || comm.type === 'sms')
-        ? <div className="flex items-center gap-1">{comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4"/> : <PhoneOutgoing className="h-4 w-4"/>} {comm.duration || '0'} seconds</div>
-        : (comm.direction || '') + ' / ' + (comm.body || '');
+       const getCallInfo = () => {
+        if (comm.type === 'sms' || comm.latest_type === 'sms') {
+          return (
+            <div className="flex items-center gap-1">
+              {comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />}
+              {comm.body}
+            </div>
+          );
+        }
+        if (comm.type === 'call' || comm.latest_type === 'call') {
+          return (
+            <div className="flex items-center gap-1">
+              {comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4" /> : <PhoneOutgoing className="h-4 w-4" />}
+              {comm.duration || '0'} seconds
+            </div>
+          );
+        }
+        return `${comm.direction || ''} / ${comm.body || ''}`;
+      };
 
       return (
            <div className="flex items-center p-4 gap-4 hover:bg-muted/50 group border-b">
@@ -221,7 +237,7 @@ function CommunicationCard({
                     <div className="flex-1 grid grid-cols-3 items-center gap-4">
                         <p className={cn("font-semibold truncate", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
                          <p className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
-                           {callInfo}
+                           {getCallInfo()}
                         </p>
                         {isInProgress && (
                             <p>
@@ -398,4 +414,5 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
     </div>
   );
 }
+
 
