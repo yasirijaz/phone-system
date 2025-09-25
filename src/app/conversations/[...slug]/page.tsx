@@ -251,9 +251,17 @@ export default function ConversationDetailPage() {
                 refreshThread();
             }
         };
+
+        const refreshCallsHandler = () => {
+          // This will be triggered by 'refresh_listing'
+          refreshThread();
+        };
+
         events.on('refreshConversation', handler);
+        events.on('refreshCalls', refreshCallsHandler);
         return () => {
             events.off('refreshConversation', handler);
+            events.off('refreshCalls', refreshCallsHandler);
         };
     }, [from, to, refreshThread]);
     
