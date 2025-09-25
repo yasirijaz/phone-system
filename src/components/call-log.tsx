@@ -207,7 +207,7 @@ function CommunicationCard({
        const queryString = source === 'unread' ? `?source=unread` : '';
   
        const callInfo = (comm.latest_type === 'call' || comm.type === 'sms')
-        ? <div className="flex items-center gap-1">{comm.direction === 'inbound' ? <PhoneIncoming className="h-3 w-3"/> : <PhoneOutgoing className="h-3 w-3"/>} {comm.duration || '0'} seconds</div>
+        ? <div className="flex items-center gap-1">{comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4"/> : <PhoneOutgoing className="h-4 w-4"/>} {comm.duration || '0'} seconds</div>
         : (comm.direction || '') + ' / ' + (comm.body || '');
 
       return (
