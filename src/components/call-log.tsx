@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { markCommunicationField, markRead } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { cn, formatPhoneNumber } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import AudioPlayer from './AudioPlayer';
 
@@ -51,15 +51,10 @@ function CommunicationCard({
   const [isTogglingStar, setIsTogglingStar] = React.useState(false);
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [isRead, setIsRead] = React.useState(!!comm.is_read);
-  const [localStarred, setLocalStarred] = React.useState(comm.is_starred);
 
   React.useEffect(() => {
     setIsRead(!!comm.is_read);
   }, [comm.is_read, comm.id]);
-
-  React.useEffect(() => {
-    setLocalStarred(comm.is_starred);
-  }, [comm.is_starred, comm.id]);
 
   React.useEffect(() => {
     if (!cardRef.current || isRead || isClickable) {
@@ -92,12 +87,12 @@ function CommunicationCard({
 
   const handleToggleStar = async () => {
     if (!comm?.id) return;
-    const next = !localStarred;
+    const next = !comm.is_starred;
     setIsTogglingStar(true);
     try {
       await markCommunicationField(comm.id, comm.type, 'is_starred', next);
-      setLocalStarred(next);
       toast({ title: 'Success', description: `Communication ${next ? 'starred' : 'unstarred'}.` });
+      events.emit('refreshCalls');
     } catch (e) {
       toast({ title: 'Failed', description: 'Could not update star. Try again.', variant: 'destructive' });
     } finally {
@@ -141,7 +136,7 @@ function CommunicationCard({
   const contact = findContact(otherPartyNumber);
   
   const otherParty = {
-      name: contact?.name || otherPartyNumber,
+      name: contact?.name || formatPhoneNumber(otherPartyNumber),
       number: otherPartyNumber,
       initial: getInitials(contact?.name || otherPartyNumber)
   };
@@ -169,8 +164,8 @@ function CommunicationCard({
     const title = isMine ? `You called ${otherParty.name}` : `${otherParty.name} called you`;
     const Icon = isMine ? PhoneOutgoing : PhoneIncoming;
 
-    const fromNumberFormatted = c.from?.replace(/^\+1/, '');
-    const toNumberFormatted = c.to?.replace(/^\+1/, '');
+    const fromNumberFormatted = formatPhoneNumber(c.from);
+    const toNumberFormatted = formatPhoneNumber(c.to);
     
     const duration = c.duration ? `${c.duration} seconds` : 'Unanswered';
     const endTime = c.created_at ? format(parseISO(c.created_at), 'p') : '';
@@ -301,7 +296,7 @@ function CommunicationCard({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => onMakeCall(mainPageContactNumber)}>
-                            Call {mainPageContactNumber}
+                            Call {formatPhoneNumber(mainPageContactNumber)}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -335,14 +330,14 @@ function CommunicationCard({
                         className="h-7 w-7"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleToggleStar(); }}
                         disabled={isTogglingStar}
-                        aria-label={localStarred ? 'Unstar' : 'Star'}
-                        aria-pressed={localStarred}
-                        title={localStarred ? 'Unstar' : 'Star'}
+                        aria-label={comm.is_starred ? 'Unstar' : 'Star'}
+                        aria-pressed={comm.is_starred}
+                        title={comm.is_starred ? 'Unstar' : 'Star'}
                     >
                         {isTogglingStar ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <Star className={cn("h-4 w-4", localStarred ? "text-yellow-500" : "text-muted-foreground")} fill={localStarred ? 'currentColor' : 'none'} />
+                          <Star className={cn("h-4 w-4", comm.is_starred ? "text-yellow-500" : "text-muted-foreground")} fill={comm.is_starred ? 'currentColor' : 'none'} />
                         )}
                     </Button>
                 </div>
@@ -445,6 +440,4 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
     </div>
   );
 }
-
-
 

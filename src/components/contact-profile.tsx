@@ -21,6 +21,7 @@ import type { Contact } from '@/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Label } from './ui/label';
+import { formatPhoneNumber } from '@/lib/utils';
 
 interface ContactProfileProps {
     contact: any;
@@ -149,7 +150,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                 <div className="space-y-4">
                      <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">{contact.phone_type || 'Other'}</span>
-                        <span>{contact.phone_no}</span>
+                        <span>{formatPhoneNumber(contact.phone_no)}</span>
                     </div>
                      <div className="flex justify-between gap-2">
                         <Dialog open={isEditing} onOpenChange={setIsEditing}>
@@ -225,7 +226,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                                     </DialogTrigger>
                                     <DialogContent className="sm:max-w-md">
                                         <DialogHeader>
-                                            <DialogTitle>BLOCK {contact.phone_no}</DialogTitle>
+                                            <DialogTitle>BLOCK {formatPhoneNumber(contact.phone_no)}</DialogTitle>
                                             <DialogDescription>
                                                 This will prevent this number from calling you or sending you messages.
                                             </DialogDescription>
@@ -248,7 +249,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                                             <Label className="flex items-start gap-4 p-4 rounded-md border has-[:checked]:border-primary">
                                                 <RadioGroupItem value="hard" />
                                                 <div className="grid gap-1.5 leading-normal">
-                                                     <span className="font-semibold">Block {contact.phone_no}</span>
+                                                     <span className="font-semibold">Block {formatPhoneNumber(contact.phone_no)}</span>
                                                      <span className="text-sm text-muted-foreground">Callers will hear a not-in-service message. Text and voicemail messages will not be allowed.</span>
                                                       <Button variant="link" size="sm" className="p-0 h-auto justify-start text-primary">
                                                         <PlayCircle className="mr-1 h-4 w-4" /> Preview not-in-service message

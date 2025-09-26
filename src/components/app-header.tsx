@@ -30,7 +30,7 @@ import { ToastAction } from "./ui/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
-import { cn } from "@/lib/utils";
+import { cn, formatPhoneNumber } from "@/lib/utils";
 import { isElectron } from '@/lib/is-electron';
 import { Logo } from "./icons";
 
@@ -178,7 +178,7 @@ export default function AppHeader({
                     };
 
                     toast({
-                        title: `New Message from ${from}`,
+                        title: `New Message from ${formatPhoneNumber(from)}`,
                         description: body,
                         action: (
                         <ToastAction altText="View" onClick={navigateToConversation}>
@@ -416,7 +416,7 @@ export default function AppHeader({
                                                 className="p-2 hover:bg-accent cursor-pointer"
                                             >
                                                 <p className="font-medium">{contact.name}</p>
-                                                <p className="text-xs text-muted-foreground">{contact.phone_no}</p>
+                                                <p className="text-xs text-muted-foreground">{formatPhoneNumber(contact.phone_no)}</p>
                                             </div>
                                         ))}
                                     </ScrollArea>
@@ -601,7 +601,3 @@ export default function AppHeader({
         </>
     );
 }
-
-    
-
-    

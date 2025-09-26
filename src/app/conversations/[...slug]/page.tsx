@@ -23,7 +23,7 @@ import { sendSms } from "@/services/twilioService";
 import { getContacts } from "@/services/contactService";
 import { events } from "@/lib/events";
 import ContactProfile from "@/components/contact-profile";
-import { cn } from "@/lib/utils";
+import { cn, formatPhoneNumber } from "@/lib/utils";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 export default function ConversationDetailPage() {
@@ -80,7 +80,7 @@ export default function ConversationDetailPage() {
                 setContact({
                     ...(foundContact || {}),
                     phone_no: otherPartyNumber,
-                    name: foundContact?.name || otherPartyNumber
+                    name: foundContact?.name || formatPhoneNumber(otherPartyNumber)
                 });
              } else {
                  const otherPartyNumber = to;
@@ -88,7 +88,7 @@ export default function ConversationDetailPage() {
                  setContact({
                     ...(foundContact || {}),
                     phone_no: otherPartyNumber,
-                    name: foundContact?.name || otherPartyNumber
+                    name: foundContact?.name || formatPhoneNumber(otherPartyNumber)
                  });
              }
         } catch (e) {
@@ -164,7 +164,7 @@ export default function ConversationDetailPage() {
                     setContact({
                         ...(foundContact || {}),
                         phone_no: otherPartyNumber,
-                        name: foundContact?.name || otherPartyNumber
+                        name: foundContact?.name || formatPhoneNumber(otherPartyNumber)
                     });
 
                     const lastUsedOurNumber = latestComm.direction === 'inbound' ? latestComm.to : latestComm.from;
@@ -207,7 +207,7 @@ export default function ConversationDetailPage() {
                         } catch (_) {}
                     }
                 } else {
-                     setContact({ phone_no: to, name: to });
+                     setContact({ phone_no: to, name: formatPhoneNumber(to) });
                      if (depts.length > 0) {
                         let deptId: string | null = null;
                         for (const d of depts) {
@@ -330,7 +330,7 @@ export default function ConversationDetailPage() {
                                             </Button>
                                             <div className="relative flex-1">
                                                 <h1 className="text-xl font-bold">{contact?.name}</h1>
-                                                <p className="text-sm text-muted-foreground">{contact?.phone_no}</p>
+                                                <p className="text-sm text-muted-foreground">{formatPhoneNumber(contact?.phone_no)}</p>
                                             </div>
                                         </div>
                                         <Button variant="ghost" size="icon" onClick={() => setIsProfileSidebarOpen(!isProfileSidebarOpen)}>
@@ -362,7 +362,7 @@ export default function ConversationDetailPage() {
                                                 <SelectContent>
                                                     {phoneNumbers.map((num) => (
                                                         <SelectItem key={num.id} value={num.phone_no}>
-                                                            {num.phone_no} ({num.label})
+                                                            {formatPhoneNumber(num.phone_no)} ({num.label})
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>

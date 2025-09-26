@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Phone, PhoneOff } from "lucide-react";
 import { Reservation } from "twilio-taskrouter";
+import { formatPhoneNumber } from "@/lib/utils";
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -51,7 +52,7 @@ export default function ReservationModal({ isOpen, onClose, reservation, onAccep
             </div>
           <div className="text-center mt-4">
             <p className="text-3xl font-bold">{callerName}</p>
-            <p className="text-neutral-300">{callerNumber}</p>
+            <p className="text-neutral-300">{formatPhoneNumber(callerNumber)}</p>
           </div>
         </div>
 

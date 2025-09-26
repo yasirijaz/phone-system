@@ -23,6 +23,7 @@ import { ArrowLeft, PlusCircle, Edit, Trash2 } from "lucide-react";
 import type { PhoneNumber } from "@/types";
 import { getPhoneNumbers, createPhoneNumber, updatePhoneNumber, deletePhoneNumber } from "@/services/phoneNumberService";
 import AppHeader from "@/components/app-header";
+import { formatPhoneNumber } from "@/lib/utils";
 
 const phoneNumberSchema = z.object({
   phone_no: z.string().min(10, "Phone number is required."),
@@ -188,7 +189,7 @@ export default function PhoneNumbersPage() {
                     <TableBody>
                       {phoneNumbers.length > 0 ? phoneNumbers.map((num) => (
                         <TableRow key={num.id}>
-                          <TableCell className="font-medium">{num.phone_no}</TableCell>
+                          <TableCell className="font-medium">{formatPhoneNumber(num.phone_no)}</TableCell>
                           <TableCell>{num.label}</TableCell>
                           <TableCell>{num.type}</TableCell>
                           <TableCell className="text-right">

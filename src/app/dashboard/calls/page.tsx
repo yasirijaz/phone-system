@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { subDays, subHours, subMonths, format, startOfHour, startOfDay, startOfMonth } from 'date-fns';
 import { isElectron } from '@/lib/is-electron';
 import { useRouter } from 'next/navigation';
+import { formatPhoneNumber } from '@/lib/utils';
 
 
 const StatCard = ({ title, value, percentage, change, icon: Icon, changeType }: { title: string, value: string, percentage: string, change: string, icon: React.ElementType, changeType: 'up' | 'down' }) => (
@@ -287,7 +288,7 @@ const RecentCallsTable = ({ calls }: { calls: Partial<Communication>[] }) => (
         <TableBody>
           {calls.slice(0, 5).map((call) => (
             <TableRow key={call.id}>
-              <TableCell className="font-medium">{call.direction === 'inbound' ? call.from : call.to}</TableCell>
+              <TableCell className="font-medium">{formatPhoneNumber(call.direction === 'inbound' ? call.from : call.to)}</TableCell>
               <TableCell>
                 <Badge variant="secondary">{call.category}</Badge>
               </TableCell>
@@ -383,7 +384,7 @@ export default function CallsDashboard() {
     return Object.entries(counts)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 4)
-        .map(([source, value]) => ({ source, value: `${value} calls` }));
+        .map(([source, value]) => ({ source: formatPhoneNumber(source), value: `${value} calls` }));
   }, [communications]);
 
   const topCategories = useMemo(() => {
@@ -462,4 +463,3 @@ export default function CallsDashboard() {
     </SidebarProvider>
   );
 }
-

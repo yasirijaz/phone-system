@@ -21,6 +21,7 @@ import { PlusCircle, Edit, Trash2 } from "lucide-react";
 import { Sidebar, SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
+import { formatPhoneNumber } from "@/lib/utils";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name is required."),
@@ -181,7 +182,7 @@ export default function ContactsPage() {
                             <TableRow key={contact.id}>
                               <TableCell className="font-medium">{contact.name}</TableCell>
                               <TableCell>{contact.email || 'N/A'}</TableCell>
-                              <TableCell>{contact.phone_no}</TableCell>
+                              <TableCell>{formatPhoneNumber(contact.phone_no)}</TableCell>
                               <TableCell>{contact.phone_type}</TableCell>
                               <TableCell className="text-right">
                                   <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(contact)}>

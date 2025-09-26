@@ -23,6 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import PaginationControls from "@/components/pagination-controls";
 import { events } from '@/lib/events';
+import { formatPhoneNumber } from "@/lib/utils";
 
 type TabName = 'all' | 'unread' | 'calls' | 'messages' | 'operators' | 'missed' | 'voicemails' | 'recordings';
 
@@ -194,7 +195,7 @@ export default function DepartmentDetailPage() {
     }
   };
   
-  const departmentPhoneNumber = phoneNumbers.length > 0 ? phoneNumbers[0].phone_no : 'No number assigned';
+  const departmentPhoneNumber = phoneNumbers.length > 0 ? formatPhoneNumber(phoneNumbers[0].phone_no) : 'No number assigned';
 
   const getRoleName = (roleId?: number) => {
     switch (roleId) {

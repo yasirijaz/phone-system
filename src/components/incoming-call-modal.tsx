@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Phone, PhoneOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { formatPhoneNumber } from "@/lib/utils";
 
 interface IncomingCallModalProps {
   isOpen: boolean;
@@ -45,7 +46,7 @@ export default function IncomingCallModal({ isOpen, onClose, callerName, callerN
                   ? callerNumber.length > 20
                     ? callerNumber.substring(0, 20) + "..."
                     : callerNumber
-                  : callerNumber
+                  : formatPhoneNumber(callerNumber)
                 }
             </p>
           </div>

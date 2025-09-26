@@ -9,6 +9,7 @@ import { Phone, Delete } from "lucide-react";
 import type { Department, PhoneNumber, Contact } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
+import { formatPhoneNumber } from '@/lib/utils';
 
 interface DialerProps {
     onMakeCall: (number: string, fromNumber?: string) => void;
@@ -54,7 +55,7 @@ export default function Dialer({
         }
     }, [initialValue, open]);
 
-    const formatPhoneNumber = (value: string): string => {
+    const formatDialerNumber = (value: string): string => {
         const cleaned = value.replace(/\D/g, '');
         if (cleaned.length > 10) {
             return number;
@@ -86,7 +87,7 @@ export default function Dialer({
     };
     
     const handleNumberChange = (value: string) => {
-        setNumber(formatPhoneNumber(value));
+        setNumber(formatDialerNumber(value));
          if (value.length > 2) {
             const searchTerm = value.toLowerCase();
             const matchingContacts = contacts.filter(contact => 
@@ -100,7 +101,7 @@ export default function Dialer({
     };
     
     const handleContactSelect = (contact: Contact) => {
-        setNumber(formatPhoneNumber(contact.phone_no));
+        handleNumberChange(contact.phone_no);
         setFilteredContacts([]);
     };
 
@@ -191,7 +192,7 @@ export default function Dialer({
                                 {filteredContacts.map(contact => (
                                     <div key={contact.id} onClick={() => handleContactSelect(contact)} className="p-2 hover:bg-accent cursor-pointer">
                                         <p className="font-semibold">{contact.name}</p>
-                                        <p className="text-sm text-muted-foreground">{contact.phone_no}</p>
+                                        <p className="text-sm text-muted-foreground">{formatPhoneNumber(contact.phone_no)}</p>
                                     </div>
                                 ))}
                                 </ScrollArea>
