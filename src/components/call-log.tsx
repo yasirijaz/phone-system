@@ -51,14 +51,14 @@ function CommunicationCard({
   const [isTogglingStar, setIsTogglingStar] = React.useState(false);
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [isRead, setIsRead] = React.useState(!!comm.is_read);
-  const [localStarred, setLocalStarred] = React.useState(!!comm.is_starred);
+  const [localStarred, setLocalStarred] = React.useState(comm.is_starred);
 
   React.useEffect(() => {
     setIsRead(!!comm.is_read);
   }, [comm.is_read, comm.id]);
 
   React.useEffect(() => {
-    setLocalStarred(!!comm.is_starred);
+    setLocalStarred(comm.is_starred);
   }, [comm.is_starred, comm.id]);
 
   React.useEffect(() => {
@@ -183,15 +183,39 @@ function CommunicationCard({
                     <div className="flex items-center justify-between">
                         <p className="font-semibold">{title}</p>
                     </div>
-                    <p className="text-muted-foreground text-xs">
-                        {c.direction === 'inbound' ? 'Dialpad' : 'Other'} {fromNumberFormatted} &rarr; {c.direction === 'inbound' ? 'Other' : 'Dialpad'} {toNumberFormatted}
-                    </p>
-                    <div className="flex items-center text-xs text-muted-foreground mt-1">
-                        <span>{duration}</span>
-                        <span className="mx-2">&bull;</span>
-                        <span>{endTime}</span>
-                    </div>
+                     {isInProgress ? (
+                        <p className="flex items-center gap-2 text-xs text-green-600 font-semibold">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                            </span>
+                            Live Call
+                        </p>
+                    ) : (
+                      <>
+                        <p className="text-muted-foreground text-xs">
+                            {c.direction === 'inbound' ? 'Dialpad' : 'Other'} {fromNumberFormatted} &rarr; {c.direction === 'inbound' ? 'Other' : 'Dialpad'} {toNumberFormatted}
+                        </p>
+                        <div className="flex items-center text-xs text-muted-foreground mt-1">
+                            <span>{duration}</span>
+                            <span className="mx-2">&bull;</span>
+                            <span>{endTime}</span>
+                        </div>
+                      </>
+                    )}
                 </div>
+                {isInProgress && isAdmin && (
+                  <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true })}>
+                          <Ear className="mr-2 h-4 w-4" />
+                          Listen
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: false })}>
+                          <Mic className="mr-2 h-4 w-4" />
+                          Barge
+                      </Button>
+                  </div>
+                )}
                 {c.recording_url && (
                     <AudioPlayer src={c.recording_url} type="Recording" />
                 )}
@@ -255,19 +279,19 @@ function CommunicationCard({
                             </p>
                         )}
                     </div>
-                    {isInProgress && isAdmin && (
-                        <div className="mt-4">
-                            <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true })}>
-                                <Ear className="mr-2 h-4 w-4" />
-                                Silently Listen
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: false })}>
-                                <Mic className="mr-2 h-4 w-4" />
-                                Barge In
-                            </Button>
-                        </div>
-                    )}
                 </Link>
+                 {isInProgress && isAdmin && (
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true })}>
+                            <Ear className="mr-2 h-4 w-4" />
+                            Silently Listen
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: false })}>
+                            <Mic className="mr-2 h-4 w-4" />
+                            Barge In
+                        </Button>
+                    </div>
+                )}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                          <Button variant="outline" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -421,5 +445,6 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
     </div>
   );
 }
+
 
 
