@@ -195,6 +195,9 @@ function CommunicationCard({
                 {c.recording_url && (
                     <AudioPlayer src={c.recording_url} type="Recording" />
                 )}
+                {c.voice_mail && (
+                    <AudioPlayer src={c.voice_mail} type="VioceMail" />
+                )}
             </div>
         </div>
     );
