@@ -300,11 +300,6 @@ export default function HardwareSettings() {
                         {testCallStatus && <p className="text-sm text-muted-foreground">{testCallStatus}</p>}
                         <audio ref={audioRef} />
                     </div>
-
-                    <div className="grid gap-2 mt-2">
-                        <Button variant="link" className="justify-start p-0 h-auto text-primary">Advanced hardware settings</Button>
-                        <Button variant="link" className="justify-start p-0 h-auto text-primary">Customize notification & sounds</Button>
-                    </div>
                 </div>
             </PopoverContent>
         </Popover>
