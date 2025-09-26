@@ -189,7 +189,7 @@ export default function Dialer({
                             <div className="absolute z-10 w-full bg-background border rounded-md mt-1 max-h-48 overflow-y-auto">
                                 <ScrollArea>
                                 {filteredContacts.map(contact => (
-                                    <div key={contact.id} onMouseDown={() => handleContactSelect(contact)} className="p-2 hover:bg-accent cursor-pointer">
+                                    <div key={contact.id} onClick={() => handleContactSelect(contact)} className="p-2 hover:bg-accent cursor-pointer">
                                         <p className="font-semibold">{contact.name}</p>
                                         <p className="text-sm text-muted-foreground">{contact.phone_no}</p>
                                     </div>
