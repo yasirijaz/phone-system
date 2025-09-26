@@ -196,7 +196,7 @@ function CommunicationCard({
                     <AudioPlayer src={c.recording_url} type="Recording" />
                 )}
                 {c.voice_mail && (
-                    <AudioPlayer src={c.voice_mail} type="VioceMail" />
+                    <AudioPlayer src={c.voice_mail} type="Voicemail" />
                 )}
             </div>
         </div>

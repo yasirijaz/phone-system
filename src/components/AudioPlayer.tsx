@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Play, Pause } from "lucide-react";
 import { Button } from './ui/button';
+import clsx from "clsx";
 
 const AudioPlayer = ({ src, type }: { src: string, type: string }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -46,7 +47,10 @@ const AudioPlayer = ({ src, type }: { src: string, type: string }) => {
 
   return (
     <div className="flex items-center gap-2">
-        <Button variant="outline" size="icon" onClick={togglePlay} className="ml-2">
+        <Button variant="outline" size="icon" onClick={togglePlay} className={clsx(
+          "ml-2",
+          type === "Voicemail" && "bg-red-500 hover:bg-red-600 text-white"
+        )}>
             {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </Button>
       
