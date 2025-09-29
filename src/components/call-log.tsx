@@ -11,7 +11,7 @@ import { Badge } from './ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { addParticipant } from '@/services/twilioService';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { markCommunicationField, markRead, saveTranscription } from '@/services/callLogService';
+import { markCommunicationField, markRead } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
 import { cn, formatPhoneNumber } from '@/lib/utils';
@@ -53,7 +53,6 @@ function CommunicationCard({
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [isRead, setIsRead] = React.useState(!!comm.is_read);
   const [isTranscribing, setIsTranscribing] = React.useState(false);
-  const [transcription, setTranscription] = React.useState<string | null>(comm.transcribe_text || null);
 
 
   React.useEffect(() => {
@@ -105,14 +104,12 @@ function CommunicationCard({
   };
 
   const handleTranscribe = async (audioUrl: string) => {
-    if (transcription) return;
     if (!comm.id) return;
 
     setIsTranscribing(true);
     try {
       const result = await getTranscriptionForAudio(audioUrl, comm.id);
       if(result.transcription) {
-        setTranscription(result.transcription);
         toast({ title: "Transcription successful" });
         events.emit('refreshCalls');
       } else {
@@ -150,7 +147,7 @@ function CommunicationCard({
     }
   }
 
-  const isMine = comm.direction === 'outbound' || (user && comm.user_id === user.id && comm.direction !== 'inbound');
+  const isMine = comm.direction === 'outbound';
 
   const findContact = (phone: string) => {
     if (!contacts || contacts.length === 0) return null;
@@ -185,7 +182,7 @@ function CommunicationCard({
         )}>
             <p className="text-sm">{c.body}</p>
             <div className={cn(
-                "text-xs mt-1",
+                "text-xs mt-1 opacity-0 group-hover:opacity-100 transition-opacity",
                 isMine ? "text-primary-foreground/70" : "text-muted-foreground/70"
             )}>
                 {time}
@@ -234,13 +231,13 @@ function CommunicationCard({
                       </>
                     )}
                     {isTranscribing && <p className="text-xs text-muted-foreground mt-2">Transcribing...</p>}
-                    {transcription && (
+                    {comm.transcribe_text && (
                       <blockquote className="mt-2 pl-3 border-l-2 text-xs">
-                        {transcription}
+                        {comm.transcribe_text}
                       </blockquote>
                     )}
                 </div>
-                {isInProgress && isAdmin && (
+                {isInProgress && isAdmin && !isClickable && (
                   <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true })}>
                           <Ear className="mr-2 h-4 w-4" />
@@ -255,7 +252,7 @@ function CommunicationCard({
                 {c.recording_url && (
                   <div className="flex items-center gap-2">
                     <AudioPlayer src={c.recording_url} type="Recording" />
-                    <Button size="icon" variant="ghost" onClick={() => handleTranscribe(c.recording_url!)} disabled={isTranscribing || !!transcription} title="Transcribe">
+                    <Button size="icon" variant="ghost" onClick={() => handleTranscribe(c.recording_url!)} disabled={isTranscribing || !!comm.transcribe_text} title="Transcribe">
                       {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -263,7 +260,7 @@ function CommunicationCard({
                 {c.voice_mail && (
                   <div className="flex items-center gap-2">
                     <AudioPlayer src={c.voice_mail} type="Voicemail" />
-                    <Button size="icon" variant="ghost" onClick={() => handleTranscribe(c.voice_mail!)} disabled={isTranscribing || !!transcription} title="Transcribe">
+                    <Button size="icon" variant="ghost" onClick={() => handleTranscribe(c.voice_mail!)} disabled={isTranscribing || !!comm.transcribe_text} title="Transcribe">
                      {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -313,9 +310,9 @@ function CommunicationCard({
                     </Avatar>
                     <div className="flex flex-col min-w-0">
                         <p className={cn("font-semibold truncate", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
-                         <div className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
+                         <p className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
                            {getCallInfo()}
-                        </div>
+                        </p>
                     </div>
                 </Link>
                 {(isInProgress && isClickable) && (
@@ -463,7 +460,7 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                     const nextComm = index < commsForDay.length - 1 ? commsForDay[index + 1] : null;
 
                     const isSameGroupable = (c1: Communication, c2: Communication) => {
-                        return c1.type === 'sms' && c2.type === 'sms' && c1.direction === c2.direction;
+                        return c1.type === c2.type && c1.direction === c2.direction;
                     };
                     
                     const isSameSenderAsPrev = prevComm && isSameGroupable(comm, prevComm);

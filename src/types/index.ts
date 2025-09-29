@@ -32,7 +32,7 @@ export interface Communication {
   user?: User | null;
   notes?: string;
   category?: string;
-  transcribe_text?: string | null;
+  transcribe_text?: string;
   task_assignments?: {
     worker_sid: string;
     assignment_status: string;

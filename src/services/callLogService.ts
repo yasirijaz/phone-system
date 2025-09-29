@@ -106,13 +106,10 @@ export const unstarCall = async (id: string): Promise<void> => {
     await axios.post(`/api/call-logs/${id}/unstar`);
 };
 
-export const saveTranscription = async (id: number, transcribe_text: string): Promise<void> => {
-  await axios.patch(`/api/call-logs/${id}/transcription`, { transcribe_text });
-}
-
     
 
     
+
 
 
 

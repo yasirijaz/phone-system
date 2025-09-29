@@ -2,7 +2,6 @@
 
 import { categorizeCall } from '@/ai/flows/categorize-call';
 import { transcribeAudio } from '@/ai/flows/transcribe-audio';
-import { saveTranscription } from '@/services/callLogService';
 
 export async function getCategoryForNotes(notes: string): Promise<{ category?: string; error?: string }> {
   if (!notes || notes.trim().length < 10) {
@@ -25,9 +24,9 @@ export async function getTranscriptionForAudio(audioUrl: string, callLogId: numb
     const fullUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/twilio/recordings/stream?url=${encodeURIComponent(audioUrl)}`;
     const result = await transcribeAudio({ audioUrl: fullUrl });
     
-    if (result.transcription) {
-      await saveTranscription(callLogId, result.transcription);
-    }
+    // Here you would typically save the transcription to your database
+    // For now, we just return it.
+    console.log(`Transcription for call ${callLogId}:`, result.transcription);
 
     return { transcription: result.transcription };
   } catch (error) {
