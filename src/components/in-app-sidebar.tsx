@@ -37,6 +37,7 @@ export function InAppSidebar() {
   const [departments, setDepartments] = useState<DepartmentWithUnread[]>([]);
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [inboxUnread, setInboxUnread] = useState(0);
   const inElectron = isElectron();
 
   const getInitials = (name: string) => {
@@ -83,6 +84,9 @@ export function InAppSidebar() {
 
         const recentComms = Array.isArray(recentCommsResponse.results) ? recentCommsResponse.results : [];
         const uniqueRecents: { [key: string]: RecentItem } = {};
+
+        const inboxUnreadCount = recentComms.filter(c => !c.is_read).length;
+        if (mounted) setInboxUnread(inboxUnreadCount);
 
         recentComms.forEach((comm: Communication) => {
             const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
@@ -168,9 +172,14 @@ export function InAppSidebar() {
                 )}
                 <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname === '/app'}>
-                        <Link href="/app">
-                            <Inbox />
-                            <span>Inbox</span>
+                        <Link href="/app" className="flex justify-between items-center w-full">
+                            <div className="flex items-center gap-2">
+                                <Inbox />
+                                <span>Inbox</span>
+                            </div>
+                            {inboxUnread > 0 && (
+                                <Badge className="h-5">{inboxUnread}</Badge>
+                            )}
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
