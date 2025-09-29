@@ -125,7 +125,7 @@ function CommunicationCard({
     }
   }
 
-  const isMine = comm.direction === 'outbound' || (user && comm.user_id === user.id && comm.direction !== 'inbound');
+  const isMine = (comm.direction === 'outbound' || (user && comm.user_id === user.id && comm.direction !== 'inbound')) || (comm.direction === 'outgoing' || (user && comm.user_id === user.id && comm.direction !== 'incoming'));
 
   const findContact = (phone: string) => {
     if (!contacts || contacts.length === 0) return null;
