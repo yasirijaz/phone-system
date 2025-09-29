@@ -1,6 +1,7 @@
 'use server';
 
 import { categorizeCall } from '@/ai/flows/categorize-call';
+import { transcribeAudio } from '@/ai/flows/transcribe-audio';
 
 export async function getCategoryForNotes(notes: string): Promise<{ category?: string; error?: string }> {
   if (!notes || notes.trim().length < 10) {
@@ -12,5 +13,19 @@ export async function getCategoryForNotes(notes: string): Promise<{ category?: s
   } catch (error) {
     console.error('AI categorization failed:', error);
     return { error: 'Failed to categorize call due to a server error.' };
+  }
+}
+
+export async function getTranscriptionForAudio(audioUrl: string): Promise<{ transcription?: string; error?: string }> {
+  if (!audioUrl) {
+    return { error: 'Audio URL is missing.' };
+  }
+  try {
+    const fullUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/twilio/recordings/stream?url=${encodeURIComponent(audioUrl)}`;
+    const result = await transcribeAudio({ audioUrl: fullUrl });
+    return { transcription: result.transcription };
+  } catch (error) {
+    console.error('AI transcription failed:', error);
+    return { error: 'Failed to transcribe audio due to a server error.' };
   }
 }
