@@ -156,79 +156,80 @@ export default function ConversationDetailPage() {
                     try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
                 }
                 
-                if (sortedLogs.length > 0) {
-                    const latestComm = sortedLogs[sortedLogs.length - 1];
-                    const otherPartyNumber = latestComm.direction === 'inbound' ? latestComm.from : latestComm.to;
-                    const foundContact = contactList.find(c => c.phone_no === otherPartyNumber);
-                    
-                    setContact({
-                        ...(foundContact || {}),
-                        phone_no: otherPartyNumber,
-                        name: foundContact?.name || formatPhoneNumber(otherPartyNumber)
-                    });
+                // Determine which number is the external contact
+                const allCompanyNumbers = new Set<string>();
+                for (const dept of depts) {
+                    try {
+                        const nums = await getPhoneNumbers(dept.id);
+                        nums.forEach(n => allCompanyNumbers.add(n.phone_no));
+                    } catch (e) {}
+                }
 
-                    const lastUsedOurNumber = latestComm.direction === 'inbound' ? latestComm.to : latestComm.from;
+                let otherPartyNumber: string;
+                let ourNumber: string;
 
-                    let resolvedDeptId: string | null = latestComm.department_id
-                        ? String(latestComm.department_id)
-                        : null;
-
-                    const findDepartmentIdByNumber = async (phone: string): Promise<string | null> => {
-                        for (const d of depts) {
-                            try {
-                                const nums = await getPhoneNumbers(d.id);
-                                if (nums.some(n => n.phone_no === phone)) {
-                                    return String(d.id);
-                                }
-                            } catch (e) {}
-                        }
-                        return null;
-                    };
-
-                    if (!resolvedDeptId && depts.length > 0) {
-                        resolvedDeptId = await findDepartmentIdByNumber(lastUsedOurNumber);
-                        if (!resolvedDeptId) {
-                            resolvedDeptId = await findDepartmentIdByNumber(from);
-                        }
-                        if (!resolvedDeptId) {
-                            resolvedDeptId = String(depts[0].id);
-                        }
-                    }
-
-                    if (resolvedDeptId) {
-                        setSelectedDepartmentId(resolvedDeptId);
-                        await handleDepartmentChange(resolvedDeptId); 
-
-                        try {
-                            const nums = await getPhoneNumbers(Number(resolvedDeptId));
-                            if (nums.some(n => n.phone_no === lastUsedOurNumber)) {
-                                setSelectedFromNumber(lastUsedOurNumber);
-                            }
-                        } catch (_) {}
-                    }
+                if (allCompanyNumbers.has(from) && !allCompanyNumbers.has(to)) {
+                    otherPartyNumber = to;
+                    ourNumber = from;
+                } else if (!allCompanyNumbers.has(from) && allCompanyNumbers.has(to)) {
+                    otherPartyNumber = from;
+                    ourNumber = to;
                 } else {
-                     setContact({ phone_no: to, name: formatPhoneNumber(to) });
-                     if (depts.length > 0) {
-                        let deptId: string | null = null;
-                        for (const d of depts) {
-                            try {
-                                const nums = await getPhoneNumbers(Number(d.id));
-                                if (nums.some(n => n.phone_no === from)) {
-                                    deptId = String(d.id);
-                                    break;
-                                }
-                            } catch (_) {}
+                    // Fallback for ambiguity - check latest message
+                    if (sortedLogs.length > 0) {
+                        const lastLog = sortedLogs[sortedLogs.length - 1];
+                        if (lastLog.direction === 'inbound') {
+                           otherPartyNumber = lastLog.from;
+                           ourNumber = lastLog.to;
+                        } else {
+                           otherPartyNumber = lastLog.to;
+                           ourNumber = lastLog.from;
                         }
-                        const finalDeptId = deptId ?? String(depts[0].id);
-                        await handleDepartmentChange(finalDeptId);
-                        try {
-                            const nums = await getPhoneNumbers(Number(finalDeptId));
-                            if (nums.some(n => n.phone_no === from)) {
-                                setSelectedFromNumber(from);
-                            }
-                        } catch (_) {}
+                    } else {
+                       // Best guess
+                       otherPartyNumber = to;
+                       ourNumber = from;
                     }
                 }
+                
+                const foundContact = contactList.find(c => c.phone_no === otherPartyNumber);
+                setContact({
+                    ...(foundContact || {}),
+                    phone_no: otherPartyNumber,
+                    name: foundContact?.name || formatPhoneNumber(otherPartyNumber)
+                });
+                
+                // Determine and set the correct department and from number
+                let resolvedDeptId: string | null = null;
+                for (const dept of depts) {
+                    try {
+                        const nums = await getPhoneNumbers(dept.id);
+                        if (nums.some(n => n.phone_no === ourNumber)) {
+                            resolvedDeptId = String(dept.id);
+                            break;
+                        }
+                    } catch(e) {}
+                }
+
+                if (!resolvedDeptId && depts.length > 0) {
+                    resolvedDeptId = String(depts[0].id); // fallback
+                }
+
+                if (resolvedDeptId) {
+                    setSelectedDepartmentId(resolvedDeptId);
+                    await handleDepartmentChange(resolvedDeptId);
+                    
+                    // This is important: re-fetch numbers for the resolved dept and set the `from` number
+                    try {
+                        const numsForDept = await getPhoneNumbers(Number(resolvedDeptId));
+                        if(numsForDept.some(n => n.phone_no === ourNumber)) {
+                            setSelectedFromNumber(ourNumber);
+                        } else if (numsForDept.length > 0) {
+                            setSelectedFromNumber(numsForDept[0].phone_no);
+                        }
+                    } catch(e) {}
+                }
+
 
             } catch (error) {
                 console.error("Failed to fetch data", error);
@@ -343,7 +344,7 @@ export default function ConversationDetailPage() {
                                     </main>
                                     <footer className="flex-shrink-0 p-4 border-t bg-background space-y-2">
                                         <div className="grid grid-cols-2 gap-2">
-                                            <Select onValueChange={handleDepartmentChange} value={selectedDepartmentId} disabled={loadingDepartments || allComms.length > 0}>
+                                            <Select onValueChange={handleDepartmentChange} value={selectedDepartmentId} disabled={loadingDepartments}>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select Department" />
                                                 </SelectTrigger>
@@ -355,7 +356,7 @@ export default function ConversationDetailPage() {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId || allComms.length > 0}>
+                                            <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select Number" />
                                                 </SelectTrigger>
