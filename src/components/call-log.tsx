@@ -159,7 +159,10 @@ function CommunicationCard({
             !isFirstInGroup && !isLastInGroup && !isMiddleOfGroup && "rounded-xl"
         )}>
             <p className="text-sm">{c.body}</p>
-             <div className="absolute bottom-1 right-2 text-xs text-background/70 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className={cn(
+                "text-xs mt-1",
+                isMine ? "text-primary-foreground/70" : "text-muted-foreground/70"
+            )}>
                 {time}
             </div>
         </div>
@@ -274,7 +277,7 @@ function CommunicationCard({
                         </div>
                     </div>
                 </Link>
-                {(isInProgress) && (
+                {(isInProgress && isClickable) && (
                   <div className="flex items-center gap-2">
                     <span className="flex h-3 w-3 shrink-0">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -424,11 +427,11 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                     };
                     
                     const isSameSenderAsPrev = prevComm && isSameGroupable(comm, prevComm);
-                    const isSameSenderAsNext = nextComm && isSameGroupedWithNext(commsForDay, index);
                     
                     const isFirstInGroup = !isSameSenderAsPrev;
-                    const isLastInGroup = !isSameSenderAsNext;
-                    const isMiddleOfGroup = isSameSenderAsPrev && isSameSenderAsNext;
+                    
+                    const isLastInGroup = !nextComm || !isSameGroupable(comm, nextComm);
+                    const isMiddleOfGroup = isSameSenderAsPrev && !isLastInGroup;
 
                     const stableKey = generateKey(comm, index);
 
@@ -469,3 +472,6 @@ function isSameGroupedWithNext(comms: Communication[], currentIndex: number): bo
     }
     return false;
 }
+
+
+    
