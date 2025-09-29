@@ -11,7 +11,7 @@ import { Badge } from './ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { addParticipant } from '@/services/twilioService';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { markCommunicationField, markRead } from '@/services/callLogService';
+import { markCommunicationField, markRead, saveTranscription } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
 import { cn, formatPhoneNumber } from '@/lib/utils';
@@ -53,7 +53,7 @@ function CommunicationCard({
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [isRead, setIsRead] = React.useState(!!comm.is_read);
   const [isTranscribing, setIsTranscribing] = React.useState(false);
-  const [transcription, setTranscription] = React.useState<string | null>(null);
+  const [transcription, setTranscription] = React.useState<string | null>(comm.transcribe_text || null);
 
 
   React.useEffect(() => {
@@ -105,13 +105,16 @@ function CommunicationCard({
   };
 
   const handleTranscribe = async (audioUrl: string) => {
+    if (transcription) return;
+    if (!comm.id) return;
+
     setIsTranscribing(true);
-    setTranscription(null);
     try {
-      const result = await getTranscriptionForAudio(audioUrl);
+      const result = await getTranscriptionForAudio(audioUrl, comm.id);
       if(result.transcription) {
         setTranscription(result.transcription);
         toast({ title: "Transcription successful" });
+        events.emit('refreshCalls');
       } else {
         throw new Error(result.error || "Unknown error");
       }
@@ -252,7 +255,7 @@ function CommunicationCard({
                 {c.recording_url && (
                   <div className="flex items-center gap-2">
                     <AudioPlayer src={c.recording_url} type="Recording" />
-                    <Button size="icon" variant="ghost" onClick={() => handleTranscribe(c.recording_url!)} disabled={isTranscribing} title="Transcribe">
+                    <Button size="icon" variant="ghost" onClick={() => handleTranscribe(c.recording_url!)} disabled={isTranscribing || !!transcription} title="Transcribe">
                       {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -260,7 +263,7 @@ function CommunicationCard({
                 {c.voice_mail && (
                   <div className="flex items-center gap-2">
                     <AudioPlayer src={c.voice_mail} type="Voicemail" />
-                    <Button size="icon" variant="ghost" onClick={() => handleTranscribe(c.voice_mail!)} disabled={isTranscribing} title="Transcribe">
+                    <Button size="icon" variant="ghost" onClick={() => handleTranscribe(c.voice_mail!)} disabled={isTranscribing || !!transcription} title="Transcribe">
                      {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4" />}
                     </Button>
                   </div>

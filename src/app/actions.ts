@@ -2,6 +2,7 @@
 
 import { categorizeCall } from '@/ai/flows/categorize-call';
 import { transcribeAudio } from '@/ai/flows/transcribe-audio';
+import { saveTranscription } from '@/services/callLogService';
 
 export async function getCategoryForNotes(notes: string): Promise<{ category?: string; error?: string }> {
   if (!notes || notes.trim().length < 10) {
@@ -16,13 +17,18 @@ export async function getCategoryForNotes(notes: string): Promise<{ category?: s
   }
 }
 
-export async function getTranscriptionForAudio(audioUrl: string): Promise<{ transcription?: string; error?: string }> {
+export async function getTranscriptionForAudio(audioUrl: string, callLogId: number): Promise<{ transcription?: string; error?: string }> {
   if (!audioUrl) {
     return { error: 'Audio URL is missing.' };
   }
   try {
     const fullUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/twilio/recordings/stream?url=${encodeURIComponent(audioUrl)}`;
     const result = await transcribeAudio({ audioUrl: fullUrl });
+    
+    if (result.transcription) {
+      await saveTranscription(callLogId, result.transcription);
+    }
+
     return { transcription: result.transcription };
   } catch (error) {
     console.error('AI transcription failed:', error);
