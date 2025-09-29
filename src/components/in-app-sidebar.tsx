@@ -17,6 +17,7 @@ import { isElectron } from '@/lib/is-electron';
 import { events } from '@/lib/events';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { getContacts } from '@/services/contactService';
+import { formatPhoneNumber } from '@/lib/utils';
 
 interface DepartmentWithUnread extends Department {
     unread_count: number;
@@ -245,7 +246,7 @@ export function InAppSidebar() {
                                         <Avatar className="h-5 w-5 text-xs">
                                             <AvatarFallback>{item.initials}</AvatarFallback>
                                         </Avatar>
-                                        <span className="truncate">{item.name}</span>
+                                        <span className="truncate">{formatPhoneNumber(item.name)}</span>
                                     </div>
                                      {item.unread_count > 0 && (
                                         <Badge className="h-5">{item.unread_count}</Badge>

@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Send, Smile, Paperclip, Mic } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { formatPhoneNumber } from "@/lib/utils";
 
 export default function MessagesPage() {
   const { user, logout } = useAuth();
@@ -156,7 +157,7 @@ export default function MessagesPage() {
                             <SelectContent>
                                 {phoneNumbers.map((num) => (
                                     <SelectItem key={num.id} value={num.phone_no}>
-                                        {num.phone_no} ({num.label})
+                                        {formatPhoneNumber(num.phone_no)} ({num.label})
                                     </SelectItem>
                                 ))}
                             </SelectContent>

@@ -149,7 +149,7 @@ function CommunicationCard({
 
   const renderMessageBubble = (c: Communication) => (
      <div className={cn(
-      "p-3 max-w-[80%] break-words",
+      "p-3",
       isMine ? "bg-primary text-primary-foreground" : "bg-muted",
       isFirstInGroup && (isMine ? "rounded-t-lg rounded-bl-lg" : "rounded-t-lg rounded-br-lg"),
       isLastInGroup && !isFirstInGroup && (isMine ? "rounded-b-lg rounded-l-lg" : "rounded-b-lg rounded-r-lg"),
@@ -253,39 +253,40 @@ function CommunicationCard({
       };
 
       return (
-           <div className="flex items-center p-4 gap-4 hover:bg-muted/50 group border-b">
+           <div className="flex items-center p-2 hover:bg-muted/50 group border-b">
                 <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="flex-1 flex items-center gap-4">
                     <Avatar className="h-10 w-10">
                         <AvatarFallback>
                             {contact ? mainPageAvatarInitial : <User className="h-5 w-5 text-muted-foreground" />}
                         </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 grid grid-cols-3 items-center gap-4">
+                    <div className="flex flex-col min-w-0">
                         <p className={cn("font-semibold truncate", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
                          <div className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
                            {getCallInfo()}
                         </div>
-                        {isInProgress && (
-                            <p>
-                                <span className="relative flex h-3 w-3">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                                </span>
-                            </p>
-                        )}
                     </div>
                 </Link>
-                 {isInProgress && isAdmin && (
-                    <div className="flex items-center gap-2">
+                {(isInProgress) && (
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-3 w-3 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                    </span>
+
+                    {isAdmin && (
+                      <>
                         <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true })}>
-                            <Ear className="mr-2 h-4 w-4" />
-                            Silently Listen
+                          <Ear className="mr-2 h-4 w-4" />
+                          Silently Listen
                         </Button>
                         <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: false })}>
-                            <Mic className="mr-2 h-4 w-4" />
-                            Barge In
+                          <Mic className="mr-2 h-4 w-4" />
+                          Barge In
                         </Button>
-                    </div>
+                      </>
+                    )}
+                  </div>
                 )}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
