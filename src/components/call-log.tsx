@@ -147,18 +147,25 @@ function CommunicationCard({
 
   const showAvatar = !isMine && isFirstInGroup;
 
-  const renderMessageBubble = (c: Communication) => (
-     <div className={cn(
-      "p-3",
-      isMine ? "bg-primary text-primary-foreground" : "bg-muted",
-      isFirstInGroup && (isMine ? "rounded-t-lg rounded-bl-lg" : "rounded-t-lg rounded-br-lg"),
-      isLastInGroup && !isFirstInGroup && (isMine ? "rounded-b-lg rounded-l-lg" : "rounded-b-lg rounded-r-lg"),
-      isMiddleOfGroup && (isMine ? "rounded-l-lg" : "rounded-r-lg"),
-      !isFirstInGroup && !isLastInGroup && !isMiddleOfGroup && "rounded-lg"
-    )}>
-      <p className="text-sm">{c.body}</p>
-    </div>
-  );
+  const renderMessageBubble = (c: Communication) => {
+    const time = c.created_at ? format(parseISO(c.created_at), 'p') : '';
+    return (
+        <div className={cn(
+            "p-3 group relative",
+            isMine ? "bg-primary text-primary-foreground" : "bg-muted",
+            isFirstInGroup && (isMine ? "rounded-t-xl rounded-l-xl" : "rounded-t-xl rounded-r-xl"),
+            isLastInGroup && !isFirstInGroup && (isMine ? "rounded-b-xl rounded-l-xl" : "rounded-b-xl rounded-r-xl"),
+            isMiddleOfGroup && (isMine ? "rounded-l-xl" : "rounded-r-xl"),
+            !isFirstInGroup && !isLastInGroup && !isMiddleOfGroup && "rounded-xl"
+        )}>
+            <p className="text-sm">{c.body}</p>
+             <div className="absolute bottom-1 right-2 text-xs text-background/70 opacity-0 group-hover:opacity-100 transition-opacity">
+                {time}
+            </div>
+        </div>
+    );
+  };
+
 
   const renderCallBubble = (c: Communication) => {
     const title = isMine ? `You called ${otherParty.name}` : `${otherParty.name} called you`;
@@ -316,10 +323,10 @@ function CommunicationCard({
             )}
             {!showAvatar && !isMine && <div className="w-8" />}
 
-            <div className={cn("flex flex-col gap-1 w-full", isMine ? 'items-end' : 'items-start')}>
+            <div className={cn("flex flex-col gap-1 w-full max-w-[75%]", isMine ? 'items-end' : 'items-start')}>
                 {isFirstInGroup && comm.created_at && (
                     <p className={cn("text-xs text-muted-foreground", isMine ? "text-right" : "text-left", "px-1")}>
-                        <span className="font-semibold">{contactName}</span> • {format(parseISO(comm.created_at), 'p')}
+                        <span className="font-semibold">{contactName}</span>
                     </p>
                 )}
                 <div className={cn("flex items-center gap-2", isMine ? 'flex-row-reverse' : 'flex-row')}>
@@ -412,9 +419,13 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                     const prevComm = index > 0 ? commsForDay[index - 1] : null;
                     const nextComm = index < commsForDay.length - 1 ? commsForDay[index + 1] : null;
 
-                    const isSameSenderAsPrev = prevComm && prevComm.direction === comm.direction;
-                    const isSameSenderAsNext = nextComm && nextComm.direction === comm.direction;
-
+                    const isSameGroupable = (c1: Communication, c2: Communication) => {
+                        return c1.type === 'sms' && c2.type === 'sms' && c1.direction === c2.direction;
+                    };
+                    
+                    const isSameSenderAsPrev = prevComm && isSameGroupable(comm, prevComm);
+                    const isSameSenderAsNext = nextComm && isSameGroupedWithNext(commsForDay, index);
+                    
                     const isFirstInGroup = !isSameSenderAsPrev;
                     const isLastInGroup = !isSameSenderAsNext;
                     const isMiddleOfGroup = isSameSenderAsPrev && isSameSenderAsNext;
@@ -442,3 +453,19 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
   );
 }
 
+function isSameGroupedWithNext(comms: Communication[], currentIndex: number): boolean {
+    if (currentIndex >= comms.length - 1) return false;
+    const current = comms[currentIndex];
+    if (current.type !== 'sms') return false;
+
+    for (let i = currentIndex + 1; i < comms.length; i++) {
+        const next = comms[i];
+        if (next.direction === current.direction && next.type === 'sms') {
+            return true;
+        }
+        if (next.type !== 'sms' || next.direction !== current.direction) {
+            return false;
+        }
+    }
+    return false;
+}
