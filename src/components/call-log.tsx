@@ -1,7 +1,7 @@
 
 
 import type { Communication, Contact } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight, ChevronDown, User, Star } from 'lucide-react';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight, ChevronDown, User, Star, FileText } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback } from './ui/avatar';
@@ -17,6 +17,7 @@ import React from 'react';
 import { cn, formatPhoneNumber } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import AudioPlayer from './AudioPlayer';
+import { getTranscriptionForAudio } from '@/app/actions';
 
 interface CallLogProps {
   calls: Communication[];
@@ -51,6 +52,9 @@ function CommunicationCard({
   const [isTogglingStar, setIsTogglingStar] = React.useState(false);
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [isRead, setIsRead] = React.useState(!!comm.is_read);
+  const [isTranscribing, setIsTranscribing] = React.useState(false);
+  const [transcription, setTranscription] = React.useState<string | null>(null);
+
 
   React.useEffect(() => {
     setIsRead(!!comm.is_read);
@@ -99,6 +103,24 @@ function CommunicationCard({
       setIsTogglingStar(false);
     }
   };
+
+  const handleTranscribe = async (audioUrl: string) => {
+    setIsTranscribing(true);
+    setTranscription(null);
+    try {
+      const result = await getTranscriptionForAudio(audioUrl);
+      if(result.transcription) {
+        setTranscription(result.transcription);
+        toast({ title: "Transcription successful" });
+      } else {
+        throw new Error(result.error || "Unknown error");
+      }
+    } catch(e: any) {
+      toast({ title: "Transcription Failed", description: e.message || "Could not transcribe audio.", variant: "destructive"});
+    } finally {
+      setIsTranscribing(false);
+    }
+  }
 
   const getInitials = (name: string) => {
     if (!name) return '?';
@@ -208,6 +230,12 @@ function CommunicationCard({
                         </div>
                       </>
                     )}
+                    {isTranscribing && <p className="text-xs text-muted-foreground mt-2">Transcribing...</p>}
+                    {transcription && (
+                      <blockquote className="mt-2 pl-3 border-l-2 text-xs">
+                        {transcription}
+                      </blockquote>
+                    )}
                 </div>
                 {isInProgress && isAdmin && (
                   <div className="flex items-center gap-2">
@@ -222,10 +250,20 @@ function CommunicationCard({
                   </div>
                 )}
                 {c.recording_url && (
+                  <div className="flex items-center gap-2">
                     <AudioPlayer src={c.recording_url} type="Recording" />
+                    <Button size="icon" variant="ghost" onClick={() => handleTranscribe(c.recording_url!)} disabled={isTranscribing} title="Transcribe">
+                      {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 )}
                 {c.voice_mail && (
+                  <div className="flex items-center gap-2">
                     <AudioPlayer src={c.voice_mail} type="Voicemail" />
+                    <Button size="icon" variant="ghost" onClick={() => handleTranscribe(c.voice_mail!)} disabled={isTranscribing} title="Transcribe">
+                     {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 )}
             </div>
         </div>
