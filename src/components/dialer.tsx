@@ -101,7 +101,7 @@ export default function Dialer({
     };
     
     const handleContactSelect = (contact: Contact) => {
-        handleNumberChange(contact.phone_no);
+        handleNumberChange(contact.phone_no.replace(/^\+1/, ""));
         setFilteredContacts([]);
     };
 
