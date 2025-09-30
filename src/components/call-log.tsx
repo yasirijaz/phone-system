@@ -18,6 +18,7 @@ import { cn, formatPhoneNumber } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import AudioPlayer from './AudioPlayer';
 import { getTranscriptionForAudio } from '@/app/actions';
+import { saveTranscription } from '@/services/callLogService';
 
 interface CallLogProps {
   calls: Communication[];
@@ -111,6 +112,7 @@ function CommunicationCard({
     try {
       const result = await getTranscriptionForAudio(audioUrl, comm.id);
       if(result.transcription) {
+        await saveTranscription(comm.id, result.transcription);
         setTranscrib(result.transcription)
         toast({ title: "Transcription successful" });
         events.emit('refreshCalls');

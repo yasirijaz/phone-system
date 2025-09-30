@@ -2,7 +2,7 @@
 
 import { categorizeCall } from '@/ai/flows/categorize-call';
 import { transcribeAudio } from '@/ai/flows/transcribe-audio';
-import { saveTranscription } from '@/services/callLogService';
+
 
 export async function getCategoryForNotes(notes: string): Promise<{ category?: string; error?: string }> {
   if (!notes || notes.trim().length < 10) {
@@ -27,7 +27,6 @@ export async function getTranscriptionForAudio(audioUrl: string, callLogId: numb
     
     if (result.transcription) { 
       console.log('Transcription:', callLogId);
-      await saveTranscription(callLogId, result.transcription);
     }
 
     return { transcription: result.transcription };
