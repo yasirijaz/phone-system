@@ -109,12 +109,3 @@ export const unstarCall = async (id: string): Promise<void> => {
 export const saveTranscription = async (id: number, transcribe_text: string): Promise<void> => {
     await axios.post(`/api/call-logs/${id}/transcription`, { transcribe_text });
 }
-
-    
-
-    
-
-
-
-
-

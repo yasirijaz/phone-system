@@ -69,7 +69,11 @@ export default function AppUIPage() {
     try {
         let filters: Record<string, any> = { page, limit };
         if (tab !== 'all') {
-            filters.type = tab;
+            if (tab === 'starred') {
+                filters.is_starred = true;
+            } else {
+                filters.type = tab;
+            }
         }
 
         const cacheKey = `comm:${tab}:${page}:${limit}`;
