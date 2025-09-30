@@ -53,6 +53,7 @@ function CommunicationCard({
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [isRead, setIsRead] = React.useState(!!comm.is_read);
   const [isTranscribing, setIsTranscribing] = React.useState(false);
+  const [transcrib, setTranscrib] = React.useState('');
 
 
   React.useEffect(() => {
@@ -104,12 +105,13 @@ function CommunicationCard({
   };
 
   const handleTranscribe = async (audioUrl: string) => {
-    if (!comm.id) return;
-
+    if (!comm.id) return; 
+    console.log(comm,'comm')
     setIsTranscribing(true);
     try {
       const result = await getTranscriptionForAudio(audioUrl, comm.id);
       if(result.transcription) {
+        setTranscrib(result.transcription)
         toast({ title: "Transcription successful" });
         events.emit('refreshCalls');
       } else {
@@ -231,11 +233,11 @@ function CommunicationCard({
                       </>
                     )}
                     {isTranscribing && <p className="text-xs text-muted-foreground mt-2">Transcribing...</p>}
-                    {comm.transcribe_text && (
+                    {comm.transcribe_text ? (
                       <blockquote className="mt-2 pl-3 border-l-2 text-xs">
                         {comm.transcribe_text}
                       </blockquote>
-                    )}
+                    ) : transcrib}
                 </div>
                 {isInProgress && isAdmin && !isClickable && (
                   <div className="flex items-center gap-2">
