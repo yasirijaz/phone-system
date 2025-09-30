@@ -55,6 +55,7 @@ function CommunicationCard({
   const [isRead, setIsRead] = React.useState(!!comm.is_read);
   const [isTranscribing, setIsTranscribing] = React.useState(false);
   const [transcrib, setTranscrib] = React.useState('');
+  const [showTranscript, setShowTranscript] = React.useState(false);
 
 
   React.useEffect(() => {
@@ -107,7 +108,6 @@ function CommunicationCard({
 
   const handleTranscribe = async (audioUrl: string) => {
     if (!comm.id) return; 
-    console.log(comm,'comm')
     setIsTranscribing(true);
     try {
       const result = await getTranscriptionForAudio(audioUrl, comm.id);
@@ -125,6 +125,14 @@ function CommunicationCard({
       setIsTranscribing(false);
     }
   }
+
+  const handleTranscribeClick = (audioUrl: string) => {
+    if (!comm.transcribe_text && !transcrib) {
+      handleTranscribe(audioUrl);
+    } else {
+      setShowTranscript(prev => !prev);
+    }
+  };
 
   const getInitials = (name: string) => {
     if (!name) return '?';
@@ -235,11 +243,11 @@ function CommunicationCard({
                       </>
                     )}
                     {isTranscribing && <p className="text-xs text-muted-foreground mt-2">Transcribing...</p>}
-                    {comm.transcribe_text ? (
+                    {(comm.transcribe_text || transcrib) && showTranscript && (
                       <blockquote className="mt-2 pl-3 border-l-2 text-xs">
-                        {comm.transcribe_text}
+                        {comm.transcribe_text || transcrib}
                       </blockquote>
-                    ) : transcrib}
+                    )}
                 </div>
                 {isInProgress && isAdmin && !isClickable && (
                   <div className="flex items-center gap-2">
@@ -256,7 +264,7 @@ function CommunicationCard({
                 {c.recording_url && (
                   <div className="flex items-center gap-2">
                     <AudioPlayer src={c.recording_url} type="Recording" />
-                    <Button size="icon" variant="ghost" onClick={() => handleTranscribe(c.recording_url!)} disabled={isTranscribing || !!comm.transcribe_text} title="Transcribe">
+                    <Button size="icon" variant="ghost" onClick={() => handleTranscribeClick(c.recording_url!)} disabled={isTranscribing} title="Transcribe">
                       {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -264,7 +272,7 @@ function CommunicationCard({
                 {c.voice_mail && (
                   <div className="flex items-center gap-2">
                     <AudioPlayer src={c.voice_mail} type="Voicemail" />
-                    <Button size="icon" variant="ghost" onClick={() => handleTranscribe(c.voice_mail!)} disabled={isTranscribing || !!comm.transcribe_text} title="Transcribe">
+                    <Button size="icon" variant="ghost" onClick={() => handleTranscribeClick(c.voice_mail!)} disabled={isTranscribing} title="Transcribe">
                      {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4" />}
                     </Button>
                   </div>
