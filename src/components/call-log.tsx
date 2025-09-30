@@ -322,9 +322,9 @@ function CommunicationCard({
                     </Avatar>
                     <div className="flex flex-col min-w-0">
                         <p className={cn("font-semibold truncate", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
-                         <p className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
-                           {getCallInfo()}
-                        </p>
+                        <div className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
+                          {getCallInfo()}
+                        </div>
                     </div>
                 </Link>
                 {(isInProgress && isClickable) && (
