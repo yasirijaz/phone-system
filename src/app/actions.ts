@@ -25,7 +25,8 @@ export async function getTranscriptionForAudio(audioUrl: string, callLogId: numb
     const fullUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/twilio/recordings/stream?url=${encodeURIComponent(audioUrl)}`;
     const result = await transcribeAudio({ audioUrl: fullUrl });
     
-    if (result.transcription) {
+    if (result.transcription) { 
+      console.log('Transcription:', callLogId);
       await saveTranscription(callLogId, result.transcription);
     }
 
