@@ -93,7 +93,8 @@ export function InAppSidebar() {
             const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
 
             if (!uniqueRecents[otherPartyNumber]) {
-                const contact = contacts.find((c: Contact) => c.phone_no === otherPartyNumber);
+                // check if contacts length is greater then 0
+                const contact = (contacts) ? contacts.find((c: Contact) => c.phone_no === otherPartyNumber) : null;
                 const name = contact?.name || otherPartyNumber;
                 uniqueRecents[otherPartyNumber] = {
                     id: otherPartyNumber,
