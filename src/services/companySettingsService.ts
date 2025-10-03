@@ -1,6 +1,7 @@
 
+
 import axios from '@/lib/axios';
-import type { CompanySettings, CompanySettingsPayload } from '@/types';
+import type { CompanySettings, CompanySettingsPayload, Integration } from '@/types';
 
 export const getCompanySettings = async (companyId: number): Promise<CompanySettings> => {
   const response = await axios.get(`/api/settings/company/${companyId}`);
@@ -23,6 +24,7 @@ export const createOrUpdateCompanySettings = async (id: number | undefined, sett
         business_hours: settings.business_hours,
         holiday_schedule: settings.holiday_schedule,
         routing_preferences: settings.routing_preferences,
+        integrations: settings.integrations,
     };
 
     if (id) {
@@ -32,4 +34,9 @@ export const createOrUpdateCompanySettings = async (id: number | undefined, sett
         const response = await axios.post('/api/settings/company', payload);
         return response.data;
     }
+};
+
+export const getIntegrations = async (): Promise<Integration[]> => {
+    const response = await axios.get('/api/integrations');
+    return response.data.data;
 };

@@ -1,13 +1,14 @@
 
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import type { CompanySettings, MediaFile } from "@/types";
+import type { CompanySettings, MediaFile, Integration } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { getCompanySettings, createOrUpdateCompanySettings } from "@/services/companySettingsService";
+import { getCompanySettings, createOrUpdateCompanySettings, getIntegrations } from "@/services/companySettingsService";
 import { uploadMedia } from "@/services/mediaService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -38,6 +39,11 @@ const holidaySchema = z.object({
   date: z.string().min(1, "Date is required"),
 });
 
+const integrationSettingSchema = z.object({
+  integration_id: z.number(),
+  enabled: z.boolean(),
+});
+
 const settingsSchema = z.object({
   call_settings: z.object({
     record_calls: z.boolean().default(false),
@@ -60,6 +66,7 @@ const settingsSchema = z.object({
     default_route: z.string().default("voicemail"),
     timeout: z.coerce.number().min(5).max(120).default(30),
   }),
+  integrations: z.array(integrationSettingSchema).optional(),
 });
 
 export default function CompanySettingsPage() {
@@ -69,6 +76,7 @@ export default function CompanySettingsPage() {
   const companyId = Number(params.companyId);
 
   const [settings, setSettings] = useState<CompanySettings | null>(null);
+  const [availableIntegrations, setAvailableIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -93,12 +101,18 @@ export default function CompanySettingsPage() {
       },
       holiday_schedule: { holidays: [] },
       routing_preferences: { default_route: "voicemail", timeout: 30 },
+      integrations: [],
     },
   });
   
   const { fields, append: appendHoliday, remove: removeHoliday } = useFieldArray({
     control: form.control,
     name: "holiday_schedule.holidays",
+  });
+
+  const { fields: integrationFields, replace: replaceIntegrationFields } = useFieldArray({
+    control: form.control,
+    name: "integrations",
   });
   
   const { fields: businessHoursFields } = useFieldArray({
@@ -107,7 +121,6 @@ export default function CompanySettingsPage() {
   });
 
   const is247 = form.watch("business_hours.is_24_7");
-
 
   useEffect(() => {
     if (user?.role_id === 3) {
@@ -122,20 +135,33 @@ export default function CompanySettingsPage() {
     
     if(companyId) {
         fetchSettings();
+        fetchIntegrations();
     }
   }, [user, companyId, router]);
 
   useEffect(() => {
-    if (settings) {
+    if (settings && availableIntegrations.length > 0) {
       form.reset({
         call_settings: settings.call_settings,
         voicemail_settings: settings.voicemail_settings,
         business_hours: settings.business_hours,
         holiday_schedule: settings.holiday_schedule || { holidays: [] },
         routing_preferences: settings.routing_preferences,
+        integrations: availableIntegrations.map(availInt => {
+            const savedInt = settings.integrations?.find(si => si.integration_id === availInt.id);
+            return {
+                integration_id: availInt.id,
+                enabled: savedInt ? savedInt.enabled : false,
+            };
+        }),
       });
+    } else if (settings) {
+        form.reset({
+            ...settings,
+            integrations: [],
+        });
     }
-  }, [settings, form]);
+  }, [settings, availableIntegrations, form]);
 
   const fetchSettings = async () => {
     try {
@@ -149,6 +175,15 @@ export default function CompanySettingsPage() {
       setLoading(false);
     }
   };
+
+  const fetchIntegrations = async () => {
+      try {
+          const data = await getIntegrations();
+          setAvailableIntegrations(Array.isArray(data) ? data : []);
+      } catch (error) {
+          toast({ title: "Error", description: "Could not fetch integrations list.", variant: "destructive" });
+      }
+  }
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -224,12 +259,13 @@ export default function CompanySettingsPage() {
             <Form {...form}>
               <form id="settings-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                  <Tabs defaultValue="call-settings">
-                    <TabsList className="grid w-full grid-cols-5">
+                    <TabsList className="grid w-full grid-cols-6">
                         <TabsTrigger value="call-settings">Call Settings</TabsTrigger>
                         <TabsTrigger value="voicemail">Voicemail</TabsTrigger>
                         <TabsTrigger value="business-hours">Business Hours</TabsTrigger>
                         <TabsTrigger value="holiday-schedule">Holiday Schedule</TabsTrigger>
                         <TabsTrigger value="routing">Routing</TabsTrigger>
+                        <TabsTrigger value="integrations">Integrations</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="call-settings">
@@ -515,6 +551,44 @@ export default function CompanySettingsPage() {
                                         </FormItem>
                                     )}
                                 />
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="integrations">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Integrations</CardTitle>
+                                <CardDescription>Connect with third-party applications.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {integrationFields.map((field, index) => {
+                                  const integrationInfo = availableIntegrations.find(i => i.id === field.integration_id);
+                                  if (!integrationInfo) return null;
+                                  
+                                  return (
+                                    <FormField
+                                      key={field.id}
+                                      control={form.control}
+                                      name={`integrations.${index}.enabled`}
+                                      render={({ field: switchField }) => (
+                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                            <div className="space-y-0.5">
+                                                <FormLabel className="text-base">{integrationInfo.name}</FormLabel>
+                                                <FormDescription>{integrationInfo.description}</FormDescription>
+                                            </div>
+                                            <FormControl>
+                                                <Switch
+                                                    checked={switchField.value}
+                                                    onCheckedChange={switchField.onChange}
+                                                />
+                                            </FormControl>
+                                        </FormItem>
+                                      )}
+                                    />
+                                  )
+                                })}
+                                {availableIntegrations.length === 0 && <p className="text-muted-foreground">No integrations available.</p>}
                             </CardContent>
                         </Card>
                     </TabsContent>

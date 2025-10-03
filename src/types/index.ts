@@ -1,5 +1,6 @@
 
 
+
 export interface Communication {
   id: number;
   type: 'call' | 'sms';
@@ -113,6 +114,12 @@ export interface Holiday {
   date: string;
 }
 
+export interface Integration {
+    id: number;
+    name: string;
+    description: string;
+}
+
 export interface CompanySettings {
   id: number;
   company_id: number;
@@ -142,6 +149,10 @@ export interface CompanySettings {
     default_route: string;
     timeout: number;
   };
+  integrations?: {
+    integration_id: number;
+    enabled: boolean;
+  }[];
 }
 
 export type CompanySettingsPayload = Omit<CompanySettings, 'id'>;
