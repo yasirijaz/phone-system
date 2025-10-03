@@ -210,10 +210,10 @@ export default function CompanySettingsPage() {
 
   const handleIntegrationToggle = async (integrationId: number, enabled: boolean) => {
     try {
-        await updateCompanyIntegration(companyId, integrationId, enabled);
+        await updateCompanyIntegration(companyId, integrationId);
         toast({
             title: "Success",
-            description: `Integration ${enabled ? 'enabled' : 'disabled'}.`
+            description: `Integration status toggled.`
         });
     } catch(error) {
         toast({
@@ -627,6 +627,3 @@ export default function CompanySettingsPage() {
     </SidebarProvider>
   );
 }
-
-
-    
