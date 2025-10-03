@@ -136,7 +136,7 @@ const appServe = app.isPackaged ? serve({
 
 const createWindow = () => {
   const win = new BrowserWindow({
-    width: 800,
+    width: 1200,
     height: 600,
     webPreferences: {
       preload: path.join(__dirname, "preload.js")
@@ -187,35 +187,35 @@ const createWindow = () => {
 
 function createAppMenu() {
   const template = [
-    {
-      label: 'About',
-      submenu: [
-        {
-          label: 'Check Version',
-          click: () => {
-            const version = app.getVersion();
-            dialog.showMessageBox({
-              type: 'info',
-              title: 'App Version',
-              message: `Version: ${version}`,
-              buttons: ['OK']
-            });
-          },
-        },
-        {
-          label: 'Check for Updates',
-          click: () => {
-            try {
-              // Trigger a manual update check
-              autoUpdater.checkForUpdatesAndNotify();
-              sendToRenderer('updatelog','Checking for updates...');
-            } catch (e) {
-              dialog.showErrorBox('Update Error', String(e));
-            }
-          },
-        },
-      ],
-    },
+    // {
+    //   label: 'About',
+    //   submenu: [
+    //     {
+    //       label: 'Check Version',
+    //       click: () => {
+    //         const version = app.getVersion();
+    //         dialog.showMessageBox({
+    //           type: 'info',
+    //           title: 'App Version',
+    //           message: `Version: ${version}`,
+    //           buttons: ['OK']
+    //         });
+    //       },
+    //     },
+    //     {
+    //       label: 'Check for Updates',
+    //       click: () => {
+    //         try {
+    //           // Trigger a manual update check
+    //           autoUpdater.checkForUpdatesAndNotify();
+    //           sendToRenderer('updatelog','Checking for updates...');
+    //         } catch (e) {
+    //           dialog.showErrorBox('Update Error', String(e));
+    //         }
+    //       },
+    //     },
+    //   ],
+    // },
   ];
 
   // In development, add a Debug menu with DevTools and Reload
