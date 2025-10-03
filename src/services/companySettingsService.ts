@@ -40,3 +40,14 @@ export const getIntegrations = async (): Promise<Integration[]> => {
     const response = await axios.get('/api/integrations');
     return response.data.data;
 };
+
+export const updateCompanyIntegration = async (companyId: number, integrationId: number, enabled: boolean): Promise<any> => {
+    const response = await axios.post('/api/company-integrations', {
+        company_id: companyId,
+        integration_id: integrationId,
+        enabled: enabled,
+    });
+    return response.data;
+};
+
+    

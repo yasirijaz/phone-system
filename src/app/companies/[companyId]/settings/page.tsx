@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import type { CompanySettings, MediaFile, Integration } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { getCompanySettings, createOrUpdateCompanySettings, getIntegrations } from "@/services/companySettingsService";
+import { getCompanySettings, createOrUpdateCompanySettings, getIntegrations, updateCompanyIntegration } from "@/services/companySettingsService";
 import { uploadMedia } from "@/services/mediaService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -207,6 +207,28 @@ export default function CompanySettingsPage() {
       }
     }
   };
+
+  const handleIntegrationToggle = async (integrationId: number, enabled: boolean) => {
+    try {
+        await updateCompanyIntegration(companyId, integrationId, enabled);
+        toast({
+            title: "Success",
+            description: `Integration ${enabled ? 'enabled' : 'disabled'}.`
+        });
+    } catch(error) {
+        toast({
+            title: "Error",
+            description: "Failed to update integration status.",
+            variant: "destructive"
+        });
+        // Revert the switch state on error
+        const currentIntegrations = form.getValues('integrations') || [];
+        const updatedIntegrations = currentIntegrations.map(int => 
+            int.integration_id === integrationId ? { ...int, enabled: !enabled } : int
+        );
+        form.setValue('integrations', updatedIntegrations);
+    }
+  }
 
   const onSubmit = async (values: z.infer<typeof settingsSchema>) => {
     try {
@@ -580,7 +602,10 @@ export default function CompanySettingsPage() {
                                             <FormControl>
                                                 <Switch
                                                     checked={switchField.value}
-                                                    onCheckedChange={switchField.onChange}
+                                                    onCheckedChange={(checked) => {
+                                                        switchField.onChange(checked);
+                                                        handleIntegrationToggle(integrationInfo.id, checked);
+                                                    }}
                                                 />
                                             </FormControl>
                                         </FormItem>
@@ -602,3 +627,6 @@ export default function CompanySettingsPage() {
     </SidebarProvider>
   );
 }
+
+
+    
