@@ -24,7 +24,7 @@ import { useRouter } from 'next/navigation';
 import AppHeader from "@/components/app-header";
 
 const integrationSchema = z.object({
-  name: z.string().min(2, "Integration name is required."),
+  integration_name: z.string().min(2, "Integration name is required."),
   description: z.string().optional(),
 });
 
@@ -39,7 +39,7 @@ export default function IntegrationsPage() {
 
   const form = useForm<z.infer<typeof integrationSchema>>({
     resolver: zodResolver(integrationSchema),
-    defaultValues: { name: "", description: "" },
+    defaultValues: { integration_name: "", description: "" },
   });
 
   useEffect(() => {
@@ -69,9 +69,9 @@ export default function IntegrationsPage() {
   const handleDialogOpen = (integration: Integration | null = null) => {
     setEditingIntegration(integration);
     if (integration) {
-      form.reset({ name: integration.name, description: integration.description });
+      form.reset({ integration_name: integration.name, description: integration.description });
     } else {
-      form.reset({ name: "", description: "" });
+      form.reset({ integration_name: "", description: "" });
     }
     setIsDialogOpen(true);
   };
@@ -84,11 +84,15 @@ export default function IntegrationsPage() {
 
   const onSubmit = async (values: z.infer<typeof integrationSchema>) => {
     try {
+      const payload = {
+        name: values.integration_name,
+        description: values.description,
+      };
       if (editingIntegration) {
-        await updateIntegration(editingIntegration.id, values);
+        await updateIntegration(editingIntegration.id, payload);
         toast({ title: "Success", description: "Integration updated successfully." });
       } else {
-        await createIntegration(values);
+        await createIntegration(payload);
         toast({ title: "Success", description: "Integration created successfully." });
       }
       fetchIntegrations();
@@ -142,7 +146,7 @@ export default function IntegrationsPage() {
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                     <FormField
                       control={form.control}
-                      name="name"
+                      name="integration_name"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Integration Name</FormLabel>
