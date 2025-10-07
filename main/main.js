@@ -85,7 +85,7 @@ function setupAutoUpdater() {
       type: 'info',
       title: 'Update Ready',
       message: 'A new version has been downloaded.',
-      detail: `Version ${info?.version || ''} is ready to install. Restart now to apply the update, or choose Later to continue and install on next restart.`,
+      detail: `Version ${info?.version || ''} is ready to install. Restart the application now to apply the update, or choose Later to continue and install on next restart.`,
       buttons: ['Restart Now', 'Later'],
       defaultId: 0,
       cancelId: 1,
@@ -146,7 +146,7 @@ const createWindow = () => {
   if (app.isPackaged) {
     win.loadURL("https://phone.windshieldhub.com");
   } else {
-    win.loadURL("http://localhost:3001");
+    win.loadURL("http://localhost:3000");
     // win.loadURL("http://127.0.0.1:3000");
     win.webContents.openDevTools();
     win.webContents.on("did-fail-load", (e, code, desc) => {
