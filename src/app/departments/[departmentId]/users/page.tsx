@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import type { User } from "@/types";
-import { getDepartmentUsers } from "@/services/departmentService";
+import { getDepartmentUsers, getDepartments } from "@/services/departmentService";
 import { getUsersByCompany, assignUserToDepartment, removeUserFromDepartment } from "@/services/userService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +37,7 @@ export default function DepartmentUsersPage() {
 
   const [departmentUsers, setDepartmentUsers] = useState<User[]>([]);
   const [allCompanyUsers, setAllCompanyUsers] = useState<User[]>([]);
+  const [departmentName, setDepartmentName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -55,10 +56,17 @@ export default function DepartmentUsersPage() {
     if (!companyId) return;
     setLoading(true);
     try {
-      const [deptUsersResponse, companyUsersResponse] = await Promise.all([
+      const [deptUsersResponse, companyUsersResponse, allDepartmentsResponse] = await Promise.all([
         getDepartmentUsers(companyId, departmentId),
-        getUsersByCompany(companyId)
+        getUsersByCompany(companyId),
+        getDepartments(companyId)
       ]);
+      
+      const currentDept = allDepartmentsResponse.find(d => d.id === departmentId);
+      if (currentDept) {
+        setDepartmentName(currentDept.name);
+      }
+
       setDepartmentUsers(Array.isArray(deptUsersResponse.users) ? deptUsersResponse.users : []);
       setAllCompanyUsers(Array.isArray(companyUsersResponse.data) ? companyUsersResponse.data : []);
     } catch (error) {
@@ -129,7 +137,7 @@ export default function DepartmentUsersPage() {
           <main className="flex-1 p-4 md:p-8 space-y-8 bg-muted/40">
              <Card>
               <CardHeader>
-                <CardTitle>Add User to Department</CardTitle>
+                <CardTitle>Add User to {departmentName ? `the ${departmentName}` : 'Department'}</CardTitle>
                 <CardDescription>Select a user from your company to add them to this department.</CardDescription>
               </CardHeader>
               <CardContent>
