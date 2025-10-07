@@ -65,7 +65,10 @@ export default function ContactsPage() {
   const handleDialogOpen = (contact: Contact | null = null) => {
     setEditingContact(contact);
     if (contact) {
-      form.reset(contact);
+      form.reset({
+        ...contact,
+        phone_no: contact.phone_no.replace(/^\+1/, ''), // Remove +1 for editing
+      });
     } else {
       form.reset({ name: "", email: "", phone_no: "", phone_type: "mobile" });
     }
@@ -81,11 +84,14 @@ export default function ContactsPage() {
   const onSubmit = async (values: z.infer<typeof contactSchema>) => {
     if (!user?.company_id) return;
     try {
+      const phoneWithCountryCode = `+1${values.phone_no.replace(/\D/g, '')}`;
+      const payload = { ...values, phone_no: phoneWithCountryCode };
+
       if (editingContact) {
-        await updateContact(editingContact.id, { ...values, company_id: user.company_id });
+        await updateContact(editingContact.id, { ...payload, company_id: user.company_id });
         toast({ title: "Success", description: "Contact updated successfully." });
       } else {
-        await createContact({ ...values, company_id: user.company_id });
+        await createContact({ ...payload, company_id: user.company_id });
         toast({ title: "Success", description: "Contact created successfully." });
       }
       fetchContacts();
@@ -104,6 +110,33 @@ export default function ContactsPage() {
         toast({ title: "Error", description: "Failed to delete contact.", variant: "destructive" });
     }
   }
+
+  const formatInputPhoneNumber = (value: string) => {
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length > 10) {
+      return value.slice(0, 14); // Keep previous formatted value
+    }
+
+    const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
+    if (!match) return cleaned;
+    
+    const [_, area, exchange, subscriber] = match;
+
+    let formatted = '';
+    if (area) {
+      formatted += `(${area}`;
+      if (area.length === 3 && exchange) {
+        formatted += `) ${exchange}`;
+      }
+    }
+    if (exchange.length === 3 && subscriber) {
+      formatted += `-${subscriber}`;
+    } else if (exchange.length > 0) {
+       formatted = `(${area}) ${exchange}`;
+    }
+    
+    return formatted;
+  };
 
   return (
     <SidebarProvider>
@@ -140,7 +173,18 @@ export default function ContactsPage() {
                               <FormItem><FormLabel>Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="e.g. john@example.com" {...field} /></FormControl><FormMessage /></FormItem>
                               )}/>
                               <FormField control={form.control} name="phone_no" render={({ field }) => (
-                              <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+1234567890" {...field} /></FormControl><FormMessage /></FormItem>
+                              <FormItem>
+                                <FormLabel>Phone Number</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="(123) 456-7890" 
+                                    {...field}
+                                    value={formatInputPhoneNumber(field.value)}
+                                    onChange={(e) => field.onChange(e.target.value)}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
                               )}/>
                               <FormField control={form.control} name="phone_type" render={({ field }) => (
                               <FormItem>
