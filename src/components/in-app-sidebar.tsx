@@ -232,7 +232,7 @@ export function InAppSidebar() {
                                     <div className="flex items-center gap-2">
                                         <Building className="h-4 w-4" />
                                         <span className="truncate flex-1">{dept.name}</span>
-                                        {dept.is_dnd && <BellOff className="h-3 w-3 text-muted-foreground" />}
+                                        {dept.is_dnd ? <BellOff className="h-3 w-3 text-amber-600" /> : ''}
                                     </div>
                                     {dept.unread_count > 0 && (
                                         <Badge className="h-5">{dept.unread_count}</Badge>
