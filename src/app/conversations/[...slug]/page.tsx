@@ -49,6 +49,7 @@ export default function ConversationDetailPage() {
     const [loadingNumbers, setLoadingNumbers] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
+    const [departmentName, setDepartmentName] = useState<string | null>(null);
     
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from, to] = slug.map(part => decodeURIComponent(part));
@@ -158,10 +159,14 @@ export default function ConversationDetailPage() {
                 
                 // Determine which number is the external contact
                 const allCompanyNumbers = new Set<string>();
+                const numberToDeptMap: Record<string, string> = {};
                 for (const dept of depts) {
                     try {
                         const nums = await getPhoneNumbers(dept.id);
-                        nums.forEach(n => allCompanyNumbers.add(n.phone_no));
+                        nums.forEach(n => {
+                            allCompanyNumbers.add(n.phone_no);
+                            numberToDeptMap[n.phone_no] = dept.name;
+                        });
                     } catch (e) {}
                 }
 
@@ -199,6 +204,10 @@ export default function ConversationDetailPage() {
                     name: foundContact?.name || formatPhoneNumber(otherPartyNumber)
                 });
                 
+                if (numberToDeptMap[ourNumber]) {
+                    setDepartmentName(numberToDeptMap[ourNumber]);
+                }
+
                 // Determine and set the correct department and from number
                 let resolvedDeptId: string | null = null;
                 for (const dept of depts) {
@@ -331,7 +340,10 @@ export default function ConversationDetailPage() {
                                             </Button>
                                             <div className="relative flex-1">
                                                 <h1 className="text-xl font-bold">{contact?.name}</h1>
-                                                <p className="text-sm text-muted-foreground">{formatPhoneNumber(contact?.phone_no)}</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {formatPhoneNumber(contact?.phone_no)}
+                                                    {departmentName && ` • ${departmentName}`}
+                                                </p>
                                             </div>
                                         </div>
                                         <Button variant="ghost" size="icon" onClick={() => setIsProfileSidebarOpen(!isProfileSidebarOpen)}>
