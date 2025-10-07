@@ -103,7 +103,11 @@ export function AppSidebar() {
                    </CollapsibleContent>
                 </Collapsible>
               )}
-               <SidebarMenuItem>
+               
+            </>
+          )}
+           {isCompanyAdmin && (
+             <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === '/departments'} tooltip="Departments">
                   <Link href="/departments">
                     <Building />
@@ -111,8 +115,7 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            </>
-          )}
+           )}
 
           {isSuperAdmin && (
             <>
