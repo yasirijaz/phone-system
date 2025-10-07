@@ -233,7 +233,7 @@ function CommunicationCard({
                     ) : (
                       <>
                         <p className="text-muted-foreground text-xs">
-                            {c.direction === 'inbound' ? 'Voice' : 'Other'} {fromNumberFormatted} &rarr; {c.direction === 'inbound' ? 'Other' : 'Voice'} {toNumberFormatted}
+                            {c.direction === 'inbound' ? 'Other' : 'Voice'} {fromNumberFormatted} &rarr; {c.direction === 'inbound' ? 'Voice' : 'Other'} {toNumberFormatted}
                         </p>
                         <div className="flex items-center text-xs text-muted-foreground mt-1">
                             <span>{duration}</span>
