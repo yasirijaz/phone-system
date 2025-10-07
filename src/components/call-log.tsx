@@ -174,7 +174,7 @@ function CommunicationCard({
       number: otherPartyNumber,
       initial: getInitials(contact?.name || otherPartyNumber)
   };
-  const contactName = isFirstInGroup ? (isMine ? (user?.name || 'Me') : otherParty.name) : '';
+  const contactName = isFirstInGroup ? (isMine ? (comm.user?.name || 'Me') : otherParty.name) : '';
   const contactInitial = getInitials(isMine ? (user?.name || 'Me') : otherParty.name);
   const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
   const isInProgress = comm.call_status === 'in_progress';
@@ -205,7 +205,14 @@ function CommunicationCard({
 
 
   const renderCallBubble = (c: Communication) => {
-    const title = isMine ? `You called ${otherParty.name}` : `${otherParty.name} called you`;
+    let title: React.ReactNode;
+    if (c.user?.name) {
+        title = isMine 
+            ? <>You <span className="font-normal text-muted-foreground">(dialed by {c.user.name})</span> called {otherParty.name}</>
+            : <>{otherParty.name} called <span className="font-normal text-muted-foreground">(received by {c.user.name})</span></>;
+    } else {
+        title = isMine ? `You called ${otherParty.name}` : `${otherParty.name} called you`;
+    }
     const Icon = isMine ? PhoneOutgoing : PhoneIncoming;
 
     const fromNumberFormatted = formatPhoneNumber(c.from);
