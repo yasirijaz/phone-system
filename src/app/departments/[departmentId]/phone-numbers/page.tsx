@@ -73,7 +73,10 @@ export default function PhoneNumbersPage() {
   const handleDialogOpen = (phoneNumber: PhoneNumber | null = null) => {
     setEditingNumber(phoneNumber);
     if (phoneNumber) {
-      form.reset(phoneNumber);
+      form.reset({
+        ...phoneNumber,
+        phone_no: phoneNumber.phone_no.replace(/^\+1/, ''),
+      });
     } else {
       form.reset({ phone_no: "", type: "local", label: "" });
     }
@@ -88,11 +91,14 @@ export default function PhoneNumbersPage() {
 
   const onSubmit = async (values: z.infer<typeof phoneNumberSchema>) => {
     try {
+      const phoneWithCountryCode = `+1${values.phone_no.replace(/\D/g, '')}`;
+      const payload = { ...values, phone_no: phoneWithCountryCode };
+      
       if (editingNumber) {
-        await updatePhoneNumber(editingNumber.id, { ...values, department_id: departmentId });
+        await updatePhoneNumber(editingNumber.id, { ...payload, department_id: departmentId });
         toast({ title: "Success", description: "Phone number updated." });
       } else {
-        await createPhoneNumber({ ...values, department_id: departmentId });
+        await createPhoneNumber({ ...payload, department_id: departmentId });
         toast({ title: "Success", description: "Phone number added." });
       }
       fetchPhoneNumbers();
@@ -111,6 +117,33 @@ export default function PhoneNumbersPage() {
        toast({ title: "Error", description: "Failed to delete phone number.", variant: "destructive" });
     }
   }
+
+  const formatInputPhoneNumber = (value: string) => {
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length > 10) {
+      return value.slice(0, 14); // Keep previous formatted value
+    }
+
+    const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
+    if (!match) return cleaned;
+    
+    const [_, area, exchange, subscriber] = match;
+
+    let formatted = '';
+    if (area) {
+      formatted += `(${area}`;
+      if (area.length === 3 && exchange) {
+        formatted += `) ${exchange}`;
+      }
+    }
+    if (exchange.length === 3 && subscriber) {
+      formatted += `-${subscriber}`;
+    } else if (exchange.length > 0) {
+       formatted = `(${area}) ${exchange}`;
+    }
+    
+    return formatted;
+  };
   
   if (user && ![1, 2].includes(user.role_id ?? 0)) {
     return null;
@@ -141,7 +174,18 @@ export default function PhoneNumbersPage() {
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                      <FormField control={form.control} name="phone_no" render={({ field }) => (
-                        <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+1234567890" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="(123) 456-7890"
+                              {...field}
+                              value={formatInputPhoneNumber(field.value)}
+                              onChange={(e) => field.onChange(e.target.value)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                      )}/>
                      <FormField control={form.control} name="label" render={({ field }) => (
                         <FormItem><FormLabel>Label</FormLabel><FormControl><Input placeholder="e.g. Main Sales Line" {...field} /></FormControl><FormMessage /></FormItem>

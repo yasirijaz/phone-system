@@ -111,33 +111,6 @@ export default function ContactsPage() {
     }
   }
 
-  const formatInputPhoneNumber = (value: string) => {
-    const cleaned = value.replace(/\D/g, '');
-    if (cleaned.length > 10) {
-      return value.slice(0, 14); // Keep previous formatted value
-    }
-
-    const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
-    if (!match) return cleaned;
-    
-    const [_, area, exchange, subscriber] = match;
-
-    let formatted = '';
-    if (area) {
-      formatted += `(${area}`;
-      if (area.length === 3 && exchange) {
-        formatted += `) ${exchange}`;
-      }
-    }
-    if (exchange.length === 3 && subscriber) {
-      formatted += `-${subscriber}`;
-    } else if (exchange.length > 0) {
-       formatted = `(${area}) ${exchange}`;
-    }
-    
-    return formatted;
-  };
-
   return (
     <SidebarProvider>
       <Sidebar>
@@ -179,8 +152,6 @@ export default function ContactsPage() {
                                   <Input 
                                     placeholder="(123) 456-7890" 
                                     {...field}
-                                    value={formatInputPhoneNumber(field.value)}
-                                    onChange={(e) => field.onChange(e.target.value)}
                                   />
                                 </FormControl>
                                 <FormMessage />
