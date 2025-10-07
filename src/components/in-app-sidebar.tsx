@@ -4,13 +4,14 @@
 
 import { useState, useEffect } from 'react';
 import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup, SidebarGroupLabel } from '@/components/ui/sidebar';
-import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, Clock } from 'lucide-react';
+import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, Clock, BellOff } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { getUserDepartments } from '@/services/userService';
 import { getCommunications } from '@/services/callLogService';
+import { getDndStatus } from '@/services/departmentService';
 import type { Department, Communication, Contact } from '@/types';
 import { Badge } from './ui/badge';
 import { isElectron } from '@/lib/is-electron';
@@ -18,9 +19,12 @@ import { events } from '@/lib/events';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { getContacts } from '@/services/contactService';
 import { formatPhoneNumber } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+
 
 interface DepartmentWithUnread extends Department {
     unread_count: number;
+    is_dnd: boolean;
 }
 
 interface RecentItem {
@@ -70,12 +74,15 @@ export function InAppSidebar() {
         const deptsWithCounts = await Promise.all(
           deptsArray.map(async (dept) => {
             try {
-                const comms = await getCommunications({ department_id: dept.id, type: 'unread', limit: 1000 });
+                const [comms, dnd] = await Promise.all([
+                    getCommunications({ department_id: dept.id, type: 'unread', limit: 1000 }),
+                    getDndStatus(dept.id, user.id)
+                ]);
                 const unreadCount = Array.isArray(comms.results) ? comms.results.filter(c => !c.is_read).length : 0;
-                return { ...dept, unread_count: unreadCount };
+                return { ...dept, unread_count: unreadCount, is_dnd: dnd.is_dnd };
             } catch (e) {
-                console.error(`Failed to get unread count for department ${dept.id}`, e);
-                return { ...dept, unread_count: 0 };
+                console.error(`Failed to get data for department ${dept.id}`, e);
+                return { ...dept, unread_count: 0, is_dnd: false };
             }
           })
         );
@@ -224,7 +231,8 @@ export function InAppSidebar() {
                                 <Link href={`/departments/${dept.id}`} className="flex justify-between items-center w-full">
                                     <div className="flex items-center gap-2">
                                         <Building className="h-4 w-4" />
-                                        <span>{dept.name}</span>
+                                        <span className="truncate flex-1">{dept.name}</span>
+                                        {dept.is_dnd && <BellOff className="h-3 w-3 text-muted-foreground" />}
                                     </div>
                                     {dept.unread_count > 0 && (
                                         <Badge className="h-5">{dept.unread_count}</Badge>
