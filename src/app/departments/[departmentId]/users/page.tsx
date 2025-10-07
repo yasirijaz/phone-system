@@ -12,17 +12,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Trash2, PlusCircle } from "lucide-react";
-import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { ArrowLeft, Trash2, PlusCircle, ChevronsUpDown, Check } from "lucide-react";
+import { Sidebar, SidebarContent, SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AppHeader from "@/components/app-header";
+import { cn } from "@/lib/utils";
 
 const assignmentSchema = z.object({
   user_id: z.coerce.number({ required_error: "User is required." }).min(1, "User is required."),
@@ -39,6 +41,7 @@ export default function DepartmentUsersPage() {
   const [allCompanyUsers, setAllCompanyUsers] = useState<User[]>([]);
   const [departmentName, setDepartmentName] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof assignmentSchema>>({
@@ -149,24 +152,55 @@ export default function DepartmentUsersPage() {
                       render={({ field }) => (
                         <FormItem className="flex-1">
                           <FormLabel>User</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(Number(value))} value={field.value === 0 ? "" : String(field.value)}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a user to add" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {availableUsers.length > 0 ? (
-                                availableUsers.map((user) => (
-                                  <SelectItem key={user.id} value={String(user.id)}>
-                                    {user.name} ({user.email})
-                                  </SelectItem>
-                                ))
-                              ) : (
-                                <SelectItem value="none" disabled>No available users to add</SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
+                          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className={cn(
+                                    "w-full justify-between",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  {field.value
+                                    ? availableUsers.find(
+                                        (user) => user.id === field.value
+                                      )?.name
+                                    : "Select a user to add"}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Search user..." />
+                                <CommandEmpty>No user found.</CommandEmpty>
+                                <CommandGroup>
+                                  {availableUsers.map((user) => (
+                                    <CommandItem
+                                      value={user.name}
+                                      key={user.id}
+                                      onSelect={() => {
+                                        form.setValue("user_id", user.id);
+                                        setIsPopoverOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          user.id === field.value
+                                            ? "opacity-100"
+                                            : "opacity-0"
+                                        )}
+                                      />
+                                      {user.name} ({user.email})
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -247,3 +281,4 @@ export default function DepartmentUsersPage() {
     </SidebarProvider>
   );
 }
+
