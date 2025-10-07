@@ -206,13 +206,17 @@ function CommunicationCard({
 
   const renderCallBubble = (c: Communication) => {
     let title: React.ReactNode;
+
     if (c.user?.name) {
-        title = isMine 
-            ? <>You <span className="font-normal text-muted-foreground">(dialed by {c.user.name})</span> called {otherParty.name}</>
-            : <>{otherParty.name} called <span className="font-normal text-muted-foreground">(received by {c.user.name})</span></>;
+        if (isMine) {
+            title = <>{c.user.name} called {otherParty.name}</>;
+        } else {
+            title = <>{otherParty.name} called <span className="font-normal text-muted-foreground">(received by {c.user.name})</span></>;
+        }
     } else {
         title = isMine ? `You called ${otherParty.name}` : `${otherParty.name} called you`;
     }
+    
     const Icon = isMine ? PhoneOutgoing : PhoneIncoming;
 
     const fromNumberFormatted = formatPhoneNumber(c.from);
