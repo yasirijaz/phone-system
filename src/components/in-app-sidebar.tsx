@@ -141,11 +141,13 @@ export function InAppSidebar() {
     const refreshHandler = () => fetchSidebarData();
     events.on('refreshDepartmentsUnread', refreshHandler);
     events.on('refreshCalls', refreshHandler);
+    events.on('refreshOperators', refreshHandler);
 
     return () => {
       mounted = false;
       events.off('refreshDepartmentsUnread', refreshHandler);
       events.off('refreshCalls', refreshHandler);
+      events.off('refreshOperators', refreshHandler);
     };
   }, [user]);
 
