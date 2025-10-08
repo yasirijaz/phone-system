@@ -55,8 +55,7 @@ export default function ProfilePage() {
       setIsUploading(true);
       try {
         await updateProfile(user.id, { profile_picture: file });
-        toast({ title: "Success", description: "Profile picture updated. Please re-login to see all changes." });
-        logout();
+        toast({ title: "Success", description: "Profile picture updated. Changes will be visible on your next login." });
       } catch (error: any) {
         toast({
             title: "Upload Failed",
@@ -83,7 +82,7 @@ export default function ProfilePage() {
       }
       
       await updateProfile(user.id, updateData);
-      toast({ title: "Success", description: "Profile updated successfully." });
+      toast({ title: "Success", description: "Profile updated successfully. Please re-login to see all changes." });
       
       logout();
 
