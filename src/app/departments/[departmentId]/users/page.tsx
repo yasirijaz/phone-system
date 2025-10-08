@@ -165,7 +165,7 @@ export default function DepartmentUsersPage() {
   };
 
   const availableUsers = allCompanyUsers.filter(
-    (companyUser) => !departmentUsers.some((deptUser) => deptUser.id === companyUser.id)
+    (companyUser) => !departmentUsers.some((deptUser) => deptUser.user.id === companyUser.id)
   );
 
   return (
@@ -252,12 +252,12 @@ export default function DepartmentUsersPage() {
                       </TableHeader>
                       <TableBody>
                         {Array.isArray(departmentUsers) && departmentUsers.map((u) => (
-                          <TableRow key={u.id}>
-                            <TableCell className="font-medium">{u.name}</TableCell>
-                            <TableCell>{u.email}</TableCell>
+                          <TableRow key={u.user.id}>
+                            <TableCell className="font-medium">{u.user.name}</TableCell>
+                            <TableCell>{u.user.email}</TableCell>
                             <TableCell>
-                              <Badge variant={u.role_id === 2 ? 'default' : 'secondary'}>
-                                {u.role_id === 1 ? 'Super Owner' : u.role_id === 2 ? 'Admin' : 'User'}
+                              <Badge variant={u.user.role_id === 2 ? 'default' : 'secondary'}>
+                                {u.user.role_id === 1 ? 'Super Owner' : u.user.role_id === 2 ? 'Admin' : 'User'}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
@@ -276,7 +276,7 @@ export default function DepartmentUsersPage() {
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleRemoveUser(u.id)}>
+                                    <AlertDialogAction onClick={() => handleRemoveUser(u.user.id)}>
                                       Continue
                                     </AlertDialogAction>
                                   </AlertDialogFooter>
