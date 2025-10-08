@@ -284,21 +284,21 @@ export default function DepartmentDetailPage() {
                                         {operators.length > 0 ? (
                                             operators.map((op) => (
                                                 <TableRow key={op.id}>
-                                                    <TableCell>{op.name}</TableCell>
-                                                    <TableCell>{op.email}</TableCell>
+                                                    <TableCell>{op.user.name}</TableCell>
+                                                    <TableCell>{op.user.email}</TableCell>
                                                     <TableCell>
-                                                        <Badge variant={op.role_id === 2 ? 'default' : 'secondary'}>
-                                                            {getRoleName(op.role_id)}
+                                                        <Badge variant={op.user.role_id === 2 ? 'default' : 'secondary'}>
+                                                            {getRoleName(op.user.role_id)}
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge variant={op.in_call === 0 ? 'default' : 'secondary'}>
-                                                            {op.in_call === 0 ? 'No' : 'Yes'}
+                                                        <Badge variant={op.user.in_call === 0 ? 'secondary' : 'default'}>
+                                                            {op.user.in_call === 0 ? 'No' : 'Yes'}
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge variant={op.do_not_disturb === 0 ? 'default' : 'secondary'}>
-                                                            {op.do_not_disturb === 0 ? 'No' : 'Yes'}
+                                                        <Badge variant={op.is_dnd === 0 ? 'secondary' : 'destructive'}>
+                                                            {op.is_dnd === 0 ? 'No' : 'Yes'}
                                                         </Badge>
                                                     </TableCell>
                                                 </TableRow>
