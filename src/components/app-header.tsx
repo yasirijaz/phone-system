@@ -168,6 +168,12 @@ export default function AppHeader({
                     events.emit("refreshOperators", data.data);
                 }
 
+                if (data.method_type == "in_call_notification" && data.task_type == "user_in_call_status") {
+                    console.log("📞 In-call status change notification received:", data.data);
+                    events.emit("refreshOperators", data.data);
+                    events.emit("refreshCalls", data.data);
+                }
+
                 if (data.method_type === "show_sms_notification" && data.data) {
                     if (audioRef.current) {
                         audioRef.current.play().catch(e =>
