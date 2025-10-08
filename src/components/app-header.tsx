@@ -159,6 +159,15 @@ export default function AppHeader({
                     events.emit("refreshCalls");
                 }
 
+                if (data.method_type == "dnd_notification" && data.task_type == "dnd_status_change") {
+                    console.log("📢 DND status change notification received:", data.data);
+                    events.emit("refreshOperators", data.data);
+                }
+                if (data.method_type == "dnd_notification" && data.task_type == "overall_dnd_status_change") {
+                    console.log("📢 DND status change notification received:", data.data);
+                    events.emit("refreshOperators", data.data);
+                }
+
                 if (data.method_type === "show_sms_notification" && data.data) {
                     if (audioRef.current) {
                         audioRef.current.play().catch(e =>

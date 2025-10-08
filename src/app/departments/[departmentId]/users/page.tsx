@@ -23,6 +23,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AppHeader from "@/components/app-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { events } from '@/lib/events';
 
 const assignmentSchema = z.object({
   user_id: z.coerce.number({ required_error: "User is required." }).min(1, "User is required."),
@@ -51,6 +52,17 @@ export default function DepartmentUsersPage() {
       fetchAllData();
     }
   }, [departmentId, companyId]);
+
+  // Handle DND status change notifications
+  useEffect(() => {
+    const handleDndStatusChange = (data: any) => {
+      console.log("🔄 Refreshing department users list due to DND status change:", data);
+      fetchAllData();
+    };
+
+    events.on('refreshOperators', handleDndStatusChange);
+    return () => events.off('refreshOperators', handleDndStatusChange);
+  }, []);
 
   const fetchAllData = async () => {
     if (!companyId) return;

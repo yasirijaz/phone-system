@@ -163,6 +163,20 @@ export default function DepartmentDetailPage() {
     return () => events.off('refreshCalls', handleRefresh);
   }, [handleRefresh]);
 
+  // Handle DND status change notifications
+  useEffect(() => {
+    const handleDndStatusChange = (data: any) => {
+      console.log("🔄 Refreshing operators list due to DND status change:", data, activeTab);
+      // Only refresh if we're currently on the operators tab
+      if (activeTab === 'operators') {
+        fetchCommunicationData('operators', pagination.operators.currentPage, pagination.operators.limit);
+      }
+    };
+
+    events.on('refreshOperators', handleDndStatusChange);
+    return () => events.off('refreshOperators', handleDndStatusChange);
+  }, [activeTab, pagination.operators, fetchCommunicationData]);
+
   const handleMakeCall = async (number: string) => {
      if (!device) {
         toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});

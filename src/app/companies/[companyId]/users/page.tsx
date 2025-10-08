@@ -26,6 +26,7 @@ import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AppHeader from "@/components/app-header";
+import { events } from '@/lib/events';
 
 const userSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -71,6 +72,17 @@ export default function ManageUsersPage() {
     }
     fetchData();
   }, [authUser, companyId, router]);
+
+  // Handle DND status change notifications
+  useEffect(() => {
+    const handleDndStatusChange = (data: any) => {
+      console.log("🔄 Refreshing users list due to DND status change:", data);
+      fetchData();
+    };
+
+    events.on('refreshOperators', handleDndStatusChange);
+    return () => events.off('refreshOperators', handleDndStatusChange);
+  }, []);
 
   const fetchData = async () => {
     try {
