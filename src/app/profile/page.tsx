@@ -16,6 +16,8 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import AppHeader from "@/components/app-header";
+import { useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -30,6 +32,8 @@ const profileSchema = z.object({
 export default function ProfilePage() {
   const { user, loading, logout } = useAuth();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const form = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -40,6 +44,30 @@ export default function ProfilePage() {
       password_confirmation: "",
     },
   });
+  
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && user) {
+      setIsUploading(true);
+      try {
+        await updateProfile(user.id, { profile_picture: file });
+        toast({ title: "Success", description: "Profile picture updated. Please re-login to see all changes." });
+        logout();
+      } catch (error: any) {
+        toast({
+            title: "Upload Failed",
+            description: error.message || "Could not upload the new profile picture.",
+            variant: "destructive"
+        });
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
 
   const onSubmit = async (values: z.infer<typeof profileSchema>) => {
     if (!user) return;
@@ -57,8 +85,6 @@ export default function ProfilePage() {
       await updateProfile(user.id, updateData);
       toast({ title: "Success", description: "Profile updated successfully." });
       
-      // Since name is part of auth context, we need to refresh or re-login to see changes everywhere.
-      // A simple solution is to re-login the user.
       logout();
 
     } catch (error: any) {
@@ -95,10 +121,18 @@ export default function ProfilePage() {
             <div className="md:col-span-1">
               <Card>
                 <CardHeader className="items-center text-center">
-                   <Avatar className="h-24 w-24 mb-4">
-                      <AvatarImage src={`https://placehold.co/100x100.png?text=${userInitial}`} alt={user.name} />
-                      <AvatarFallback>{userInitial}</AvatarFallback>
-                  </Avatar>
+                   <div className="relative">
+                     <Avatar className="h-24 w-24 mb-4 cursor-pointer" onClick={handleAvatarClick}>
+                        <AvatarImage src={user.profile_picture || `https://placehold.co/100x100.png?text=${userInitial}`} alt={user.name} />
+                        <AvatarFallback>{userInitial}</AvatarFallback>
+                    </Avatar>
+                    {isUploading && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full">
+                            <Loader2 className="h-8 w-8 animate-spin text-white" />
+                        </div>
+                    )}
+                   </div>
+                   <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
                   <CardTitle>{user.name}</CardTitle>
                   <CardDescription>{user.email}</CardDescription>
                 </CardHeader>
@@ -122,7 +156,7 @@ export default function ProfilePage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Name</FormLabel>
-                            <FormControl><Input {...field} /></FormControl>
+                            <FormControl><Input {...field} defaultValue={user.name} /></FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -133,7 +167,7 @@ export default function ProfilePage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Email</FormLabel>
-                            <FormControl><Input type="email" {...field} disabled /></FormControl>
+                            <FormControl><Input type="email" {...field} defaultValue={user.email} disabled /></FormControl>
                              <FormDescription>Email address cannot be changed.</FormDescription>
                             <FormMessage />
                           </FormItem>

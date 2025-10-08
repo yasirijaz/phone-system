@@ -1,6 +1,5 @@
 
 
-
 export interface Communication {
   id: number;
   type: 'call' | 'sms';
@@ -61,6 +60,7 @@ export interface User {
   id: number;
   name:string;
   email: string;
+  profile_picture?: string;
   role_id?: number;
   company_id?: number;
   company?: Company;
@@ -70,10 +70,11 @@ export interface User {
 }
 
 export interface ProfilePayload {
-  name: string;
-  email: string;
+  name?: string;
+  email?: string;
   password?: string;
   password_confirmation?: string;
+  profile_picture?: File;
 }
 
 export interface Company {
