@@ -36,7 +36,7 @@ export default function DepartmentUsersPage() {
   const departmentId = Number(params.departmentId);
   const companyId = authUser?.company_id;
 
-  const [departmentUsers, setDepartmentUsers] = useState<User[]>([]);
+  const [departmentUsers, setDepartmentUsers] = useState<any[]>([]);
   const [allCompanyUsers, setAllCompanyUsers] = useState<User[]>([]);
   const [departmentName, setDepartmentName] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -56,12 +56,57 @@ export default function DepartmentUsersPage() {
   // Handle DND status change notifications
   useEffect(() => {
     const handleDndStatusChange = (data: any) => {
-      console.log("🔄 Refreshing department users list due to DND status change:", data);
-      fetchAllData();
+      console.log("🔄 Updating department users DND status directly:", data);
+      
+      // Update department users list directly without API call
+      setDepartmentUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.user.id === data.user_id 
+            ? { ...user, is_dnd: data.is_dnd ? 1 : 0 }
+            : user
+        )
+      );
+      
+      // Also update all company users list
+      setAllCompanyUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === data.user_id 
+            ? { ...user, is_dnd: data.is_dnd }
+            : user
+        )
+      );
     };
 
     events.on('refreshOperators', handleDndStatusChange);
     return () => events.off('refreshOperators', handleDndStatusChange);
+  }, []);
+
+  // Handle in-call status change notifications
+  useEffect(() => {
+    const handleInCallStatusChange = (data: any) => {
+      console.log("🔄 Updating department users in-call status directly:", data);
+      
+      // Update department users list directly without API call
+      setDepartmentUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.user.id === data.user_id 
+            ? { ...user, user: { ...user.user, in_call: data.in_call ? 1 : 0 } }
+            : user
+        )
+      );
+      
+      // Also update all company users list
+      setAllCompanyUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === data.user_id 
+            ? { ...user, in_call: data.in_call }
+            : user
+        )
+      );
+    };
+
+    events.on('refreshOperators', handleInCallStatusChange);
+    return () => events.off('refreshOperators', handleInCallStatusChange);
   }, []);
 
   const fetchAllData = async () => {

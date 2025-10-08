@@ -76,12 +76,39 @@ export default function ManageUsersPage() {
   // Handle DND status change notifications
   useEffect(() => {
     const handleDndStatusChange = (data: any) => {
-      console.log("🔄 Refreshing users list due to DND status change:", data);
-      fetchData();
+      console.log("🔄 Updating user DND status directly:", data);
+      
+      // Update users list directly without API call
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === data.user_id 
+            ? { ...user, is_dnd: data.is_dnd }
+            : user
+        )
+      );
     };
 
     events.on('refreshOperators', handleDndStatusChange);
     return () => events.off('refreshOperators', handleDndStatusChange);
+  }, []);
+
+  // Handle in-call status change notifications
+  useEffect(() => {
+    const handleInCallStatusChange = (data: any) => {
+      console.log("🔄 Updating user in-call status directly:", data);
+      
+      // Update users list directly without API call
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === data.user_id 
+            ? { ...user, in_call: data.in_call }
+            : user
+        )
+      );
+    };
+
+    events.on('refreshOperators', handleInCallStatusChange);
+    return () => events.off('refreshOperators', handleInCallStatusChange);
   }, []);
 
   const fetchData = async () => {

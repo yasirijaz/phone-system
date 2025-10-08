@@ -55,7 +55,7 @@ export default function DepartmentDetailPage() {
     all: [], unread: [], calls: [], messages: [], operators: [],
     missed: [], voicemails: [], recordings: []
   });
-  const [operators, setOperators] = useState<User[]>([]);
+  const [operators, setOperators] = useState<any[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
 
@@ -166,16 +166,44 @@ export default function DepartmentDetailPage() {
   // Handle DND status change notifications
   useEffect(() => {
     const handleDndStatusChange = (data: any) => {
-      console.log("🔄 Refreshing operators list due to DND status change:", data, activeTab);
-      // Only refresh if we're currently on the operators tab
+      console.log("🔄 Updating DND status directly:", data, activeTab);
+      
+      // Update operators list directly without API call
       if (activeTab === 'operators') {
-        fetchCommunicationData('operators', pagination.operators.currentPage, pagination.operators.limit);
+        setOperators(prevOperators => 
+          prevOperators.map(op => 
+            op.user.id === data.user_id 
+              ? { ...op, is_dnd: data.is_dnd ? 1 : 0 }
+              : op
+          )
+        );
       }
     };
 
     events.on('refreshOperators', handleDndStatusChange);
     return () => events.off('refreshOperators', handleDndStatusChange);
-  }, [activeTab, pagination.operators, fetchCommunicationData]);
+  }, [activeTab]);
+
+  // Handle in-call status change notifications
+  useEffect(() => {
+    const handleInCallStatusChange = (data: any) => {
+      console.log("🔄 Updating in-call status directly:", data, activeTab);
+      
+      // Update operators list directly without API call
+      if (activeTab === 'operators') {
+        setOperators(prevOperators => 
+          prevOperators.map(op => 
+            op.user.id === data.user_id 
+              ? { ...op, user: { ...op.user, in_call: data.in_call ? 1 : 0 } }
+              : op
+          )
+        );
+      }
+    };
+
+    events.on('refreshOperators', handleInCallStatusChange);
+    return () => events.off('refreshOperators', handleInCallStatusChange);
+  }, [activeTab]);
 
   const handleMakeCall = async (number: string) => {
      if (!device) {

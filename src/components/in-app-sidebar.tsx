@@ -139,15 +139,31 @@ export function InAppSidebar() {
     fetchSidebarData();
 
     const refreshHandler = () => fetchSidebarData();
+    const handleDndStatusChange = (data: any) => {
+      console.log("🔄 Updating sidebar DND status directly:", data);
+      console.log("Department ID from socket:", data.department_id);
+      console.log("DND status from socket:", data.is_dnd);
+      
+      // Update departments DND status directly using department_id from socket data
+      setDepartments(prevDepartments => 
+        prevDepartments.map(dept => {
+          console.log("Checking department:", dept.id, "against socket department:", data.department_id);
+          return dept.id === data.department_id 
+            ? { ...dept, is_dnd: data.is_dnd }
+            : dept;
+        })
+      );
+    };
+
     events.on('refreshDepartmentsUnread', refreshHandler);
     events.on('refreshCalls', refreshHandler);
-    events.on('refreshOperators', refreshHandler);
+    events.on('refreshOperators', handleDndStatusChange);
 
     return () => {
       mounted = false;
       events.off('refreshDepartmentsUnread', refreshHandler);
       events.off('refreshCalls', refreshHandler);
-      events.off('refreshOperators', refreshHandler);
+      events.off('refreshOperators', handleDndStatusChange);
     };
   }, [user]);
 
