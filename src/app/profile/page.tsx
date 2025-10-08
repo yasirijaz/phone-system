@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/context/AuthContext";
 import { updateProfile } from "@/services/profileService";
+import { useAppDispatch } from "@/store";
+import { updateUser } from "@/store/slices/authSlice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -32,6 +34,7 @@ const profileSchema = z.object({
 export default function ProfilePage() {
   const { user, loading, logout } = useAuth();
   const { toast } = useToast();
+  const dispatch = useAppDispatch();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -54,8 +57,10 @@ export default function ProfilePage() {
     if (file && user) {
       setIsUploading(true);
       try {
-        await updateProfile(user.id, { profile_picture: file });
-        toast({ title: "Success", description: "Profile picture updated. Changes will be visible on your next login." });
+        const updatedUser = await updateProfile(user.id, { profile_picture: file });
+        console.log("🔄 Updating user in store:", updatedUser);
+        dispatch(updateUser(updatedUser));
+        toast({ title: "Success", description: "Profile picture updated successfully." });
       } catch (error: any) {
         toast({
             title: "Upload Failed",
@@ -81,10 +86,18 @@ export default function ProfilePage() {
         updateData.password_confirmation = values.password_confirmation;
       }
       
-      await updateProfile(user.id, updateData);
-      toast({ title: "Success", description: "Profile updated successfully. Please re-login to see all changes." });
+      const updatedUser = await updateProfile(user.id, updateData);
       
-      logout();
+      if (values.password) {
+        // If password was changed, logout user
+        toast({ title: "Success", description: "Profile updated successfully. Please re-login with your new password." });
+        logout();
+      } else {
+        // If only name/email was changed, update user in store
+        console.log("🔄 Updating user in store:", updatedUser);
+        dispatch(updateUser(updatedUser));
+        toast({ title: "Success", description: "Profile updated successfully." });
+      }
 
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || "An unexpected error occurred.";

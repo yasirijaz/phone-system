@@ -487,7 +487,7 @@ export default function AppHeader({
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                                 <Avatar className="h-9 w-9">
-                                    <AvatarImage src={`https://placehold.co/100x100.png?text=${userInitial}`} alt={user?.name} />
+                                    <AvatarImage src={user?.profile_picture || `https://placehold.co/100x100.png?text=${userInitial}`} alt={user?.name} />
                                     <AvatarFallback>{userInitial}</AvatarFallback>
                                 </Avatar>
                                  {activityName && (
@@ -498,7 +498,7 @@ export default function AppHeader({
                         <DropdownMenuContent align="end" className="w-64 p-4">
                             <div className="flex items-center gap-3 mb-4">
                                 <Avatar className="h-12 w-12">
-                                     <AvatarImage src={`https://placehold.co/100x100.png?text=${userInitial}`} alt={user?.name} />
+                                     <AvatarImage src={user?.profile_picture || `https://placehold.co/100x100.png?text=${userInitial}`} alt={user?.name} />
                                      <AvatarFallback>{userInitial}</AvatarFallback>
                                      {activityName && (
                                         <span className={cn("absolute bottom-0 right-0 block h-3 w-3 rounded-full ring-2 ring-background", statusClasses[activityName as keyof typeof statusClasses] || 'bg-gray-500')} />
