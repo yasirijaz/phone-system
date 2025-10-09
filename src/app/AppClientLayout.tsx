@@ -53,8 +53,8 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   
   const callerName = connection?.parameters?.FriendlyName || "Unknown Caller";
   const callerNumber = connection?.parameters?.From || "";
-  
-  const activeCallContact = connection?.parameters?.FriendlyName || connection?.parameters?.To || "Unknown";
+  console.log("🔄 Caller Name:", connection); 
+  const activeCallContact = connection?.parameters?.From || connection?.parameters?.To || "Unknown";
 
   return (
     <>

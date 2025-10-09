@@ -26,7 +26,7 @@ export default function ReservationModal({ isOpen, onClose, reservation, onAccep
     onReject(reservation);
   };
   
-  const callerName = reservation.task.attributes.callerName || 'Unknown Caller';
+  const callerName = reservation.task.attributes.contact_name || 'Unknown Caller';
   const callerNumber = reservation.task.attributes.from || '';
 
 
