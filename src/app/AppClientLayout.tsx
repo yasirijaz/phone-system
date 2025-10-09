@@ -19,6 +19,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     rejectCall,
     hangUp,
     incomingReservation,
+    activeReservation,
     showReservationModal,
     acceptReservation,
     rejectReservation,
@@ -51,10 +52,13 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   // Consider active when we have a connection and it's not in a ringing/pending/closed state.
   const isActiveCall = !!connection && !['pending', 'ringing', 'closed'].includes(String(callStatus || ''));
   
-  const callerName = connection?.parameters?.FriendlyName || "Unknown Caller";
-  const callerNumber = connection?.parameters?.From || "";
-  console.log("🔄 Caller Name:", connection); 
-  const activeCallContact = connection?.parameters?.From || connection?.parameters?.To || "Unknown";
+  // For reservation-based calls, get customer info from reservation
+  // For regular calls, get customer info from connection parameters
+  const callerName = activeReservation?.task?.attributes?.contact_name || connection?.parameters?.FriendlyName || "Unknown Caller";
+  const callerNumber = activeReservation?.task?.attributes?.from || connection?.parameters?.From || "";
+  
+  // Use customer number (From) for active call display
+  const activeCallContact = activeReservation?.task?.attributes?.from || connection?.parameters?.From || connection?.parameters?.To || "Unknown";
 
   return (
     <>
@@ -69,7 +73,8 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
       />
        <ActiveCallBar
         isOpen={!!isActiveCall}
-        contactName={activeCallContact}
+        contactNumber={callerNumber}
+        callerName={callerName}
         onHangUp={hangUp}
         connection={connection}
         conferenceSid={conferenceSid}

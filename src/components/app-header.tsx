@@ -603,7 +603,8 @@ export default function AppHeader({
             
             <ActiveCallBar
               isOpen={isActiveCallOpen}
-              contactName={activeContactName}
+              contactNumber={activeContactName}
+              callerName={activeContactName}
               connection={activeCall}
               conferenceSid={activeConferenceSid}
               onHangUp={() => {

@@ -15,6 +15,7 @@ interface TwilioContextType {
   connection: Call | null;
   worker: TwilioWorker | null;
   incomingReservation: Reservation | null;
+  activeReservation: Reservation | null;
   showReservationModal: boolean | null;
   isDeviceReady: boolean;
   isWorkerReady: boolean;
@@ -53,6 +54,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const workerRef = useRef<TwilioWorker | null>(null);
   const [connection, setConnection] = useState<Call | null>(null);
   const [incomingReservation, setIncomingReservation] = useState<Reservation | null>(null);
+  const [activeReservation, setActiveReservation] = useState<Reservation | null>(null);
   const [showReservationModal, setShowReservationModal] = useState<boolean | null>(null);
   const [isDeviceReady, setIsDeviceReady] = useState(false);
   const [isWorkerReady, setIsWorkerReady] = useState(false);
@@ -139,6 +141,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           console.log('Call disconnected.');
           if (connectionSourceRef.current === 'device') {
             setConnection(null);
+            setActiveReservation(null);
             setConferenceSid(null);
             setFromNumber(null);
           }
@@ -148,6 +151,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           console.log('Call rejected.');
           if (connectionSourceRef.current === 'device') {
             setConnection(null);
+            setActiveReservation(null);
             setConferenceSid(null);
             setFromNumber(null);
           }
@@ -166,6 +170,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.log('Call disconnected (device event).');
         if (connectionSourceRef.current === 'device') {
           setConnection(null);
+          setActiveReservation(null);
           setConferenceSid(null);
           setFromNumber(null);
         }
@@ -254,6 +259,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           incomingReservationRef.current = null;
           if (connectionSourceRef.current === 'reservation') {
             setConnection(null);
+            setActiveReservation(null);
             setConferenceSid(null);
             setFromNumber(null);
             connectionSourceRef.current = null;
@@ -333,6 +339,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       connection.reject();
       toast({ title: "Call Rejected" });
       setConnection(null);
+      setActiveReservation(null);
     }
   };
 
@@ -340,6 +347,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     if (connection) {
       connection.disconnect();
       setConnection(null);
+      setActiveReservation(null);
       setConferenceSid(null);
       setFromNumber(null);
       toast({ title: "Call Ended" });
@@ -368,6 +376,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     connectionSourceRef.current = 'reservation';
     setConnection(fakeCall);
+    setActiveReservation(reservation);
     setShowReservationModal(false);
     setIncomingReservation(null);
 
@@ -411,6 +420,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     reservation.reject();
     if (connectionSourceRef.current === 'reservation') {
       setConnection(null);
+      setActiveReservation(null);
       setConferenceSid(null);
       setFromNumber(null);
       connectionSourceRef.current = null;
@@ -422,6 +432,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     reservation.complete();
     if (connectionSourceRef.current === 'reservation') {
       setConnection(null);
+      setActiveReservation(null);
       setConferenceSid(null);
       setFromNumber(null);
       connectionSourceRef.current = null;
@@ -461,6 +472,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     connection,
     worker: workerRef.current,
     incomingReservation,
+    activeReservation,
     showReservationModal,
     isDeviceReady,
     isWorkerReady,

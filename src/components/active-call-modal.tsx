@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { useToast } from '@/hooks/use-toast';
 import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { cn } from '@/lib/utils';
+import { cn, formatPhoneNumber } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
 import { allParticipant, removeParticipant, addParticipant, holdParticipant } from '@/services/twilioService';
 import { getDepartmentSettings } from '@/services/departmentSettingsService';
@@ -24,7 +24,8 @@ import { Input } from './ui/input';
 
 interface ActiveCallBarProps {
   isOpen: boolean;
-  contactName: string;
+  contactNumber: string;
+  callerName: string;
   onHangUp: () => void;
   connection: Call | null;
   conferenceSid: string | null;
@@ -40,7 +41,7 @@ const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { ico
 );
 
 
-export default function ActiveCallBar({ isOpen, contactName, onHangUp, connection, conferenceSid }: ActiveCallBarProps) {
+export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHangUp, connection, conferenceSid }: ActiveCallBarProps) {
   const { user: authUser } = useAuth();
   const { fromNumber, setConferenceSid } = useTwilio();
   const [duration, setDuration] = useState(0);
@@ -50,7 +51,6 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   const [companyContacts, setCompanyContacts] = useState<Contact[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const { toast } = useToast();
-  const [displayName, setDisplayName] = useState(contactName);
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
   const [isAddParticipantModalOpen, setIsAddParticipantModalOpen] = useState(false);
@@ -70,18 +70,14 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
   ];
 
    useEffect(() => {
-    if (isOpen && contactName.startsWith('client:')) {
-      console.log("Fetching user name for active call:", contactName);
+    if (isOpen && contactNumber.startsWith('client:')) {
+      console.log("Fetching user name for active call:", contactNumber);
       const fetchUserName = async () => {
         try {
           const currentCallSid = connection?.parameters?.CallSid || '';
           const matchingCall = await getCallLogsBySid(currentCallSid);
           
-          if (matchingCall?.user?.name) {
-            setDisplayName(matchingCall.user.name);
-          } else {
-            setDisplayName(contactName);
-          }
+          
 
           if (currentCallSid) {
             if (matchingCall?.conference_sid) {
@@ -100,20 +96,18 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
           }
         } catch (error) {
           console.error("Could not fetch user name for active call", error);
-          setDisplayName(contactName); // Fallback to original name
         }
       };
 
       fetchUserName();
     } else {
-        setDisplayName(contactName);
     }
 
     if (!isOpen) {
       setDepartmentSettings(null);
       setCompanySettings(null);
     }
-  }, [isOpen, contactName, connection]);
+  }, [isOpen, contactNumber, connection]);
   
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
@@ -276,7 +270,7 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
     return `${mins}:${secs}`;
   };
 
-   const contactInitial = displayName ? displayName.charAt(0).toUpperCase() : '?';
+   const contactInitial = callerName ? callerName.charAt(0).toUpperCase() : '?';
 
    const handleDigitClick = (digit: string) => {
     setDialerNumber((prev) => prev + digit);
@@ -308,8 +302,16 @@ export default function ActiveCallBar({ isOpen, contactName, onHangUp, connectio
                     <AvatarFallback>{contactInitial}</AvatarFallback>
                 </Avatar>
                 <div>
-                    <p className="font-semibold text-lg truncate max-w-[200px]">{displayName}</p>
-                    <p className="text-sm text-muted-foreground truncate max-w-[200px]">{contactName} &bull; {formatTime(duration)}</p>
+                    <p className="font-semibold text-lg truncate max-w-[200px]">{callerName}</p>
+                    
+                    <p className="text-sm text-muted-foreground truncate max-w-[200px]">
+                    {contactNumber?.toLowerCase().startsWith("client:")
+                      ? contactNumber.length > 20
+                        ? contactNumber.substring(0, 20) + "..."
+                        : contactNumber
+                      : formatPhoneNumber(contactNumber)
+                    }
+                       &bull; {formatTime(duration)}</p>
                 </div>
             </div>
 
