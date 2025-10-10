@@ -41,10 +41,26 @@ export const getIntegrations = async (): Promise<Integration[]> => {
     return response.data.data;
 };
 
+export const getCompanyIntegration = async (companyId: number, integrationId: number): Promise<any> => {
+    const response = await axios.post(`/api/company-integrations/${integrationId}`, {
+        company_id: companyId,
+    });
+    return response.data;
+};
+
 export const updateCompanyIntegration = async (companyId: number, integrationId: number): Promise<any> => {
     const response = await axios.post('/api/company-integrations', {
         company_id: companyId,
         integration_id: integrationId,
+    });
+    return response.data;
+};
+
+export const deleteCompanyIntegration = async (companyId: number, integrationId: number): Promise<any> => {
+    const response = await axios.delete(`/api/company-integrations/${integrationId}`, {
+        data: {
+            company_id: companyId,
+        }
     });
     return response.data;
 };
