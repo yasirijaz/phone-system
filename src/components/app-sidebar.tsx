@@ -53,7 +53,7 @@ export function AppSidebar() {
             alt="CallSync"
             width={180}
             height={48}
-            className="h-12 w-auto"
+            className="w-auto"
             priority
             sizes="(max-width: 768px) 140px, 180px"
           />
@@ -170,14 +170,6 @@ export function AppSidebar() {
         
         <SidebarGroup>
             <SidebarGroupLabel>Settings</SidebarGroupLabel>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/profile'} tooltip="Profile">
-                <Link href="/profile">
-                  <Users />
-                  <span>Profile</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
             {(isSuperAdmin || isCompanyAdmin) && (
              <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === '/settings'} tooltip="Settings">

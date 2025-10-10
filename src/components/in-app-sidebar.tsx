@@ -176,7 +176,7 @@ export function InAppSidebar() {
             alt="CallSync"
             width={180}
             height={48}
-            className="h-12 w-auto"
+            className="w-auto"
             priority
             sizes="(max-width: 768px) 140px, 180px"
           />

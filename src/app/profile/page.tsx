@@ -14,7 +14,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { AppSidebar } from '@/components/app-sidebar';
+import { InAppSidebar } from '@/components/in-app-sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import AppHeader from "@/components/app-header";
@@ -119,7 +119,7 @@ export default function ProfilePage() {
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarContent><AppSidebar /></SidebarContent>
+        <SidebarContent><InAppSidebar /></SidebarContent>
       </Sidebar>
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
