@@ -8,7 +8,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import type { CompanySettings, MediaFile, Integration } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { getCompanySettings, createOrUpdateCompanySettings, getIntegrations, updateCompanyIntegration } from "@/services/companySettingsService";
+import { getCompanySettings, createOrUpdateCompanySettings, updateCompanyIntegration } from "@/services/companySettingsService";
+import { getIntegrations } from "@/services/integrationService";
 import { uploadMedia } from "@/services/mediaService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -178,9 +179,24 @@ export default function CompanySettingsPage() {
 
   const fetchIntegrations = async () => {
       try {
+          console.log('Fetching integrations...');
           const data = await getIntegrations();
-          setAvailableIntegrations(Array.isArray(data) ? data : []);
+          console.log('Integrations data received:', data);
+          console.log('Data type:', typeof data);
+          console.log('Is array:', Array.isArray(data));
+          
+          if (Array.isArray(data)) {
+              setAvailableIntegrations(data);
+              console.log('Set integrations:', data.length, 'items');
+          } else if (data && data.data && Array.isArray(data.data)) {
+              setAvailableIntegrations(data.data);
+              console.log('Set integrations from data.data:', data.data.length, 'items');
+          } else {
+              console.log('No valid integrations data found');
+              setAvailableIntegrations([]);
+          }
       } catch (error) {
+          console.error('Error fetching integrations:', error);
           toast({ title: "Error", description: "Could not fetch integrations list.", variant: "destructive" });
       }
   }
@@ -596,8 +612,7 @@ export default function CompanySettingsPage() {
                                       render={({ field: switchField }) => (
                                         <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                                             <div className="space-y-0.5">
-                                                <FormLabel className="text-base">{integrationInfo.name}</FormLabel>
-                                                <FormDescription>{integrationInfo.description}</FormDescription>
+                                                <FormLabel className="text-base">{integrationInfo.integration_name}</FormLabel>
                                             </div>
                                             <FormControl>
                                                 <Switch

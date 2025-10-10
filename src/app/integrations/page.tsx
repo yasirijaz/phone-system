@@ -24,8 +24,7 @@ import { useRouter } from 'next/navigation';
 import AppHeader from "@/components/app-header";
 
 const integrationSchema = z.object({
-  integration_name: z.string().min(2, "Integration name is required."),
-  description: z.string().optional(),
+  integration_name: z.string().min(2, "Integration name is required.")
 });
 
 export default function IntegrationsPage() {
@@ -39,7 +38,7 @@ export default function IntegrationsPage() {
 
   const form = useForm<z.infer<typeof integrationSchema>>({
     resolver: zodResolver(integrationSchema),
-    defaultValues: { integration_name: "", description: "" },
+    defaultValues: { integration_name: ""},
   });
 
   useEffect(() => {
@@ -69,9 +68,9 @@ export default function IntegrationsPage() {
   const handleDialogOpen = (integration: Integration | null = null) => {
     setEditingIntegration(integration);
     if (integration) {
-      form.reset({ integration_name: integration.name, description: integration.description });
+      form.reset({ integration_name: integration.integration_name });
     } else {
-      form.reset({ integration_name: "", description: "" });
+      form.reset({ integration_name: "" });
     }
     setIsDialogOpen(true);
   };
@@ -85,8 +84,7 @@ export default function IntegrationsPage() {
   const onSubmit = async (values: z.infer<typeof integrationSchema>) => {
     try {
       const payload = {
-        name: values.integration_name,
-        description: values.description,
+        integration_name: values.integration_name
       };
       if (editingIntegration) {
         await updateIntegration(editingIntegration.id, payload);
@@ -155,17 +153,7 @@ export default function IntegrationsPage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Description</FormLabel>
-                          <FormControl><Textarea placeholder="Describe the integration" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    
                     <DialogFooter>
                       <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
                       <Button type="submit">Save</Button>
@@ -188,15 +176,13 @@ export default function IntegrationsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead>Description</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {integrations.map((integration) => (
                         <TableRow key={integration.id}>
-                          <TableCell className="font-medium">{integration.name}</TableCell>
-                          <TableCell>{integration.description}</TableCell>
+                          <TableCell className="font-medium">{integration.integration_name}</TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(integration)}><Edit className="h-4 w-4" /></Button>
                             <AlertDialog>

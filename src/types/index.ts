@@ -117,8 +117,7 @@ export interface Holiday {
 
 export interface Integration {
     id: number;
-    name: string;
-    description: string;
+    integration_name: string;
 }
 
 export interface CompanySettings {
