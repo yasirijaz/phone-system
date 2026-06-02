@@ -1,36 +1,38 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useState, useEffect, useMemo } from "react";
 import type { User } from "@/types";
 import { getDepartmentUsers, getDepartments } from "@/services/departmentService";
-import { getUsersByCompany, assignUserToDepartment, removeUserFromDepartment } from "@/services/userService";
+import { getUsersByCompany, assignUsersToDepartment, removeUserFromDepartment } from "@/services/userService";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Trash2, PlusCircle } from "lucide-react";
+import { ArrowLeft, Trash2, PlusCircle, Search, Loader2 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AppHeader from "@/components/app-header";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { events } from '@/lib/events';
 
-const assignmentSchema = z.object({
-  user_id: z.coerce.number({ required_error: "User is required." }).min(1, "User is required."),
-});
+function matchesSearch(user: { name: string; email: string }, query: string): boolean {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+  return (
+    user.name.toLowerCase().includes(normalized) ||
+    user.email.toLowerCase().includes(normalized)
+  );
+}
 
 export default function DepartmentUsersPage() {
-  const router = useRouter();
   const params = useParams();
   const { user: authUser, logout } = useAuth();
   const departmentId = Number(params.departmentId);
@@ -40,12 +42,11 @@ export default function DepartmentUsersPage() {
   const [allCompanyUsers, setAllCompanyUsers] = useState<User[]>([]);
   const [departmentName, setDepartmentName] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [assigning, setAssigning] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+  const [addUserSearch, setAddUserSearch] = useState("");
+  const [departmentUserSearch, setDepartmentUserSearch] = useState("");
   const { toast } = useToast();
-
-  const form = useForm<z.infer<typeof assignmentSchema>>({
-    resolver: zodResolver(assignmentSchema),
-    defaultValues: { user_id: 0 },
-  });
 
   useEffect(() => {
     if (companyId && !isNaN(departmentId)) {
@@ -53,24 +54,19 @@ export default function DepartmentUsersPage() {
     }
   }, [departmentId, companyId]);
 
-  // Handle DND status change notifications
   useEffect(() => {
     const handleDndStatusChange = (data: any) => {
-      console.log("🔄 Updating department users DND status directly:", data);
-      
-      // Update department users list directly without API call
-      setDepartmentUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.user.id === data.user_id 
+      setDepartmentUsers(prevUsers =>
+        prevUsers.map(user =>
+          user.user.id === data.user_id
             ? { ...user, is_dnd: data.is_dnd ? 1 : 0 }
             : user
         )
       );
-      
-      // Also update all company users list
-      setAllCompanyUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.id === data.user_id 
+
+      setAllCompanyUsers(prevUsers =>
+        prevUsers.map(user =>
+          user.id === data.user_id
             ? { ...user, is_dnd: data.is_dnd }
             : user
         )
@@ -81,24 +77,19 @@ export default function DepartmentUsersPage() {
     return () => events.off('refreshOperators', handleDndStatusChange);
   }, []);
 
-  // Handle in-call status change notifications
   useEffect(() => {
     const handleInCallStatusChange = (data: any) => {
-      console.log("🔄 Updating department users in-call status directly:", data);
-      
-      // Update department users list directly without API call
-      setDepartmentUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.user.id === data.user_id 
+      setDepartmentUsers(prevUsers =>
+        prevUsers.map(user =>
+          user.user.id === data.user_id
             ? { ...user, user: { ...user.user, in_call: data.in_call ? 1 : 0 } }
             : user
         )
       );
-      
-      // Also update all company users list
-      setAllCompanyUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.id === data.user_id 
+
+      setAllCompanyUsers(prevUsers =>
+        prevUsers.map(user =>
+          user.id === data.user_id
             ? { ...user, in_call: data.in_call }
             : user
         )
@@ -118,7 +109,7 @@ export default function DepartmentUsersPage() {
         getUsersByCompany(companyId),
         getDepartments(companyId)
       ]);
-      
+
       const currentDept = allDepartmentsResponse.find(d => d.id === departmentId);
       if (currentDept) {
         setDepartmentName(currentDept.name);
@@ -136,20 +127,75 @@ export default function DepartmentUsersPage() {
       setLoading(false);
     }
   };
-  
-  const onSubmit = async (values: z.infer<typeof assignmentSchema>) => {
-    if (!companyId) return;
+
+  const availableUsers = useMemo(
+    () => allCompanyUsers.filter(
+      (companyUser) => !departmentUsers.some((deptUser) => deptUser.user.id === companyUser.id)
+    ),
+    [allCompanyUsers, departmentUsers]
+  );
+
+  const filteredAvailableUsers = useMemo(
+    () => availableUsers.filter((user) => matchesSearch(user, addUserSearch)),
+    [availableUsers, addUserSearch]
+  );
+
+  const filteredDepartmentUsers = useMemo(
+    () => departmentUsers.filter((entry) => matchesSearch(entry.user, departmentUserSearch)),
+    [departmentUsers, departmentUserSearch]
+  );
+
+  const allFilteredSelected =
+    filteredAvailableUsers.length > 0 &&
+    filteredAvailableUsers.every((user) => selectedUserIds.includes(user.id));
+
+  const toggleUserSelection = (userId: number, checked: boolean) => {
+    setSelectedUserIds((prev) =>
+      checked ? [...prev, userId] : prev.filter((id) => id !== userId)
+    );
+  };
+
+  const handleSelectAllFiltered = (checked: boolean) => {
+    if (checked) {
+      setSelectedUserIds((prev) => {
+        const merged = new Set([...prev, ...filteredAvailableUsers.map((user) => user.id)]);
+        return Array.from(merged);
+      });
+    } else {
+      const filteredIds = new Set(filteredAvailableUsers.map((user) => user.id));
+      setSelectedUserIds((prev) => prev.filter((id) => !filteredIds.has(id)));
+    }
+  };
+
+  const handleBulkAssign = async () => {
+    if (!companyId || selectedUserIds.length === 0) return;
+
+    setAssigning(true);
     try {
-        await assignUserToDepartment(companyId, departmentId, values.user_id);
-        toast({ title: "Success", description: "User assigned to department successfully." });
-        fetchAllData(); // Refresh both lists
-        form.reset({ user_id: 0 });
-    } catch (error: any) {
+      const result = await assignUsersToDepartment(companyId, departmentId, selectedUserIds);
+      setSelectedUserIds([]);
+      fetchAllData();
+
+      if (result.failed.length === 0) {
         toast({
-            title: "Error assigning user",
-            description: error.response?.data?.message || "An unexpected error occurred.",
-            variant: "destructive",
+          title: "Success",
+          description: `${result.success.length} user${result.success.length === 1 ? '' : 's'} added to ${departmentName || 'the department'}.`,
         });
+      } else {
+        toast({
+          title: "Partially complete",
+          description: `${result.success.length} added, ${result.failed.length} failed.`,
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Error assigning users",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -164,9 +210,7 @@ export default function DepartmentUsersPage() {
     }
   };
 
-  const availableUsers = allCompanyUsers.filter(
-    (companyUser) => !departmentUsers.some((deptUser) => deptUser.user.id === companyUser.id)
-  );
+  const departmentLabel = departmentName || 'Department';
 
   return (
     <SidebarProvider>
@@ -184,9 +228,10 @@ export default function DepartmentUsersPage() {
                       <ArrowLeft />
                     </Link>
                   </Button>
-                <h1 className="text-xl font-bold">
-                  Department Users
-                </h1>
+                <div>
+                  <h1 className="text-xl font-bold">{departmentLabel} Users</h1>
+                  <p className="text-sm text-muted-foreground">Manage users assigned to this department</p>
+                </div>
               </div>
             </div>
           </header>
@@ -194,51 +239,114 @@ export default function DepartmentUsersPage() {
           <main className="flex-1 p-4 md:p-8 space-y-8 bg-muted/40">
              <Card>
               <CardHeader>
-                <CardTitle>Add User to {departmentName ? `the ${departmentName}` : 'Department'}</CardTitle>
-                <CardDescription>Select a user from your company to add them to this department.</CardDescription>
+                <CardTitle>Add Users to {departmentLabel}</CardTitle>
+                <CardDescription>
+                  Search company users and add one or more to {departmentLabel}.
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-end gap-4">
-                     <FormField
-                        control={form.control}
-                        name="user_id"
-                        render={({ field }) => (
-                            <FormItem className="flex-1">
-                            <FormLabel>User</FormLabel>
-                            <Select onValueChange={field.onChange} value={String(field.value === 0 ? '' : field.value)}>
-                                <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a user to add" />
-                                </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {availableUsers.map((user) => (
-                                        <SelectItem key={user.id} value={String(user.id)}>
-                                            {user.name} ({user.email})
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                            </FormItem>
-                        )}
+              <CardContent className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name or email..."
+                    value={addUserSearch}
+                    onChange={(e) => setAddUserSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+
+                {loading ? (
+                  <p className="text-sm text-muted-foreground">Loading users...</p>
+                ) : availableUsers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    All company users are already assigned to {departmentLabel}.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="select-all-users"
+                          checked={allFilteredSelected}
+                          onCheckedChange={(checked) => handleSelectAllFiltered(checked === true)}
                         />
-                    <Button type="submit">
-                      <PlusCircle className="mr-2 h-4 w-4"/>
-                      Add User
+                        <label htmlFor="select-all-users" className="text-sm font-medium cursor-pointer">
+                          Select all {filteredAvailableUsers.length} shown
+                        </label>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedUserIds.length} selected
+                      </p>
+                    </div>
+
+                    <ScrollArea className="h-64 rounded-md border">
+                      <div className="divide-y">
+                        {filteredAvailableUsers.length === 0 ? (
+                          <p className="p-4 text-sm text-muted-foreground text-center">
+                            No users match your search.
+                          </p>
+                        ) : (
+                          filteredAvailableUsers.map((user) => (
+                            <label
+                              key={user.id}
+                              htmlFor={`add-user-${user.id}`}
+                              className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer"
+                            >
+                              <Checkbox
+                                id={`add-user-${user.id}`}
+                                checked={selectedUserIds.includes(user.id)}
+                                onCheckedChange={(checked) => toggleUserSelection(user.id, checked === true)}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium truncate">{user.name}</p>
+                                <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                              </div>
+                              <Badge variant={user.role_id === 2 ? 'default' : 'secondary'}>
+                                {user.role_id === 2 ? 'Admin' : 'User'}
+                              </Badge>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </ScrollArea>
+
+                    <Button
+                      type="button"
+                      onClick={handleBulkAssign}
+                      disabled={assigning || selectedUserIds.length === 0}
+                    >
+                      {assigning ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Add {selectedUserIds.length > 0 ? `${selectedUserIds.length} ` : ''}User{selectedUserIds.length === 1 ? '' : 's'} to {departmentLabel}
+                        </>
+                      )}
                     </Button>
-                  </form>
-                </Form>
+                  </>
+                )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Users in Department</CardTitle>
+                <CardTitle>Users in {departmentLabel}</CardTitle>
                 <CardDescription>A list of all users assigned to this department.</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <div className="relative max-w-md">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search assigned users..."
+                    value={departmentUserSearch}
+                    onChange={(e) => setDepartmentUserSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
                 {loading ? <p>Loading...</p> : (
                   <div className="overflow-x-auto">
                     <Table>
@@ -251,7 +359,7 @@ export default function DepartmentUsersPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {Array.isArray(departmentUsers) && departmentUsers.map((u) => (
+                        {filteredDepartmentUsers.map((u) => (
                           <TableRow key={u.user.id}>
                             <TableCell className="font-medium">{u.user.name}</TableCell>
                             <TableCell>{u.user.email}</TableCell>
@@ -271,7 +379,7 @@ export default function DepartmentUsersPage() {
                                   <AlertDialogHeader>
                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      This will permanently remove the user from this department.
+                                      This will remove the user from {departmentLabel}.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
@@ -285,8 +393,11 @@ export default function DepartmentUsersPage() {
                             </TableCell>
                           </TableRow>
                         ))}
-                        {(!Array.isArray(departmentUsers) || departmentUsers.length === 0) && (
+                        {departmentUsers.length === 0 && (
                           <TableRow><TableCell colSpan={4} className="text-center h-24">No users found for this department.</TableCell></TableRow>
+                        )}
+                        {departmentUsers.length > 0 && filteredDepartmentUsers.length === 0 && (
+                          <TableRow><TableCell colSpan={4} className="text-center h-24">No users match your search.</TableCell></TableRow>
                         )}
                       </TableBody>
                     </Table>
@@ -300,4 +411,3 @@ export default function DepartmentUsersPage() {
     </SidebarProvider>
   );
 }
-

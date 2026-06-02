@@ -8,9 +8,45 @@ export const getUsersByCompany = async (companyId: number): Promise<{data: User[
   return response.data;
 };
 
+export interface UserImportPayload {
+  name: string;
+  email: string;
+  password: string;
+  role_id: number;
+}
+
+export interface UserImportResult {
+  success: UserImportPayload[];
+  failed: { row: number; email: string; error: string }[];
+}
+
 export const addUserToCompany = async (companyId: number, userData: Omit<User, 'id' | 'company_id'>): Promise<User> => {
   const response = await axios.post(`/api/companies/${companyId}/users`, userData);
   return response.data;
+};
+
+export const importUsersToCompany = async (
+  companyId: number,
+  users: UserImportPayload[]
+): Promise<UserImportResult> => {
+  const success: UserImportPayload[] = [];
+  const failed: UserImportResult['failed'] = [];
+
+  for (let i = 0; i < users.length; i++) {
+    const user = users[i];
+    try {
+      await addUserToCompany(companyId, user);
+      success.push(user);
+    } catch (error: any) {
+      failed.push({
+        row: i + 2,
+        email: user.email,
+        error: error.response?.data?.message || 'Failed to create user.',
+      });
+    }
+  }
+
+  return { success, failed };
 };
 
 export const updateUser = async (id: number, userData: Partial<Omit<User, 'id' | 'company_id'>>): Promise<User> => {
@@ -27,7 +63,35 @@ export const assignUserToDepartment = async (companyId: number, departmentId: nu
         user_id: userId,
     });
     return response.data;
+};
+
+export interface BulkAssignResult {
+  success: number[];
+  failed: { userId: number; error: string }[];
 }
+
+export const assignUsersToDepartment = async (
+  companyId: number,
+  departmentId: number,
+  userIds: number[]
+): Promise<BulkAssignResult> => {
+  const success: number[] = [];
+  const failed: BulkAssignResult['failed'] = [];
+
+  for (const userId of userIds) {
+    try {
+      await assignUserToDepartment(companyId, departmentId, userId);
+      success.push(userId);
+    } catch (error: any) {
+      failed.push({
+        userId,
+        error: error.response?.data?.message || 'Failed to assign user.',
+      });
+    }
+  }
+
+  return { success, failed };
+};
 
 export const getUserAssignments = async (companyId: number): Promise<{data: Assignment[]}> => {
     const response = await axios.get(`/api/companies/${companyId}/assignments`);

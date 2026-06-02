@@ -247,7 +247,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
     }
   }
   
-   const handleRemoveParticipant = async (callSid: string) => {
+  const handleRemoveParticipant = async (callSid: string) => {
     if (!conferenceSid) return;
     try {
       await removeParticipant(conferenceSid, callSid);
@@ -270,22 +270,22 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
     return `${mins}:${secs}`;
   };
 
-   const contactInitial = callerName ? callerName.charAt(0).toUpperCase() : '?';
+  const contactInitial = callerName ? callerName.charAt(0).toUpperCase() : '?';
 
-   const handleDigitClick = (digit: string) => {
-    setDialerNumber((prev) => prev + digit);
-   };
+  const handleDigitClick = (digit: string) => {
+  setDialerNumber((prev) => prev + digit);
+  };
 
-   const handleSendDigits = (digit: string) => {
-    if (connection) {
-        connection.sendDigits(digit);
-        toast({ title: `Sent digit: ${digit}` });
-    }
-   };
+  const handleSendDigits = (digit: string) => {
+  if (connection) {
+      connection.sendDigits(digit);
+      toast({ title: `Sent digit: ${digit}` });
+  }
+  };
 
-    const handleBackspace = () => {
-        setDialerNumber((prev) => prev.slice(0, -1));
-    };
+  const handleBackspace = () => {
+      setDialerNumber((prev) => prev.slice(0, -1));
+  };
 
 
   if (!isOpen) {
