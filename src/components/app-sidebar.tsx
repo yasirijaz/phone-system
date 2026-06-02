@@ -41,7 +41,7 @@ export function AppSidebar() {
   const isRegularUser = user?.role_id === 3;
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
-  const usersLink = user?.company_id ? `/companies/${user.company_id}/users` : '/companies';
+  const usersLink = user?.company_id ? `/companies/${user.company_id}/members` : '/companies';
 
 
   return (
@@ -149,7 +149,7 @@ export function AppSidebar() {
            {isCompanyAdmin && (
             <>
              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/companies') && pathname.endsWith('/users')} tooltip="Users">
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/companies') && pathname.endsWith('/members')} tooltip="Users">
                   <Link href={usersLink}>
                     <Users />
                     <span>Users</span>

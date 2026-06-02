@@ -147,11 +147,11 @@ export default function CompaniesPage() {
   };
   
   const handleManageUsers = (companyId: number) => {
-    router.push(`/companies/${companyId}/users`);
+    router.push(`/companies/${companyId}/members`);
   }
   
   const handleManageAssignments = (companyId: number) => {
-    router.push(`/users?companyId=${companyId}`);
+    router.push(`/companies/${companyId}/members`);
   };
 
   const handleManageSettings = (companyId: number) => {

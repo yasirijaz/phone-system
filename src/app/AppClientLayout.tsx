@@ -33,6 +33,22 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
       window.api.receive('updatelog', handleUpdates);
   }, []);
 
+  useEffect(() => {
+    const handleChunkError = (event: ErrorEvent) => {
+      const message = event.message || '';
+      if (message.includes('ChunkLoadError') || message.includes('Loading chunk')) {
+        const reloadKey = 'chunk-reload';
+        if (!sessionStorage.getItem(reloadKey)) {
+          sessionStorage.setItem(reloadKey, '1');
+          window.location.reload();
+        }
+      }
+    };
+
+    window.addEventListener('error', handleChunkError);
+    return () => window.removeEventListener('error', handleChunkError);
+  }, []);
+
   const handleUpdates = (data:any) => {
     console.log('Received updates from Main:', data);
     setUpdateMessage(String(data));
