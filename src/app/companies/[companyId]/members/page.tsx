@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AppHeader from "@/components/app-header";
 import { events } from '@/lib/events';
+import { parseWorkerStatusPayload } from '@/lib/worker-status';
 
 const userSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -153,6 +154,24 @@ export default function ManageUsersPage() {
 
     events.on('refreshInCallStatus', handleInCallStatusChange);
     return () => events.off('refreshInCallStatus', handleInCallStatusChange);
+  }, []);
+
+  useEffect(() => {
+    const handleWorkerStatusChange = (data: any) => {
+      const parsed = parseWorkerStatusPayload(data);
+      if (!parsed) return;
+
+      setUsers(prevUsers =>
+        prevUsers.map(u =>
+          Number(u.id) === parsed.user_id
+            ? { ...u, worker_status: parsed.worker_status }
+            : u
+        )
+      );
+    };
+
+    events.on('refreshWorkerStatus', handleWorkerStatusChange);
+    return () => events.off('refreshWorkerStatus', handleWorkerStatusChange);
   }, []);
 
   const fetchData = async () => {

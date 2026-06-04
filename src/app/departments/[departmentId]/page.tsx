@@ -7,7 +7,7 @@ import type { Communication, Department, PhoneNumber, User, PaginatedCommunicati
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
-import { getCommunications } from "@/services/callLogService";
+import { getCommunications, enrichThreadsWithLastAttendee } from "@/services/callLogService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { getDepartmentUsers, getDepartments, updateDndStatus, getDndStatus } from "@/services/departmentService";
 import { getContacts } from "@/services/contactService";
+import { getUsersByCompany } from "@/services/userService";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,6 +25,11 @@ import { Badge } from "@/components/ui/badge";
 import PaginationControls from "@/components/pagination-controls";
 import { events } from '@/lib/events';
 import { formatPhoneNumber } from "@/lib/utils";
+import {
+  getWorkerStatusFromUser,
+  getWorkerStatusBadgeVariant,
+  parseWorkerStatusPayload,
+} from '@/lib/worker-status';
 
 type TabName = 'all' | 'unread' | 'calls' | 'messages' | 'operators' | 'missed' | 'voicemails' | 'recordings';
 
@@ -45,7 +51,7 @@ const initialPaginationState: PaginationState = {
 
 export default function DepartmentDetailPage() {
   const { user, logout } = useAuth();
-  const { device } = useTwilio();
+  const { device, activityName } = useTwilio();
   const { toast } = useToast();
   const params = useParams();
   const departmentId = Number(params.departmentId);
@@ -58,6 +64,7 @@ export default function DepartmentDetailPage() {
   const [operators, setOperators] = useState<any[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [companyUsers, setCompanyUsers] = useState<User[]>([]);
 
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerNumber, setDialerNumber] = useState('');
@@ -79,8 +86,23 @@ export default function DepartmentDetailPage() {
       try {
         setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
         const operatorsResponse = await getDepartmentUsers(user.company_id!, departmentId);
-        const rawOperators = Array.isArray(operatorsResponse.users) ? operatorsResponse.users : [];
-        const validOperators = rawOperators.filter((op) => op?.user);
+        const rawOperators = (Array.isArray(operatorsResponse.users) ? operatorsResponse.users : []) as unknown as Array<{
+          id?: number;
+          is_dnd?: number;
+          user: User;
+        }>;
+        const validOperators = rawOperators
+          .filter((op) => op?.user)
+          .map((op) => ({
+            ...op,
+            user: {
+              ...op.user,
+              worker_status:
+                (Number(op.user.id) === Number(user.id) && activityName) ||
+                getWorkerStatusFromUser(op.user) ||
+                undefined,
+            },
+          }));
         setOperators(validOperators);
         // Note: Operator list is not paginated from the API yet.
         setPagination(prev => ({ ...prev, [tab]: { ...initialPaginationState, loading: false, totalRecords: validOperators.length, totalPages: 1 } }));
@@ -99,13 +121,17 @@ export default function DepartmentDetailPage() {
             filters.type = tab;
         }
 
-        const [response, contactsResponse] = await Promise.all([
+        const [response, contactsResponse, usersResponse] = await Promise.all([
           getCommunications(filters),
-          user.company_id ? getContacts(user.company_id) : Promise.resolve([])
+          user.company_id ? getContacts(user.company_id) : Promise.resolve([]),
+          user.company_id ? getUsersByCompany(user.company_id) : Promise.resolve({ data: [] }),
         ]);
         
-        setData(prev => ({ ...prev, [tab]: response.results }));
+        const companyUsersList = Array.isArray(usersResponse.data) ? usersResponse.data : [];
+        const threadResults = Array.isArray(response.results) ? response.results : [];
+        setData(prev => ({ ...prev, [tab]: threadResults }));
         setContacts(contactsResponse || []);
+        setCompanyUsers(companyUsersList);
         setPagination(prev => ({
             ...prev,
             [tab]: {
@@ -116,11 +142,15 @@ export default function DepartmentDetailPage() {
                 loading: false
             }
         }));
+
+        enrichThreadsWithLastAttendee(threadResults, companyUsersList).then((enrichedResults) => {
+          setData((prev) => ({ ...prev, [tab]: enrichedResults }));
+        });
     } catch (error) {
         toast({ title: `Error fetching ${tab}`, description: "Failed to load data for this tab.", variant: "destructive" });
         setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: false } }));
     }
-  }, [user, departmentId, toast]);
+  }, [user, departmentId, toast, activityName]);
 
   useEffect(() => {
     fetchCommunicationData(activeTab, pagination[activeTab].currentPage, pagination[activeTab].limit);
@@ -202,6 +232,35 @@ export default function DepartmentDetailPage() {
     return () => events.off('refreshInCallStatus', handleInCallStatusChange);
   }, []);
 
+  useEffect(() => {
+    const handleWorkerStatusChange = (data: any) => {
+      const parsed = parseWorkerStatusPayload(data);
+      if (!parsed) return;
+
+      setOperators(prevOperators =>
+        prevOperators.map(op =>
+          op.user && Number(op.user.id) === parsed.user_id
+            ? { ...op, user: { ...op.user, worker_status: parsed.worker_status } }
+            : op
+        )
+      );
+    };
+
+    events.on('refreshWorkerStatus', handleWorkerStatusChange);
+    return () => events.off('refreshWorkerStatus', handleWorkerStatusChange);
+  }, []);
+
+  useEffect(() => {
+    if (!activityName || !user?.id) return;
+    setOperators(prevOperators =>
+      prevOperators.map(op =>
+        op.user && Number(op.user.id) === Number(user.id)
+          ? { ...op, user: { ...op.user, worker_status: activityName } }
+          : op
+      )
+    );
+  }, [activityName, user?.id]);
+
   const handleMakeCall = async (number: string) => {
      if (!device) {
         toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});
@@ -251,7 +310,7 @@ export default function DepartmentDetailPage() {
     
     return (
       <Card>
-        <CallLog calls={currentData || []} contacts={contacts} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
+        <CallLog calls={currentData || []} contacts={contacts} companyUsers={companyUsers} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
         <PaginationControls
           {...currentPagination}
           onPageChange={handlePageChange}
@@ -315,6 +374,7 @@ export default function DepartmentDetailPage() {
                                             <TableHead>Name</TableHead>
                                             <TableHead>Email</TableHead>
                                             <TableHead>Role</TableHead>
+                                            <TableHead>Status</TableHead>
                                             <TableHead>In-Call</TableHead>
                                             <TableHead>DND</TableHead>
                                         </TableRow>
@@ -324,6 +384,7 @@ export default function DepartmentDetailPage() {
                                             operators.map((op) => {
                                                 const operatorUser = op.user;
                                                 if (!operatorUser) return null;
+                                                const workerStatus = operatorUser.worker_status ?? '—';
                                                 return (
                                                 <TableRow key={op.id ?? operatorUser.id}>
                                                     <TableCell>{operatorUser.name ?? '—'}</TableCell>
@@ -331,6 +392,11 @@ export default function DepartmentDetailPage() {
                                                     <TableCell>
                                                         <Badge variant={operatorUser.role_id === 2 ? 'default' : 'secondary'}>
                                                             {getRoleName(operatorUser.role_id)}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={getWorkerStatusBadgeVariant(workerStatus)}>
+                                                            {workerStatus}
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
@@ -347,7 +413,7 @@ export default function DepartmentDetailPage() {
                                                 );
                                             })
                                         ) : (
-                                            <TableRow><TableCell colSpan={5} className="text-center h-24">No operators assigned</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={6} className="text-center h-24">No operators assigned</TableCell></TableRow>
                                         )}
                                     </TableBody>
                                 </Table>

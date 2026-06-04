@@ -9,6 +9,7 @@ import axios from '@/lib/axios';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { isElectron } from '@/lib/is-electron';
+import { events } from '@/lib/events';
 
 interface TwilioContextType {
   device: Device | null;
@@ -67,6 +68,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const audio = new Audio('/sounds/reservation.mp3');
   const incomingReservationRef = useRef<Reservation | null>(null);
   const connectionSourceRef = useRef<'device' | 'reservation' | null>(null);
+
+  const broadcastWorkerStatus = useCallback(
+    (status: string) => {
+      if (!user?.id || !status) return;
+      events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: status });
+    },
+    [user?.id]
+  );
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -184,11 +193,15 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       newWorker.on('ready', (worker: TwilioWorker) => {
         console.log(`Worker ${worker.sid} is ready`);
         setIsWorkerReady(true);
-        setActivityName(worker.activity?.name || null);
+        const status = worker.activity?.name || null;
+        setActivityName(status);
+        if (status) broadcastWorkerStatus(status);
       });
 
       newWorker.on('activityUpdated', (worker: TwilioWorker) => {
-        setActivityName(worker.activity?.name || null);
+        const status = worker.activity?.name || null;
+        setActivityName(status);
+        if (status) broadcastWorkerStatus(status);
       });
 
       newWorker.on('reservationCreated', (reservation: Reservation) => {
@@ -290,7 +303,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsConnecting(false);
     }
-  }, [twilio, user, isConnecting, toast]);
+  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus]);
 
   // Listen for accept/reject actions coming back from Electron main
   useEffect(() => {
@@ -453,6 +466,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     if (newActivity) {
       await newActivity.setAsCurrent();
       setActivityName(newActivity.name);
+      broadcastWorkerStatus(newActivity.name);
     } else {
       console.error(`Activity '${newActivityName}' not found in worker.activities`);
     }

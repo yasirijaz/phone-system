@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
-import type { Communication, Contact, PaginatedCommunicationsResponse } from "@/types";
+import type { Communication, Contact, PaginatedCommunicationsResponse, User } from "@/types";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
-import { getCommunications } from "@/services/callLogService";
+import { getCommunications, enrichThreadsWithLastAttendee } from "@/services/callLogService";
 import { getContacts } from "@/services/contactService";
+import { getUsersByCompany } from "@/services/userService";
 import CallLog from "@/components/call-log";
 import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
@@ -50,6 +51,7 @@ export default function AppUIPage() {
     voicemails: [], recordings: [], messages: [], starred: [], spam: [], unlogged: []
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [companyUsers, setCompanyUsers] = useState<User[]>([]);
   const [pagination, setPagination] = useState<Record<TabName, PaginationState>>({
     all: { ...initialPaginationState }, unread: { ...initialPaginationState }, calls: { ...initialPaginationState },
     missed: { ...initialPaginationState }, meetings: { ...initialPaginationState }, voicemails: { ...initialPaginationState },
@@ -79,7 +81,9 @@ export default function AppUIPage() {
         const cacheKey = `comm:${tab}:${page}:${limit}`;
         const cached = cacheGet<PaginatedCommunicationsResponse>(cacheKey);
         const contactsKey = user.company_id ? `contacts:${user.company_id}` : undefined;
+        const usersKey = user.company_id ? `companyUsers:${user.company_id}` : undefined;
         const cachedContacts = contactsKey ? cacheGet<Contact[]>(contactsKey) : [];
+        const cachedUsers = usersKey ? cacheGet<User[]>(usersKey) : [];
 
         let response: PaginatedCommunicationsResponse;
         if (cached) {
@@ -105,9 +109,20 @@ export default function AppUIPage() {
           contactsResponse = await getContacts(user.company_id);
           cacheSet(`contacts:${user.company_id}`, contactsResponse, 5 * 60_000);
         }
+
+        let usersResponse: User[] = [];
+        if (Array.isArray(cachedUsers) && cachedUsers.length > 0) {
+          usersResponse = cachedUsers;
+        } else if (user.company_id) {
+          const usersResult = await getUsersByCompany(user.company_id);
+          usersResponse = Array.isArray(usersResult.data) ? usersResult.data : [];
+          cacheSet(`companyUsers:${user.company_id}`, usersResponse, 5 * 60_000);
+        }
         
-        setData(prev => ({ ...prev, [tab]: response.results }));
+        const threadResults = Array.isArray(response.results) ? response.results : [];
+        setData(prev => ({ ...prev, [tab]: threadResults }));
         setContacts(Array.isArray(contactsResponse) ? contactsResponse : []);
+        setCompanyUsers(usersResponse);
         setPagination(prev => ({
             ...prev,
             [tab]: {
@@ -118,6 +133,10 @@ export default function AppUIPage() {
                 loading: false
             }
         }));
+
+        enrichThreadsWithLastAttendee(threadResults, usersResponse).then((enrichedResults) => {
+          setData((prev) => ({ ...prev, [tab]: enrichedResults }));
+        });
     } catch (error) {
         toast({ title: "Error", description: `Failed to load data for ${tab}.`, variant: "destructive" });
         setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: false } }));
@@ -161,7 +180,7 @@ export default function AppUIPage() {
     
     return (
       <Card className="overflow-hidden">
-        <CallLog calls={currentData || []} contacts={contacts} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
+        <CallLog calls={currentData || []} contacts={contacts} companyUsers={companyUsers} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
         <PaginationControls
           {...currentPagination}
           onPageChange={handlePageChange}

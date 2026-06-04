@@ -1,7 +1,7 @@
 
 
-import type { Communication, Contact } from '@/types';
-import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight, ChevronDown, User, Star, FileText } from 'lucide-react';
+import type { Communication, Contact, User as AppUser } from '@/types';
+import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight, ChevronDown, User as UserIcon, Star, FileText } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import Link from 'next/link';
 import { Avatar, AvatarFallback } from './ui/avatar';
@@ -15,6 +15,12 @@ import { markCommunicationField, markRead } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
 import { cn, formatPhoneNumber } from '@/lib/utils';
+import {
+  getCallAttendeeName,
+  formatCallListingSubtitle,
+  formatCallAttendeeLabel,
+  isCallThread,
+} from '@/lib/call-attendee';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import AudioPlayer from './AudioPlayer';
 import { getTranscriptionForAudio } from '@/app/actions';
@@ -23,6 +29,7 @@ import { saveTranscription } from '@/services/callLogService';
 interface CallLogProps {
   calls: Communication[];
   contacts?: Contact[];
+  companyUsers?: AppUser[];
   onMakeCall: (number: string) => void;
   isClickable?: boolean;
   source?: string;
@@ -31,6 +38,7 @@ interface CallLogProps {
 function CommunicationCard({ 
     comm, 
     contacts,
+    companyUsers,
     onMakeCall, 
     isClickable, 
     source, 
@@ -40,6 +48,7 @@ function CommunicationCard({
 }: { 
     comm: Communication, 
     contacts?: Contact[],
+    companyUsers?: AppUser[],
     onMakeCall: (number: string) => void, 
     isClickable: boolean, 
     source?: string,
@@ -175,7 +184,7 @@ function CommunicationCard({
       initial: getInitials(contact?.name || otherPartyNumber)
   };
   const contactName = isFirstInGroup ? (isMine ? (comm.user?.name || 'Me') : otherParty.name) : '';
-  const contactInitial = getInitials(isMine ? (user?.name || 'Me') : otherParty.name);
+  const contactInitial = getInitials(isMine ? (user?.name || 'Me') : (otherParty.name || otherParty.number));
   const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
   const isInProgress = comm.call_status === 'in_progress';
 
@@ -207,11 +216,12 @@ function CommunicationCard({
   const renderCallBubble = (c: Communication) => {
     let title: React.ReactNode;
 
-    if (c.user?.name) {
+    const attendeeName = getCallAttendeeName(c, companyUsers);
+    if (attendeeName) {
         if (isMine) {
-            title = <>{c.user.name} called {otherParty.name}</>;
+            title = <>{attendeeName} called {otherParty.name}</>;
         } else {
-            title = <>{otherParty.name} called <span className="font-normal text-muted-foreground">(received by {c.user.name})</span></>;
+            title = <>{otherParty.name} called <span className="font-normal text-muted-foreground">(received by {attendeeName})</span></>;
         }
     } else {
         title = isMine ? `You called ${otherParty.name}` : `${otherParty.name} called you`;
@@ -302,6 +312,9 @@ function CommunicationCard({
        const from = encodeURIComponent(comm.direction === 'inbound' ? comm.to : comm.from);
        const to = encodeURIComponent(comm.direction === 'inbound' ? comm.from : comm.to);
        const queryString = source === 'unread' ? `?source=unread` : '';
+       const attendeeLabel = isCallThread(comm)
+         ? formatCallAttendeeLabel(comm, companyUsers)
+         : null;
   
        const getCallInfo = () => {
         if (comm.type === 'sms' || comm.latest_type === 'sms') {
@@ -313,10 +326,30 @@ function CommunicationCard({
           );
         }
         if (comm.type === 'call' || comm.latest_type === 'call') {
+          const isMissedCall =
+            comm.call_status === 'missed' ||
+            comm.call_status === 'no-answer' ||
+            comm.call_status === 'busy' ||
+            comm.call_status === 'canceled';
+          const attendeeName = getCallAttendeeName(comm, companyUsers);
+          let subtitle: string;
+          if (isMissedCall && !attendeeName) {
+            subtitle = 'Missed call';
+          } else if (isMissedCall) {
+            subtitle = 'Missed call';
+          } else {
+            subtitle = formatCallListingSubtitle(comm, companyUsers, {
+              omitAttendee: Boolean(attendeeLabel),
+            });
+          }
           return (
-            <div className="flex items-center gap-1">
-              {comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4 text-green-500" /> : <PhoneOutgoing className="h-4 w-4 text-blue-500" />}
-              {comm.duration || '0'} seconds
+            <div className="flex items-center gap-1 min-w-0 truncate">
+              {comm.direction === 'inbound' ? (
+                <PhoneIncoming className="h-4 w-4 shrink-0 text-green-500" />
+              ) : (
+                <PhoneOutgoing className="h-4 w-4 shrink-0 text-blue-500" />
+              )}
+              <span className="truncate">{subtitle}</span>
             </div>
           );
         }
@@ -328,11 +361,14 @@ function CommunicationCard({
                 <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="flex-1 flex items-center gap-4">
                     <Avatar className="h-10 w-10">
                         <AvatarFallback>
-                            {contact ? mainPageAvatarInitial : <User className="h-5 w-5 text-muted-foreground" />}
+                            {contact ? mainPageAvatarInitial : <UserIcon className="h-5 w-5 text-muted-foreground" />}
                         </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col min-w-0">
                         <p className={cn("font-semibold truncate", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
+                        {attendeeLabel && (
+                          <p className="text-xs text-muted-foreground truncate">{attendeeLabel}</p>
+                        )}
                         <div className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
                           {getCallInfo()}
                         </div>
@@ -380,7 +416,7 @@ function CommunicationCard({
             {showAvatar && (
                 <Avatar className="h-8 w-8">
                     <AvatarFallback>
-                        {contact ? contactInitial : <User className="h-4 w-4 text-muted-foreground" />}
+                        {contact ? contactInitial : <UserIcon className="h-4 w-4 text-muted-foreground" />}
                     </AvatarFallback>
                 </Avatar>
             )}
@@ -420,7 +456,7 @@ function CommunicationCard({
   return <CardContent />;
 }
 
-export default function CallLog({ calls: communications, contacts, onMakeCall, isClickable = true, source }: CallLogProps) {
+export default function CallLog({ calls: communications, contacts, companyUsers, onMakeCall, isClickable = true, source }: CallLogProps) {
   if (!communications || communications.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 border-2 border-dashed rounded-lg m-6 p-4">
@@ -443,6 +479,7 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                     <CommunicationCard
                         comm={comm}
                         contacts={contacts}
+                        companyUsers={companyUsers}
                         key={stableKey}
                         onMakeCall={onMakeCall}
                         isClickable={isClickable}
@@ -499,6 +536,7 @@ export default function CallLog({ calls: communications, contacts, onMakeCall, i
                         <CommunicationCard 
                             comm={comm} 
                             contacts={contacts}
+                            companyUsers={companyUsers}
                             key={stableKey} 
                             onMakeCall={onMakeCall} 
                             isClickable={isClickable} 

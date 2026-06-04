@@ -30,6 +30,7 @@ export interface Communication {
   from_name?: Partial<Contact> | null;
   department?: Department;
   user?: User | null;
+  user_name?: string;
   notes?: string;
   category?: string;
   transcribe_text?: string;
@@ -67,6 +68,7 @@ export interface User {
   is_dnd?: boolean;
   do_not_disturb?: number;
   in_call?: number;
+  worker_status?: string;
 }
 
 export interface ProfilePayload {
