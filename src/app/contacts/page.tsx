@@ -1,13 +1,14 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import type { Contact } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { getContacts, createContact, updateContact, deleteContact } from "@/services/contactService";
+import { getContactsPaginated, createContact, updateContact, deleteContact } from "@/services/contactService";
+import PaginationControls from "@/components/pagination-controls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +18,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search } from "lucide-react";
 import { Sidebar, SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
@@ -33,9 +34,18 @@ const contactSchema = z.object({
 export default function ContactsPage() {
   const { user, logout } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalRecords: 0,
+    loading: true,
+  });
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof contactSchema>>({
@@ -44,22 +54,55 @@ export default function ContactsPage() {
   });
 
   useEffect(() => {
-    if (user?.company_id) {
-      fetchContacts();
-    }
-  }, [user]);
+    const timer = setTimeout(() => {
+      const trimmed = searchQuery.trim();
+      setDebouncedSearch((prev) => {
+        if (prev !== trimmed) setPage(1);
+        return trimmed;
+      });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  const fetchContacts = async () => {
+  const fetchContacts = useCallback(async (page: number, limit: number, search: string) => {
     if (!user?.company_id) return;
-    setLoading(true);
+    setPagination((prev) => ({ ...prev, loading: true }));
     try {
-      const data = await getContacts(user.company_id);
-      setContacts(data || []);
+      const response = await getContactsPaginated(user.company_id, {
+        page,
+        per_page: limit,
+        search: search || undefined,
+      });
+      setContacts(response.data || []);
+      setPagination({
+        currentPage: response.current_page,
+        totalPages: response.last_page,
+        totalRecords: response.total,
+        loading: false,
+      });
     } catch (error) {
       toast({ title: "Error", description: "Could not fetch contacts.", variant: "destructive" });
-    } finally {
-      setLoading(false);
+      setPagination((prev) => ({ ...prev, loading: false }));
     }
+  }, [user?.company_id, toast]);
+
+  useEffect(() => {
+    if (user?.company_id) {
+      fetchContacts(page, limit, debouncedSearch);
+    }
+  }, [user?.company_id, page, limit, debouncedSearch, fetchContacts]);
+
+  const handlePageChange = (nextPage: number) => {
+    setPage(nextPage);
+  };
+
+  const handleLimitChange = (nextLimit: number) => {
+    setPage(1);
+    setLimit(nextLimit);
+  };
+
+  const refreshContacts = () => {
+    fetchContacts(page, limit, debouncedSearch);
   };
 
   const handleDialogOpen = (contact: Contact | null = null) => {
@@ -94,7 +137,7 @@ export default function ContactsPage() {
         await createContact({ ...payload, company_id: user.company_id });
         toast({ title: "Success", description: "Contact created successfully." });
       }
-      fetchContacts();
+      refreshContacts();
       handleDialogClose();
     } catch (error: any) {
       toast({ title: "Error", description: error.response?.data?.message || "Failed to save contact.", variant: "destructive" });
@@ -105,7 +148,7 @@ export default function ContactsPage() {
     try {
         await deleteContact(contactId);
         toast({ title: "Success", description: "Contact deleted successfully." });
-        fetchContacts();
+        refreshContacts();
     } catch (error) {
         toast({ title: "Error", description: "Failed to delete contact.", variant: "destructive" });
     }
@@ -180,8 +223,17 @@ export default function ContactsPage() {
                       </DialogContent>
                     </Dialog>
                   </CardHeader>
-                  <CardContent>
-                    {loading ? <p>Loading...</p> : (
+                  <CardContent className="space-y-4">
+                    <div className="relative max-w-md">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by name, phone, or email..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    {pagination.loading ? <p>Loading...</p> : (
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -225,12 +277,25 @@ export default function ContactsPage() {
                               </TableCell>
                             </TableRow>
                           )) : (
-                            <TableRow><TableCell colSpan={5} className="text-center h-24">No contacts found.</TableCell></TableRow>
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center h-24">
+                                {debouncedSearch ? "No contacts match your search." : "No contacts found."}
+                              </TableCell>
+                            </TableRow>
                           )}
                         </TableBody>
                       </Table>
                     )}
                   </CardContent>
+                  <PaginationControls
+                    currentPage={pagination.currentPage}
+                    totalPages={pagination.totalPages}
+                    totalRecords={pagination.totalRecords}
+                    limit={limit}
+                    onPageChange={handlePageChange}
+                    onLimitChange={handleLimitChange}
+                    isLoading={pagination.loading}
+                  />
                 </Card>
             </main>
         </div>
