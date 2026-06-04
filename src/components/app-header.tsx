@@ -170,7 +170,7 @@ export default function AppHeader({
 
                 if (data.method_type == "in_call_notification" && data.task_type == "user_in_call_status") {
                     console.log("📞 In-call status change notification received:", data.data);
-                    events.emit("refreshOperators", data.data);
+                    events.emit("refreshInCallStatus", data.data);
                     events.emit("refreshCalls", data.data);
                 }
 

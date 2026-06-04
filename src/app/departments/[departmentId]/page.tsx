@@ -79,9 +79,11 @@ export default function DepartmentDetailPage() {
       try {
         setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
         const operatorsResponse = await getDepartmentUsers(user.company_id!, departmentId);
-        setOperators(Array.isArray(operatorsResponse.users) ? operatorsResponse.users : []);
+        const rawOperators = Array.isArray(operatorsResponse.users) ? operatorsResponse.users : [];
+        const validOperators = rawOperators.filter((op) => op?.user);
+        setOperators(validOperators);
         // Note: Operator list is not paginated from the API yet.
-        setPagination(prev => ({ ...prev, [tab]: { ...initialPaginationState, loading: false, totalRecords: operators.length, totalPages: 1 } }));
+        setPagination(prev => ({ ...prev, [tab]: { ...initialPaginationState, loading: false, totalRecords: validOperators.length, totalPages: 1 } }));
       } catch (error) {
         toast({ title: "Error fetching operators", description: "Failed to load data for this tab.", variant: "destructive" });
         setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: false } }));
@@ -166,44 +168,39 @@ export default function DepartmentDetailPage() {
   // Handle DND status change notifications
   useEffect(() => {
     const handleDndStatusChange = (data: any) => {
-      console.log("🔄 Updating DND status directly:", data, activeTab);
-      
-      // Update operators list directly without API call
-      if (activeTab === 'operators') {
-        setOperators(prevOperators => 
-          prevOperators.map(op => 
-            op.user.id === data.user_id 
-              ? { ...op, is_dnd: data.is_dnd ? 1 : 0 }
-              : op
-          )
-        );
-      }
+      if (data?.is_dnd === undefined) return;
+
+      setOperators(prevOperators =>
+        prevOperators.map(op =>
+          op.user && Number(op.user.id) === Number(data.user_id)
+            ? { ...op, is_dnd: data.is_dnd ? 1 : 0 }
+            : op
+        )
+      );
     };
 
     events.on('refreshOperators', handleDndStatusChange);
     return () => events.off('refreshOperators', handleDndStatusChange);
-  }, [activeTab]);
+  }, []);
 
   // Handle in-call status change notifications
   useEffect(() => {
     const handleInCallStatusChange = (data: any) => {
-      console.log("🔄 Updating in-call status directly:", data, activeTab);
-      
-      // Update operators list directly without API call
-      if (activeTab === 'operators') {
-        setOperators(prevOperators => 
-          prevOperators.map(op => 
-            op.user.id === data.user_id 
-              ? { ...op, user: { ...op.user, in_call: data.in_call ? 1 : 0 } }
-              : op
-          )
-        );
-      }
+      if (data?.in_call === undefined) return;
+
+      const inCall = Number(data.in_call) ? 1 : 0;
+      setOperators(prevOperators =>
+        prevOperators.map(op =>
+          op.user && Number(op.user.id) === Number(data.user_id)
+            ? { ...op, user: { ...op.user, in_call: inCall } }
+            : op
+        )
+      );
     };
 
-    events.on('refreshOperators', handleInCallStatusChange);
-    return () => events.off('refreshOperators', handleInCallStatusChange);
-  }, [activeTab]);
+    events.on('refreshInCallStatus', handleInCallStatusChange);
+    return () => events.off('refreshInCallStatus', handleInCallStatusChange);
+  }, []);
 
   const handleMakeCall = async (number: string) => {
      if (!device) {
@@ -324,18 +321,21 @@ export default function DepartmentDetailPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {operators.length > 0 ? (
-                                            operators.map((op) => (
-                                                <TableRow key={op.id}>
-                                                    <TableCell>{op.user.name}</TableCell>
-                                                    <TableCell>{op.user.email}</TableCell>
+                                            operators.map((op) => {
+                                                const operatorUser = op.user;
+                                                if (!operatorUser) return null;
+                                                return (
+                                                <TableRow key={op.id ?? operatorUser.id}>
+                                                    <TableCell>{operatorUser.name ?? '—'}</TableCell>
+                                                    <TableCell>{operatorUser.email ?? '—'}</TableCell>
                                                     <TableCell>
-                                                        <Badge variant={op.user.role_id === 2 ? 'default' : 'secondary'}>
-                                                            {getRoleName(op.user.role_id)}
+                                                        <Badge variant={operatorUser.role_id === 2 ? 'default' : 'secondary'}>
+                                                            {getRoleName(operatorUser.role_id)}
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge variant={op.user.in_call === 0 ? 'secondary' : 'default'}>
-                                                            {op.user.in_call === 0 ? 'No' : 'Yes'}
+                                                        <Badge variant={operatorUser.in_call === 0 ? 'secondary' : 'default'}>
+                                                            {operatorUser.in_call === 0 ? 'No' : 'Yes'}
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
@@ -344,7 +344,8 @@ export default function DepartmentDetailPage() {
                                                         </Badge>
                                                     </TableCell>
                                                 </TableRow>
-                                            ))
+                                                );
+                                            })
                                         ) : (
                                             <TableRow><TableCell colSpan={5} className="text-center h-24">No operators assigned</TableCell></TableRow>
                                         )}

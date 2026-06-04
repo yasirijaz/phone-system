@@ -185,9 +185,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.log(`Worker ${worker.sid} is ready`);
         setIsWorkerReady(true);
         setActivityName(worker.activity?.name || null);
-        // worker.activities.forEach((activity) => {
-        //   console.log(`${activity.name} => ${activity.sid}`);
-        // });
+      });
+
+      newWorker.on('activityUpdated', (worker: TwilioWorker) => {
+        setActivityName(worker.activity?.name || null);
       });
 
       newWorker.on('reservationCreated', (reservation: Reservation) => {

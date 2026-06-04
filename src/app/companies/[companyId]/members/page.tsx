@@ -121,12 +121,11 @@ export default function ManageUsersPage() {
   // Handle DND status change notifications
   useEffect(() => {
     const handleDndStatusChange = (data: any) => {
-      console.log("🔄 Updating user DND status directly:", data);
-      
-      // Update users list directly without API call
-      setUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.id === data.user_id 
+      if (data?.is_dnd === undefined) return;
+
+      setUsers(prevUsers =>
+        prevUsers.map(user =>
+          Number(user.id) === Number(data.user_id)
             ? { ...user, is_dnd: data.is_dnd }
             : user
         )
@@ -140,20 +139,20 @@ export default function ManageUsersPage() {
   // Handle in-call status change notifications
   useEffect(() => {
     const handleInCallStatusChange = (data: any) => {
-      console.log("🔄 Updating user in-call status directly:", data);
-      
-      // Update users list directly without API call
-      setUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.id === data.user_id 
-            ? { ...user, in_call: data.in_call }
+      if (data?.in_call === undefined) return;
+
+      const inCall = Number(data.in_call) ? 1 : 0;
+      setUsers(prevUsers =>
+        prevUsers.map(user =>
+          Number(user.id) === Number(data.user_id)
+            ? { ...user, in_call: inCall }
             : user
         )
       );
     };
 
-    events.on('refreshOperators', handleInCallStatusChange);
-    return () => events.off('refreshOperators', handleInCallStatusChange);
+    events.on('refreshInCallStatus', handleInCallStatusChange);
+    return () => events.off('refreshInCallStatus', handleInCallStatusChange);
   }, []);
 
   const fetchData = async () => {

@@ -56,9 +56,11 @@ export default function DepartmentUsersPage() {
 
   useEffect(() => {
     const handleDndStatusChange = (data: any) => {
+      if (data?.is_dnd === undefined) return;
+
       setDepartmentUsers(prevUsers =>
         prevUsers.map(user =>
-          user.user.id === data.user_id
+          user.user && Number(user.user.id) === Number(data.user_id)
             ? { ...user, is_dnd: data.is_dnd ? 1 : 0 }
             : user
         )
@@ -66,7 +68,7 @@ export default function DepartmentUsersPage() {
 
       setAllCompanyUsers(prevUsers =>
         prevUsers.map(user =>
-          user.id === data.user_id
+          Number(user.id) === Number(data.user_id)
             ? { ...user, is_dnd: data.is_dnd }
             : user
         )
@@ -79,25 +81,28 @@ export default function DepartmentUsersPage() {
 
   useEffect(() => {
     const handleInCallStatusChange = (data: any) => {
+      if (data?.in_call === undefined) return;
+
+      const inCall = Number(data.in_call) ? 1 : 0;
       setDepartmentUsers(prevUsers =>
         prevUsers.map(user =>
-          user.user.id === data.user_id
-            ? { ...user, user: { ...user.user, in_call: data.in_call ? 1 : 0 } }
+          user.user && Number(user.user.id) === Number(data.user_id)
+            ? { ...user, user: { ...user.user, in_call: inCall } }
             : user
         )
       );
 
       setAllCompanyUsers(prevUsers =>
         prevUsers.map(user =>
-          user.id === data.user_id
-            ? { ...user, in_call: data.in_call }
+          Number(user.id) === Number(data.user_id)
+            ? { ...user, in_call: inCall }
             : user
         )
       );
     };
 
-    events.on('refreshOperators', handleInCallStatusChange);
-    return () => events.off('refreshOperators', handleInCallStatusChange);
+    events.on('refreshInCallStatus', handleInCallStatusChange);
+    return () => events.off('refreshInCallStatus', handleInCallStatusChange);
   }, []);
 
   const fetchAllData = async () => {
@@ -115,7 +120,8 @@ export default function DepartmentUsersPage() {
         setDepartmentName(currentDept.name);
       }
 
-      setDepartmentUsers(Array.isArray(deptUsersResponse.users) ? deptUsersResponse.users : []);
+      const rawDeptUsers = Array.isArray(deptUsersResponse.users) ? deptUsersResponse.users : [];
+      setDepartmentUsers(rawDeptUsers.filter((u) => u?.user));
       setAllCompanyUsers(Array.isArray(companyUsersResponse.data) ? companyUsersResponse.data : []);
     } catch (error) {
       toast({
