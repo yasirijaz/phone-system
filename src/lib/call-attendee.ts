@@ -1,3 +1,4 @@
+import { format, parseISO, isToday, isYesterday, differenceInMinutes } from 'date-fns';
 import type { Communication, User } from '@/types';
 
 const HANDLED_ASSIGNMENT_STATUSES = [
@@ -157,4 +158,68 @@ export function formatCallAttendeeLabel(
   const name = getCallAttendeeName(comm, companyUsers);
   if (!name) return null;
   return comm.direction === 'inbound' ? `Attended by ${name}` : `Called by ${name}`;
+}
+
+export function getCallAttendeeUser(
+  comm: Communication,
+  companyUsers?: User[]
+): Pick<User, 'name' | 'profile_picture' | 'id'> | null {
+  if (comm.user?.name) {
+    return comm.user;
+  }
+
+  if (comm.user_id != null && companyUsers?.length) {
+    const match = companyUsers.find((u) => Number(u.id) === Number(comm.user_id));
+    if (match?.name) return match;
+  }
+
+  const name = getCallAttendeeName(comm, companyUsers);
+  if (!name) return null;
+  return { name, id: comm.user_id ?? 0 };
+}
+
+export function formatCallTypeDurationLine(comm: Communication): string {
+  if (comm.type === 'sms' || comm.latest_type === 'sms') {
+    return comm.direction === 'inbound' ? 'Inbound / SMS' : 'Outbound / SMS';
+  }
+
+  if (comm.call_status === 'in_progress') {
+    return 'Active call';
+  }
+
+  const isMissed =
+    comm.call_status === 'missed' ||
+    comm.call_status === 'no-answer' ||
+    comm.call_status === 'busy' ||
+    comm.call_status === 'canceled';
+
+  const directionLabel = comm.direction === 'inbound' ? 'Inbound' : 'Outbound';
+  if (isMissed) {
+    return `${directionLabel} / Missed`;
+  }
+
+  const durationSec = parseInt(String(comm.duration || comm.call_duration || '0'), 10);
+  if (durationSec >= 60) {
+    const minutes = Math.max(1, Math.round(durationSec / 60));
+    return `${directionLabel} / ${minutes} min`;
+  }
+  if (durationSec > 0) {
+    return `${directionLabel} / ${durationSec} sec`;
+  }
+
+  return directionLabel;
+}
+
+export function formatListingTimestamp(createdAt?: string | null): string {
+  if (!createdAt) return '';
+  try {
+    const date = parseISO(createdAt);
+    const minutesAgo = differenceInMinutes(new Date(), date);
+    if (minutesAgo < 1) return 'Just now';
+    if (isToday(date)) return format(date, 'h:mma').toLowerCase();
+    if (isYesterday(date)) return 'Yesterday';
+    return format(date, 'MMM d');
+  } catch {
+    return '';
+  }
 }

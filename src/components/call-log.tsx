@@ -4,7 +4,7 @@ import type { Communication, Contact, User as AppUser } from '@/types';
 import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight, ChevronDown, User as UserIcon, Star, FileText } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import Link from 'next/link';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Button } from './ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from './ui/badge';
@@ -14,11 +14,12 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { markCommunicationField, markRead } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
-import { cn, formatPhoneNumber } from '@/lib/utils';
+import { cn, formatPhoneNumber, getContactAvatarColorClass } from '@/lib/utils';
 import {
   getCallAttendeeName,
-  formatCallListingSubtitle,
-  formatCallAttendeeLabel,
+  getCallAttendeeUser,
+  formatCallTypeDurationLine,
+  formatListingTimestamp,
   isCallThread,
 } from '@/lib/call-attendee';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -312,93 +313,97 @@ function CommunicationCard({
        const from = encodeURIComponent(comm.direction === 'inbound' ? comm.to : comm.from);
        const to = encodeURIComponent(comm.direction === 'inbound' ? comm.from : comm.to);
        const queryString = source === 'unread' ? `?source=unread` : '';
-       const attendeeLabel = isCallThread(comm)
-         ? formatCallAttendeeLabel(comm, companyUsers)
-         : null;
-  
-       const getCallInfo = () => {
-        if (comm.type === 'sms' || comm.latest_type === 'sms') {
-          return (
-            <div className="flex items-center gap-1">
-              {comm.direction === 'inbound' ? <PhoneIncoming className="h-4 w-4 text-green-500" /> : <PhoneOutgoing className="h-4 w-4 text-blue-500" />}
-              {comm.body}
-            </div>
-          );
-        }
-        if (comm.type === 'call' || comm.latest_type === 'call') {
-          const isMissedCall =
-            comm.call_status === 'missed' ||
-            comm.call_status === 'no-answer' ||
-            comm.call_status === 'busy' ||
-            comm.call_status === 'canceled';
-          const attendeeName = getCallAttendeeName(comm, companyUsers);
-          let subtitle: string;
-          if (isMissedCall && !attendeeName) {
-            subtitle = 'Missed call';
-          } else if (isMissedCall) {
-            subtitle = 'Missed call';
-          } else {
-            subtitle = formatCallListingSubtitle(comm, companyUsers, {
-              omitAttendee: Boolean(attendeeLabel),
-            });
-          }
-          return (
-            <div className="flex items-center gap-1 min-w-0 truncate">
-              {comm.direction === 'inbound' ? (
-                <PhoneIncoming className="h-4 w-4 shrink-0 text-green-500" />
-              ) : (
-                <PhoneOutgoing className="h-4 w-4 shrink-0 text-blue-500" />
-              )}
-              <span className="truncate">{subtitle}</span>
-            </div>
-          );
-        }
-        return `${comm.direction || ''} / ${comm.body || ''}`;
-      };
+       const isSms = comm.type === 'sms' || comm.latest_type === 'sms';
+       const attendee = isCallThread(comm) ? getCallAttendeeUser(comm, companyUsers) : null;
+       const attendeeInitials = attendee?.name ? getInitials(attendee.name) : '';
+       const listingTime = formatListingTimestamp(comm.latest_created_at || comm.created_at);
+       const callTypeLine = isSms
+         ? (comm.body ? String(comm.body).slice(0, 40) : formatCallTypeDurationLine(comm))
+         : formatCallTypeDurationLine(comm);
+       const contactColorClass = getContactAvatarColorClass(mainPageContactName || mainPageContactNumber);
 
       return (
-           <div className="flex items-center p-2 hover:bg-muted/50 group border-b">
-                <Link href={`/conversations/${from}/${to}${queryString}`} key={comm.id || `${comm.from}-${comm.to}`} className="flex-1 flex items-center gap-4">
-                    <Avatar className="h-10 w-10">
-                        <AvatarFallback>
-                            {contact ? mainPageAvatarInitial : <UserIcon className="h-5 w-5 text-muted-foreground" />}
+           <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 group">
+                <Link
+                  href={`/conversations/${from}/${to}${queryString}`}
+                  key={comm.id || `${comm.from}-${comm.to}`}
+                  className="grid flex-1 grid-cols-[36px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.6fr)_72px] items-center gap-x-6 min-w-0"
+                >
+                    <Avatar className="h-9 w-9">
+                        <AvatarFallback
+                          className={cn(
+                            'text-xs font-medium',
+                            contact ? contactColorClass : 'bg-muted text-muted-foreground'
+                          )}
+                        >
+                            {contact ? mainPageAvatarInitial : <UserIcon className="h-4 w-4" />}
                         </AvatarFallback>
                     </Avatar>
-                    <div className="flex flex-col min-w-0">
-                        <p className={cn("font-semibold truncate", !comm.is_read && "font-bold")}>{mainPageContactName}</p>
-                        {attendeeLabel && (
-                          <p className="text-xs text-muted-foreground truncate">{attendeeLabel}</p>
-                        )}
-                        <div className={cn("text-sm text-muted-foreground truncate", !comm.is_read && "text-foreground")}>
-                          {getCallInfo()}
-                        </div>
-                    </div>
-                </Link>
-                {(isInProgress && isClickable) && (
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-3 w-3 shrink-0">
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+
+                    <span
+                      className={cn(
+                        'truncate text-sm font-medium text-foreground',
+                        !comm.is_read && 'font-semibold'
+                      )}
+                    >
+                      {mainPageContactName}
                     </span>
 
+                    <span className="truncate text-sm text-muted-foreground">
+                      {callTypeLine}
+                    </span>
+
+                    <div className="flex items-center gap-2 min-w-0">
+                      {attendee ? (
+                        <>
+                          <Avatar className="h-7 w-7 shrink-0">
+                            {attendee.profile_picture ? (
+                              <AvatarImage src={attendee.profile_picture} alt={attendee.name} />
+                            ) : null}
+                            <AvatarFallback className="bg-muted text-[10px] font-medium text-muted-foreground">
+                              {attendeeInitials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="truncate text-sm text-muted-foreground">{attendee.name}</span>
+                        </>
+                      ) : (
+                        <span className="text-sm text-muted-foreground/50">—</span>
+                      )}
+                    </div>
+
+                    <span className="text-right text-sm text-muted-foreground tabular-nums">
+                      {listingTime}
+                    </span>
+                </Link>
+
+                {(isInProgress && isClickable) && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="flex h-2.5 w-2.5 shrink-0">
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+                    </span>
                     {isAdmin && (
                       <>
                         <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: true })}>
                           <Ear className="mr-2 h-4 w-4" />
-                          Silently Listen
+                          Listen
                         </Button>
                         <Button variant="outline" size="sm" onClick={(e) => handleJoinCall(e, { silent: false })}>
                           <Mic className="mr-2 h-4 w-4" />
-                          Barge In
+                          Barge
                         </Button>
                       </>
                     )}
                   </div>
                 )}
+
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                         <Button variant="outline" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                         <Button
+                           variant="ghost"
+                           size="icon"
+                           className="h-9 w-9 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                         >
                             <PhoneIcon className="h-4 w-4" />
-                            <ChevronDown className="h-4 w-4 ml-1" />
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -472,7 +477,14 @@ export default function CallLog({ calls: communications, contacts, companyUsers,
 
   if(isClickable) {
     return (
-        <div className="space-y-1">
+        <div className="divide-y divide-border/60">
+            <div className="hidden md:grid grid-cols-[36px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.6fr)_72px] items-center gap-x-6 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <span />
+              <span>Contact</span>
+              <span>Call</span>
+              <span>Agent</span>
+              <span className="text-right">Time</span>
+            </div>
             {communications.map((comm, index) => {
                 const stableKey = generateKey(comm, index);
                 return (
