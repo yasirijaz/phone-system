@@ -1,4 +1,4 @@
-# **App Name**: CallSync
+# **App Name**: Voice by WHUB
 
 ## Core Features:
 

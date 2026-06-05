@@ -50,7 +50,7 @@ export function AppSidebar() {
         <div className="flex items-center justify-center px-2 py-2">
           <Image
             src="/logo.png"
-            alt="CallSync"
+            alt="Voice by WHUB"
             width={180}
             height={48}
             className="w-auto"

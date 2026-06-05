@@ -16,7 +16,7 @@ const inter = Inter({
 
 // Metadata is correctly exported from a Server Component.
 export const metadata: Metadata = {
-  title: 'CallSync',
+  title: 'Voice by WHUB',
   description: 'Manage your calls with ease and AI-powered insights.',
 };
 
