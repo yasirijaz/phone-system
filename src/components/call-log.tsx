@@ -15,7 +15,7 @@ import { markCommunicationField, markRead } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
 import { cn, formatPhoneNumber, getContactAvatarColorClass } from '@/lib/utils';
-import { getCommunicationMediaUrls, isImageMediaUrl } from '@/lib/message-media';
+import { getCommunicationMediaUrls, isImageMediaUrl, isInlineImageBody } from '@/lib/message-media';
 import {
   getCallAttendeeName,
   getCallAttendeeUser,
@@ -179,11 +179,20 @@ function CommunicationCard({
   
   const otherPartyNumber = isMine ? comm.to : comm.from;
   const contact = findContact(otherPartyNumber);
-  
+  const apiContactName =
+    comm.contact_name?.trim() ||
+    (isMine ? comm.to_name?.name : comm.from_name?.name)?.trim() ||
+    comm.client_name?.trim() ||
+    contact?.name?.trim() ||
+    null;
+  const formattedOtherPartyNumber = formatPhoneNumber(otherPartyNumber);
+
   const otherParty = {
-      name: contact?.name || formatPhoneNumber(otherPartyNumber),
+      name: apiContactName || formattedOtherPartyNumber,
+      sublabel: apiContactName ? formattedOtherPartyNumber : null,
       number: otherPartyNumber,
-      initial: getInitials(contact?.name || otherPartyNumber)
+      initial: getInitials(apiContactName || otherPartyNumber),
+      hasContactName: Boolean(apiContactName),
   };
   const contactName = isFirstInGroup ? (isMine ? (comm.user?.name || 'Me') : otherParty.name) : '';
   const contactInitial = getInitials(isMine ? (user?.name || 'Me') : (otherParty.name || otherParty.number));
@@ -195,7 +204,7 @@ function CommunicationCard({
   const renderMessageBubble = (c: Communication) => {
     const time = c.created_at ? format(parseISO(c.created_at), 'p') : '';
     const mediaUrls = getCommunicationMediaUrls(c).filter(isImageMediaUrl);
-    const showBody = Boolean(c.body?.trim()) && !mediaUrls.includes(String(c.body).trim());
+    const showBody = Boolean(c.body?.trim()) && !isInlineImageBody(c.body) && !mediaUrls.includes(String(c.body).trim());
 
     return (
         <div className={cn(
@@ -323,6 +332,7 @@ function CommunicationCard({
 
   const CardContent = () => {
     const mainPageContactName = otherParty.name;
+    const mainPageContactSublabel = otherParty.sublabel;
     const mainPageContactNumber = otherParty.number;
     const mainPageAvatarInitial = otherParty.initial;
 
@@ -337,7 +347,9 @@ function CommunicationCard({
        const callTypeLine = isSms
          ? (comm.body ? String(comm.body).slice(0, 40) : formatCallTypeDurationLine(comm))
          : formatCallTypeDurationLine(comm);
-       const contactColorClass = getContactAvatarColorClass(mainPageContactName || mainPageContactNumber);
+       const contactColorClass = getContactAvatarColorClass(
+         otherParty.hasContactName ? mainPageContactName : mainPageContactNumber
+       );
 
       return (
            <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 group">
@@ -350,21 +362,28 @@ function CommunicationCard({
                         <AvatarFallback
                           className={cn(
                             'text-xs font-medium',
-                            contact ? contactColorClass : 'bg-muted text-muted-foreground'
+                            otherParty.hasContactName || contact ? contactColorClass : 'bg-muted text-muted-foreground'
                           )}
                         >
-                            {contact ? mainPageAvatarInitial : <UserIcon className="h-4 w-4" />}
+                            {otherParty.hasContactName || contact ? mainPageAvatarInitial : <UserIcon className="h-4 w-4" />}
                         </AvatarFallback>
                     </Avatar>
 
-                    <span
-                      className={cn(
-                        'truncate text-sm font-medium text-foreground',
-                        !comm.is_read && 'font-semibold'
+                    <div className="flex min-w-0 flex-col">
+                      <span
+                        className={cn(
+                          'truncate text-sm font-medium text-foreground',
+                          !comm.is_read && 'font-semibold'
+                        )}
+                      >
+                        {mainPageContactName}
+                      </span>
+                      {mainPageContactSublabel && (
+                        <span className="truncate text-xs text-muted-foreground">
+                          {mainPageContactSublabel}
+                        </span>
                       )}
-                    >
-                      {mainPageContactName}
-                    </span>
+                    </div>
 
                     <span className="truncate text-sm text-muted-foreground">
                       {callTypeLine}
@@ -446,9 +465,12 @@ function CommunicationCard({
 
             <div className={cn("flex flex-col gap-1 w-full max-w-[75%]", isMine ? 'items-end' : 'items-start')}>
                 {isFirstInGroup && comm.created_at && (
-                    <p className={cn("text-xs text-muted-foreground", isMine ? "text-right" : "text-left", "px-1")}>
-                        <span className="font-semibold">{contactName}</span>
-                    </p>
+                    <div className={cn("px-1", isMine ? "text-right" : "text-left")}>
+                      <p className="text-xs font-semibold text-muted-foreground">{contactName}</p>
+                      {!isMine && otherParty.sublabel && (
+                        <p className="text-[11px] text-muted-foreground/80">{otherParty.sublabel}</p>
+                      )}
+                    </div>
                 )}
                 <div className={cn("flex items-center gap-2", isMine ? 'flex-row-reverse' : 'flex-row')}>
                     {comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)}

@@ -44,17 +44,35 @@ export const allParticipant = async (conferenceSid: string): Promise<any> => {
     return response.data;
 }
 
+export interface SendSmsPayload {
+  from: string;
+  to: string;
+  body: string;
+  media_urls?: string[];
+}
+
 export const sendSms = async (
   from: string,
   to: string,
   body: string,
   media_urls?: string[]
 ): Promise<any> => {
-    const payload: Record<string, string | string[]> = { from, to, body };
+    const payload: SendSmsPayload = {
+        from,
+        to,
+        body: body ?? '',
+    };
+
     if (media_urls?.length) {
         payload.media_urls = media_urls;
     }
-    const response = await axios.post('/api/twilio/sms/send', payload);
+
+    const response = await axios.post('/api/twilio/sms/send', JSON.stringify(payload), {
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+        },
+    });
     return response.data;
 };
 

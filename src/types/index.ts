@@ -7,6 +7,7 @@ export interface Communication {
   department_id?: number;
   company_id?: number;
   client_name?: string | null;
+  contact_name?: string | null;
   user_id?: number | null;
   call_sid?: string;
   conference_sid?: string;

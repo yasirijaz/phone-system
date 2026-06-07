@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ImagePlus, Loader2, Send, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { uploadMedia } from '@/services/mediaService';
 import {
   MAX_MESSAGE_IMAGES,
+  prepareImageForSms,
   validateMessageImage,
 } from '@/lib/message-media';
 import { cn } from '@/lib/utils';
@@ -38,9 +38,9 @@ export default function MessageComposer({
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const busy = isSending || isUploading;
+  const busy = isSending || isProcessing;
   const canSend = Boolean(messageBody.trim() || pendingImages.length);
 
   const handlePickImages = () => {
@@ -93,12 +93,11 @@ export default function MessageComposer({
   const handleSend = async () => {
     if (!canSend || busy) return;
 
-    setIsUploading(true);
+    setIsProcessing(true);
     try {
       const mediaUrls: string[] = [];
       for (const item of pendingImages) {
-        const uploaded = await uploadMedia(item.file, item.file.name);
-        if (uploaded.file_url) mediaUrls.push(uploaded.file_url);
+        mediaUrls.push(await prepareImageForSms(item.file));
       }
 
       await onSend({
@@ -113,9 +112,11 @@ export default function MessageComposer({
       if (error?.response) {
         const errorMessage = error.response?.data?.message || 'Failed to send message.';
         toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+      } else if (error instanceof Error && error.message) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
       }
     } finally {
-      setIsUploading(false);
+      setIsProcessing(false);
     }
   };
 
