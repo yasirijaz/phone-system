@@ -22,6 +22,7 @@ import { getContacts } from "@/services/contactService";
 import { events } from "@/lib/events";
 import ContactProfile from "@/components/contact-profile";
 import { cn, formatPhoneNumber } from "@/lib/utils";
+import { getThreadContactDisplay } from "@/lib/contact-display";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 export default function ConversationDetailPage() {
@@ -75,19 +76,26 @@ export default function ConversationDetailPage() {
                 const latestComm = sortedLogs[sortedLogs.length - 1];
                 const otherPartyNumber = latestComm.direction === 'inbound' ? latestComm.from : latestComm.to;
                 const foundContact = findContact(otherPartyNumber, contactList);
-                
+                const display = getThreadContactDisplay(sortedLogs, otherPartyNumber, foundContact);
+
                 setContact({
                     ...(foundContact || {}),
                     phone_no: otherPartyNumber,
-                    name: foundContact?.name || formatPhoneNumber(otherPartyNumber)
+                    name: display.displayName,
+                    sublabel: display.sublabel,
+                    hasContactName: display.hasContactName,
                 });
              } else {
                  const otherPartyNumber = to;
                  const foundContact = findContact(otherPartyNumber, contactList);
+                 const display = getThreadContactDisplay([], otherPartyNumber, foundContact);
+
                  setContact({
                     ...(foundContact || {}),
                     phone_no: otherPartyNumber,
-                    name: foundContact?.name || formatPhoneNumber(otherPartyNumber)
+                    name: display.displayName,
+                    sublabel: display.sublabel,
+                    hasContactName: display.hasContactName,
                  });
              }
         } catch (e) {
@@ -196,10 +204,13 @@ export default function ConversationDetailPage() {
                 }
                 
                 const foundContact = contactList.find(c => c.phone_no === otherPartyNumber);
+                const display = getThreadContactDisplay(sortedLogs, otherPartyNumber, foundContact);
                 setContact({
                     ...(foundContact || {}),
                     phone_no: otherPartyNumber,
-                    name: foundContact?.name || formatPhoneNumber(otherPartyNumber)
+                    name: display.displayName,
+                    sublabel: display.sublabel,
+                    hasContactName: display.hasContactName,
                 });
                 
                 if (numberToDeptMap[ourNumber]) {
@@ -334,10 +345,11 @@ export default function ConversationDetailPage() {
                                             </Button>
                                             <div className="relative flex-1">
                                                 <h1 className="text-xl font-bold">{contact?.name}</h1>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {formatPhoneNumber(contact?.phone_no)}
-                                                    {departmentName && ` • ${departmentName}`}
-                                                </p>
+                                                {(contact?.sublabel || departmentName) && (
+                                                  <p className="text-sm text-muted-foreground">
+                                                    {[contact?.sublabel, departmentName].filter(Boolean).join(' • ')}
+                                                  </p>
+                                                )}
                                             </div>
                                         </div>
                                         <Button variant="ghost" size="icon" onClick={() => setIsProfileSidebarOpen(!isProfileSidebarOpen)}>

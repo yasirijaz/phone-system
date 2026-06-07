@@ -16,6 +16,7 @@ import { events } from '@/lib/events';
 import React from 'react';
 import { cn, formatPhoneNumber, getContactAvatarColorClass } from '@/lib/utils';
 import { getCommunicationMediaUrls, isImageMediaUrl, isInlineImageBody } from '@/lib/message-media';
+import { getOtherPartyDisplay } from '@/lib/contact-display';
 import {
   getCallAttendeeName,
   getCallAttendeeUser,
@@ -179,23 +180,9 @@ function CommunicationCard({
   
   const otherPartyNumber = isMine ? comm.to : comm.from;
   const contact = findContact(otherPartyNumber);
-  const apiContactName =
-    comm.contact_name?.trim() ||
-    (isMine ? comm.to_name?.name : comm.from_name?.name)?.trim() ||
-    comm.client_name?.trim() ||
-    contact?.name?.trim() ||
-    null;
-  const formattedOtherPartyNumber = formatPhoneNumber(otherPartyNumber);
-
-  const otherParty = {
-      name: apiContactName || formattedOtherPartyNumber,
-      sublabel: apiContactName ? formattedOtherPartyNumber : null,
-      number: otherPartyNumber,
-      initial: getInitials(apiContactName || otherPartyNumber),
-      hasContactName: Boolean(apiContactName),
-  };
-  const contactName = isFirstInGroup ? (isMine ? (comm.user?.name || 'Me') : otherParty.name) : '';
-  const contactInitial = getInitials(isMine ? (user?.name || 'Me') : (otherParty.name || otherParty.number));
+  const otherParty = getOtherPartyDisplay(comm, contact);
+  const contactName = isFirstInGroup ? (isMine ? (comm.user?.name || 'Me') : otherParty.displayName) : '';
+  const contactInitial = getInitials(isMine ? (user?.name || 'Me') : (otherParty.displayName || otherParty.number));
   const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
   const isInProgress = comm.call_status === 'in_progress';
 
@@ -246,12 +233,12 @@ function CommunicationCard({
     const attendeeName = getCallAttendeeName(c, companyUsers);
     if (attendeeName) {
         if (isMine) {
-            title = <>{attendeeName} called {otherParty.name}</>;
+            title = <>{attendeeName} called {otherParty.displayName}</>;
         } else {
-            title = <>{otherParty.name} called <span className="font-normal text-muted-foreground">(received by {attendeeName})</span></>;
+            title = <>{otherParty.displayName} called <span className="font-normal text-muted-foreground">(received by {attendeeName})</span></>;
         }
     } else {
-        title = isMine ? `You called ${otherParty.name}` : `${otherParty.name} called you`;
+        title = isMine ? `You called ${otherParty.displayName}` : `${otherParty.displayName} called you`;
     }
     
     const Icon = isMine ? PhoneOutgoing : PhoneIncoming;
@@ -331,7 +318,7 @@ function CommunicationCard({
   };
 
   const CardContent = () => {
-    const mainPageContactName = otherParty.name;
+    const mainPageContactName = otherParty.displayName;
     const mainPageContactSublabel = otherParty.sublabel;
     const mainPageContactNumber = otherParty.number;
     const mainPageAvatarInitial = otherParty.initial;

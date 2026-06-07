@@ -18,8 +18,8 @@ import { isElectron } from '@/lib/is-electron';
 import { events } from '@/lib/events';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { getContacts } from '@/services/contactService';
-import { formatPhoneNumber } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { getOtherPartyDisplay } from '@/lib/contact-display';
 
 
 interface DepartmentWithUnread extends Department {
@@ -43,15 +43,6 @@ export function InAppSidebar() {
   const [loading, setLoading] = useState(true);
   const [inboxUnread, setInboxUnread] = useState(0);
   const inElectron = isElectron();
-
-  const getInitials = (name: string) => {
-    if (!name) return '?';
-    const nameParts = name.split(' ').filter(Boolean);
-    if (nameParts.length > 1) {
-      return `${nameParts[0].charAt(0)}${nameParts[nameParts.length - 1].charAt(0)}`.toUpperCase();
-    }
-    return name.charAt(0).toUpperCase();
-  };
 
   useEffect(() => {
     if (!user) return;
@@ -100,14 +91,13 @@ export function InAppSidebar() {
             const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
 
             if (!uniqueRecents[otherPartyNumber]) {
-                // check if contacts length is greater then 0
                 const contact = (contacts) ? contacts.find((c: Contact) => c.phone_no === otherPartyNumber) : null;
-                const name = contact?.name || otherPartyNumber;
+                const display = getOtherPartyDisplay(comm, contact);
                 uniqueRecents[otherPartyNumber] = {
                     id: otherPartyNumber,
-                    name: name,
+                    name: display.displayName,
                     href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}`,
-                    initials: getInitials(name),
+                    initials: display.initial,
                     unread_count: 0
                 };
             }
@@ -278,7 +268,7 @@ export function InAppSidebar() {
                                         <Avatar className="h-5 w-5 text-xs">
                                             <AvatarFallback>{item.initials}</AvatarFallback>
                                         </Avatar>
-                                        <span className="truncate">{formatPhoneNumber(item.name)}</span>
+                                        <span className="truncate">{item.name}</span>
                                     </div>
                                      {item.unread_count > 0 && (
                                         <Badge className="h-5">{item.unread_count}</Badge>

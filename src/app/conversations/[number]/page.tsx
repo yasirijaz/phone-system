@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import AppHeader from "@/components/app-header";
 import { events } from "@/lib/events";
 import { cacheGet, cacheSet } from "@/lib/simpleCache";
+import { formatPhoneNumber } from "@/lib/utils";
+import { getOtherPartyDisplay } from "@/lib/contact-display";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -27,6 +29,7 @@ export default function ConversationDetailPage() {
     const [allComms, setAllComms] = useState<Communication[]>([]);
     const [loading, setLoading] = useState(true);
     const [contactName, setContactName] = useState('');
+    const [contactSublabel, setContactSublabel] = useState<string | null>(null);
     const inFlightRef = useRef<Map<string, Promise<Communication[]>>>(new Map());
     
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
@@ -68,12 +71,14 @@ export default function ConversationDetailPage() {
             try {
                 const logs = await refreshThread();
                 const latest = logs[0];
-                const computedName = latest
-                    ? (latest.direction === 'inbound' 
-                        ? (latest.from_name?.name || from) 
-                        : (latest.to_name?.name || to))
-                    : to;
-                setContactName(computedName);
+                if (latest) {
+                    const display = getOtherPartyDisplay(latest);
+                    setContactName(display.displayName);
+                    setContactSublabel(display.sublabel);
+                } else {
+                    setContactName(formatPhoneNumber(to));
+                    setContactSublabel(null);
+                }
 
                 const hasUnread = logs.some((l: any) => l?.is_read === 0 || l?.is_read === false);
                 if (hasUnread) {
@@ -125,7 +130,9 @@ export default function ConversationDetailPage() {
                                 </Button>
                                 <div className="relative flex-1">
                                     <h1 className="text-xl font-bold">{contactName}</h1>
-                                     <p className="text-sm text-muted-foreground">{to}</p>
+                                    {contactSublabel && (
+                                      <p className="text-sm text-muted-foreground">{contactSublabel}</p>
+                                    )}
                                 </div>
                             </div>
                         </header>
