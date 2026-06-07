@@ -7,9 +7,9 @@ import { getCommunicationThread, markRead } from "@/services/callLogService";
 import type { Communication, Contact, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Send, PanelRightClose, PanelRightOpen, User } from "lucide-react";
+import { ArrowLeft, PanelRightClose, User } from "lucide-react";
 import CallLog from "@/components/call-log";
-import { Textarea } from "@/components/ui/textarea";
+import MessageComposer from "@/components/message-composer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTwilio } from "@/context/TwilioContext";
 import { useToast } from "@/hooks/use-toast";
@@ -288,7 +288,7 @@ export default function ConversationDetailPage() {
         console.log("Request to call from conversation detail:", number);
     };
 
-    const handleSendMessage = async () => {
+    const handleSendMessage = async ({ body, mediaUrls }: { body: string; mediaUrls: string[] }) => {
         const recipient = contact?.phone_no;
         if (!selectedFromNumber) {
             toast({ title: "Error", description: "Please select a 'from' number.", variant: "destructive" });
@@ -298,21 +298,22 @@ export default function ConversationDetailPage() {
             toast({ title: "Error", description: "Could not determine recipient.", variant: "destructive" });
             return;
         }
-        if (!messageBody) {
-            toast({ title: "Error", description: "Message body cannot be empty.", variant: "destructive" });
+        if (!body && mediaUrls.length === 0) {
+            toast({ title: "Error", description: "Add a message or image to send.", variant: "destructive" });
             return;
         }
         setIsSending(true);
         try {
-            await sendSms(selectedFromNumber, recipient, messageBody);
-            toast({ title: "Success", description: "Message sent successfully." });
-            setMessageBody("");
+            await sendSms(
+                selectedFromNumber,
+                recipient,
+                body,
+                mediaUrls.length ? mediaUrls : undefined
+            );
+            toast({ title: "Success", description: mediaUrls.length ? "Message with image sent successfully." : "Message sent successfully." });
             const logs = await getCommunicationThread(from, to);
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);
-        } catch (error: any) {
-            const errorMessage = error.response?.data?.message || "Failed to send message.";
-            toast({ title: "Error", description: errorMessage, variant: "destructive" });
         } finally {
             setIsSending(false);
         }
@@ -374,17 +375,13 @@ export default function ConversationDetailPage() {
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                        <div className="relative">
-                                            <Textarea 
-                                                placeholder="Write Your Message..."
-                                                className="pr-10"
-                                                value={messageBody}
-                                                onChange={(e) => setMessageBody(e.target.value)}
-                                            />
-                                            <Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2" onClick={handleSendMessage} disabled={isSending}>
-                                                {isSending ? '...' : <Send className="h-5 w-5"/>}
-                                            </Button>
-                                        </div>
+                                        <MessageComposer
+                                            messageBody={messageBody}
+                                            onMessageBodyChange={setMessageBody}
+                                            onSend={handleSendMessage}
+                                            isSending={isSending}
+                                            placeholder="Write your message..."
+                                        />
                                     </footer>
                                 </div>
                             </ResizablePanel>

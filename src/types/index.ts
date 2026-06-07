@@ -20,6 +20,7 @@ export interface Communication {
   duration?: string;
   call_duration?: string;
   meta_data?: any;
+  media_urls?: string[];
   is_read?: boolean | number | null;
   is_starred?: boolean;
   recording_url?: string | null;

@@ -15,6 +15,7 @@ import { markCommunicationField, markRead } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
 import { cn, formatPhoneNumber, getContactAvatarColorClass } from '@/lib/utils';
+import { getCommunicationMediaUrls, isImageMediaUrl } from '@/lib/message-media';
 import {
   getCallAttendeeName,
   getCallAttendeeUser,
@@ -193,18 +194,34 @@ function CommunicationCard({
 
   const renderMessageBubble = (c: Communication) => {
     const time = c.created_at ? format(parseISO(c.created_at), 'p') : '';
+    const mediaUrls = getCommunicationMediaUrls(c).filter(isImageMediaUrl);
+    const showBody = Boolean(c.body?.trim()) && !mediaUrls.includes(String(c.body).trim());
+
     return (
         <div className={cn(
-            "p-3 group relative",
+            "p-3 group relative space-y-2",
             isMine ? "bg-primary text-primary-foreground" : "bg-muted",
             isFirstInGroup && (isMine ? "rounded-t-xl rounded-l-xl" : "rounded-t-xl rounded-r-xl"),
             isLastInGroup && !isFirstInGroup && (isMine ? "rounded-b-xl rounded-l-xl" : "rounded-b-xl rounded-r-xl"),
             isMiddleOfGroup && (isMine ? "rounded-l-xl" : "rounded-r-xl"),
             !isFirstInGroup && !isLastInGroup && !isMiddleOfGroup && "rounded-xl"
         )}>
-            <p className="text-sm">{c.body}</p>
+            {mediaUrls.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {mediaUrls.map((url) => (
+                  <a key={url} href={url} target="_blank" rel="noreferrer" className="block">
+                    <img
+                      src={url}
+                      alt="Message attachment"
+                      className="max-h-56 max-w-xs rounded-md object-cover"
+                    />
+                  </a>
+                ))}
+              </div>
+            )}
+            {showBody && <p className="text-sm whitespace-pre-wrap break-words">{c.body}</p>}
             <div className={cn(
-                "text-xs mt-1 opacity-0 group-hover:opacity-100 transition-opacity",
+                "text-xs opacity-0 group-hover:opacity-100 transition-opacity",
                 isMine ? "text-primary-foreground/70" : "text-muted-foreground/70"
             )}>
                 {time}

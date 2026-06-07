@@ -12,12 +12,11 @@ import { sendSms } from "@/services/twilioService";
 import { useRouter } from 'next/navigation';
 
 import AppHeader from "@/components/app-header";
+import MessageComposer from "@/components/message-composer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Smile, Paperclip, Mic } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
 import { formatPhoneNumber } from "@/lib/utils";
 
 export default function MessagesPage() {
@@ -96,7 +95,7 @@ export default function MessagesPage() {
       setFilteredContacts([]);
   };
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = async ({ body, mediaUrls }: { body: string; mediaUrls: string[] }) => {
     if (!selectedFromNumber) {
         toast({ title: "Error", description: "Please select a 'from' number.", variant: "destructive" });
         return;
@@ -105,19 +104,21 @@ export default function MessagesPage() {
         toast({ title: "Error", description: "Please enter a recipient.", variant: "destructive" });
         return;
     }
-    if (!messageBody) {
-        toast({ title: "Error", description: "Message body cannot be empty.", variant: "destructive" });
+    if (!body && mediaUrls.length === 0) {
+        toast({ title: "Error", description: "Add a message or image to send.", variant: "destructive" });
         return;
     }
     setIsSending(true);
     try {
-        await sendSms(selectedFromNumber, recipient, messageBody);
-        toast({ title: "Success", description: "Message sent successfully." });
-        setMessageBody(""); // Clear message box on success
+        await sendSms(
+            selectedFromNumber,
+            recipient,
+            body,
+            mediaUrls.length ? mediaUrls : undefined
+        );
+        toast({ title: "Success", description: mediaUrls.length ? "Message with image sent successfully." : "Message sent successfully." });
+        setMessageBody("");
         router.push(`/conversations/${encodeURIComponent(selectedFromNumber)}/${encodeURIComponent(recipient)}`);
-    } catch (error: any) {
-        const errorMessage = error.response?.data?.message || "Failed to send message.";
-        toast({ title: "Error", description: errorMessage, variant: "destructive" });
     } finally {
         setIsSending(false);
     }
@@ -187,22 +188,13 @@ export default function MessagesPage() {
                      <p className="text-muted-foreground mt-2">Enter a name or number to start chatting</p>
                 </div>
                 <div className="p-4 border-t bg-background">
-                    <div className="relative">
-                        <Textarea 
-                            placeholder="New message" 
-                            className="pr-24" 
-                            value={messageBody}
-                            onChange={(e) => setMessageBody(e.target.value)}
-                        />
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                           <Button variant="ghost" size="icon"><Paperclip className="h-5 w-5"/></Button>
-                           <Button variant="ghost" size="icon"><Smile className="h-5 w-5"/></Button>
-                           <Button variant="ghost" size="icon"><Mic className="h-5 w-5"/></Button>
-                           <Button size="icon" onClick={handleSendMessage} disabled={isSending}>
-                            {isSending ? '...' : <Send className="h-5 w-5"/>}
-                           </Button>
-                        </div>
-                    </div>
+                    <MessageComposer
+                        messageBody={messageBody}
+                        onMessageBodyChange={setMessageBody}
+                        onSend={handleSendMessage}
+                        isSending={isSending}
+                        placeholder="New message"
+                    />
                 </div>
             </main>
           </div>
