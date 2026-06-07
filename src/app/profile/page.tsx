@@ -13,8 +13,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { InAppSidebar } from '@/components/in-app-sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import AppHeader from "@/components/app-header";
@@ -117,12 +115,7 @@ export default function ProfilePage() {
   const userRole = user.role_id === 1 ? 'Super Admin' : user.role_id === 2 ? 'Admin' : 'User';
 
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarContent><InAppSidebar /></SidebarContent>
-      </Sidebar>
-      <SidebarInset>
-        <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-screen">
           <AppHeader user={user} logout={logout} />
           <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
             <h1 className="text-xl font-bold">My Profile</h1>
@@ -217,7 +210,5 @@ export default function ProfilePage() {
             </div>
           </main>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
   );
 }

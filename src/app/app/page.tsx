@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
 import type { Communication, Contact, PaginatedCommunicationsResponse, User } from "@/types";
-import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
@@ -15,7 +14,6 @@ import { getCommunications, enrichThreadsWithLastAttendee } from "@/services/cal
 import { getContacts } from "@/services/contactService";
 import { getUsersByCompany } from "@/services/userService";
 import CallLog from "@/components/call-log";
-import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
 import { events } from '@/lib/events';
 import PaginationControls from "@/components/pagination-controls";
@@ -191,11 +189,6 @@ export default function AppUIPage() {
   };
 
   return (
-    <SidebarProvider>
-        <Sidebar>
-            <InAppSidebar />
-        </Sidebar>
-        <SidebarInset>
              <div className="flex h-screen w-full bg-background text-foreground">
                 <div className="flex flex-1 flex-col">
                   <AppHeader 
@@ -238,8 +231,6 @@ export default function AppUIPage() {
                   </main>
                 </div>
               </div>
-        </SidebarInset>
-    </SidebarProvider>
   );
 }
 

@@ -8,9 +8,7 @@ import type { Communication, Contact, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Send, PanelRightClose, PanelRightOpen, User } from "lucide-react";
-import { Sidebar, SidebarContent, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import CallLog from "@/components/call-log";
-import { InAppSidebar } from "@/components/in-app-sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTwilio } from "@/context/TwilioContext";
@@ -322,11 +320,6 @@ export default function ConversationDetailPage() {
 
 
     return (
-        <SidebarProvider>
-            <Sidebar>
-                <InAppSidebar />
-            </Sidebar>
-            <SidebarInset>
                  <div className="flex h-screen w-full bg-background text-foreground">
                     <div className="flex-1 flex flex-col">
                         <AppHeader user={user} logout={logout} />
@@ -408,7 +401,5 @@ export default function ConversationDetailPage() {
                         </ResizablePanelGroup>
                     </div>
                 </div>
-            </SidebarInset>
-        </SidebarProvider>
     );
 }

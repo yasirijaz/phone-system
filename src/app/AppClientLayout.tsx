@@ -10,6 +10,9 @@ import { useEffect, useState } from 'react';
 import { toast } from '@/hooks/use-toast';
 import UpdateProgress from '@/components/update-progress';
 import ReconnectPrompt from '@/components/reconnect-prompt';
+import { usePathname } from 'next/navigation';
+import { isInAppRoute } from '@/lib/in-app-routes';
+import { InAppShell } from '@/components/in-app-shell';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const {
@@ -28,6 +31,8 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   // set update status state
   const [updateMessage, setUpdateMessage] = useState<string>("");
   const { user } = useAuth();
+  const pathname = usePathname();
+  const showInAppShell = isInAppRoute(pathname);
    useEffect(() => {
     if(window.api)
       window.api.receive('updatelog', handleUpdates);
@@ -78,7 +83,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      {children}
+      {showInAppShell ? <InAppShell>{children}</InAppShell> : children}
       <IncomingCallModal
         isOpen={!!isIncomingCall}
         onClose={rejectCall}

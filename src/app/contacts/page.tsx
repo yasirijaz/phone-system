@@ -19,8 +19,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle, Edit, Trash2, Search } from "lucide-react";
-import { Sidebar, SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
-import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
 import { formatPhoneNumber } from "@/lib/utils";
 
@@ -155,11 +153,6 @@ export default function ContactsPage() {
   }
 
   return (
-    <SidebarProvider>
-      <Sidebar>
-          <InAppSidebar />
-      </Sidebar>
-      <SidebarInset>
           <div className="flex flex-col min-h-screen">
             <AppHeader user={user} logout={logout} />
 
@@ -299,7 +292,5 @@ export default function ContactsPage() {
                 </Card>
             </main>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
   );
 }

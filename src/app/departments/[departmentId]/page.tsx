@@ -10,9 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getCommunications, enrichThreadsWithLastAttendee } from "@/services/callLogService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
 import CallLog from "@/components/call-log";
-import { InAppSidebar } from "@/components/in-app-sidebar";
 import AppHeader from "@/components/app-header";
-import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { getDepartmentUsers, getDepartments, updateDndStatus, getDndStatus } from "@/services/departmentService";
@@ -321,11 +319,6 @@ export default function DepartmentDetailPage() {
   };
 
   return (
-    <SidebarProvider>
-        <Sidebar>
-            <InAppSidebar />
-        </Sidebar>
-        <SidebarInset>
              <div className="flex h-screen w-full bg-background text-foreground">
                 <div className="flex flex-1 flex-col">
                   <AppHeader 
@@ -428,7 +421,5 @@ export default function DepartmentDetailPage() {
                   </main>
                 </div>
               </div>
-        </SidebarInset>
-    </SidebarProvider>
   );
 }
