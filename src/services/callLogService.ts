@@ -48,6 +48,31 @@ function pickLatestCallLog(logs: Communication[]): Communication | null {
   }, callLogs[0]);
 }
 
+const ENRICH_CONCURRENCY = 2;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  if (!items.length) return [];
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const current = nextIndex;
+      nextIndex += 1;
+      results[current] = await fn(items[current]);
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => worker())
+  );
+  return results;
+}
+
 /** Thread list rows omit agent info; load it from the conversation thread (same as detail page). */
 export async function enrichThreadsWithLastAttendee(
   threads: Communication[],
@@ -91,8 +116,7 @@ export async function enrichThreadsWithLastAttendee(
     }
   };
 
-  const enriched = await Promise.all(threads.map(enrichOne));
-  return enriched;
+  return mapWithConcurrency(threads, ENRICH_CONCURRENCY, enrichOne);
 }
 
 export const getCallLogsBySid = async (callSid: string): Promise<Communication | null> => {

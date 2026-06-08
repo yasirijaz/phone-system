@@ -19,6 +19,7 @@ import { events } from '@/lib/events';
 import PaginationControls from "@/components/pagination-controls";
 import { cacheGet, cacheSet } from "@/lib/simpleCache";
 import { useRef } from "react";
+import { debounce } from "@/lib/utils";
 
 type TabName = 'all' | 'unread' | 'calls' | 'missed' | 'meetings' | 'voicemails' | 'recordings' | 'messages' | 'starred' | 'spam' | 'unlogged';
 
@@ -60,9 +61,21 @@ export default function AppUIPage() {
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerInitialValue, setDialerInitialValue] = useState('');
   const inFlightRequestsRef = useRef<Map<string, Promise<PaginatedCommunicationsResponse>>>(new Map());
+  const activeTabRef = useRef(activeTab);
+  const paginationRef = useRef(pagination);
+  const lastFetchKeyRef = useRef<string | null>(null);
 
-  const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10) => {
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+    paginationRef.current = pagination;
+  }, [activeTab, pagination]);
+
+  const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10, force = false) => {
     if (!user) return;
+
+    const fetchKey = `${tab}:${page}:${limit}`;
+    if (!force && lastFetchKeyRef.current === fetchKey) return;
+    lastFetchKeyRef.current = fetchKey;
 
     setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
     
@@ -77,7 +90,7 @@ export default function AppUIPage() {
         }
 
         const cacheKey = `comm:${tab}:${page}:${limit}`;
-        const cached = cacheGet<PaginatedCommunicationsResponse>(cacheKey);
+        const cached = !force ? cacheGet<PaginatedCommunicationsResponse>(cacheKey) : null;
         const contactsKey = user.company_id ? `contacts:${user.company_id}` : undefined;
         const usersKey = user.company_id ? `companyUsers:${user.company_id}` : undefined;
         const cachedContacts = contactsKey ? cacheGet<Contact[]>(contactsKey) : [];
@@ -142,25 +155,31 @@ export default function AppUIPage() {
   }, [user, toast]);
 
   useEffect(() => {
+    lastFetchKeyRef.current = null;
     fetchCommunicationData(activeTab, pagination[activeTab].currentPage, pagination[activeTab].limit);
   }, [activeTab, fetchCommunicationData]);
 
   const handlePageChange = (page: number) => {
+      lastFetchKeyRef.current = null;
       fetchCommunicationData(activeTab, page, pagination[activeTab].limit);
   };
 
   const handleLimitChange = (limit: number) => {
+      lastFetchKeyRef.current = null;
       fetchCommunicationData(activeTab, 1, limit);
   };
   
   const handleRefresh = useCallback(() => {
-    console.log('Refresh event received, fetching new communication data...');
-    fetchCommunicationData(activeTab, pagination[activeTab].currentPage, pagination[activeTab].limit);
-  }, [fetchCommunicationData, activeTab, pagination]);
+    const tab = activeTabRef.current;
+    const pag = paginationRef.current[tab];
+    lastFetchKeyRef.current = null;
+    fetchCommunicationData(tab, pag.currentPage, pag.limit, true);
+  }, [fetchCommunicationData]);
 
   useEffect(() => {
-    events.on('refreshCalls', handleRefresh);
-    return () => events.off('refreshCalls', handleRefresh);
+    const debouncedRefresh = debounce(handleRefresh, 2000);
+    events.on('refreshCalls', debouncedRefresh);
+    return () => events.off('refreshCalls', debouncedRefresh);
   }, [handleRefresh]);
 
   const handleMakeCall = async (number: string) => {

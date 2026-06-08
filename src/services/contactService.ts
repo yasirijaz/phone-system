@@ -2,7 +2,7 @@
 import axios from '@/lib/axios';
 import type { Contact, PaginatedResponse } from '@/types';
 import { normalizePhoneDigits, phonesMatch } from '@/lib/utils';
-//import { cacheGet, cacheSet } from '@/lib/simpleCache';
+import { cacheGet, cacheSet } from '@/lib/simpleCache';
 
 export interface GetContactsParams {
   page?: number;
@@ -25,13 +25,12 @@ export const getContactsPaginated = async (
 };
 
 export const getContacts = async (companyId: number): Promise<Contact[]> => {
-  // const cacheKey = `company:${companyId}:contacts`;
-  // const cached = cacheGet<Contact[]>(cacheKey);
-  // if (cached) return cached;
+  const cacheKey = `company:${companyId}:contacts`;
+  const cached = cacheGet<Contact[]>(cacheKey);
+  if (cached) return cached;
 
   const { data } = await getContactsPaginated(companyId, { page: 1, per_page: 500 });
-  // Cache for 2 minutes
-  //cacheSet(cacheKey, data, 2 * 60 * 1000);
+  cacheSet(cacheKey, data, 2 * 60 * 1000);
   return data;
 };
 

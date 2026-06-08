@@ -1,16 +1,15 @@
 
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup, SidebarGroupLabel } from '@/components/ui/sidebar';
-import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, Clock, BellOff } from 'lucide-react';
+import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, BellOff } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { getUserDepartments } from '@/services/userService';
-import { getCommunications } from '@/services/callLogService';
+import { getCommunications, getUnreadCallLogs } from '@/services/callLogService';
 import { getDndStatus } from '@/services/departmentService';
 import type { Department, Communication, Contact } from '@/types';
 import { Badge } from './ui/badge';
@@ -18,9 +17,9 @@ import { isElectron } from '@/lib/is-electron';
 import { events } from '@/lib/events';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { getContacts } from '@/services/contactService';
-import { cn } from '@/lib/utils';
+import { debounce } from '@/lib/utils';
 import { getOtherPartyDisplay } from '@/lib/contact-display';
-
+import { cacheGet, cacheSet } from '@/lib/simpleCache';
 
 interface DepartmentWithUnread extends Department {
     unread_count: number;
@@ -35,105 +34,222 @@ interface RecentItem {
     unread_count: number;
 }
 
+const SIDEBAR_CACHE_TTL = 30_000;
+const UNREAD_REFRESH_DEBOUNCE_MS = 1_500;
+
 export function InAppSidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const [departments, setDepartments] = useState<DepartmentWithUnread[]>([]);
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [recentsLoading, setRecentsLoading] = useState(true);
   const [inboxUnread, setInboxUnread] = useState(0);
   const inElectron = isElectron();
+  const initialLoadRef = useRef<Promise<void> | null>(null);
+  const unreadRefreshRef = useRef<Promise<void> | null>(null);
+  const departmentsRef = useRef<DepartmentWithUnread[]>([]);
 
   useEffect(() => {
-    if (!user) return;
+    departmentsRef.current = departments;
+  }, [departments]);
 
-    let mounted = true;
+  const refreshDepartmentUnreadBadges = useCallback(async (targetDepartmentId?: number) => {
+    if (!user?.id) return;
 
-    const fetchSidebarData = async () => {
+    const currentDepartments = departmentsRef.current;
+    if (currentDepartments.length === 0) return;
+
+    if (unreadRefreshRef.current) {
+      await unreadRefreshRef.current;
+      return;
+    }
+
+    const departmentsToUpdate = targetDepartmentId
+      ? currentDepartments.filter((dept) => dept.id === targetDepartmentId)
+      : currentDepartments;
+
+    if (departmentsToUpdate.length === 0) return;
+
+    const request = (async () => {
       try {
-        setLoading(true);
-        if (!user.id || !user.company_id) return;
+        const updates = await Promise.all(
+          departmentsToUpdate.map(async (dept) => {
+            try {
+              const unreadLogs = await getUnreadCallLogs(dept.id);
+              const unreadCount = Array.isArray(unreadLogs) ? unreadLogs.length : 0;
+              const updated = { ...dept, unread_count: unreadCount };
+              cacheSet(`sidebar-dept:${user.id}:${dept.id}`, updated, SIDEBAR_CACHE_TTL);
+              return { id: dept.id, unread_count: unreadCount };
+            } catch (e) {
+              console.error(`Failed to refresh unread count for department ${dept.id}`, e);
+              return { id: dept.id, unread_count: dept.unread_count };
+            }
+          })
+        );
+
+        setDepartments((prev) =>
+          prev.map((dept) => {
+            const update = updates.find((item) => item.id === dept.id);
+            return update ? { ...dept, unread_count: update.unread_count } : dept;
+          })
+        );
+
+        const cached = cacheGet<{
+          departments: DepartmentWithUnread[];
+          recentItems: RecentItem[];
+          inboxUnread: number;
+        }>(`sidebar:${user.id}`);
+        if (cached) {
+          cacheSet(
+            `sidebar:${user.id}`,
+            {
+              ...cached,
+              departments: cached.departments.map((dept) => {
+                const update = updates.find((item) => item.id === dept.id);
+                return update ? { ...dept, unread_count: update.unread_count } : dept;
+              }),
+            },
+            SIDEBAR_CACHE_TTL
+          );
+        }
+      } finally {
+        unreadRefreshRef.current = null;
+      }
+    })();
+
+    unreadRefreshRef.current = request;
+    await request;
+  }, [user?.id]);
+
+  const fetchInitialSidebarData = useCallback(async () => {
+    if (!user?.id || !user?.company_id) return;
+
+    const cacheKey = `sidebar:${user.id}`;
+    const cached = cacheGet<{
+      departments: DepartmentWithUnread[];
+      recentItems: RecentItem[];
+      inboxUnread: number;
+    }>(cacheKey);
+    if (cached) {
+      setDepartments(cached.departments);
+      setRecentItems(cached.recentItems);
+      setInboxUnread(cached.inboxUnread);
+      setDepartmentsLoading(false);
+      setRecentsLoading(false);
+      return;
+    }
+
+    if (initialLoadRef.current) {
+      await initialLoadRef.current;
+      return;
+    }
+
+    const request = (async () => {
+      try {
+        setDepartmentsLoading(true);
+        setRecentsLoading(true);
 
         const [userDepts, recentCommsResponse, contacts] = await Promise.all([
-            getUserDepartments(user.id),
-            getCommunications({ limit: 100 }),
-            getContacts(user.company_id),
+          getUserDepartments(user.id),
+          getCommunications({ limit: 50 }),
+          getContacts(user.company_id),
         ]);
-        
+
         const deptsArray = Array.isArray(userDepts) ? userDepts : [];
 
         const deptsWithCounts = await Promise.all(
           deptsArray.map(async (dept) => {
             try {
-                const [comms, dnd] = await Promise.all([
-                    getCommunications({ department_id: dept.id, type: 'unread', limit: 1000 }),
-                    getDndStatus(dept.id, user.id)
-                ]);
-                const unreadCount = Array.isArray(comms.results) ? comms.results.filter(c => !c.is_read).length : 0;
-                return { ...dept, unread_count: unreadCount, is_dnd: dnd.is_dnd };
+              const deptCacheKey = `sidebar-dept:${user.id}:${dept.id}`;
+              const cachedDept = cacheGet<DepartmentWithUnread>(deptCacheKey);
+              if (cachedDept) return cachedDept;
+
+              const [unreadLogs, dnd] = await Promise.all([
+                getUnreadCallLogs(dept.id),
+                getDndStatus(dept.id, user.id),
+              ]);
+              const unreadCount = Array.isArray(unreadLogs) ? unreadLogs.length : 0;
+              const result = { ...dept, unread_count: unreadCount, is_dnd: dnd.is_dnd };
+              cacheSet(deptCacheKey, result, SIDEBAR_CACHE_TTL);
+              return result;
             } catch (e) {
-                console.error(`Failed to get data for department ${dept.id}`, e);
-                return { ...dept, unread_count: 0, is_dnd: false };
+              console.error(`Failed to get data for department ${dept.id}`, e);
+              return { ...dept, unread_count: 0, is_dnd: false };
             }
           })
         );
-        
-        if (mounted) setDepartments(deptsWithCounts);
+
+        setDepartments(deptsWithCounts);
 
         const recentComms = Array.isArray(recentCommsResponse.results) ? recentCommsResponse.results : [];
         const uniqueRecents: { [key: string]: RecentItem } = {};
-
-        const inboxUnreadCount = recentComms.filter(c => !c.is_read).length;
-        if (mounted) setInboxUnread(inboxUnreadCount);
+        const inboxUnreadCount = recentComms.filter((c) => !c.is_read).length;
+        setInboxUnread(inboxUnreadCount);
 
         recentComms.forEach((comm: Communication) => {
-            const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
-            const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
+          const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
+          const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
 
-            if (!uniqueRecents[otherPartyNumber]) {
-                const contact = (contacts) ? contacts.find((c: Contact) => c.phone_no === otherPartyNumber) : null;
-                const display = getOtherPartyDisplay(comm, contact);
-                uniqueRecents[otherPartyNumber] = {
-                    id: otherPartyNumber,
-                    name: display.displayName,
-                    href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}`,
-                    initials: display.initial,
-                    unread_count: 0
-                };
-            }
+          if (!uniqueRecents[otherPartyNumber]) {
+            const contact = contacts
+              ? contacts.find((c: Contact) => c.phone_no === otherPartyNumber)
+              : null;
+            const display = getOtherPartyDisplay(comm, contact);
+            uniqueRecents[otherPartyNumber] = {
+              id: otherPartyNumber,
+              name: display.displayName,
+              href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}`,
+              initials: display.initial,
+              unread_count: 0,
+            };
+          }
         });
 
-        // Now count unread for each unique recent contact
-        Object.keys(uniqueRecents).forEach(number => {
-            const unreadCount = recentComms.filter(
-                c => (c.direction === 'inbound' ? c.from : c.to) === number && !c.is_read
-            ).length;
-            uniqueRecents[number].unread_count = unreadCount;
+        Object.keys(uniqueRecents).forEach((number) => {
+          const unreadCount = recentComms.filter(
+            (c) => (c.direction === 'inbound' ? c.from : c.to) === number && !c.is_read
+          ).length;
+          uniqueRecents[number].unread_count = unreadCount;
         });
-        
-        if (mounted) {
-            setRecentItems(Object.values(uniqueRecents).slice(0, 10));
-        }
 
+        const recents = Object.values(uniqueRecents).slice(0, 10);
+        setRecentItems(recents);
+
+        cacheSet(cacheKey, {
+          departments: deptsWithCounts,
+          recentItems: recents,
+          inboxUnread: inboxUnreadCount,
+        }, SIDEBAR_CACHE_TTL);
       } catch (error) {
-        console.error("Failed to fetch sidebar data", error);
-        if (mounted) {
-            setDepartments([]);
-            setRecentItems([]);
-        }
+        console.error('Failed to fetch sidebar data', error);
+        setDepartments([]);
+        setRecentItems([]);
       } finally {
-        if (mounted) setLoading(false);
+        setDepartmentsLoading(false);
+        setRecentsLoading(false);
+        initialLoadRef.current = null;
       }
-    };
+    })();
 
-    fetchSidebarData();
+    initialLoadRef.current = request;
+    await request;
+  }, [user]);
 
-    const refreshHandler = () => fetchSidebarData();
-    const handleDndStatusChange = (data: any) => {
+  useEffect(() => {
+    if (!user) return;
+
+    fetchInitialSidebarData();
+
+    const debouncedUnreadRefresh = debounce(() => {
+      refreshDepartmentUnreadBadges();
+    }, UNREAD_REFRESH_DEBOUNCE_MS);
+
+    const handleDndStatusChange = (data: { department_id?: number; is_dnd?: boolean }) => {
       if (data?.department_id == null || data?.is_dnd === undefined) return;
 
-      setDepartments(prevDepartments =>
-        prevDepartments.map(dept =>
+      setDepartments((prevDepartments) =>
+        prevDepartments.map((dept) =>
           dept.id === data.department_id
             ? { ...dept, is_dnd: Boolean(data.is_dnd) }
             : dept
@@ -141,17 +257,15 @@ export function InAppSidebar() {
       );
     };
 
-    events.on('refreshDepartmentsUnread', refreshHandler);
-    events.on('refreshCalls', refreshHandler);
+    // Only refresh unread badges when the user reads something — not on every socket call event.
+    events.on('refreshDepartmentsUnread', debouncedUnreadRefresh);
     events.on('refreshOperators', handleDndStatusChange);
 
     return () => {
-      mounted = false;
-      events.off('refreshDepartmentsUnread', refreshHandler);
-      events.off('refreshCalls', refreshHandler);
+      events.off('refreshDepartmentsUnread', debouncedUnreadRefresh);
       events.off('refreshOperators', handleDndStatusChange);
     };
-  }, [user]);
+  }, [user, fetchInitialSidebarData, refreshDepartmentUnreadBadges]);
 
   return (
     <>
@@ -224,7 +338,7 @@ export function InAppSidebar() {
          <SidebarGroup>
             <SidebarGroupLabel>Departments</SidebarGroupLabel>
             <SidebarMenu>
-                {loading ? (
+                {departmentsLoading ? (
                     <SidebarMenuItem>
                         <SidebarMenuButton disabled>Loading...</SidebarMenuButton>
                     </SidebarMenuItem>
@@ -255,7 +369,7 @@ export function InAppSidebar() {
          <SidebarGroup>
             <SidebarGroupLabel>Recents</SidebarGroupLabel>
             <SidebarMenu>
-                 {loading ? (
+                 {recentsLoading ? (
                     <SidebarMenuItem>
                         <SidebarMenuButton disabled>Loading...</SidebarMenuButton>
                     </SidebarMenuItem>

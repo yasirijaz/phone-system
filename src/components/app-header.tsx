@@ -33,6 +33,7 @@ import { Switch } from "./ui/switch";
 import { cn, formatPhoneNumber } from "@/lib/utils";
 import { isElectron } from '@/lib/is-electron';
 import { canListAllCompanyDepartments } from '@/lib/roles';
+import { cacheGet, cacheSet } from '@/lib/simpleCache';
 import { Logo } from "./icons";
 
 type AppInfo = { version?: string; updateReady?: boolean };
@@ -263,6 +264,35 @@ export default function AppHeader({
     useEffect(() => {
         const fetchInitialData = async () => {
             if (!user) return;
+
+            const cacheKey = `header-init:${user.id}`;
+            const cached = cacheGet<{
+              departments: Department[];
+              contacts: Contact[];
+              firstDeptId?: string;
+            }>(cacheKey);
+            if (cached) {
+              setDepartments(cached.departments);
+              setContacts(cached.contacts);
+              if (cached.firstDeptId) {
+                setSelectedDepartmentId(cached.firstDeptId);
+                setLoadingNumbers(true);
+                try {
+                  const numbers = await getPhoneNumbers(Number(cached.firstDeptId));
+                  setPhoneNumbers(numbers);
+                  if (numbers.length > 0) {
+                    setSelectedFromNumber(numbers[0].phone_no);
+                  }
+                } catch {
+                  // ignore cached phone number load failure
+                } finally {
+                  setLoadingNumbers(false);
+                }
+              }
+              setLoadingDepartments(false);
+              return;
+            }
+
             setLoadingDepartments(true);
             try {
                 const canFetchAllDepts = canListAllCompanyDepartments(user.role_id);
@@ -273,11 +303,31 @@ export default function AppHeader({
                     user.company_id ? getContacts(user.company_id) : Promise.resolve([])
                 ]);
                 const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
+                const contactList = Array.isArray(fetchedContacts) ? fetchedContacts : [];
                 setDepartments(depts);
-                setContacts(Array.isArray(fetchedContacts) ? fetchedContacts : []);
+                setContacts(contactList);
+
+                let firstDeptId: string | undefined;
                 if (depts.length > 0) {
-                    handleDepartmentChange(String(depts[0].id));
+                    firstDeptId = String(depts[0].id);
+                    setSelectedDepartmentId(firstDeptId);
+                    setLoadingNumbers(true);
+                    try {
+                      const numbers = await getPhoneNumbers(depts[0].id);
+                      setPhoneNumbers(numbers);
+                      if (numbers.length > 0) {
+                        setSelectedFromNumber(numbers[0].phone_no);
+                      }
+                    } finally {
+                      setLoadingNumbers(false);
+                    }
                 }
+
+                cacheSet(cacheKey, {
+                  departments: depts,
+                  contacts: contactList,
+                  firstDeptId,
+                }, 60_000);
             } catch (error) {
                 toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
             } finally {
@@ -285,7 +335,7 @@ export default function AppHeader({
             }
         };
         fetchInitialData();
-    }, [user, toast, handleDepartmentChange]);
+    }, [user?.id, user?.company_id, user?.role_id, toast]);
     
     const handleMakeCall = async (number: string, fromNumber?: string) => {
         if (!device || !isDeviceReady) {
