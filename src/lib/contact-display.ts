@@ -23,6 +23,97 @@ export function getOtherPartyNumber(comm: Communication): string {
   return comm.direction === 'outbound' ? comm.to : comm.from;
 }
 
+/** contact_name returned by the call/thread detail API (saved contact indicator). */
+export function getApiContactName(comm: Communication): string | null {
+  return comm.contact_name?.trim() || null;
+}
+
+export function getThreadApiContactName(
+  logs: Communication[],
+  otherPartyNumber: string
+): string | null {
+  for (let i = logs.length - 1; i >= 0; i -= 1) {
+    const log = logs[i];
+    if (getOtherPartyNumber(log) !== otherPartyNumber) continue;
+    const name = getApiContactName(log);
+    if (name) return name;
+  }
+  return null;
+}
+
+/** True when the thread detail API returned contact_name for this number. */
+export function isThreadContactSavedFromApi(
+  logs: Communication[],
+  otherPartyNumber: string
+): boolean {
+  return Boolean(getThreadApiContactName(logs, otherPartyNumber));
+}
+
+/** Saved contact fields from thread detail API, merged with local contact when available. */
+export function getThreadSavedContactFromApi(
+  logs: Communication[],
+  otherPartyNumber: string,
+  localContact?: Contact | null
+): Partial<Contact> | null {
+  const apiName = getThreadApiContactName(logs, otherPartyNumber);
+  if (!apiName) return null;
+
+  for (let i = logs.length - 1; i >= 0; i -= 1) {
+    const log = logs[i];
+    if (getOtherPartyNumber(log) !== otherPartyNumber) continue;
+    if (!getApiContactName(log)) continue;
+
+    const isOutbound = log.direction === 'outbound';
+    const nameRecord = isOutbound ? log.to_name : log.from_name;
+    if (nameRecord && typeof nameRecord === 'object') {
+      return {
+        ...nameRecord,
+        name: apiName,
+        phone_no: otherPartyNumber,
+      };
+    }
+  }
+
+  if (localContact) {
+    return {
+      ...localContact,
+      name: apiName,
+      phone_no: otherPartyNumber,
+    };
+  }
+
+  return {
+    name: apiName,
+    phone_no: otherPartyNumber,
+  };
+}
+
+export function buildThreadContactState(
+  logs: Communication[],
+  otherPartyNumber: string,
+  localContact?: Contact | null
+): Partial<Contact> & {
+  sublabel: string | null;
+  hasContactName: boolean;
+  apiContactName: string | null;
+  isSavedFromApi: boolean;
+} {
+  const display = getThreadContactDisplay(logs, otherPartyNumber, localContact);
+  const apiContactName = getThreadApiContactName(logs, otherPartyNumber);
+  const apiSavedContact = getThreadSavedContactFromApi(logs, otherPartyNumber, localContact);
+
+  return {
+    ...(localContact || {}),
+    ...(apiSavedContact || {}),
+    phone_no: otherPartyNumber,
+    name: display.displayName,
+    sublabel: display.sublabel,
+    hasContactName: display.hasContactName,
+    apiContactName,
+    isSavedFromApi: Boolean(apiContactName),
+  };
+}
+
 /** Resolve a human-readable name; contact_name from the API takes priority. */
 export function resolveContactName(
   comm: Communication,

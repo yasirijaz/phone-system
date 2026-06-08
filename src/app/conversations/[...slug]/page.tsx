@@ -21,8 +21,8 @@ import { sendSms } from "@/services/twilioService";
 import { getContacts } from "@/services/contactService";
 import { events } from "@/lib/events";
 import ContactProfile from "@/components/contact-profile";
-import { cn, formatPhoneNumber } from "@/lib/utils";
-import { getThreadContactDisplay } from "@/lib/contact-display";
+import { cn, formatPhoneNumber, phonesMatch } from "@/lib/utils";
+import { buildThreadContactState } from "@/lib/contact-display";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 export default function ConversationDetailPage() {
@@ -55,7 +55,7 @@ export default function ConversationDetailPage() {
 
     const findContact = (phone: string, contactList: Contact[]) => {
         if(!contactList || contactList.length === 0) return null;
-        return contactList.find(c => c.phone_no === phone);
+        return contactList.find(c => phonesMatch(c.phone_no, phone)) ?? null;
     };
 
     const refreshThread = useCallback(async () => {
@@ -76,27 +76,13 @@ export default function ConversationDetailPage() {
                 const latestComm = sortedLogs[sortedLogs.length - 1];
                 const otherPartyNumber = latestComm.direction === 'inbound' ? latestComm.from : latestComm.to;
                 const foundContact = findContact(otherPartyNumber, contactList);
-                const display = getThreadContactDisplay(sortedLogs, otherPartyNumber, foundContact);
 
-                setContact({
-                    ...(foundContact || {}),
-                    phone_no: otherPartyNumber,
-                    name: display.displayName,
-                    sublabel: display.sublabel,
-                    hasContactName: display.hasContactName,
-                });
+                setContact(buildThreadContactState(sortedLogs, otherPartyNumber, foundContact));
              } else {
                  const otherPartyNumber = to;
                  const foundContact = findContact(otherPartyNumber, contactList);
-                 const display = getThreadContactDisplay([], otherPartyNumber, foundContact);
 
-                 setContact({
-                    ...(foundContact || {}),
-                    phone_no: otherPartyNumber,
-                    name: display.displayName,
-                    sublabel: display.sublabel,
-                    hasContactName: display.hasContactName,
-                 });
+                 setContact(buildThreadContactState([], otherPartyNumber, foundContact));
              }
         } catch (e) {
             console.error('Failed to refresh conversation thread', e);
@@ -203,15 +189,8 @@ export default function ConversationDetailPage() {
                     }
                 }
                 
-                const foundContact = contactList.find(c => c.phone_no === otherPartyNumber);
-                const display = getThreadContactDisplay(sortedLogs, otherPartyNumber, foundContact);
-                setContact({
-                    ...(foundContact || {}),
-                    phone_no: otherPartyNumber,
-                    name: display.displayName,
-                    sublabel: display.sublabel,
-                    hasContactName: display.hasContactName,
-                });
+                const foundContact = contactList.find(c => phonesMatch(c.phone_no, otherPartyNumber));
+                setContact(buildThreadContactState(sortedLogs, otherPartyNumber, foundContact ?? null));
                 
                 if (numberToDeptMap[ourNumber]) {
                     setDepartmentName(numberToDeptMap[ourNumber]);
@@ -402,7 +381,12 @@ export default function ConversationDetailPage() {
                                     <ResizableHandle withHandle />
                                     <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
                                         <aside className="border-l bg-background overflow-y-auto h-full">
-                                            <ContactProfile contact={contact} onContactUpdate={refreshThread} onCollapse={() => setIsProfileSidebarOpen(false)} />
+                                            <ContactProfile
+                                              contact={contact}
+                                              contacts={contacts}
+                                              onContactUpdate={refreshThread}
+                                              onCollapse={() => setIsProfileSidebarOpen(false)}
+                                            />
                                         </aside>
                                     </ResizablePanel>
                                 </>

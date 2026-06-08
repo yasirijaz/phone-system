@@ -1,19 +1,17 @@
 
-
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import { ChevronDown, PlusCircle, Trash2, User, PanelRightOpen, PlayCircle } from 'lucide-react';
+import { ChevronDown, PlusCircle, PanelRightOpen, PlayCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { createContact, updateContact, blockContact, unblockContact } from '@/services/contactService';
@@ -21,10 +19,17 @@ import type { Contact } from '@/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Label } from './ui/label';
-import { formatPhoneNumber } from '@/lib/utils';
+import { formatPhoneNumber, phonesMatch } from '@/lib/utils';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 interface ContactProfileProps {
-    contact: any;
+    contact: Partial<Contact> & {
+        sublabel?: string | null;
+        hasContactName?: boolean;
+        apiContactName?: string | null;
+        isSavedFromApi?: boolean;
+    };
+    contacts?: Contact[];
     onContactUpdate: () => void;
     onCollapse: () => void;
 }
@@ -38,12 +43,58 @@ const contactSchema = z.object({
 
 type BlockOption = 'voicemail' | 'spam' | 'hard';
 
-export default function ContactProfile({ contact, onContactUpdate, onCollapse }: ContactProfileProps) {
+function isContactBlocked(contact: Partial<Contact> | null | undefined): boolean {
+    if (!contact) return false;
+    return Boolean(contact.is_block) || contact.status === 'blocked';
+}
+
+function resolveSavedContact(
+    contact: ContactProfileProps['contact'],
+    contacts?: Contact[]
+): Partial<Contact> | null {
+    if (typeof contact?.id === 'number' && contact.id > 0) {
+        return contact;
+    }
+
+    const matched = contacts?.find((c) => phonesMatch(c.phone_no, contact?.phone_no));
+    if (matched) {
+        return {
+            ...matched,
+            name: contact.apiContactName || matched.name || contact?.name,
+            phone_no: contact?.phone_no || matched.phone_no,
+        };
+    }
+
+    if (contact.isSavedFromApi) {
+        return {
+            name: contact.apiContactName || contact.name,
+            phone_no: contact.phone_no,
+            email: contact.email,
+            phone_type: contact.phone_type,
+            is_block: contact.is_block,
+            status: contact.status,
+        };
+    }
+
+    return null;
+}
+
+export default function ContactProfile({ contact, contacts, onContactUpdate, onCollapse }: ContactProfileProps) {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isEditing, setIsEditing] = useState(false);
     const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
     const [selectedBlockOption, setSelectedBlockOption] = useState<BlockOption>('voicemail');
+
+    const savedContact = useMemo(
+        () => resolveSavedContact(contact, contacts),
+        [contact, contacts]
+    );
+    const isSavedContact = Boolean(contact.isSavedFromApi);
+    const isBlocked = isContactBlocked(savedContact);
+    const savedContactId =
+        savedContact?.id ??
+        contacts?.find((c) => phonesMatch(c.phone_no, contact.phone_no))?.id;
 
     const form = useForm<z.infer<typeof contactSchema>>({
         resolver: zodResolver(contactSchema),
@@ -55,30 +106,38 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
         }
     });
 
-    const isSavedContact = !!contact?.id;
-
     useEffect(() => {
-        if (contact) {
-            form.reset({
-                name: isSavedContact ? contact.name : '',
-                email: contact.email || '',
-                phone_no: contact.phone_no || '',
-                phone_type: contact.phone_type || 'mobile',
-            });
-        }
-    }, [contact, form, isSavedContact]);
+        if (!contact) return;
+
+        form.reset({
+            name: savedContact?.name || contact.name || '',
+            email: savedContact?.email || contact.email || '',
+            phone_no: savedContact?.phone_no || contact.phone_no || '',
+            phone_type: savedContact?.phone_type || contact.phone_type || 'mobile',
+        });
+    }, [contact, savedContact, form]);
     
     const handleAddClick = () => {
         form.reset({
             name: '',
             email: '',
-            phone_no: contact.phone_no,
+            phone_no: contact.phone_no || '',
             phone_type: 'mobile',
         });
         setIsEditing(true);
     };
+
+    const openEditDialog = () => {
+        form.reset({
+            name: savedContact?.name || contact.apiContactName || contact.name || '',
+            email: savedContact?.email || contact.email || '',
+            phone_no: savedContact?.phone_no || contact.phone_no || '',
+            phone_type: savedContact?.phone_type || contact.phone_type || 'mobile',
+        });
+        setIsEditing(true);
+    };
     
-    if (!contact) {
+    if (!contact?.phone_no) {
         return (
             <div className="h-full flex items-center justify-center text-muted-foreground">
                 <p>Select a conversation to see details.</p>
@@ -86,14 +145,22 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
         );
     }
     
-    const contactInitial = contact.name ? contact.name.charAt(0).toUpperCase() : '?';
+    const displayName = contact.name || formatPhoneNumber(contact.phone_no);
+    const contactInitial = displayName ? displayName.charAt(0).toUpperCase() : '?';
 
     const handleFormSubmit = async (values: z.infer<typeof contactSchema>) => {
         if (!user?.company_id) return;
         try {
-            if (isSavedContact) {
-                await updateContact(contact.id, { ...values, company_id: user.company_id });
+            if (isSavedContact && savedContactId) {
+                await updateContact(savedContactId, { ...values, company_id: user.company_id });
                 toast({ title: 'Success', description: 'Contact updated.' });
+            } else if (isSavedContact && !savedContactId) {
+                toast({
+                    title: 'Error',
+                    description: 'Contact is saved but could not be updated. Try refreshing the page.',
+                    variant: 'destructive',
+                });
+                return;
             } else {
                 await createContact({ ...values, company_id: user.company_id });
                 toast({ title: 'Success', description: 'Contact created.' });
@@ -106,9 +173,16 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
     };
     
     const handleBlock = async () => {
-        if (!isSavedContact) return;
+        if (!savedContactId) {
+            toast({
+                title: 'Error',
+                description: 'Contact is saved but could not be blocked. Try refreshing the page.',
+                variant: 'destructive',
+            });
+            return;
+        }
         try {
-            await blockContact(contact.id, selectedBlockOption);
+            await blockContact(savedContactId, selectedBlockOption);
             toast({ title: 'Success', description: `Contact has been blocked.` });
             onContactUpdate();
             setIsBlockDialogOpen(false);
@@ -118,9 +192,16 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
     };
     
     const handleUnblock = async () => {
-        if (!isSavedContact) return;
+        if (!savedContactId) {
+            toast({
+                title: 'Error',
+                description: 'Contact is saved but could not be unblocked. Try refreshing the page.',
+                variant: 'destructive',
+            });
+            return;
+        }
         try {
-            await unblockContact(contact.id);
+            await unblockContact(savedContactId);
             toast({ title: 'Success', description: 'Contact has been unblocked.' });
             onContactUpdate();
         } catch (error: any) {
@@ -141,28 +222,62 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                     <Avatar className="h-12 w-12 text-xl">
                         <AvatarFallback>{contactInitial}</AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 flex items-center justify-between">
-                         <h3 className="text-xl font-bold">{contact.name}</h3>
-                         <Button variant="ghost" size="icon"><ChevronDown className="h-5 w-5" /></Button>
+                    <div className="flex-1 flex items-center justify-between min-w-0">
+                         <div className="min-w-0">
+                           <h3 className="text-xl font-bold truncate">{displayName}</h3>
+                           {contact.sublabel && (
+                             <p className="text-sm text-muted-foreground truncate">{contact.sublabel}</p>
+                           )}
+                         </div>
+                         <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="shrink-0">
+                                  <ChevronDown className="h-5 w-5" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                {isSavedContact ? (
+                                  <>
+                                    <DropdownMenuItem onSelect={openEditDialog}>
+                                      Edit contact
+                                    </DropdownMenuItem>
+                                    {isBlocked ? (
+                                      <DropdownMenuItem onSelect={handleUnblock}>
+                                        Unblock contact
+                                      </DropdownMenuItem>
+                                    ) : (
+                                      <DropdownMenuItem
+                                        className="text-destructive focus:text-destructive"
+                                        onSelect={() => setIsBlockDialogOpen(true)}
+                                      >
+                                        Block contact
+                                      </DropdownMenuItem>
+                                    )}
+                                  </>
+                                ) : (
+                                  <DropdownMenuItem onSelect={handleAddClick}>
+                                    Add contact
+                                  </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                         </DropdownMenu>
                     </div>
                 </div>
 
                 <div className="space-y-4">
                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">{contact.phone_type || 'Other'}</span>
-                        <span>{formatPhoneNumber(contact.phone_no)}</span>
+                        <span className="text-muted-foreground">{savedContact?.phone_type || contact.phone_type || 'Other'}</span>
+                        <span>{formatPhoneNumber(savedContact?.phone_no || contact.phone_no)}</span>
                     </div>
                      <div className="flex justify-between gap-2">
                         <Dialog open={isEditing} onOpenChange={setIsEditing}>
-                            <DialogTrigger asChild>
-                                {isSavedContact ? (
-                                    <Button variant="outline" className="w-full" onClick={() => setIsEditing(true)}>Edit contact</Button>
-                                ) : (
-                                     <Button className="w-full" onClick={handleAddClick}>
-                                        <PlusCircle className="mr-2 h-4 w-4" /> Add contact
-                                    </Button>
-                                )}
-                            </DialogTrigger>
+                            {!isSavedContact && (
+                              <DialogTrigger asChild>
+                                  <Button className="w-full" onClick={handleAddClick}>
+                                      <PlusCircle className="mr-2 h-4 w-4" /> Add contact
+                                  </Button>
+                              </DialogTrigger>
+                            )}
                              <DialogContent>
                                 <DialogHeader>
                                     <DialogTitle>{isSavedContact ? 'Edit' : 'Add'} Contact</DialogTitle>
@@ -201,7 +316,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                             </DialogContent>
                         </Dialog>
                          {isSavedContact && (
-                             contact.is_block ? (
+                             isBlocked ? (
                                  <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                         <Button variant="outline" className="w-full">Unblock Contact</Button>
@@ -226,7 +341,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                                     </DialogTrigger>
                                     <DialogContent className="sm:max-w-md">
                                         <DialogHeader>
-                                            <DialogTitle>BLOCK {formatPhoneNumber(contact.phone_no)}</DialogTitle>
+                                            <DialogTitle>BLOCK {formatPhoneNumber(savedContact?.phone_no || contact.phone_no)}</DialogTitle>
                                             <DialogDescription>
                                                 This will prevent this number from calling you or sending you messages.
                                             </DialogDescription>
@@ -249,7 +364,7 @@ export default function ContactProfile({ contact, onContactUpdate, onCollapse }:
                                             <Label className="flex items-start gap-4 p-4 rounded-md border has-[:checked]:border-primary">
                                                 <RadioGroupItem value="hard" />
                                                 <div className="grid gap-1.5 leading-normal">
-                                                     <span className="font-semibold">Block {formatPhoneNumber(contact.phone_no)}</span>
+                                                     <span className="font-semibold">Block {formatPhoneNumber(savedContact?.phone_no || contact.phone_no)}</span>
                                                      <span className="text-sm text-muted-foreground">Callers will hear a not-in-service message. Text and voicemail messages will not be allowed.</span>
                                                       <Button variant="link" size="sm" className="p-0 h-auto justify-start text-primary">
                                                         <PlayCircle className="mr-1 h-4 w-4" /> Preview not-in-service message

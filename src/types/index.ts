@@ -247,6 +247,7 @@ export interface Contact {
   phone_no: string;
   phone_type: string;
   status?: 'active' | 'blocked';
+  is_block?: boolean | number | null;
 }
 
 export interface MediaFile {

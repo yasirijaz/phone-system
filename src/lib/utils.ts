@@ -35,3 +35,23 @@ export function formatPhoneNumber(phoneNumberString: string | undefined | null) 
   }
   return phoneNumberString;
 }
+
+/** Strip phone numbers to comparable digits (10-digit US when possible). */
+export function normalizePhoneDigits(phone: string | undefined | null): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return digits.slice(1);
+  }
+  return digits;
+}
+
+export function phonesMatch(
+  a: string | undefined | null,
+  b: string | undefined | null
+): boolean {
+  const left = normalizePhoneDigits(a);
+  const right = normalizePhoneDigits(b);
+  if (!left || !right) return false;
+  return left === right;
+}
