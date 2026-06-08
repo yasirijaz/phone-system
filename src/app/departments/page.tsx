@@ -21,6 +21,7 @@ import { PlusCircle, Edit, Trash2, Settings, Users, Phone } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from "next/navigation";
+import AppHeader from "@/components/app-header";
 import {
   isPlatformAdmin,
   isCompanyAdmin,
