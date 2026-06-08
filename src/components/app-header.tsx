@@ -32,6 +32,7 @@ import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import { cn, formatPhoneNumber } from "@/lib/utils";
 import { isElectron } from '@/lib/is-electron';
+import { canListAllCompanyDepartments } from '@/lib/roles';
 import { Logo } from "./icons";
 
 type AppInfo = { version?: string; updateReady?: boolean };
@@ -264,9 +265,9 @@ export default function AppHeader({
             if (!user) return;
             setLoadingDepartments(true);
             try {
-                const isAdmin = user.role_id === 1 || user.role_id === 2;
+                const canFetchAllDepts = canListAllCompanyDepartments(user.role_id);
                 const [fetchedDepts, fetchedContacts] = await Promise.all([
-                    isAdmin && user.company_id
+                    canFetchAllDepts && user.company_id
                         ? getDepartments(user.company_id)
                         : getUserDepartments(user.id),
                     user.company_id ? getContacts(user.company_id) : Promise.resolve([])

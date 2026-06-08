@@ -27,6 +27,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, PlusCircle, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import AppHeader from "@/components/app-header";
+import { canAccessCompanySettings } from "@/lib/roles";
 
 const businessHoursSchema = z.object({
   day: z.string(),
@@ -126,8 +127,10 @@ export default function CompanySettingsPage() {
   const is247 = form.watch("business_hours.is_24_7");
 
   useEffect(() => {
-    if (user?.role_id === 3) {
-       router.replace('/');
+    if (!user) return;
+
+    if (!canAccessCompanySettings(user.role_id)) {
+       router.replace('/app');
        return;
     }
 

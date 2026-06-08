@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import PaginationControls from "@/components/pagination-controls";
 import { events } from '@/lib/events';
 import { formatPhoneNumber } from "@/lib/utils";
+import { getRoleName } from '@/lib/roles';
 import {
   getWorkerStatusFromUser,
   getWorkerStatusBadgeVariant,
@@ -292,15 +293,6 @@ export default function DepartmentDetailPage() {
   };
   
   const departmentPhoneNumber = phoneNumbers.length > 0 ? formatPhoneNumber(phoneNumbers[0].phone_no) : 'No number assigned';
-
-  const getRoleName = (roleId?: number) => {
-    switch (roleId) {
-        case 1: return 'Super Admin';
-        case 2: return 'Admin';
-        case 3: return 'User';
-        default: return 'Unknown';
-    }
-  };
 
   const renderTabContent = (tabName: TabName) => {
     const currentData = data[tabName];

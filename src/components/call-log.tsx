@@ -15,6 +15,7 @@ import { markCommunicationField, markRead } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
 import { cn, formatPhoneNumber, getContactAvatarColorClass } from '@/lib/utils';
+import { hasSupervisorAccess } from '@/lib/roles';
 import { getCommunicationMediaUrls, isImageMediaUrl, isInlineImageBody } from '@/lib/message-media';
 import { getOtherPartyDisplay } from '@/lib/contact-display';
 import {
@@ -60,7 +61,7 @@ function CommunicationCard({
     isMiddleOfGroup: boolean | null
 }) {
   const { user } = useAuth();
-  const isAdmin = user?.role_id === 1 || user?.role_id === 2;
+  const isAdmin = hasSupervisorAccess(user?.role_id);
   const { toast } = useToast();
   const [isTogglingStar, setIsTogglingStar] = React.useState(false);
   const cardRef = React.useRef<HTMLDivElement>(null);

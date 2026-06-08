@@ -24,6 +24,10 @@ import type { PhoneNumber } from "@/types";
 import { getPhoneNumbers, createPhoneNumber, updatePhoneNumber, deletePhoneNumber } from "@/services/phoneNumberService";
 import AppHeader from "@/components/app-header";
 import { formatPhoneNumber } from "@/lib/utils";
+import {
+  canViewPhoneNumbers,
+  canManagePhoneNumbers,
+} from '@/lib/roles';
 
 const phoneNumberSchema = z.object({
   phone_no: z.string().min(10, "Phone number is required."),
@@ -48,15 +52,18 @@ export default function PhoneNumbersPage() {
     defaultValues: { phone_no: "", type: "local", label: "" },
   });
 
+  const canView = canViewPhoneNumbers(user?.role_id);
+  const canManage = canManagePhoneNumbers(user?.role_id);
+
   useEffect(() => {
-    if (user && ![1, 2].includes(user.role_id ?? 0)) {
+    if (user && !canView) {
         router.replace('/');
         return;
     }
-    if (departmentId) {
+    if (departmentId && canView) {
       fetchPhoneNumbers();
     }
-  }, [user, departmentId, router]);
+  }, [user, departmentId, router, canView]);
 
   const fetchPhoneNumbers = async () => {
     try {
@@ -145,7 +152,7 @@ export default function PhoneNumbersPage() {
     return formatted;
   };
   
-  if (user && ![1, 2].includes(user.role_id ?? 0)) {
+  if (user && !canView) {
     return null;
   }
 
@@ -162,6 +169,7 @@ export default function PhoneNumbersPage() {
               </Button>
               <h1 className="text-xl font-bold">Department Phone Numbers</h1>
             </div>
+            {canManage && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => handleDialogOpen()}>
@@ -211,6 +219,7 @@ export default function PhoneNumbersPage() {
                 </Form>
               </DialogContent>
             </Dialog>
+            )}
           </header>
 
           <main className="flex-1 p-4 md:p-8 bg-muted/40">
@@ -227,7 +236,7 @@ export default function PhoneNumbersPage() {
                         <TableHead>Number</TableHead>
                         <TableHead>Label</TableHead>
                         <TableHead>Type</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        {canManage && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -236,6 +245,7 @@ export default function PhoneNumbersPage() {
                           <TableCell className="font-medium">{formatPhoneNumber(num.phone_no)}</TableCell>
                           <TableCell>{num.label}</TableCell>
                           <TableCell>{num.type}</TableCell>
+                          {canManage && (
                           <TableCell className="text-right">
                             <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(num)}><Edit className="h-4 w-4" /></Button>
                             <AlertDialog>
@@ -249,9 +259,10 @@ export default function PhoneNumbersPage() {
                               </AlertDialogContent>
                             </AlertDialog>
                           </TableCell>
+                          )}
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={4} className="text-center h-24">No phone numbers found.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={canManage ? 4 : 3} className="text-center h-24">No phone numbers found.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>

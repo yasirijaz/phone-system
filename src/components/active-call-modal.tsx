@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn, formatPhoneNumber } from '@/lib/utils';
+import { hasSupervisorAccess } from '@/lib/roles';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
 import { allParticipant, removeParticipant, addParticipant, holdParticipant } from '@/services/twilioService';
 import { getDepartmentSettings } from '@/services/departmentSettingsService';
@@ -292,7 +293,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
     return null;
   }
   
-  const isAdmin = authUser?.role_id === 1 || authUser?.role_id === 2;
+  const isAdmin = hasSupervisorAccess(authUser?.role_id);
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-50">

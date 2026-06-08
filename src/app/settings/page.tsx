@@ -4,21 +4,26 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { canAccessCompanySettings } from "@/lib/roles";
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (user?.company_id) {
+    if (!user) return;
+
+    if (!canAccessCompanySettings(user.role_id)) {
+      router.replace('/app');
+      return;
+    }
+
+    if (user.company_id) {
         if (user.role_id === 1) {
             router.replace('/companies');
         } else {
             router.replace(`/companies/${user.company_id}/settings`);
         }
-    } else if (user && user.role_id !== 1) {
-        // Fallback for user without company_id, maybe redirect to a different page
-        router.replace('/');
     }
   }, [user, router]);
 

@@ -21,7 +21,16 @@ import { PlusCircle, Edit, Trash2, Settings, Users, Phone } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from "next/navigation";
-import AppHeader from "@/components/app-header";
+import {
+  isPlatformAdmin,
+  isCompanyAdmin,
+  isManager,
+  isRegularUser,
+  canCreateDepartments,
+  canDeleteDepartments,
+  canUpdateDepartments,
+  canViewPhoneNumbers,
+} from '@/lib/roles';
 
 const departmentSchema = z.object({
   name: z.string().min(2, "Department name must be at least 2 characters."),
@@ -36,7 +45,11 @@ export default function DepartmentsPage() {
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const { toast } = useToast();
 
-  const isAdmin = user?.role_id === 1 || user?.role_id === 2;
+  const isAdmin = isPlatformAdmin(user?.role_id) || isCompanyAdmin(user?.role_id);
+  const canCreate = canCreateDepartments(user?.role_id);
+  const canDelete = canDeleteDepartments(user?.role_id);
+  const canUpdate = canUpdateDepartments(user?.role_id);
+  const canViewPhones = canViewPhoneNumbers(user?.role_id);
 
   const form = useForm<z.infer<typeof departmentSchema>>({
     resolver: zodResolver(departmentSchema),
@@ -58,7 +71,7 @@ export default function DepartmentsPage() {
       let data: Department[] = [];
       if (isAdmin && user.company_id) {
         data = await getDepartments(user.company_id);
-      } else if (user.role_id === 3) {
+      } else if (isManager(user?.role_id) || isRegularUser(user?.role_id)) {
         data = await getUserDepartments(user.id);
       }
       setDepartments(Array.isArray(data) ? data : []);
@@ -91,12 +104,14 @@ export default function DepartmentsPage() {
   }
 
   const onSubmit = async (values: z.infer<typeof departmentSchema>) => {
-    if (!user?.company_id || !isAdmin) return;
+    if (!user?.company_id) return;
     try {
       if (editingDepartment) {
+        if (!canUpdate) return;
         await updateDepartment(editingDepartment.id, { name: values.name, company_id: user.company_id });
         toast({ title: "Success", description: "Department updated successfully." });
       } else {
+        if (!canCreate) return;
         await createDepartment({ ...values, company_id: user.company_id });
         toast({ title: "Success", description: "Department created successfully." });
       }
@@ -113,7 +128,7 @@ export default function DepartmentsPage() {
   };
   
   const handleDelete = async (id: number) => {
-    if (!isAdmin) return;
+    if (!canDelete) return;
     try {
       await deleteDepartment(id);
       toast({ title: "Success", description: "Department deleted successfully." });
@@ -152,7 +167,7 @@ export default function DepartmentsPage() {
             <AppHeader user={user} logout={logout} />
            <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
             <h1 className="text-xl font-bold">Departments</h1>
-            {isAdmin && (
+            {canCreate && (
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                     <Button onClick={() => handleDialogOpen()}>
@@ -205,27 +220,30 @@ export default function DepartmentsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        {isAdmin && <TableHead className="text-right">Actions</TableHead>}
+                        {canUpdate && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {Array.isArray(departments) && departments.map((dept) => (
                         <TableRow key={dept.id}>
                           <TableCell className="font-medium">{dept.name}</TableCell>
-                          {isAdmin && (
+                          {canUpdate && (
                             <TableCell className="text-right">
                                 <Button variant="ghost" size="icon" onClick={() => handleManageUsers(dept.id)}>
                                     <Users className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleManagePhoneNumbers(dept.id)}>
-                                    <Phone className="h-4 w-4" />
-                                </Button>
+                                {canViewPhones && (
+                                  <Button variant="ghost" size="icon" onClick={() => handleManagePhoneNumbers(dept.id)}>
+                                      <Phone className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 <Button variant="ghost" size="icon" onClick={() => handleManageSettings(dept.id)}>
                                     <Settings className="h-4 w-4" />
                                 </Button>
                                 <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(dept)}>
                                 <Edit className="h-4 w-4" />
                                 </Button>
+                                {canDelete && (
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                     <Button variant="ghost" size="icon">
@@ -248,13 +266,14 @@ export default function DepartmentsPage() {
                                     </AlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
+                                )}
                             </TableCell>
                           )}
                         </TableRow>
                       ))}
                        {(!Array.isArray(departments) || departments.length === 0) && (
                           <TableRow>
-                            <TableCell colSpan={isAdmin ? 2 : 1} className="text-center h-24">
+                            <TableCell colSpan={canUpdate ? 2 : 1} className="text-center h-24">
                               No departments found.
                             </TableCell>
                           </TableRow>

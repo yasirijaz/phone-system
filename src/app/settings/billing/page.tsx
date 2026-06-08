@@ -23,6 +23,7 @@ import { Loader2, Check, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/app-header";
+import { canAccessBilling } from "@/lib/roles";
 
 const featureList = [
   "Unlimited call logging",
@@ -63,10 +64,14 @@ export default function BillingPage() {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user && !canAccessBilling(user.role_id)) {
+      router.replace('/app');
+      return;
+    }
+    if (user && canAccessBilling(user.role_id)) {
       fetchBillingData();
     }
-  }, [user]);
+  }, [user, router]);
 
   const currentPlan = useMemo(() => {
     if (!subscription || packages.length === 0) return null;
@@ -181,6 +186,10 @@ export default function BillingPage() {
       </Card>
     );
   };
+
+  if (user && !canAccessBilling(user.role_id)) {
+    return null;
+  }
 
   return (
     <SidebarProvider>

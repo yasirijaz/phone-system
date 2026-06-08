@@ -23,6 +23,7 @@ import { events } from "@/lib/events";
 import ContactProfile from "@/components/contact-profile";
 import { cn, formatPhoneNumber, phonesMatch } from "@/lib/utils";
 import { buildThreadContactState } from "@/lib/contact-display";
+import { canListAllCompanyDepartments } from "@/lib/roles";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 export default function ConversationDetailPage() {
@@ -123,9 +124,9 @@ export default function ConversationDetailPage() {
             setLoadingDepartments(true);
 
             try {
-                const isAdmin = user.role_id === 1 || user.role_id === 2;
+                const canFetchAllDepts = canListAllCompanyDepartments(user.role_id);
                 const [fetchedDepts, fetchedContacts, logs] = await Promise.all([
-                    isAdmin && user.company_id
+                    canFetchAllDepts && user.company_id
                         ? getDepartments(user.company_id)
                         : getUserDepartments(user.id),
                     user.company_id ? getContacts(user.company_id) : Promise.resolve([]),

@@ -22,6 +22,15 @@ import Link from 'next/link';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
 import { isElectron } from '@/lib/is-electron';
+import {
+  isPlatformAdmin,
+  isCompanyAdmin,
+  isManager,
+  isRegularUser,
+  isCompanyScopedAdmin,
+  canAccessBilling,
+  canAccessCompanySettings,
+} from '@/lib/roles';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 export function AppSidebar() {
@@ -36,9 +45,11 @@ export function AppSidebar() {
     router.push('/login');
   };
 
-  const isSuperAdmin = user?.role_id === 1;
-  const isCompanyAdmin = user?.role_id === 2;
-  const isRegularUser = user?.role_id === 3;
+  const isSuperAdmin = isPlatformAdmin(user?.role_id);
+  const isAdmin = isCompanyAdmin(user?.role_id);
+  const isMgr = isManager(user?.role_id);
+  const isUser = isRegularUser(user?.role_id);
+  const isScopedAdmin = isCompanyScopedAdmin(user?.role_id);
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
   const usersLink = user?.company_id ? `/companies/${user.company_id}/members` : '/companies';
@@ -64,7 +75,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>MENU</SidebarGroupLabel>
           
-          {(isCompanyAdmin || isRegularUser) && (
+          {(isAdmin || isMgr || isUser) && (
             <>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname.startsWith('/app')} tooltip="Go To App">
@@ -106,7 +117,7 @@ export function AppSidebar() {
                
             </>
           )}
-           {isCompanyAdmin && (
+           {isScopedAdmin && (
              <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === '/departments'} tooltip="Departments">
                   <Link href="/departments">
@@ -146,7 +157,7 @@ export function AppSidebar() {
             </>
           )}
 
-           {isCompanyAdmin && (
+           {isScopedAdmin && (
             <>
              <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname.startsWith('/companies') && pathname.endsWith('/members')} tooltip="Users">
@@ -170,7 +181,7 @@ export function AppSidebar() {
         
         <SidebarGroup>
             <SidebarGroupLabel>Settings</SidebarGroupLabel>
-            {(isSuperAdmin || isCompanyAdmin) && (
+            {canAccessCompanySettings(user?.role_id) && (
              <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === '/settings'} tooltip="Settings">
                 <Link href="/settings">
@@ -180,7 +191,7 @@ export function AppSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
             )}
-            {(isCompanyAdmin) && (
+            {canAccessBilling(user?.role_id) && (
              <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === '/settings/billing'} tooltip="Billing">
                 <Link href="/settings/billing">

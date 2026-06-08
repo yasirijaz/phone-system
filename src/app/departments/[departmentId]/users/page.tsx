@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AppHeader from "@/components/app-header";
+import { getRoleName } from '@/lib/roles';
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { events } from '@/lib/events';
@@ -308,7 +309,7 @@ export default function DepartmentUsersPage() {
                                 <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                               </div>
                               <Badge variant={user.role_id === 2 ? 'default' : 'secondary'}>
-                                {user.role_id === 2 ? 'Admin' : 'User'}
+                                {getRoleName(user.role_id)}
                               </Badge>
                             </label>
                           ))
@@ -371,7 +372,7 @@ export default function DepartmentUsersPage() {
                             <TableCell>{u.user.email}</TableCell>
                             <TableCell>
                               <Badge variant={u.user.role_id === 2 ? 'default' : 'secondary'}>
-                                {u.user.role_id === 1 ? 'Super Owner' : u.user.role_id === 2 ? 'Admin' : 'User'}
+                                {getRoleName(u.user.role_id)}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">

@@ -17,6 +17,10 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from 'next/navigation';
 import AppHeader from "@/components/app-header";
 import { format } from 'date-fns';
+import {
+  canAccessMediaLibrary,
+  canDeleteMediaFile,
+} from '@/lib/roles';
 
 export default function MediaPage() {
   const { user, logout } = useAuth();
@@ -28,15 +32,17 @@ export default function MediaPage() {
   const [title, setTitle] = useState('');
   const { toast } = useToast();
 
-  const isCompanyAdmin = user?.role_id === 2;
+  const canAccess = canAccessMediaLibrary(user?.role_id);
 
   useEffect(() => {
-    if (!isCompanyAdmin) {
+    if (user && !canAccess) {
         router.replace('/');
         return;
     }
-    fetchMediaFiles();
-  }, [isCompanyAdmin, router]);
+    if (canAccess) {
+      fetchMediaFiles();
+    }
+  }, [user, canAccess, router]);
 
   const fetchMediaFiles = async () => {
     setLoading(true);
@@ -98,7 +104,7 @@ export default function MediaPage() {
     toast({ title: "Copied!", description: "Link copied to clipboard." });
   }
 
-  if (!isCompanyAdmin) {
+  if (!canAccess) {
     return null; 
   }
 
@@ -154,21 +160,23 @@ export default function MediaPage() {
                           </TableCell>
                           <TableCell>{format(new Date(file.created_at), 'PPp')}</TableCell>
                           <TableCell className="text-right">
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>This action will permanently delete the file.</AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(file.id)}>Delete</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            {canDeleteMediaFile(user?.role_id, file.user_id, user?.id) && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>This action will permanently delete the file.</AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(file.id)}>Delete</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
                           </TableCell>
                         </TableRow>
                       )) : (

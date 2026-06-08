@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import AppHeader from "@/components/app-header";
+import { getRoleName } from '@/lib/roles';
 import { useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -112,7 +113,7 @@ export default function ProfilePage() {
   }
   
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
-  const userRole = user.role_id === 1 ? 'Super Admin' : user.role_id === 2 ? 'Admin' : 'User';
+  const userRole = getRoleName(user.role_id);
 
   return (
       <div className="flex flex-col min-h-screen">

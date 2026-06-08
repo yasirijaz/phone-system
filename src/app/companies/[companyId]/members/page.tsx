@@ -29,6 +29,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import AppHeader from "@/components/app-header";
 import { events } from '@/lib/events';
 import { parseWorkerStatusPayload } from '@/lib/worker-status';
+import {
+  canManageUsers,
+  canDeleteUsers,
+  getAssignableRolesForCreator,
+  getRoleName,
+  ROLES,
+} from '@/lib/roles';
 
 const userSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -112,7 +119,7 @@ export default function ManageUsersPage() {
   });
 
   useEffect(() => {
-    if ((authUser?.role_id !== 1 && authUser?.role_id !== 2) || !companyId) {
+    if (!canManageUsers(authUser?.role_id) || !companyId) {
       router.replace('/');
       return;
     }
@@ -386,7 +393,10 @@ export default function ManageUsersPage() {
   };
   
 
-  if (authUser?.role_id !== 1 && authUser?.role_id !== 2) {
+  const assignableRoles = getAssignableRolesForCreator(authUser?.role_id);
+  const canDelete = canDeleteUsers(authUser?.role_id);
+
+  if (!canManageUsers(authUser?.role_id)) {
     return null;
   }
   
@@ -416,6 +426,7 @@ export default function ManageUsersPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {authUser?.role_id !== ROLES.MANAGER && (
               <Dialog open={isImportDialogOpen} onOpenChange={(open) => open ? setIsImportDialogOpen(true) : handleImportDialogClose()}>
                 <DialogTrigger asChild>
                   <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
@@ -522,6 +533,7 @@ export default function ManageUsersPage() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+              )}
               <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => handleUserDialogOpen(null)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
@@ -558,8 +570,11 @@ export default function ManageUsersPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="2">Admin</SelectItem>
-                              <SelectItem value="3">User</SelectItem>
+                              {assignableRoles.map((roleId) => (
+                                <SelectItem key={roleId} value={String(roleId)}>
+                                  {getRoleName(roleId)}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -622,13 +637,14 @@ export default function ManageUsersPage() {
                             <TableCell className="font-medium">{u.name}</TableCell>
                             <TableCell>{u.email}</TableCell>
                             <TableCell>
-                              <Badge variant={u.role_id === 2 ? 'default' : 'secondary'}>
-                                {u.role_id === 2 ? 'Admin' : 'User'}
+                              <Badge variant={u.role_id === ROLES.COMPANY_ADMIN ? 'default' : 'secondary'}>
+                                {getRoleName(u.role_id)}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
                               <Button variant="ghost" size="icon" onClick={() => handleOpenAssignmentDialog(u)}><Briefcase className="h-4 w-4" /></Button>
                               <Button variant="ghost" size="icon" onClick={() => handleUserDialogOpen(u)}><Edit className="h-4 w-4" /></Button>
+                              {canDelete && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                     <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -646,6 +662,7 @@ export default function ManageUsersPage() {
                                     </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
