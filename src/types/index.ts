@@ -8,6 +8,7 @@ export interface Communication {
   company_id?: number;
   client_name?: string | null;
   contact_name?: string | null;
+  contact_id?: number | null;
   user_id?: number | null;
   call_sid?: string;
   conference_sid?: string;

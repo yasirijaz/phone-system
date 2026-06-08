@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { ChevronDown, PlusCircle, PanelRightOpen, PlayCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { createContact, updateContact, blockContact, unblockContact } from '@/services/contactService';
+import { createContact, updateContact, blockContact, unblockContact, findContactByPhone, formatContactPhoneForApi } from '@/services/contactService';
 import type { Contact } from '@/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
@@ -36,7 +36,10 @@ interface ContactProfileProps {
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name is required."),
-  email: z.string().email("Invalid email address.").optional().or(z.literal('')),
+  email: z.preprocess(
+    (val) => (val == null ? '' : String(val).trim()),
+    z.union([z.literal(''), z.string().email("Invalid email address.")])
+  ),
   phone_no: z.string().min(10, "Phone number is required."),
   phone_type: z.string().min(1, "Phone type is required."),
 });
@@ -92,9 +95,18 @@ export default function ContactProfile({ contact, contacts, onContactUpdate, onC
     );
     const isSavedContact = Boolean(contact.isSavedFromApi);
     const isBlocked = isContactBlocked(savedContact);
-    const savedContactId =
-        savedContact?.id ??
-        contacts?.find((c) => phonesMatch(c.phone_no, contact.phone_no))?.id;
+    const savedContactId = useMemo(() => {
+        if (typeof contact?.id === 'number' && contact.id > 0) return contact.id;
+        if (typeof savedContact?.id === 'number' && savedContact.id > 0) return savedContact.id;
+        return contacts?.find((c) => phonesMatch(c.phone_no, contact.phone_no))?.id ?? null;
+    }, [contact, savedContact, contacts]);
+
+    const resolveContactId = async (): Promise<number | null> => {
+        if (savedContactId) return savedContactId;
+        if (!user?.company_id || !contact.phone_no) return null;
+        const found = await findContactByPhone(user.company_id, contact.phone_no);
+        return found?.id ?? null;
+    };
 
     const form = useForm<z.infer<typeof contactSchema>>({
         resolver: zodResolver(contactSchema),
@@ -150,19 +162,28 @@ export default function ContactProfile({ contact, contacts, onContactUpdate, onC
 
     const handleFormSubmit = async (values: z.infer<typeof contactSchema>) => {
         if (!user?.company_id) return;
+        const payload = {
+            ...values,
+            email: values.email?.trim() || null,
+            phone_no: formatContactPhoneForApi(values.phone_no),
+            company_id: user.company_id,
+        };
+
         try {
-            if (isSavedContact && savedContactId) {
-                await updateContact(savedContactId, { ...values, company_id: user.company_id });
+            if (isSavedContact) {
+                const contactId = await resolveContactId();
+                if (!contactId) {
+                    toast({
+                        title: 'Error',
+                        description: 'Could not find this contact to update. Try refreshing the page.',
+                        variant: 'destructive',
+                    });
+                    return;
+                }
+                await updateContact(contactId, payload);
                 toast({ title: 'Success', description: 'Contact updated.' });
-            } else if (isSavedContact && !savedContactId) {
-                toast({
-                    title: 'Error',
-                    description: 'Contact is saved but could not be updated. Try refreshing the page.',
-                    variant: 'destructive',
-                });
-                return;
             } else {
-                await createContact({ ...values, company_id: user.company_id });
+                await createContact(payload);
                 toast({ title: 'Success', description: 'Contact created.' });
             }
             onContactUpdate();
@@ -173,16 +194,17 @@ export default function ContactProfile({ contact, contacts, onContactUpdate, onC
     };
     
     const handleBlock = async () => {
-        if (!savedContactId) {
+        const contactId = await resolveContactId();
+        if (!contactId) {
             toast({
                 title: 'Error',
-                description: 'Contact is saved but could not be blocked. Try refreshing the page.',
+                description: 'Could not find this contact to block. Try refreshing the page.',
                 variant: 'destructive',
             });
             return;
         }
         try {
-            await blockContact(savedContactId, selectedBlockOption);
+            await blockContact(contactId, selectedBlockOption);
             toast({ title: 'Success', description: `Contact has been blocked.` });
             onContactUpdate();
             setIsBlockDialogOpen(false);
@@ -192,16 +214,17 @@ export default function ContactProfile({ contact, contacts, onContactUpdate, onC
     };
     
     const handleUnblock = async () => {
-        if (!savedContactId) {
+        const contactId = await resolveContactId();
+        if (!contactId) {
             toast({
                 title: 'Error',
-                description: 'Contact is saved but could not be unblocked. Try refreshing the page.',
+                description: 'Could not find this contact to unblock. Try refreshing the page.',
                 variant: 'destructive',
             });
             return;
         }
         try {
-            await unblockContact(savedContactId);
+            await unblockContact(contactId);
             toast({ title: 'Success', description: 'Contact has been unblocked.' });
             onContactUpdate();
         } catch (error: any) {

@@ -23,6 +23,28 @@ export function getOtherPartyNumber(comm: Communication): string {
   return comm.direction === 'outbound' ? comm.to : comm.from;
 }
 
+/** contact_id returned by the call/thread detail API. */
+export function getApiContactId(comm: Communication): number | null {
+  const ext = comm as Communication & { contact_id?: number | string | null };
+  const raw = ext.contact_id;
+  if (raw == null || raw === '') return null;
+  const id = Number(raw);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+export function getThreadApiContactId(
+  logs: Communication[],
+  otherPartyNumber: string
+): number | null {
+  for (let i = logs.length - 1; i >= 0; i -= 1) {
+    const log = logs[i];
+    if (getOtherPartyNumber(log) !== otherPartyNumber) continue;
+    const id = getApiContactId(log);
+    if (id) return id;
+  }
+  return null;
+}
+
 /** contact_name returned by the call/thread detail API (saved contact indicator). */
 export function getApiContactName(comm: Communication): string | null {
   return comm.contact_name?.trim() || null;
@@ -63,11 +85,17 @@ export function getThreadSavedContactFromApi(
     if (getOtherPartyNumber(log) !== otherPartyNumber) continue;
     if (!getApiContactName(log)) continue;
 
+    const contactId = getApiContactId(log);
     const isOutbound = log.direction === 'outbound';
     const nameRecord = isOutbound ? log.to_name : log.from_name;
-    if (nameRecord && typeof nameRecord === 'object') {
+    const recordId =
+      contactId ||
+      (typeof nameRecord?.id === 'number' && nameRecord.id > 0 ? nameRecord.id : null);
+
+    if (recordId || (nameRecord && typeof nameRecord === 'object')) {
       return {
         ...nameRecord,
+        id: recordId ?? nameRecord?.id,
         name: apiName,
         phone_no: otherPartyNumber,
       };
@@ -100,11 +128,13 @@ export function buildThreadContactState(
 } {
   const display = getThreadContactDisplay(logs, otherPartyNumber, localContact);
   const apiContactName = getThreadApiContactName(logs, otherPartyNumber);
+  const apiContactId = getThreadApiContactId(logs, otherPartyNumber);
   const apiSavedContact = getThreadSavedContactFromApi(logs, otherPartyNumber, localContact);
 
   return {
     ...(localContact || {}),
     ...(apiSavedContact || {}),
+    id: apiContactId ?? apiSavedContact?.id ?? localContact?.id,
     phone_no: otherPartyNumber,
     name: display.displayName,
     sublabel: display.sublabel,

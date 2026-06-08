@@ -24,7 +24,10 @@ import { formatPhoneNumber } from "@/lib/utils";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name is required."),
-  email: z.string().email("Invalid email address.").optional().or(z.literal('')),
+  email: z.preprocess(
+    (val) => (val == null ? '' : String(val).trim()),
+    z.union([z.literal(''), z.string().email("Invalid email address.")])
+  ),
   phone_no: z.string().min(10, "Phone number is required."),
   phone_type: z.string().min(1, "Phone type is required."),
 });
@@ -126,7 +129,11 @@ export default function ContactsPage() {
     if (!user?.company_id) return;
     try {
       const phoneWithCountryCode = `+1${values.phone_no.replace(/\D/g, '')}`;
-      const payload = { ...values, phone_no: phoneWithCountryCode };
+      const payload = {
+        ...values,
+        email: values.email?.trim() || null,
+        phone_no: phoneWithCountryCode,
+      };
 
       if (editingContact) {
         await updateContact(editingContact.id, { ...payload, company_id: user.company_id });
