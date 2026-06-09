@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Users, Trash2, Delete, Disc } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Users, Trash2, Delete, ChevronDown, ChevronUp, Phone } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
 import type { User, Contact, DepartmentSettings, CompanySettings } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -14,7 +14,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn, formatPhoneNumber } from '@/lib/utils';
-import { hasSupervisorAccess } from '@/lib/roles';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
 import { allParticipant, removeParticipant, addParticipant, holdParticipant } from '@/services/twilioService';
 import { getDepartmentSettings } from '@/services/departmentSettingsService';
@@ -62,6 +61,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
   const [departmentSettings, setDepartmentSettings] = useState<DepartmentSettings | null>(null);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   
   const dialpadKeys = [
     '1', '2', '3',
@@ -151,6 +151,12 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
       connection?.removeListener('mute', handleMute);
     };
   }, [isOpen, connection, authUser, toast]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsCollapsed(false);
+    }
+  }, [isOpen]);
   
   const fetchParticipants = async () => {
       if (!conferenceSid) return;
@@ -292,10 +298,34 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
   if (!isOpen) {
     return null;
   }
-  
-  const isAdmin = hasSupervisorAccess(authUser?.role_id);
+
+  const floatingToggle = (
+    <button
+      type="button"
+      onClick={() => setIsCollapsed((prev) => !prev)}
+      className="fixed bottom-4 right-4 z-[60] flex items-center gap-2.5 rounded-full bg-background px-4 py-2.5 shadow-2xl ring-1 ring-border hover:bg-muted/50 transition-colors"
+      aria-label={isCollapsed ? 'Expand active call controls' : 'Collapse active call controls'}
+    >
+      <span className="relative flex h-2.5 w-2.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+      </span>
+      <Phone className="h-4 w-4 text-green-600" />
+      <span className="font-mono text-sm font-semibold tabular-nums">{formatTime(duration)}</span>
+      {isCollapsed ? (
+        <ChevronUp className="h-4 w-4 text-muted-foreground" />
+      ) : (
+        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+      )}
+    </button>
+  );
+
+  if (isCollapsed) {
+    return floatingToggle;
+  }
 
   return (
+    <>
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-50">
         <div className="bg-background rounded-2xl shadow-2xl p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -439,5 +469,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
             </Button>
         </div>
     </div>
+    {floatingToggle}
+    </>
   );
 }
