@@ -24,6 +24,9 @@ import {
   formatCallTypeDurationLine,
   formatListingTimestamp,
   isCallThread,
+  isMissedCall,
+  isHungUpCall,
+  isFailedCallRow,
 } from '@/lib/call-attendee';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import AudioPlayer from './AudioPlayer';
@@ -37,6 +40,7 @@ interface CallLogProps {
   onMakeCall: (number: string) => void;
   isClickable?: boolean;
   source?: string;
+  highlightFailedCalls?: boolean;
 }
 
 function CommunicationCard({ 
@@ -45,7 +49,8 @@ function CommunicationCard({
     companyUsers,
     onMakeCall, 
     isClickable, 
-    source, 
+    source,
+    highlightFailedCalls,
     isFirstInGroup,
     isLastInGroup,
     isMiddleOfGroup
@@ -56,6 +61,7 @@ function CommunicationCard({
     onMakeCall: (number: string) => void, 
     isClickable: boolean, 
     source?: string,
+    highlightFailedCalls?: boolean,
     isFirstInGroup: boolean,
     isLastInGroup: boolean,
     isMiddleOfGroup: boolean | null
@@ -184,7 +190,9 @@ function CommunicationCard({
   const otherParty = getOtherPartyDisplay(comm, contact);
   const contactName = isFirstInGroup ? (isMine ? (comm.user?.name || 'Me') : otherParty.displayName) : '';
   const contactInitial = getInitials(isMine ? (user?.name || 'Me') : (otherParty.displayName || otherParty.number));
-  const isMissed = comm.call_status === 'missed' || comm.call_status === 'no-answer' || comm.call_status === 'busy' || comm.call_status === 'canceled';
+  const isMissed = isMissedCall(comm);
+  const isHungUp = isHungUpCall(comm);
+  const isFailedCall = highlightFailedCalls && isFailedCallRow(comm);
   const isInProgress = comm.call_status === 'in_progress';
 
   const showAvatar = !isMine && isFirstInGroup;
@@ -252,7 +260,7 @@ function CommunicationCard({
 
     return (
         <div className={cn("flex items-start gap-3 p-3 rounded-lg w-full", isMine ? "bg-primary/10" : "bg-muted")}>
-            <Icon className={cn("h-5 w-5 mt-1", isMissed ? "text-destructive" : "text-muted-foreground")} />
+            <Icon className={cn("h-5 w-5 mt-1", (isMissed || isHungUp) ? "text-destructive" : "text-muted-foreground")} />
             <div className="flex-1 flex items-center justify-between text-sm space-y-1">
                 <div className="flex-1">
                     <div className="flex items-center justify-between">
@@ -335,22 +343,34 @@ function CommunicationCard({
        const callTypeLine = isSms
          ? (comm.body ? String(comm.body).slice(0, 40) : formatCallTypeDurationLine(comm))
          : formatCallTypeDurationLine(comm);
+       const failedCallLabel = isHungUp ? 'Hung up' : isMissed ? 'Missed' : null;
        const contactColorClass = getContactAvatarColorClass(
          otherParty.hasContactName ? mainPageContactName : mainPageContactNumber
        );
 
       return (
-           <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 group">
+           <div
+             className={cn(
+               'flex items-center gap-3 px-4 py-3 group transition-colors',
+               isFailedCall
+                 ? 'bg-destructive/10 hover:bg-destructive/15 border-l-4 border-l-destructive'
+                 : 'hover:bg-muted/40'
+             )}
+           >
                 <Link
                   href={`/conversations/${from}/${to}${queryString}`}
                   key={comm.id || `${comm.from}-${comm.to}`}
                   className="grid flex-1 grid-cols-[36px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.6fr)_72px] items-center gap-x-6 min-w-0"
                 >
-                    <Avatar className="h-9 w-9">
+                    <Avatar className={cn('h-9 w-9', isFailedCall && 'ring-2 ring-destructive/40')}>
                         <AvatarFallback
                           className={cn(
                             'text-xs font-medium',
-                            otherParty.hasContactName || contact ? contactColorClass : 'bg-muted text-muted-foreground'
+                            isFailedCall
+                              ? 'bg-destructive/15 text-destructive'
+                              : otherParty.hasContactName || contact
+                                ? contactColorClass
+                                : 'bg-muted text-muted-foreground'
                           )}
                         >
                             {otherParty.hasContactName || contact ? mainPageAvatarInitial : <UserIcon className="h-4 w-4" />}
@@ -360,22 +380,36 @@ function CommunicationCard({
                     <div className="flex min-w-0 flex-col">
                       <span
                         className={cn(
-                          'truncate text-sm font-medium text-foreground',
-                          !comm.is_read && 'font-semibold'
+                          'truncate text-sm font-medium',
+                          isFailedCall ? 'text-destructive font-semibold' : 'text-foreground',
+                          !comm.is_read && !isFailedCall && 'font-semibold'
                         )}
                       >
                         {mainPageContactName}
                       </span>
                       {mainPageContactSublabel && (
-                        <span className="truncate text-xs text-muted-foreground">
+                        <span className={cn(
+                          'truncate text-xs',
+                          isFailedCall ? 'text-destructive/80' : 'text-muted-foreground'
+                        )}>
                           {mainPageContactSublabel}
                         </span>
                       )}
                     </div>
 
-                    <span className="truncate text-sm text-muted-foreground">
-                      {callTypeLine}
-                    </span>
+                    <div className="flex min-w-0 items-center gap-2">
+                      {failedCallLabel && (
+                        <Badge variant="destructive" className="shrink-0 text-[10px] uppercase tracking-wide">
+                          {failedCallLabel}
+                        </Badge>
+                      )}
+                      <span className={cn(
+                        'truncate text-sm',
+                        isFailedCall ? 'font-medium text-destructive' : 'text-muted-foreground'
+                      )}>
+                        {callTypeLine}
+                      </span>
+                    </div>
 
                     <div className="flex items-center gap-2 min-w-0">
                       {attendee ? (
@@ -488,7 +522,15 @@ function CommunicationCard({
   return <CardContent />;
 }
 
-export default function CallLog({ calls: communications, contacts, companyUsers, onMakeCall, isClickable = true, source }: CallLogProps) {
+export default function CallLog({
+  calls: communications,
+  contacts,
+  companyUsers,
+  onMakeCall,
+  isClickable = true,
+  source,
+  highlightFailedCalls = false,
+}: CallLogProps) {
   if (!communications || communications.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 border-2 border-dashed rounded-lg m-6 p-4">
@@ -523,6 +565,7 @@ export default function CallLog({ calls: communications, contacts, companyUsers,
                         onMakeCall={onMakeCall}
                         isClickable={isClickable}
                         source={source}
+                        highlightFailedCalls={highlightFailedCalls}
                         isFirstInGroup={true}
                         isLastInGroup={true}
                         isMiddleOfGroup={false}

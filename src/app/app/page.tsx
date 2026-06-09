@@ -197,7 +197,14 @@ export default function AppUIPage() {
     
     return (
       <Card className="overflow-hidden">
-        <CallLog calls={currentData || []} contacts={contacts} companyUsers={companyUsers} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
+        <CallLog
+          calls={currentData || []}
+          contacts={contacts}
+          companyUsers={companyUsers}
+          onMakeCall={handleMakeCall}
+          source={tabName === 'unread' ? 'unread' : undefined}
+          highlightFailedCalls
+        />
         <PaginationControls
           {...currentPagination}
           onPageChange={handlePageChange}

@@ -178,6 +178,52 @@ export function getCallAttendeeUser(
   return { name, id: comm.user_id ?? 0 };
 }
 
+const MISSED_CALL_STATUSES = new Set([
+  'missed',
+  'no-answer',
+  'no_answer',
+  'busy',
+  'canceled',
+  'cancelled',
+]);
+
+const HUNG_UP_CALL_STATUSES = new Set([
+  'hangup',
+  'hang-up',
+  'hung-up',
+  'hung_up',
+  'hang_up',
+  'hungup',
+]);
+
+function normalizedCallStatus(comm: Communication): string {
+  return String(comm.call_status || '').trim().toLowerCase();
+}
+
+export function isMissedCall(comm: Communication): boolean {
+  if (!isCallThread(comm)) return false;
+  if (MISSED_CALL_STATUSES.has(normalizedCallStatus(comm))) return true;
+
+  const durationSec = parseInt(String(comm.duration || comm.call_duration || '0'), 10);
+  const status = normalizedCallStatus(comm);
+  return (
+    comm.direction === 'inbound' &&
+    durationSec === 0 &&
+    status !== 'in_progress' &&
+    status !== 'completed' &&
+    !HUNG_UP_CALL_STATUSES.has(status)
+  );
+}
+
+export function isHungUpCall(comm: Communication): boolean {
+  if (!isCallThread(comm)) return false;
+  return HUNG_UP_CALL_STATUSES.has(normalizedCallStatus(comm));
+}
+
+export function isFailedCallRow(comm: Communication): boolean {
+  return isMissedCall(comm) || isHungUpCall(comm);
+}
+
 export function formatCallTypeDurationLine(comm: Communication): string {
   if (comm.type === 'sms' || comm.latest_type === 'sms') {
     return comm.direction === 'inbound' ? 'Inbound / SMS' : 'Outbound / SMS';
@@ -187,14 +233,11 @@ export function formatCallTypeDurationLine(comm: Communication): string {
     return 'Active call';
   }
 
-  const isMissed =
-    comm.call_status === 'missed' ||
-    comm.call_status === 'no-answer' ||
-    comm.call_status === 'busy' ||
-    comm.call_status === 'canceled';
-
   const directionLabel = comm.direction === 'inbound' ? 'Inbound' : 'Outbound';
-  if (isMissed) {
+  if (isHungUpCall(comm)) {
+    return `${directionLabel} / Hung up`;
+  }
+  if (isMissedCall(comm)) {
     return `${directionLabel} / Missed`;
   }
 
