@@ -76,6 +76,8 @@ const authSlice = createSlice({
       state.token = null;
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
+      localStorage.removeItem('impersonation_id');
+      localStorage.removeItem('is_impersonating');
     },
     setInitialState: (state) => {
         try {

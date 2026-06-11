@@ -19,6 +19,7 @@ import AppHeader from "@/components/app-header";
 import { getRoleName } from '@/lib/roles';
 import { useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
+import UserDevices from "@/components/user-devices";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -208,6 +209,8 @@ export default function ProfilePage() {
                   </Form>
                 </CardContent>
               </Card>
+
+              <UserDevices />
             </div>
           </main>
         </div>

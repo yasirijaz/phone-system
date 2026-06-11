@@ -23,3 +23,14 @@ export const updateProfile = async (id: number, data: ProfilePayload): Promise<U
     
     return response.data;
 };
+
+export const getUserDevices = async (): Promise<any[]> => {
+    const response = await axios.get('/api/devices');
+    return response.data;
+}
+
+export const logoutDevice = async (deviceId: number) => {
+  const response = await axios.delete(`/api/devices/${deviceId}`);
+
+  return response.data;
+};
