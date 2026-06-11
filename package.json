@@ -121,6 +121,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/caseless": "^0.12.5",
     "@types/js-cookie": "^3.0.6",
     "@types/node": "^20",
     "@types/react": "^18",

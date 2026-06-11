@@ -44,20 +44,36 @@ export const allParticipant = async (conferenceSid: string): Promise<any> => {
     return response.data;
 }
 
-export interface SendSmsPayload {
+export interface SendMmsPayload {
   from: string;
   to: string;
   body: string;
   media_urls?: string[];
 }
 
-export const sendSms = async (
+/** @deprecated Use SendMmsPayload */
+export type SendSmsPayload = SendMmsPayload;
+
+export const uploadMmsMedia = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await axios.post('/api/twilio/mms/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return response.data.url;
+};
+
+export const sendMms = async (
   from: string,
   to: string,
   body: string,
   media_urls?: string[]
 ): Promise<any> => {
-    const payload: SendSmsPayload = {
+    const payload: SendMmsPayload = {
         from,
         to,
         body: body ?? '',
@@ -67,14 +83,12 @@ export const sendSms = async (
         payload.media_urls = media_urls;
     }
 
-    const response = await axios.post('/api/twilio/sms/send', JSON.stringify(payload), {
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-        },
-    });
+    const response = await axios.post('/api/twilio/mms/send', payload);
     return response.data;
 };
+
+/** @deprecated Use sendMms */
+export const sendSms = sendMms;
 
 export const holdParticipant = async (conferenceSid: string, callSid: string, hold: boolean): Promise<any> => {
     const response = await axios.post('/api/twilio/hold', {

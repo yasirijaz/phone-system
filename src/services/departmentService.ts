@@ -21,7 +21,15 @@ export const deleteDepartment = async (id: number): Promise<void> => {
   await axios.delete(`/api/departments/${id}`);
 };
 
-export const getDepartmentUsers = async (companyId: number, departmentId: number): Promise<{users: User[]}> => {
+export interface DepartmentUserAssignment {
+    id: number;
+    user_id: number;
+    department_id: number;
+    is_dnd?: boolean | number;
+    user: User;
+}
+
+export const getDepartmentUsers = async (companyId: number, departmentId: number): Promise<{users: DepartmentUserAssignment[]}> => {
     const response = await axios.get(`/api/companies/${companyId}/departments/${departmentId}/users`);
     return response.data;
 };

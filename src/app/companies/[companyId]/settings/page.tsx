@@ -230,9 +230,6 @@ export default function CompanySettingsPage() {
           if (Array.isArray(data)) {
               integrations = data;
               console.log('Set integrations:', data.length, 'items');
-          } else if (data && data.data && Array.isArray(data.data)) {
-              integrations = data.data;
-              console.log('Set integrations from data.data:', data.data.length, 'items');
           } else {
               console.log('No valid integrations data found, using fallback');
               // Fallback integrations for testing

@@ -213,11 +213,14 @@ export default function AppHeader({
                 const data = JSON.parse(evt.data);
                 console.log("📩 WebSocket message received:", data);
 
-                if (data.method_type === "refresh_listing" || data.method_type === "status_change") {
+                if (data.method_type === "status_change") {
                     if (data.data) {
                         events.emit("refreshWorkerStatus", data.data);
                     }
-                    events.emit("refreshCalls");
+                }
+
+                if (data.method_type === "refresh_listing") {
+                    events.emitDebounced("refreshCalls", 3000);
                 }
 
                 if (data.method_type == "dnd_notification" && data.task_type == "dnd_status_change") {
@@ -232,7 +235,6 @@ export default function AppHeader({
                 if (data.method_type == "in_call_notification" && data.task_type == "user_in_call_status") {
                     console.log("📞 In-call status change notification received:", data.data);
                     events.emit("refreshInCallStatus", data.data);
-                    events.emit("refreshCalls", data.data);
                 }
 
                 if (data.method_type === "show_sms_notification" && data.data) {
@@ -253,9 +255,12 @@ export default function AppHeader({
                         router.push(`/conversations/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
                     };
 
+                    const hasMedia = Boolean(data.data?.meta_data?.num_media || data.data?.meta_data?.media_urls?.length);
                     toast({
-                        title: `New Message from ${formatPhoneNumber(from)}`,
-                        description: body,
+                        title: hasMedia
+                          ? `New MMS from ${formatPhoneNumber(from)}`
+                          : `New Message from ${formatPhoneNumber(from)}`,
+                        description: body || (hasMedia ? 'Media attachment' : ''),
                         action: (
                         <ToastAction altText="View" onClick={navigateToConversation}>
                             View

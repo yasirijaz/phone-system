@@ -1,11 +1,19 @@
 
 import axios from '@/lib/axios';
 import type { User, Assignment, Department } from '@/types';
-//import { cacheGet, cacheSet } from '@/lib/simpleCache';
+import { cacheGet, cacheSet } from '@/lib/simpleCache';
+
+const COMPANY_USERS_CACHE_TTL = 5 * 60_000;
 
 export const getUsersByCompany = async (companyId: number): Promise<{data: User[]}> => {
+  const cacheKey = `company:${companyId}:users`;
+  const cached = cacheGet<User[]>(cacheKey);
+  if (cached) return { data: cached };
+
   const response = await axios.get(`/api/companies/${companyId}/users`);
-  return response.data;
+  const users = Array.isArray(response.data?.data) ? response.data.data : [];
+  cacheSet(cacheKey, users, COMPANY_USERS_CACHE_TTL);
+  return { data: users };
 };
 
 export interface UserImportPayload {

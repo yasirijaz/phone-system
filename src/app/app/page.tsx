@@ -3,7 +3,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
 import type { Communication, Contact, PaginatedCommunicationsResponse, User } from "@/types";
@@ -64,11 +64,24 @@ export default function AppUIPage() {
   const activeTabRef = useRef(activeTab);
   const paginationRef = useRef(pagination);
   const lastFetchKeyRef = useRef<string | null>(null);
+  const companyUsersRef = useRef(companyUsers);
+
+  useEffect(() => {
+    companyUsersRef.current = companyUsers;
+  }, [companyUsers]);
 
   useEffect(() => {
     activeTabRef.current = activeTab;
     paginationRef.current = pagination;
   }, [activeTab, pagination]);
+
+  useEffect(() => {
+    if (!user?.company_id) return;
+    getContacts(user.company_id).then((list) => setContacts(Array.isArray(list) ? list : []));
+    getUsersByCompany(user.company_id).then((result) => {
+      setCompanyUsers(Array.isArray(result.data) ? result.data : []);
+    });
+  }, [user?.company_id]);
 
   const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10, force = false) => {
     if (!user) return;
@@ -91,10 +104,6 @@ export default function AppUIPage() {
 
         const cacheKey = `comm:${tab}:${page}:${limit}`;
         const cached = !force ? cacheGet<PaginatedCommunicationsResponse>(cacheKey) : null;
-        const contactsKey = user.company_id ? `contacts:${user.company_id}` : undefined;
-        const usersKey = user.company_id ? `companyUsers:${user.company_id}` : undefined;
-        const cachedContacts = contactsKey ? cacheGet<Contact[]>(contactsKey) : [];
-        const cachedUsers = usersKey ? cacheGet<User[]>(usersKey) : [];
 
         let response: PaginatedCommunicationsResponse;
         if (cached) {
@@ -113,27 +122,8 @@ export default function AppUIPage() {
           cacheSet(cacheKey, response, 10_000);
         }
 
-        let contactsResponse: Contact[] = [];
-        if (Array.isArray(cachedContacts) && cachedContacts.length > 0) {
-          contactsResponse = cachedContacts;
-        } else if (user.company_id) {
-          contactsResponse = await getContacts(user.company_id);
-          cacheSet(`contacts:${user.company_id}`, contactsResponse, 5 * 60_000);
-        }
-
-        let usersResponse: User[] = [];
-        if (Array.isArray(cachedUsers) && cachedUsers.length > 0) {
-          usersResponse = cachedUsers;
-        } else if (user.company_id) {
-          const usersResult = await getUsersByCompany(user.company_id);
-          usersResponse = Array.isArray(usersResult.data) ? usersResult.data : [];
-          cacheSet(`companyUsers:${user.company_id}`, usersResponse, 5 * 60_000);
-        }
-        
         const threadResults = Array.isArray(response.results) ? response.results : [];
         setData(prev => ({ ...prev, [tab]: threadResults }));
-        setContacts(Array.isArray(contactsResponse) ? contactsResponse : []);
-        setCompanyUsers(usersResponse);
         setPagination(prev => ({
             ...prev,
             [tab]: {
@@ -145,7 +135,7 @@ export default function AppUIPage() {
             }
         }));
 
-        enrichThreadsWithLastAttendee(threadResults, usersResponse).then((enrichedResults) => {
+        enrichThreadsWithLastAttendee(threadResults, companyUsersRef.current).then((enrichedResults) => {
           setData((prev) => ({ ...prev, [tab]: enrichedResults }));
         });
     } catch (error) {
@@ -153,6 +143,19 @@ export default function AppUIPage() {
         setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: false } }));
     }
   }, [user, toast]);
+
+  useEffect(() => {
+    if (!companyUsers.length) return;
+    const tab = activeTabRef.current;
+    setData((prev) => {
+      const threads = prev[tab];
+      if (!threads.length) return prev;
+      enrichThreadsWithLastAttendee(threads, companyUsers).then((enrichedResults) => {
+        setData((p) => ({ ...p, [tab]: enrichedResults }));
+      });
+      return prev;
+    });
+  }, [companyUsers]);
 
   useEffect(() => {
     lastFetchKeyRef.current = null;
@@ -238,21 +241,15 @@ export default function AppUIPage() {
                         {/* <TabsTrigger value="spam">Spam</TabsTrigger>
                         <TabsTrigger value="unlogged">Unlogged</TabsTrigger> */}
                       </TabsList>
-                      <TabsContent value="all" className="mt-6">{renderTabContent('all')}</TabsContent>
-                      <TabsContent value="unread" className="mt-6">{renderTabContent('unread')}</TabsContent>
-                      <TabsContent value="calls" className="mt-6">{renderTabContent('calls')}</TabsContent>
-                      <TabsContent value="missed" className="mt-6">{renderTabContent('missed')}</TabsContent>
-                      <TabsContent value="meetings" className="mt-6">{renderTabContent('meetings')}</TabsContent>
-                      <TabsContent value="voicemails" className="mt-6">{renderTabContent('voicemails')}</TabsContent>
-                      <TabsContent value="recordings" className="mt-6">{renderTabContent('recordings')}</TabsContent>
-                      <TabsContent value="messages" className="mt-6">{renderTabContent('messages')}</TabsContent>
-                      <TabsContent value="starred" className="mt-6">{renderTabContent('starred')}</TabsContent>
-                      {/* <TabsContent value="spam" className="mt-6">
+                      <div className="mt-6">
+                        {activeTab === 'spam' ? (
                           <Card><CardContent className="p-6">Spam will appear here.</CardContent></Card>
-                      </TabsContent>
-                      <TabsContent value="unlogged" className="mt-6">
+                        ) : activeTab === 'unlogged' ? (
                           <Card><CardContent className="p-6">Unlogged calls will appear here.</CardContent></Card>
-                      </TabsContent> */}
+                        ) : (
+                          renderTabContent(activeTab)
+                        )}
+                      </div>
                     </Tabs>
                   </main>
                 </div>

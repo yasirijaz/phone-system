@@ -1,23 +1,60 @@
 import type { Communication } from '@/types';
 
 const IMAGE_URL_PATTERN = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i;
+const VIDEO_URL_PATTERN = /\.(mp4|mov|webm|m4v)(\?|$)/i;
+const AUDIO_URL_PATTERN = /\.(mp3|wav|ogg|m4a|aac)(\?|$)/i;
 const DATA_IMAGE_PATTERN = /^data:image\/[a-z0-9+.-]+;base64,/i;
+const DATA_VIDEO_PATTERN = /^data:video\/[a-z0-9+.-]+;base64,/i;
+const DATA_AUDIO_PATTERN = /^data:audio\/[a-z0-9+.-]+;base64,/i;
 
-export const MAX_MESSAGE_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
-export const MAX_MESSAGE_IMAGES = 10;
+export const MAX_MESSAGE_MEDIA_SIZE_BYTES = 5 * 1024 * 1024;
+export const MAX_MESSAGE_MEDIA = 10;
+
+/** @deprecated Use MAX_MESSAGE_MEDIA */
+export const MAX_MESSAGE_IMAGES = MAX_MESSAGE_MEDIA;
+
+/** @deprecated Use MAX_MESSAGE_MEDIA_SIZE_BYTES */
+export const MAX_MESSAGE_IMAGE_SIZE_BYTES = MAX_MESSAGE_MEDIA_SIZE_BYTES;
+
+export type MessageMediaKind = 'image' | 'video' | 'audio' | 'file';
+
+export function getMessageMediaKind(file: File): MessageMediaKind {
+  if (file.type.startsWith('image/')) return 'image';
+  if (file.type.startsWith('video/')) return 'video';
+  if (file.type.startsWith('audio/')) return 'audio';
+  return 'file';
+}
 
 export function isImageFile(file: File): boolean {
-  return file.type.startsWith('image/');
+  return getMessageMediaKind(file) === 'image';
 }
 
 export function isDataImageUrl(value: string): boolean {
   return DATA_IMAGE_PATTERN.test(value.trim());
 }
 
-export function validateMessageImage(file: File): string | null {
-  if (!isImageFile(file)) return 'Only image files are supported.';
-  if (file.size > MAX_MESSAGE_IMAGE_SIZE_BYTES) return 'Each image must be 5 MB or smaller.';
+export function isDataVideoUrl(value: string): boolean {
+  return DATA_VIDEO_PATTERN.test(value.trim());
+}
+
+export function isDataAudioUrl(value: string): boolean {
+  return DATA_AUDIO_PATTERN.test(value.trim());
+}
+
+export function validateMessageMedia(file: File): string | null {
+  const kind = getMessageMediaKind(file);
+  if (kind === 'file') {
+    return 'Unsupported file type. Use images, video, or audio.';
+  }
+  if (file.size > MAX_MESSAGE_MEDIA_SIZE_BYTES) {
+    return 'Each attachment must be 5 MB or smaller.';
+  }
   return null;
+}
+
+/** @deprecated Use validateMessageMedia */
+export function validateMessageImage(file: File): string | null {
+  return validateMessageMedia(file);
 }
 
 function loadImageElement(file: File): Promise<HTMLImageElement> {
@@ -36,8 +73,8 @@ function loadImageElement(file: File): Promise<HTMLImageElement> {
   });
 }
 
-/** Resize and compress so the JSON body stays within typical API limits. */
-export async function prepareImageForSms(
+/** Resize and compress images so JSON payloads stay within typical API limits. */
+export async function prepareImageForMms(
   file: File,
   maxDimension = 1280,
   quality = 0.82
@@ -59,7 +96,6 @@ export async function prepareImageForSms(
   const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
   const dataUrl = canvas.toDataURL(outputType, quality);
 
-  // ~900 KB base64 keeps requests under common 1 MB body limits
   if (dataUrl.length > 900_000) {
     throw new Error('Image is too large after compression. Try a smaller image.');
   }
@@ -67,8 +103,11 @@ export async function prepareImageForSms(
   return dataUrl;
 }
 
+/** @deprecated Use prepareImageForMms */
+export const prepareImageForSms = prepareImageForMms;
+
 export function fileToDataUrl(file: File): Promise<string> {
-  return prepareImageForSms(file);
+  return prepareImageForMms(file);
 }
 
 export async function filesToDataUrls(files: File[]): Promise<string[]> {
@@ -107,19 +146,67 @@ export function getCommunicationMediaUrls(comm: Communication): string[] {
 
   if (typeof comm.body === 'string') {
     const body = comm.body.trim();
-    if (isDataImageUrl(body)) return [body];
-    if (IMAGE_URL_PATTERN.test(body)) return [body];
+    if (isDataImageUrl(body) || isDataVideoUrl(body) || isDataAudioUrl(body)) return [body];
+    if (IMAGE_URL_PATTERN.test(body) || VIDEO_URL_PATTERN.test(body) || AUDIO_URL_PATTERN.test(body)) {
+      return [body];
+    }
   }
 
   return [];
 }
 
-export function isImageMediaUrl(url: string): boolean {
-  return isDataImageUrl(url) || IMAGE_URL_PATTERN.test(url) || url.includes('/uploads/') || url.includes('image');
+export function getCommunicationMediaContentTypes(comm: Communication): string[] {
+  const meta = comm.meta_data;
+  if (!meta || typeof meta !== 'object') return [];
+
+  if (Array.isArray(meta.media_content_types)) {
+    return meta.media_content_types.filter((value: unknown) => typeof value === 'string');
+  }
+
+  const types: string[] = [];
+  const numMedia = Number(meta.NumMedia ?? meta.num_media ?? 0);
+  for (let i = 0; i < numMedia; i++) {
+    const type = meta[`MediaContentType${i}`] ?? meta[`media_content_type_${i}`];
+    if (typeof type === 'string' && type) types.push(type);
+  }
+
+  return types;
+}
+
+export function isImageMediaUrl(url: string, contentType?: string): boolean {
+  if (contentType?.startsWith('image/')) return true;
+  return isDataImageUrl(url) || IMAGE_URL_PATTERN.test(url) || url.includes('/uploads/') || url.includes('/mms/') && IMAGE_URL_PATTERN.test(url);
+}
+
+export function isVideoMediaUrl(url: string, contentType?: string): boolean {
+  if (contentType?.startsWith('video/')) return true;
+  return isDataVideoUrl(url) || VIDEO_URL_PATTERN.test(url);
+}
+
+export function isAudioMediaUrl(url: string, contentType?: string): boolean {
+  if (contentType?.startsWith('audio/')) return true;
+  return isDataAudioUrl(url) || AUDIO_URL_PATTERN.test(url);
 }
 
 export function isInlineImageBody(body?: string | null): boolean {
   if (!body?.trim()) return false;
   const trimmed = body.trim();
   return isDataImageUrl(trimmed) || (IMAGE_URL_PATTERN.test(trimmed) && !trimmed.includes(' '));
+}
+
+export function getMessagePreviewText(comm: Communication): string {
+  const body = comm.body?.trim();
+  if (body && !isInlineImageBody(body)) {
+    return body.slice(0, 40);
+  }
+
+  const mediaUrls = getCommunicationMediaUrls(comm);
+  if (!mediaUrls.length) return '';
+
+  const contentTypes = getCommunicationMediaContentTypes(comm);
+  if (mediaUrls.some((url, index) => isImageMediaUrl(url, contentTypes[index]))) return 'Photo';
+  if (mediaUrls.some((url, index) => isVideoMediaUrl(url, contentTypes[index]))) return 'Video';
+  if (mediaUrls.some((url, index) => isAudioMediaUrl(url, contentTypes[index]))) return 'Audio';
+
+  return 'Attachment';
 }

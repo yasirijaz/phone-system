@@ -8,7 +8,7 @@ import { getPhoneNumbers } from "@/services/phoneNumberService";
 import { getContacts } from "@/services/contactService";
 import type { Department, PhoneNumber, Contact } from "@/types";
 import { useToast } from "@/hooks/use-toast";
-import { sendSms } from "@/services/twilioService";
+import { sendMms } from "@/services/twilioService";
 import { useRouter } from 'next/navigation';
 
 import AppHeader from "@/components/app-header";
@@ -105,18 +105,18 @@ export default function MessagesPage() {
         return;
     }
     if (!body && mediaUrls.length === 0) {
-        toast({ title: "Error", description: "Add a message or image to send.", variant: "destructive" });
+        toast({ title: "Error", description: "Add a message or media attachment to send.", variant: "destructive" });
         return;
     }
     setIsSending(true);
     try {
-        await sendSms(
+        await sendMms(
             selectedFromNumber,
             recipient,
             body,
             mediaUrls.length ? mediaUrls : undefined
         );
-        toast({ title: "Success", description: mediaUrls.length ? "Message with image sent successfully." : "Message sent successfully." });
+        toast({ title: "Success", description: mediaUrls.length ? "MMS sent successfully." : "Message sent successfully." });
         setMessageBody("");
         router.push(`/conversations/${encodeURIComponent(selectedFromNumber)}/${encodeURIComponent(recipient)}`);
     } finally {

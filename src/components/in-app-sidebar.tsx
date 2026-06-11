@@ -34,7 +34,7 @@ interface RecentItem {
     unread_count: number;
 }
 
-const SIDEBAR_CACHE_TTL = 30_000;
+const SIDEBAR_CACHE_TTL = 2 * 60_000;
 const UNREAD_REFRESH_DEBOUNCE_MS = 1_500;
 
 export function InAppSidebar() {
@@ -124,8 +124,10 @@ export function InAppSidebar() {
 
   const fetchInitialSidebarData = useCallback(async () => {
     if (!user?.id || !user?.company_id) return;
+    const userId = user.id;
+    const companyId = user.company_id;
 
-    const cacheKey = `sidebar:${user.id}`;
+    const cacheKey = `sidebar:${userId}`;
     const cached = cacheGet<{
       departments: DepartmentWithUnread[];
       recentItems: RecentItem[];
@@ -151,9 +153,9 @@ export function InAppSidebar() {
         setRecentsLoading(true);
 
         const [userDepts, recentCommsResponse, contacts] = await Promise.all([
-          getUserDepartments(user.id),
+          getUserDepartments(userId),
           getCommunications({ limit: 50 }),
-          getContacts(user.company_id),
+          getContacts(companyId),
         ]);
 
         const deptsArray = Array.isArray(userDepts) ? userDepts : [];
@@ -161,13 +163,13 @@ export function InAppSidebar() {
         const deptsWithCounts = await Promise.all(
           deptsArray.map(async (dept) => {
             try {
-              const deptCacheKey = `sidebar-dept:${user.id}:${dept.id}`;
+              const deptCacheKey = `sidebar-dept:${userId}:${dept.id}`;
               const cachedDept = cacheGet<DepartmentWithUnread>(deptCacheKey);
               if (cachedDept) return cachedDept;
 
               const [unreadLogs, dnd] = await Promise.all([
                 getUnreadCallLogs(dept.id),
-                getDndStatus(dept.id, user.id),
+                getDndStatus(dept.id, userId),
               ]);
               const unreadCount = Array.isArray(unreadLogs) ? unreadLogs.length : 0;
               const result = { ...dept, unread_count: unreadCount, is_dnd: dnd.is_dnd };

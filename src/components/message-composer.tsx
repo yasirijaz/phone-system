@@ -3,19 +3,23 @@
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ImagePlus, Loader2, Send, X } from 'lucide-react';
+import { Loader2, Mic, Paperclip, Send, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
-  MAX_MESSAGE_IMAGES,
-  prepareImageForSms,
-  validateMessageImage,
+  MAX_MESSAGE_MEDIA,
+  getMessageMediaKind,
+  prepareImageForMms,
+  validateMessageMedia,
+  type MessageMediaKind,
 } from '@/lib/message-media';
+import { uploadMmsMedia } from '@/services/twilioService';
 import { cn } from '@/lib/utils';
 
-interface PendingImage {
+interface PendingMedia {
   id: string;
   file: File;
   previewUrl: string;
+  kind: MessageMediaKind;
 }
 
 interface MessageComposerProps {
@@ -25,6 +29,22 @@ interface MessageComposerProps {
   isSending?: boolean;
   placeholder?: string;
   className?: string;
+}
+
+function PendingMediaPreview({ item }: { item: PendingMedia }) {
+  if (item.kind === 'video') {
+    return <video src={item.previewUrl} className="h-full w-full object-cover" muted playsInline />;
+  }
+
+  if (item.kind === 'audio') {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-muted">
+        <Mic className="h-6 w-6 text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return <img src={item.previewUrl} alt="" className="h-full w-full object-cover" />;
 }
 
 export default function MessageComposer({
@@ -37,13 +57,13 @@ export default function MessageComposer({
 }: MessageComposerProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const busy = isSending || isProcessing;
-  const canSend = Boolean(messageBody.trim() || pendingImages.length);
+  const canSend = Boolean(messageBody.trim() || pendingMedia.length);
 
-  const handlePickImages = () => {
+  const handlePickMedia = () => {
     fileInputRef.current?.click();
   };
 
@@ -53,41 +73,51 @@ export default function MessageComposer({
 
     if (!files.length) return;
 
-    const remainingSlots = MAX_MESSAGE_IMAGES - pendingImages.length;
+    const remainingSlots = MAX_MESSAGE_MEDIA - pendingMedia.length;
     if (remainingSlots <= 0) {
       toast({
-        title: 'Too many images',
-        description: `You can attach up to ${MAX_MESSAGE_IMAGES} images per message.`,
+        title: 'Too many attachments',
+        description: `You can attach up to ${MAX_MESSAGE_MEDIA} files per message.`,
         variant: 'destructive',
       });
       return;
     }
 
-    const accepted: PendingImage[] = [];
+    const accepted: PendingMedia[] = [];
     for (const file of files.slice(0, remainingSlots)) {
-      const error = validateMessageImage(file);
+      const error = validateMessageMedia(file);
       if (error) {
-        toast({ title: 'Invalid image', description: error, variant: 'destructive' });
+        toast({ title: 'Invalid attachment', description: error, variant: 'destructive' });
         continue;
       }
+
+      const kind = getMessageMediaKind(file);
       accepted.push({
         id: `${file.name}-${file.lastModified}-${Math.random()}`,
         file,
         previewUrl: URL.createObjectURL(file),
+        kind,
       });
     }
 
     if (accepted.length) {
-      setPendingImages((current) => [...current, ...accepted]);
+      setPendingMedia((current) => [...current, ...accepted]);
     }
   };
 
-  const removePendingImage = (id: string) => {
-    setPendingImages((current) => {
+  const removePendingMedia = (id: string) => {
+    setPendingMedia((current) => {
       const target = current.find((item) => item.id === id);
       if (target) URL.revokeObjectURL(target.previewUrl);
       return current.filter((item) => item.id !== id);
     });
+  };
+
+  const prepareMediaUrl = async (item: PendingMedia): Promise<string> => {
+    if (item.kind === 'image') {
+      return prepareImageForMms(item.file);
+    }
+    return uploadMmsMedia(item.file);
   };
 
   const handleSend = async () => {
@@ -96,8 +126,8 @@ export default function MessageComposer({
     setIsProcessing(true);
     try {
       const mediaUrls: string[] = [];
-      for (const item of pendingImages) {
-        mediaUrls.push(await prepareImageForSms(item.file));
+      for (const item of pendingMedia) {
+        mediaUrls.push(await prepareMediaUrl(item));
       }
 
       await onSend({
@@ -105,8 +135,8 @@ export default function MessageComposer({
         mediaUrls,
       });
 
-      pendingImages.forEach((item) => URL.revokeObjectURL(item.previewUrl));
-      setPendingImages([]);
+      pendingMedia.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+      setPendingMedia([]);
       onMessageBodyChange('');
     } catch (error: any) {
       if (error?.response) {
@@ -129,17 +159,17 @@ export default function MessageComposer({
 
   return (
     <div className={cn('space-y-2', className)}>
-      {pendingImages.length > 0 && (
+      {pendingMedia.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {pendingImages.map((item) => (
+          {pendingMedia.map((item) => (
             <div key={item.id} className="relative h-20 w-20 overflow-hidden rounded-md border bg-muted">
-              <img src={item.previewUrl} alt="" className="h-full w-full object-cover" />
+              <PendingMediaPreview item={item} />
               <Button
                 type="button"
                 variant="secondary"
                 size="icon"
                 className="absolute right-1 top-1 h-6 w-6 rounded-full"
-                onClick={() => removePendingImage(item.id)}
+                onClick={() => removePendingMedia(item.id)}
                 disabled={busy}
               >
                 <X className="h-3 w-3" />
@@ -162,7 +192,7 @@ export default function MessageComposer({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,video/*,audio/*"
             multiple
             className="hidden"
             onChange={handleFilesSelected}
@@ -171,11 +201,11 @@ export default function MessageComposer({
             type="button"
             variant="ghost"
             size="icon"
-            onClick={handlePickImages}
-            disabled={busy || pendingImages.length >= MAX_MESSAGE_IMAGES}
-            title="Attach image"
+            onClick={handlePickMedia}
+            disabled={busy || pendingMedia.length >= MAX_MESSAGE_MEDIA}
+            title="Attach image, video, or audio"
           >
-            <ImagePlus className="h-5 w-5" />
+            <Paperclip className="h-5 w-5" />
           </Button>
           <Button type="button" size="icon" onClick={() => void handleSend()} disabled={!canSend || busy}>
             {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}

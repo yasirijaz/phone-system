@@ -17,7 +17,7 @@ import AppHeader from "@/components/app-header";
 import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
-import { sendSms } from "@/services/twilioService";
+import { sendMms } from "@/services/twilioService";
 import { getContacts } from "@/services/contactService";
 import { events } from "@/lib/events";
 import ContactProfile from "@/components/contact-profile";
@@ -150,17 +150,27 @@ export default function ConversationDetailPage() {
                     try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
                 }
                 
-                // Determine which number is the external contact
+                // Load phone numbers once per department (cached at service layer)
+                const numbersByDept = await Promise.all(
+                    depts.map(async (dept) => {
+                        try {
+                            const nums = await getPhoneNumbers(dept.id);
+                            return { dept, nums };
+                        } catch {
+                            return { dept, nums: [] as PhoneNumber[] };
+                        }
+                    })
+                );
+
                 const allCompanyNumbers = new Set<string>();
                 const numberToDeptMap: Record<string, string> = {};
-                for (const dept of depts) {
-                    try {
-                        const nums = await getPhoneNumbers(dept.id);
-                        nums.forEach(n => {
-                            allCompanyNumbers.add(n.phone_no);
-                            numberToDeptMap[n.phone_no] = dept.name;
-                        });
-                    } catch (e) {}
+                const numberToDeptIdMap: Record<string, string> = {};
+                for (const { dept, nums } of numbersByDept) {
+                    nums.forEach((n) => {
+                        allCompanyNumbers.add(n.phone_no);
+                        numberToDeptMap[n.phone_no] = dept.name;
+                        numberToDeptIdMap[n.phone_no] = String(dept.id);
+                    });
                 }
 
                 let otherPartyNumber: string;
@@ -198,16 +208,7 @@ export default function ConversationDetailPage() {
                 }
 
                 // Determine and set the correct department and from number
-                let resolvedDeptId: string | null = null;
-                for (const dept of depts) {
-                    try {
-                        const nums = await getPhoneNumbers(dept.id);
-                        if (nums.some(n => n.phone_no === ourNumber)) {
-                            resolvedDeptId = String(dept.id);
-                            break;
-                        }
-                    } catch(e) {}
-                }
+                let resolvedDeptId: string | null = numberToDeptIdMap[ourNumber] ?? null;
 
                 if (!resolvedDeptId && depts.length > 0) {
                     resolvedDeptId = String(depts[0].id); // fallback
@@ -215,17 +216,14 @@ export default function ConversationDetailPage() {
 
                 if (resolvedDeptId) {
                     setSelectedDepartmentId(resolvedDeptId);
-                    await handleDepartmentChange(resolvedDeptId);
-                    
-                    // This is important: re-fetch numbers for the resolved dept and set the `from` number
-                    try {
-                        const numsForDept = await getPhoneNumbers(Number(resolvedDeptId));
-                        if(numsForDept.some(n => n.phone_no === ourNumber)) {
-                            setSelectedFromNumber(ourNumber);
-                        } else if (numsForDept.length > 0) {
-                            setSelectedFromNumber(numsForDept[0].phone_no);
-                        }
-                    } catch(e) {}
+                    const numsForDept =
+                        numbersByDept.find((entry) => String(entry.dept.id) === resolvedDeptId)?.nums ?? [];
+                    setPhoneNumbers(numsForDept);
+                    if (numsForDept.some((n) => n.phone_no === ourNumber)) {
+                        setSelectedFromNumber(ourNumber);
+                    } else if (numsForDept.length > 0) {
+                        setSelectedFromNumber(numsForDept[0].phone_no);
+                    }
                 }
 
 
@@ -252,7 +250,6 @@ export default function ConversationDetailPage() {
         };
 
         const refreshCallsHandler = () => {
-          // This will be triggered by 'refresh_listing'
           refreshThread();
         };
 
@@ -290,18 +287,18 @@ export default function ConversationDetailPage() {
             return;
         }
         if (!body && mediaUrls.length === 0) {
-            toast({ title: "Error", description: "Add a message or image to send.", variant: "destructive" });
+            toast({ title: "Error", description: "Add a message or media attachment to send.", variant: "destructive" });
             return;
         }
         setIsSending(true);
         try {
-            await sendSms(
+            await sendMms(
                 selectedFromNumber,
                 recipient,
                 body,
                 mediaUrls.length ? mediaUrls : undefined
             );
-            toast({ title: "Success", description: mediaUrls.length ? "Message with image sent successfully." : "Message sent successfully." });
+            toast({ title: "Success", description: mediaUrls.length ? "MMS sent successfully." : "Message sent successfully." });
             const logs = await getCommunicationThread(from, to);
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);

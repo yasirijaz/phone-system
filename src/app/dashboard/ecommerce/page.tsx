@@ -190,9 +190,8 @@ export default function EcommerceDashboard() {
 
 
   const handleRefreshCalls = useCallback(() => {
-    console.log("🔄 Refresh event received, reloading communications...");
     fetchCommunications(pagination.currentPage, pagination.limit);
-  }, [fetchCommunications, pagination.currentPage, pagination.limit, toast]);
+  }, [fetchCommunications, pagination.currentPage, pagination.limit]);
 
   useEffect(() => {
     events.on("refreshCalls", handleRefreshCalls);

@@ -223,7 +223,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
         const phoneNumber = dialerNumber ? `+1${dialerNumber.replace(/\D/g, '')}` : undefined;
         const userId = selectedParticipant || undefined;
         
-        const response = await addParticipant(conferenceSid, twilioNumber, userId, phoneNumber, { conferenceSid: conferenceSid });
+        const response = await addParticipant(conferenceSid, twilioNumber, userId, phoneNumber);
 
         if (response?.data?.conference_sid) {
           setConferenceSid(response.data.conference_sid);

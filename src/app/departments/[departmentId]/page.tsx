@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from 'next/navigation';
 import type { Communication, Department, PhoneNumber, User, PaginatedCommunicationsResponse, Contact } from "@/types";
 import { useAuth } from "@/context/AuthContext";
@@ -77,6 +77,19 @@ export default function DepartmentDetailPage() {
   const [dndStatus, setDndStatus] = useState(false);
   const [dndLoading, setDndLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabName>("all");
+  const companyUsersRef = useRef<User[]>([]);
+
+  useEffect(() => {
+    companyUsersRef.current = companyUsers;
+  }, [companyUsers]);
+
+  useEffect(() => {
+    if (!user?.company_id) return;
+    getContacts(user.company_id).then((list) => setContacts(Array.isArray(list) ? list : []));
+    getUsersByCompany(user.company_id).then((result) => {
+      setCompanyUsers(Array.isArray(result.data) ? result.data : []);
+    });
+  }, [user?.company_id]);
 
   const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10) => {
     if (!user || !departmentId) return;
@@ -120,17 +133,10 @@ export default function DepartmentDetailPage() {
             filters.type = tab;
         }
 
-        const [response, contactsResponse, usersResponse] = await Promise.all([
-          getCommunications(filters),
-          user.company_id ? getContacts(user.company_id) : Promise.resolve([]),
-          user.company_id ? getUsersByCompany(user.company_id) : Promise.resolve({ data: [] }),
-        ]);
+        const response = await getCommunications(filters);
         
-        const companyUsersList = Array.isArray(usersResponse.data) ? usersResponse.data : [];
         const threadResults = Array.isArray(response.results) ? response.results : [];
         setData(prev => ({ ...prev, [tab]: threadResults }));
-        setContacts(contactsResponse || []);
-        setCompanyUsers(companyUsersList);
         setPagination(prev => ({
             ...prev,
             [tab]: {
@@ -142,7 +148,7 @@ export default function DepartmentDetailPage() {
             }
         }));
 
-        enrichThreadsWithLastAttendee(threadResults, companyUsersList).then((enrichedResults) => {
+        enrichThreadsWithLastAttendee(threadResults, companyUsersRef.current).then((enrichedResults) => {
           setData((prev) => ({ ...prev, [tab]: enrichedResults }));
         });
     } catch (error) {

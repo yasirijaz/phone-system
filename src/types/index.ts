@@ -3,7 +3,7 @@
 export interface Communication {
   id: number;
   type: 'call' | 'sms';
-  body?: string; // For SMS
+  body?: string; // For MMS / text messages
   department_id?: number;
   company_id?: number;
   client_name?: string | null;
@@ -48,6 +48,18 @@ export interface Communication {
   sms_count?: number;
   call_count?: number;
   status?: string; // for SMS
+}
+
+export interface Call {
+  id: string | number;
+  contact?: string;
+  from?: string;
+  to?: string;
+  created_at?: string;
+  duration?: number | string;
+  direction: 'inbound' | 'outbound';
+  notes?: string;
+  category?: string;
 }
 
 export interface PaginatedCommunicationsResponse {
@@ -157,6 +169,7 @@ export interface CompanySettings {
   integrations?: {
     integration_id: number;
     enabled: boolean;
+    api_key?: string;
   }[];
 }
 
@@ -174,7 +187,7 @@ export interface DepartmentSettings {
     timezone: string;
     call_settings: {
         greeting_message: string;
-        hold_music_url: string;
+        hold_music_url?: string;
     };
     business_hours: {
         is_24_7: boolean;

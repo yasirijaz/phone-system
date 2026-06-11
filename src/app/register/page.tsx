@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/icons';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { registerUser } from '@/store/slices/authSlice';
-import { useForm, type FieldValues } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Progress } from '@/components/ui/progress';
@@ -56,8 +56,8 @@ export default function RegisterPage() {
     getValues,
     register,
     formState: { errors }
-  } = useForm({
-    resolver: zodResolver(currentValidationSchema),
+  } = useForm<any>({
+    resolver: zodResolver(currentValidationSchema as z.ZodTypeAny),
     mode: "onChange"
   });
 
