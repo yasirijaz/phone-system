@@ -27,7 +27,7 @@ export function getOtherPartyNumber(comm: Communication): string {
 export function getApiContactId(comm: Communication): number | null {
   const ext = comm as Communication & { contact_id?: number | string | null };
   const raw = ext.contact_id;
-  if (raw == null || raw === '') return null;
+  if (raw == null || String(raw) === '') return null;
   const id = Number(raw);
   return Number.isFinite(id) && id > 0 ? id : null;
 }

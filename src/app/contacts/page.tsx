@@ -111,6 +111,7 @@ export default function ContactsPage() {
     if (contact) {
       form.reset({
         ...contact,
+        email: contact.email ?? "",
         phone_no: contact.phone_no.replace(/^\+1/, ''), // Remove +1 for editing
       });
     } else {

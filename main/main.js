@@ -139,7 +139,12 @@ const createWindow = () => {
     width: 1200,
     height: 600,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js")
+      preload: path.join(__dirname, "preload.js"),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
     }
   });
 
@@ -169,6 +174,9 @@ const createWindow = () => {
           preload: path.join(__dirname, "preload.js"),
           nodeIntegration: false,
           contextIsolation: true,
+          sandbox: true,
+          webSecurity: true,
+          allowRunningInsecureContent: false,
         }
       });
       const url = app.isPackaged
@@ -292,6 +300,9 @@ ipcMain.on('incoming-call', (event, callInfo) => {
         preload: path.join(__dirname, "preload.js"),
         nodeIntegration: false,
         contextIsolation: true,
+        sandbox: true,
+        webSecurity: true,
+        allowRunningInsecureContent: false,
       }
     });
 

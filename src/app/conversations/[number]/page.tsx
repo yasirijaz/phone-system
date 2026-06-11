@@ -33,7 +33,7 @@ export default function ConversationDetailPage() {
     const inFlightRef = useRef<Map<string, Promise<Communication[]>>>(new Map());
     
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
-    const [from, to] = slug.map(part => decodeURIComponent(part));
+    const [from = '', to = ''] = slug.map(part => decodeURIComponent(part));
 
     const refreshThread = useCallback(async (): Promise<Communication[]> => {
         try {

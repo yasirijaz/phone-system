@@ -10,6 +10,10 @@ import {
 import { cacheGet, cacheSet } from '@/lib/simpleCache';
 
 const THREAD_ATTENDEE_CACHE_TTL = 5 * 60_000;
+const THREAD_LOGS_CACHE_TTL = 2 * 60_000;
+const MAX_THREADS_TO_ENRICH = 5;
+
+const inFlightThreadRequests = new Map<string, Promise<Communication[]>>();
 
 export const getCommunications = async (filters: Record<string, any> = {}): Promise<PaginatedCommunicationsResponse> => {
   const safeFilters: Record<string, any> = { ...filters };
@@ -34,8 +38,26 @@ export const getCommunicationThreads = async (type: string, page: number = 1, li
 };
 
 export const getCommunicationThread = async (from: string, to: string): Promise<Communication[]> => {
-    const response = await axios.get(`/api/communications/thread/${from}/${to}`);
-    return response.data.logs;
+    const cacheKey = `thread-logs:${from}:${to}`;
+    const cached = cacheGet<Communication[]>(cacheKey);
+    if (cached) return cached;
+
+    let inFlight = inFlightThreadRequests.get(cacheKey);
+    if (!inFlight) {
+      inFlight = axios
+        .get(`/api/communications/thread/${from}/${to}`)
+        .then((response) => {
+          const logs = response.data.logs ?? [];
+          cacheSet(cacheKey, logs, THREAD_LOGS_CACHE_TTL);
+          return logs;
+        })
+        .finally(() => {
+          inFlightThreadRequests.delete(cacheKey);
+        });
+      inFlightThreadRequests.set(cacheKey, inFlight);
+    }
+
+    return inFlight;
 };
 
 function pickLatestCallLog(logs: Communication[]): Communication | null {
@@ -80,18 +102,24 @@ export async function enrichThreadsWithLastAttendee(
 ): Promise<Communication[]> {
   if (!threads.length) return threads;
 
-  const enrichOne = async (thread: Communication): Promise<Communication> => {
-    if (!isCallThread(thread) || getCallAttendeeName(thread, companyUsers)) {
-      return thread;
-    }
+  const needsEnrichment = threads.filter(
+    (thread) => isCallThread(thread) && !getCallAttendeeName(thread, companyUsers)
+  );
+  if (!needsEnrichment.length) return threads;
 
+  const toEnrich = needsEnrichment.slice(0, MAX_THREADS_TO_ENRICH);
+  const enrichedById = new Map<number | string, Communication>();
+
+  const enrichedSubset = await mapWithConcurrency(toEnrich, ENRICH_CONCURRENCY, async (thread) => {
     const endpoints = getThreadEndpoints(thread);
     if (!endpoints) return thread;
 
     const cacheKey = `thread-attendee:${endpoints.from}:${endpoints.to}`;
     const cached = cacheGet<Partial<Communication>>(cacheKey);
     if (cached) {
-      return { ...thread, ...cached };
+      const merged = { ...thread, ...cached };
+      if (thread.id != null) enrichedById.set(thread.id, merged);
+      return merged;
     }
 
     try {
@@ -110,13 +138,23 @@ export async function enrichThreadsWithLastAttendee(
       }
 
       cacheSet(cacheKey, patch, THREAD_ATTENDEE_CACHE_TTL);
-      return { ...thread, ...patch };
+      const merged = { ...thread, ...patch };
+      if (thread.id != null) enrichedById.set(thread.id, merged);
+      return merged;
     } catch {
       return thread;
     }
-  };
+  });
 
-  return mapWithConcurrency(threads, ENRICH_CONCURRENCY, enrichOne);
+  enrichedSubset.forEach((thread) => {
+    if (thread.id != null) enrichedById.set(thread.id, thread);
+  });
+
+  return threads.map((thread) =>
+    thread.id != null && enrichedById.has(thread.id)
+      ? enrichedById.get(thread.id)!
+      : thread
+  );
 }
 
 export const getCallLogsBySid = async (callSid: string): Promise<Communication | null> => {
@@ -150,12 +188,18 @@ export const getDepartmentVoiceMails = async (department_id: number, page: numbe
 };
 
 export const getUnreadCallLogs = async (departmentId?: number): Promise<Communication[]> => {
+  const cacheKey = departmentId ? `unread-logs:${departmentId}` : 'unread-logs:all';
+  const cached = cacheGet<Communication[]>(cacheKey);
+  if (cached) return cached;
+
   const url = departmentId
     ? `/api/call-logs/unread/${departmentId}`
     : `/api/call-logs/unread`;
 
   const response = await axios.get(url);
-  return response.data.data;
+  const data = response.data.data ?? [];
+  cacheSet(cacheKey, data, 5_000);
+  return data;
 };
 
 export const markRead = async (id: string, type: 'call' | 'sms'): Promise<void> => {

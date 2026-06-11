@@ -1,7 +1,29 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+const electronSendChannels = [
+  'incoming-sms',
+  'incoming-call',
+  'accept-call',
+  'reject-call',
+  'check-for-updates',
+  'successfully-accepted-call',
+  'successfully-rejected-call',
+  'dismiss-incoming-overlay',
+];
+
+const electronReceiveChannels = [
+  'call-accepted',
+  'call-rejected',
+];
+
+const apiSendChannels = ['check-for-updates', 'restart-to-update'];
+const apiReceiveChannels = ['updatelog', 'update-ready', 'app-info'];
+
 contextBridge.exposeInMainWorld("electronAPI", {
     on: (channel, callback) => {
+        if (!electronReceiveChannels.includes(channel)) {
+            return () => {};
+        }
         const newCallback = (_, ...args) => callback(...args);
         ipcRenderer.on(channel, newCallback);
         return () => {
@@ -9,28 +31,29 @@ contextBridge.exposeInMainWorld("electronAPI", {
         };
     },
     send: (channel, args) => {
-        ipcRenderer.send(channel, args);
+        if (electronSendChannels.includes(channel)) {
+            ipcRenderer.send(channel, args);
+        }
     }
 });
 
 contextBridge.exposeInMainWorld(
   'api', {
     send: (channel, data) => {
-      // whitelist channels
-      let validChannels = ['navigate','check-for-updates','restart-to-update'];
-      if (validChannels.includes(channel)) {
+      if (apiSendChannels.includes(channel)) {
         ipcRenderer.send(channel, data);
       }
     },
     receive: (channel, func) => {
-      let validChannels = ['request-data-from-renderer','log','updatelog','update-ready','app-info'];
-      if (validChannels.includes(channel)) {
+      if (apiReceiveChannels.includes(channel)) {
         // Deliberately strip event as it includes `sender`
         ipcRenderer.on(channel, (event, ...args) => func(...args));
       }
     },
     remove:  (channel) => {
-      ipcRenderer.removeAllListeners(channel);
+      if (apiReceiveChannels.includes(channel) || electronReceiveChannels.includes(channel)) {
+        ipcRenderer.removeAllListeners(channel);
+      }
     },
     // helpers
     getAppInfo: () => ipcRenderer.invoke('get-app-info'),

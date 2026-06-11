@@ -30,10 +30,11 @@ export default function CallStats({ calls }: CallStatsProps) {
       return { totalCalls: 0, totalDuration: 0, mostFrequentContact: 'N/A' };
     }
 
-    const totalDuration = calls.reduce((acc, call) => acc + call.duration, 0);
+    const totalDuration = calls.reduce((acc, call) => acc + Number(call.duration || 0), 0);
 
     const contactCounts = calls.reduce((acc, call) => {
-      acc[call.contact] = (acc[call.contact] || 0) + 1;
+      const contact = call.contact || call.from || call.to || 'Unknown';
+      acc[contact] = (acc[contact] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 

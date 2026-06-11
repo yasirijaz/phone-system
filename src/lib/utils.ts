@@ -31,8 +31,8 @@ export function getContactAvatarColorClass(seed: string): string {
   return CONTACT_AVATAR_COLORS[Math.abs(hash) % CONTACT_AVATAR_COLORS.length];
 }
 
-export function formatPhoneNumber(phoneNumberString: string | undefined | null) {
-  if (!phoneNumberString) return phoneNumberString;
+export function formatPhoneNumber(phoneNumberString: string | undefined | null): string {
+  if (!phoneNumberString) return '';
   const cleaned = ('' + phoneNumberString).replace(/\D/g, '');
   const match = cleaned.match(/^(1|)?(\d{3})(\d{3})(\d{4})$/);
   if (match) {

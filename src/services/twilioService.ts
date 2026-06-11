@@ -67,12 +67,7 @@ export const sendSms = async (
         payload.media_urls = media_urls;
     }
 
-    const response = await axios.post('/api/twilio/sms/send', JSON.stringify(payload), {
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-        },
-    });
+    const response = await axios.post('/api/twilio/sms/send', payload);
     return response.data;
 };
 

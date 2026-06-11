@@ -1,11 +1,19 @@
 
 import axios from '@/lib/axios';
 import type { PhoneNumber } from '@/types';
+import { cacheGet, cacheSet } from '@/lib/simpleCache';
+
+const PHONE_NUMBERS_CACHE_TTL = 5 * 60_000;
 
 export const getPhoneNumbers = async (departmentId: number): Promise<PhoneNumber[]> => {
+  const cacheKey = `phone-numbers:${departmentId}`;
+  const cached = cacheGet<PhoneNumber[]>(cacheKey);
+  if (cached) return cached;
+
   const response = await axios.get(`/api/phone-numbers/${departmentId}`);
-  // The API response nests the array inside a `phone_numbers` key
-  return response.data.phone_numbers;
+  const numbers = response.data.phone_numbers ?? [];
+  cacheSet(cacheKey, numbers, PHONE_NUMBERS_CACHE_TTL);
+  return numbers;
 };
 
 export const createPhoneNumber = async (data: Omit<PhoneNumber, 'id'>): Promise<PhoneNumber> => {

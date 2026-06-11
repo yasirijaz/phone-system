@@ -50,6 +50,18 @@ export interface Communication {
   status?: string; // for SMS
 }
 
+export interface Call {
+  id: string | number;
+  contact?: string;
+  from?: string;
+  to?: string;
+  created_at?: string;
+  duration?: number | string;
+  direction: 'inbound' | 'outbound';
+  notes?: string;
+  category?: string;
+}
+
 export interface PaginatedCommunicationsResponse {
     TotalRecords: number;
     TotalPages: number;
@@ -157,6 +169,7 @@ export interface CompanySettings {
   integrations?: {
     integration_id: number;
     enabled: boolean;
+    api_key?: string;
   }[];
 }
 
@@ -174,7 +187,7 @@ export interface DepartmentSettings {
     timezone: string;
     call_settings: {
         greeting_message: string;
-        hold_music_url: string;
+        hold_music_url?: string;
     };
     business_hours: {
         is_24_7: boolean;

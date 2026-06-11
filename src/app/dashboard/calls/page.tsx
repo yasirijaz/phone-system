@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, AreaChart as RechartsAreaChart, Tooltip, DonutChart, Pie, PieChart } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, AreaChart as RechartsAreaChart, Tooltip, Pie, PieChart } from 'recharts';
 import { MoreHorizontal, Eye, Users, Phone, Clock, TrendingDown, TrendingUp, Filter, Globe, Loader2 } from 'lucide-react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
