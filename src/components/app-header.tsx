@@ -6,7 +6,7 @@ import type { Department, PhoneNumber, Contact, User } from "@/types";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
 import { getDepartments } from "@/services/departmentService";
-import { getUserDepartments } from "@/services/userService";
+import { getUserDepartments, stopImpersonation } from "@/services/userService";
 import { getPhoneNumbers, getconferenceSid } from "@/services/phoneNumberService";
 import { getContacts } from "@/services/contactService";
 import Link from 'next/link';
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuShortcut } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, MessageSquare, Video, Settings, LogOut, MoreVertical, RefreshCw } from "lucide-react";
+import { Search, Phone, MessageSquare, Video, Settings, LogOut, MoreVertical, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
@@ -34,7 +34,8 @@ import { cn, formatPhoneNumber } from "@/lib/utils";
 import { isElectron } from '@/lib/is-electron';
 import { canListAllCompanyDepartments } from '@/lib/roles';
 import { cacheGet, cacheSet } from '@/lib/simpleCache';
-import { Logo } from "./icons";
+import { useAppDispatch } from "@/store";
+import { setUser } from "@/store/slices/authSlice";
 
 type AppInfo = { version?: string; updateReady?: boolean };
 
@@ -97,12 +98,67 @@ export default function AppHeader({
     // Electron app info
     const [appVersion, setAppVersion] = useState<string | null>(null);
     const [updateReady, setUpdateReady] = useState<boolean>(false);
+
+    const dispatch = useAppDispatch();
+    const [isImpersonating, setIsImpersonating] = useState(false);
+    const [stoppingImpersonation, setStoppingImpersonation] = useState(false);
     
+    const handleStopImpersonation = async () => {
+        try {
+            setStoppingImpersonation(true);
+
+            const impersonationId =
+            localStorage.getItem("impersonation_id");
+
+            if (!impersonationId) {
+            throw new Error(
+                "Impersonation session not found."
+            );
+            }
+
+            const response = await stopImpersonation(impersonationId);
+
+            dispatch(
+                setUser({
+                    user: response.user,
+                    token: response.token,
+                })
+            );
+
+            // localStorage.setItem("authToken", response.token);
+            // localStorage.setItem("user", JSON.stringify(response.user));
+
+            localStorage.removeItem("impersonation_id");
+            localStorage.removeItem("is_impersonating");
+
+            toast({
+                title: "Impersonation Ended",
+                description: "You are now back in your admin account.",
+            });
+
+            router.push("/dashboard/ecommerce");
+        } catch (error: any) {
+            toast({
+                title: "Error",
+                description:
+                    error?.response?.data?.message ||
+                    "Failed to stop impersonation.",
+                variant: "destructive",
+            });
+        } finally {
+            setStoppingImpersonation(false);
+        }
+    };
+
     useEffect(() => {
         // Initialize the audio element once.
         if (typeof window !== 'undefined' && !audioRef.current) {
             audioRef.current = new Audio('/sounds/message.mp3');
         }
+
+        setIsImpersonating(
+            localStorage.getItem("is_impersonating") === "true"
+        );
     }, []);
     
     useEffect(() => {
@@ -648,6 +704,35 @@ export default function AppHeader({
                     </DropdownMenu>
                 </div>
             </header>
+
+            {isImpersonating && (
+                <div className="bg-amber-100 border-b border-amber-300 px-4 py-2">
+                    <div className="flex items-center justify-between max-w-screen-2xl mx-auto">
+                    <div className="flex items-center gap-2 text-amber-900">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span className="font-medium">
+                            You are currently impersonating another user.
+                        </span>
+                    </div>
+
+                    <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={handleStopImpersonation}
+                        disabled={stoppingImpersonation}
+                    >
+                        {stoppingImpersonation ? (
+                        <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Restoring...
+                        </>
+                        ) : (
+                            "Exit Impersonation"
+                        )}
+                    </Button>
+                    </div>
+                </div>
+            )}
               
             <Dialog open={isVideoOpen} onOpenChange={setIsVideoOpen}>
             <DialogContent>

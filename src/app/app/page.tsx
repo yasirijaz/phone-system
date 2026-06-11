@@ -85,7 +85,7 @@ export default function AppUIPage() {
 
   const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10, force = false) => {
     if (!user) return;
-
+    
     const fetchKey = `${tab}:${page}:${limit}`;
     if (!force && lastFetchKeyRef.current === fetchKey) return;
     lastFetchKeyRef.current = fetchKey;
@@ -238,8 +238,8 @@ export default function AppUIPage() {
                         <TabsTrigger value="recordings">Recordings</TabsTrigger>
                         <TabsTrigger value="messages">Messages</TabsTrigger>
                         <TabsTrigger value="starred">Starred</TabsTrigger>
-                        <TabsTrigger value="spam">Spam</TabsTrigger>
-                        <TabsTrigger value="unlogged">Unlogged</TabsTrigger>
+                        {/* <TabsTrigger value="spam">Spam</TabsTrigger>
+                        <TabsTrigger value="unlogged">Unlogged</TabsTrigger> */}
                       </TabsList>
                       <div className="mt-6">
                         {activeTab === 'spam' ? (

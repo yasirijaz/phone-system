@@ -123,6 +123,18 @@ export const getUserDepartments = async (userId: number): Promise<Department[]> 
     return departments;
 };
 
-    
+export const impersonateUser = async (userId: number): Promise<any> => {
+    const response = await axios.post(
+      `/api/users/${userId}/impersonate`
+    );
+
+  return response.data;
+};
+
+export const stopImpersonation = async (impersonationId: string): Promise<any> => {
+  const response = await axios.post(`/api/impersonation/${impersonationId}/stop`, {});
+
+  return response.data;
+};
 
     
