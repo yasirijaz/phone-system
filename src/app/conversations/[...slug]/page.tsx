@@ -17,7 +17,7 @@ import AppHeader from "@/components/app-header";
 import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
 import { getPhoneNumbers } from "@/services/phoneNumberService";
-import { sendSms } from "@/services/twilioService";
+import { sendMms } from "@/services/twilioService";
 import { getContacts } from "@/services/contactService";
 import { events } from "@/lib/events";
 import ContactProfile from "@/components/contact-profile";
@@ -287,18 +287,18 @@ export default function ConversationDetailPage() {
             return;
         }
         if (!body && mediaUrls.length === 0) {
-            toast({ title: "Error", description: "Add a message or image to send.", variant: "destructive" });
+            toast({ title: "Error", description: "Add a message or media attachment to send.", variant: "destructive" });
             return;
         }
         setIsSending(true);
         try {
-            await sendSms(
+            await sendMms(
                 selectedFromNumber,
                 recipient,
                 body,
                 mediaUrls.length ? mediaUrls : undefined
             );
-            toast({ title: "Success", description: mediaUrls.length ? "Message with image sent successfully." : "Message sent successfully." });
+            toast({ title: "Success", description: mediaUrls.length ? "MMS sent successfully." : "Message sent successfully." });
             const logs = await getCommunicationThread(from, to);
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);

@@ -3,7 +3,7 @@
 export interface Communication {
   id: number;
   type: 'call' | 'sms';
-  body?: string; // For SMS
+  body?: string; // For MMS / text messages
   department_id?: number;
   company_id?: number;
   client_name?: string | null;

@@ -199,9 +199,12 @@ export default function AppHeader({
                         router.push(`/conversations/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
                     };
 
+                    const hasMedia = Boolean(data.data?.meta_data?.num_media || data.data?.meta_data?.media_urls?.length);
                     toast({
-                        title: `New Message from ${formatPhoneNumber(from)}`,
-                        description: body,
+                        title: hasMedia
+                          ? `New MMS from ${formatPhoneNumber(from)}`
+                          : `New Message from ${formatPhoneNumber(from)}`,
+                        description: body || (hasMedia ? 'Media attachment' : ''),
                         action: (
                         <ToastAction altText="View" onClick={navigateToConversation}>
                             View

@@ -16,7 +16,15 @@ import { events } from '@/lib/events';
 import React from 'react';
 import { cn, formatPhoneNumber, getContactAvatarColorClass } from '@/lib/utils';
 import { hasSupervisorAccess } from '@/lib/roles';
-import { getCommunicationMediaUrls, isImageMediaUrl, isInlineImageBody } from '@/lib/message-media';
+import {
+  getCommunicationMediaContentTypes,
+  getCommunicationMediaUrls,
+  getMessagePreviewText,
+  isAudioMediaUrl,
+  isImageMediaUrl,
+  isInlineImageBody,
+  isVideoMediaUrl,
+} from '@/lib/message-media';
 import { getOtherPartyDisplay } from '@/lib/contact-display';
 import {
   getCallAttendeeName,
@@ -197,9 +205,52 @@ function CommunicationCard({
 
   const showAvatar = !isMine && isFirstInGroup;
 
+  const renderMediaAttachment = (url: string, contentType?: string) => {
+    if (isImageMediaUrl(url, contentType)) {
+      return (
+        <a key={url} href={url} target="_blank" rel="noreferrer" className="block">
+          <img
+            src={url}
+            alt="MMS attachment"
+            className="max-h-56 max-w-xs rounded-md object-cover"
+          />
+        </a>
+      );
+    }
+
+    if (isVideoMediaUrl(url, contentType)) {
+      return (
+        <video
+          key={url}
+          src={url}
+          controls
+          className="max-h-56 max-w-xs rounded-md"
+          preload="metadata"
+        />
+      );
+    }
+
+    if (isAudioMediaUrl(url, contentType)) {
+      return <audio key={url} src={url} controls className="w-full max-w-xs" preload="metadata" />;
+    }
+
+    return (
+      <a
+        key={url}
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="text-sm underline underline-offset-2"
+      >
+        Download attachment
+      </a>
+    );
+  };
+
   const renderMessageBubble = (c: Communication) => {
     const time = c.created_at ? format(parseISO(c.created_at), 'p') : '';
-    const mediaUrls = getCommunicationMediaUrls(c).filter(isImageMediaUrl);
+    const mediaUrls = getCommunicationMediaUrls(c);
+    const contentTypes = getCommunicationMediaContentTypes(c);
     const showBody = Boolean(c.body?.trim()) && !isInlineImageBody(c.body) && !mediaUrls.includes(String(c.body).trim());
 
     return (
@@ -212,16 +263,8 @@ function CommunicationCard({
             !isFirstInGroup && !isLastInGroup && !isMiddleOfGroup && "rounded-xl"
         )}>
             {mediaUrls.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {mediaUrls.map((url) => (
-                  <a key={url} href={url} target="_blank" rel="noreferrer" className="block">
-                    <img
-                      src={url}
-                      alt="Message attachment"
-                      className="max-h-56 max-w-xs rounded-md object-cover"
-                    />
-                  </a>
-                ))}
+              <div className="flex flex-col gap-2">
+                {mediaUrls.map((url, index) => renderMediaAttachment(url, contentTypes[index]))}
               </div>
             )}
             {showBody && <p className="text-sm whitespace-pre-wrap break-words">{c.body}</p>}
@@ -341,7 +384,7 @@ function CommunicationCard({
        const attendeeInitials = attendee?.name ? getInitials(attendee.name) : '';
        const listingTime = formatListingTimestamp(comm.latest_created_at || comm.created_at);
        const callTypeLine = isSms
-         ? (comm.body ? String(comm.body).slice(0, 40) : formatCallTypeDurationLine(comm))
+         ? (getMessagePreviewText(comm) || formatCallTypeDurationLine(comm))
          : formatCallTypeDurationLine(comm);
        const failedCallLabel = isHungUp ? 'Hung up' : isMissed ? 'Missed' : null;
        const contactColorClass = getContactAvatarColorClass(

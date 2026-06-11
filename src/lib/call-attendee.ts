@@ -226,7 +226,7 @@ export function isFailedCallRow(comm: Communication): boolean {
 
 export function formatCallTypeDurationLine(comm: Communication): string {
   if (comm.type === 'sms' || comm.latest_type === 'sms') {
-    return comm.direction === 'inbound' ? 'Inbound / SMS' : 'Outbound / SMS';
+    return comm.direction === 'inbound' ? 'Inbound / MMS' : 'Outbound / MMS';
   }
 
   if (comm.call_status === 'in_progress') {
