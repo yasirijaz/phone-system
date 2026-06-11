@@ -72,7 +72,7 @@ export default function AppUIPage() {
 
   const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10, force = false) => {
     if (!user) return;
-
+    
     const fetchKey = `${tab}:${page}:${limit}`;
     if (!force && lastFetchKeyRef.current === fetchKey) return;
     lastFetchKeyRef.current = fetchKey;
@@ -224,7 +224,7 @@ export default function AppUIPage() {
                   />
 
                   <main className="flex-1 p-6 overflow-y-auto">
-                    <Tabs defaultValue="all" onValueChange={(value) => setActiveTab(value as TabName)}>
+                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabName)}>
                       <TabsList>
                         <TabsTrigger value="all">All</TabsTrigger>
                         <TabsTrigger value="unread">Unread</TabsTrigger>
@@ -235,8 +235,8 @@ export default function AppUIPage() {
                         <TabsTrigger value="recordings">Recordings</TabsTrigger>
                         <TabsTrigger value="messages">Messages</TabsTrigger>
                         <TabsTrigger value="starred">Starred</TabsTrigger>
-                        <TabsTrigger value="spam">Spam</TabsTrigger>
-                        <TabsTrigger value="unlogged">Unlogged</TabsTrigger>
+                        {/* <TabsTrigger value="spam">Spam</TabsTrigger>
+                        <TabsTrigger value="unlogged">Unlogged</TabsTrigger> */}
                       </TabsList>
                       <TabsContent value="all" className="mt-6">{renderTabContent('all')}</TabsContent>
                       <TabsContent value="unread" className="mt-6">{renderTabContent('unread')}</TabsContent>
@@ -247,12 +247,12 @@ export default function AppUIPage() {
                       <TabsContent value="recordings" className="mt-6">{renderTabContent('recordings')}</TabsContent>
                       <TabsContent value="messages" className="mt-6">{renderTabContent('messages')}</TabsContent>
                       <TabsContent value="starred" className="mt-6">{renderTabContent('starred')}</TabsContent>
-                      <TabsContent value="spam" className="mt-6">
+                      {/* <TabsContent value="spam" className="mt-6">
                           <Card><CardContent className="p-6">Spam will appear here.</CardContent></Card>
                       </TabsContent>
                       <TabsContent value="unlogged" className="mt-6">
                           <Card><CardContent className="p-6">Unlogged calls will appear here.</CardContent></Card>
-                      </TabsContent>
+                      </TabsContent> */}
                     </Tabs>
                   </main>
                 </div>

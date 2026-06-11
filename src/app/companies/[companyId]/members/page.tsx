@@ -9,7 +9,7 @@ import type { User, Company, Department, Assignment } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { getCompany } from "@/services/companyService";
 import { getDepartments } from "@/services/departmentService";
-import { getUsersByCompany, addUserToCompany, assignUserToDepartment, removeUserFromDepartment, updateUser, deleteUser, importUsersToCompany, type UserImportPayload } from "@/services/userService";
+import { getUsersByCompany, addUserToCompany, assignUserToDepartment, removeUserFromDepartment, updateUser, deleteUser, importUsersToCompany, type UserImportPayload, impersonateUser } from "@/services/userService";
 import { parseCsv, getCsvValue } from "@/lib/csvParser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, ArrowLeft, Edit, Trash2, Users, Briefcase, Upload, Download, Loader2 } from "lucide-react";
+import { PlusCircle, ArrowLeft, Edit, Trash2, Users, Briefcase, Upload, Download, UserCog, Loader2 } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter, useParams } from 'next/navigation';
@@ -36,6 +36,8 @@ import {
   getRoleName,
   ROLES,
 } from '@/lib/roles';
+import { setUser } from "@/store/slices/authSlice";
+import { useAppDispatch } from '@/store';
 
 const userSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -107,6 +109,8 @@ export default function ManageUsersPage() {
   const [defaultImportPassword, setDefaultImportPassword] = useState("");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [impersonatingUserId, setImpersonatingUserId] = useState<number | null>(null);
+  const dispatch = useAppDispatch();
   const { toast } = useToast();
 
   const userForm = useForm<z.infer<typeof userSchema>>({
@@ -377,6 +381,51 @@ export default function ManageUsersPage() {
     }
   };
 
+  const handleImpersonateUser = async (selectedUser: User) => {
+    try {
+      setImpersonatingUserId(selectedUser.id);
+
+      const response = await impersonateUser(selectedUser.id);
+
+      // localStorage.setItem("authToken", response.token);
+      // localStorage.setItem("user", JSON.stringify(response.user));
+
+      dispatch(
+        setUser({
+          user: response.user,
+          token: response.token,
+        })
+      );
+
+      localStorage.setItem(
+        "impersonation_id",
+        String(response.impersonation_id)
+      );
+
+      localStorage.setItem(
+        "is_impersonating",
+        "true"
+      );
+
+      toast({
+        title: "Impersonation Started",
+        description: `You are now logged in as ${selectedUser.name}`,
+      });
+
+      router.push("/app");
+    } catch (error: any) {
+      toast({
+        title: "Failed",
+        description:
+          error?.response?.data?.message ||
+          "Could not impersonate user.",
+        variant: "destructive",
+      });
+    } finally {
+      setImpersonatingUserId(null);
+    }
+  };
+
   const validImportCount = importRows.filter((row) => !row.error).length;
   const invalidImportCount = importRows.length - validImportCount;
 
@@ -644,6 +693,22 @@ export default function ManageUsersPage() {
                             <TableCell className="text-right">
                               <Button variant="ghost" size="icon" onClick={() => handleOpenAssignmentDialog(u)}><Briefcase className="h-4 w-4" /></Button>
                               <Button variant="ghost" size="icon" onClick={() => handleUserDialogOpen(u)}><Edit className="h-4 w-4" /></Button>
+                              {authUser?.role_id === ROLES.COMPANY_ADMIN &&
+                                authUser.id !== u.id && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    title="Login As User"
+                                    onClick={() => handleImpersonateUser(u)}
+                                    disabled={impersonatingUserId === u.id}
+                                  >
+                                    {impersonatingUserId === u.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <UserCog className="h-4 w-4 text-blue-600" />
+                                    )}
+                                  </Button>
+                              )}
                               {canDelete && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
