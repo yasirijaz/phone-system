@@ -276,7 +276,7 @@ export default function ConversationDetailPage() {
         console.log("Request to call from conversation detail:", number);
     };
 
-    const handleSendMessage = async ({ body, mediaUrls }: { body: string; mediaUrls: string[] }) => {
+    const handleSendMessage = async ({ body, mediaFiles }: { body: string; mediaFiles: File[] }) => {
         const recipient = contact?.phone_no;
         if (!selectedFromNumber) {
             toast({ title: "Error", description: "Please select a 'from' number.", variant: "destructive" });
@@ -286,7 +286,7 @@ export default function ConversationDetailPage() {
             toast({ title: "Error", description: "Could not determine recipient.", variant: "destructive" });
             return;
         }
-        if (!body && mediaUrls.length === 0) {
+        if (!body && mediaFiles.length === 0) {
             toast({ title: "Error", description: "Add a message or media attachment to send.", variant: "destructive" });
             return;
         }
@@ -296,9 +296,9 @@ export default function ConversationDetailPage() {
                 selectedFromNumber,
                 recipient,
                 body,
-                mediaUrls.length ? mediaUrls : undefined
+                mediaFiles.length ? mediaFiles : undefined
             );
-            toast({ title: "Success", description: mediaUrls.length ? "MMS sent successfully." : "Message sent successfully." });
+            toast({ title: "Success", description: mediaFiles.length ? "MMS sent successfully." : "Message sent successfully." });
             const logs = await getCommunicationThread(from, to);
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);

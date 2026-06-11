@@ -18,9 +18,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Edit, Trash2, Search } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Phone } from "lucide-react";
 import AppHeader from "@/components/app-header";
 import { formatPhoneNumber } from "@/lib/utils";
+import { useTwilio } from "@/context/TwilioContext";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name is required."),
@@ -65,6 +66,25 @@ export default function ContactsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  const { device } = useTwilio();
+
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [dialerInitialValue, setDialerInitialValue] = useState("");
+
+  const handleMakeCall = (number: string) => {
+    if (!device) {
+      toast({
+        title: "Twilio Error",
+        description: "Twilio Device not ready.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setDialerInitialValue(number.replace(/^\+1/, ""));
+    setDialerOpen(true);
+  };
+  
   const fetchContacts = useCallback(async (page: number, limit: number, search: string) => {
     if (!user?.company_id) return;
     setPagination((prev) => ({ ...prev, loading: true }));
@@ -162,7 +182,13 @@ export default function ContactsPage() {
 
   return (
           <div className="flex flex-col min-h-screen">
-            <AppHeader user={user} logout={logout} />
+            <AppHeader
+              user={user}
+              logout={logout}
+              dialerOpen={dialerOpen}
+              dialerInitialValue={dialerInitialValue}
+              onDialerOpenChange={() => setDialerOpen(!dialerOpen)}
+            />
 
             <main className="flex-1 p-4 md:p-8 bg-muted/40">
                 <Card>
@@ -253,28 +279,36 @@ export default function ContactsPage() {
                               <TableCell>{formatPhoneNumber(contact.phone_no)}</TableCell>
                               <TableCell>{contact.phone_type}</TableCell>
                               <TableCell className="text-right">
-                                  <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(contact)}>
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                          <Button variant="ghost" size="icon">
-                                              <Trash2 className="h-4 w-4 text-destructive" />
-                                          </Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                              <AlertDialogDescription>
-                                                  This will permanently delete the contact. This action cannot be undone.
-                                              </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                              <AlertDialogAction onClick={() => handleDelete(contact.id)}>Delete</AlertDialogAction>
-                                          </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                  </AlertDialog>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleMakeCall(contact.phone_no)}
+                                  title="Call Contact"
+                                >
+                                  <Phone className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(contact)}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon">
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This will permanently delete the contact. This action cannot be undone.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDelete(contact.id)}>Delete</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                               </TableCell>
                             </TableRow>
                           )) : (

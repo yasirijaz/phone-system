@@ -8,7 +8,7 @@ const DATA_VIDEO_PATTERN = /^data:video\/[a-z0-9+.-]+;base64,/i;
 const DATA_AUDIO_PATTERN = /^data:audio\/[a-z0-9+.-]+;base64,/i;
 
 export const MAX_MESSAGE_MEDIA_SIZE_BYTES = 5 * 1024 * 1024;
-export const MAX_MESSAGE_MEDIA = 10;
+export const MAX_MESSAGE_MEDIA = 5;
 
 /** @deprecated Use MAX_MESSAGE_MEDIA */
 export const MAX_MESSAGE_IMAGES = MAX_MESSAGE_MEDIA;

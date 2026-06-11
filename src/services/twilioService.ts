@@ -48,46 +48,43 @@ export interface SendMmsPayload {
   from: string;
   to: string;
   body: string;
-  media_urls?: string[];
+  media_urls?: File[];
 }
 
 /** @deprecated Use SendMmsPayload */
 export type SendSmsPayload = SendMmsPayload;
 
-export const uploadMmsMedia = async (file: File): Promise<string> => {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await axios.post('/api/twilio/mms/upload', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-
-  return response.data.url;
-};
-
 export const sendMms = async (
-  from: string,
-  to: string,
-  body: string,
-  media_urls?: string[]
+    from: string,
+    to: string,
+    body: string,
+    media_urls?: File[]
 ): Promise<any> => {
-    const payload: SendMmsPayload = {
-        from,
-        to,
-        body: body ?? '',
-    };
+    const formData = new FormData();
+
+    formData.append('from', from);
+    formData.append('to', to);
+    formData.append('body', body ?? '');
 
     if (media_urls?.length) {
-        payload.media_urls = media_urls;
+        media_urls.forEach((file) => {
+            formData.append('media_urls[]', file);
+        });
     }
 
-    const response = await axios.post('/api/twilio/mms/send', payload);
+    const response = await axios.post(
+        '/api/twilio/sms/send',
+        formData,
+        {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        }
+    );
+
     return response.data;
 };
 
-/** @deprecated Use sendMms */
 export const sendSms = sendMms;
 
 export const holdParticipant = async (conferenceSid: string, callSid: string, hold: boolean): Promise<any> => {
