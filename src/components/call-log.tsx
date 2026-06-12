@@ -252,11 +252,14 @@ function CommunicationCard({
     const mediaUrls = getCommunicationMediaUrls(c);
     const contentTypes = getCommunicationMediaContentTypes(c);
     const showBody = Boolean(c.body?.trim()) && !isInlineImageBody(c.body) && !mediaUrls.includes(String(c.body).trim());
+    const isUnreadSms = c.type === 'sms' && c.direction === 'inbound' && Number(c.is_read) === 0;
 
     return (
         <div className={cn(
             "p-3 group relative space-y-2",
-            isMine ? "bg-primary text-primary-foreground" : "bg-muted",
+            isUnreadSms
+            ? "bg-red-100 border border-red-200"
+            : isMine ? "bg-primary text-primary-foreground" : "bg-muted",
             isFirstInGroup && (isMine ? "rounded-t-xl rounded-l-xl" : "rounded-t-xl rounded-r-xl"),
             isLastInGroup && !isFirstInGroup && (isMine ? "rounded-b-xl rounded-l-xl" : "rounded-b-xl rounded-r-xl"),
             isMiddleOfGroup && (isMine ? "rounded-l-xl" : "rounded-r-xl"),
@@ -390,12 +393,15 @@ function CommunicationCard({
        const contactColorClass = getContactAvatarColorClass(
          otherParty.hasContactName ? mainPageContactName : mainPageContactNumber
        );
+       const isUnreadSms = (comm.latest_type === 'sms' || comm.type === 'sms') && Number(comm.is_read) === 0;
 
       return (
            <div
              className={cn(
                'flex items-center gap-3 px-4 py-3 group transition-colors',
-               isFailedCall
+               isUnreadSms
+                ? 'bg-red-100 hover:bg-red-200'
+                : isFailedCall
                  ? 'bg-destructive/10 hover:bg-destructive/15 border-l-4 border-l-destructive'
                  : 'hover:bg-muted/40'
              )}
