@@ -185,6 +185,33 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         }
       });
 
+
+      // --- AUDIO HARDWARE INITIALIZATION ---
+      try {
+        // 1. Request microphone access so device names and IDs can map properly
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // 2. Fetch saved keys from local storage
+        const savedMicrophoneId = localStorage.getItem('hardware_selected_microphone');
+        const savedSpeakerId = localStorage.getItem('hardware_selected_speaker');
+
+        // 3. Bind saved mic hardware selection
+        if (savedMicrophoneId && newDevice.audio) {
+          await newDevice.audio.setInputDevice(savedMicrophoneId);
+          console.log('Applied saved mic:', savedMicrophoneId);
+        }
+
+        // 4. Bind saved speaker hardware selections
+        if (savedSpeakerId && newDevice.audio) {
+          await newDevice.audio.speakerDevices.set([savedSpeakerId]);
+          await newDevice.audio.ringtoneDevices.set([savedSpeakerId]);
+          console.log('Applied saved speaker output routes:', savedSpeakerId);
+        }
+      } catch (audioErr) {
+        console.warn('Could not initialize custom local storage audio routing:', audioErr);
+      }
+      // --- END AUDIO HARDWARE INITIALIZATION ---
+
       await newDevice.register();
 
       const newWorker = new twilio.Worker(token);
