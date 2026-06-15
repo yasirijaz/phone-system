@@ -17,9 +17,9 @@ export default function HardwareSettings() {
     const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
     const [videoInputDevices, setVideoInputDevices] = useState<MediaDeviceInfo[]>([]);
     
-    const [selectedMicrophone, setSelectedMicrophone] = useState<string>('');
-    const [selectedSpeaker, setSelectedSpeaker] = useState<string>('');
-    const [selectedCamera, setSelectedCamera] = useState<string>('');
+    const [selectedMicrophone, setSelectedMicrophone] = useState('');
+    const [selectedSpeaker, setSelectedSpeaker] = useState('');
+    const [selectedCamera, setSelectedCamera] = useState('');
 
     // Mic testing states
     const [isTestingMic, setIsTestingMic] = useState(false);
@@ -36,39 +36,124 @@ export default function HardwareSettings() {
     const chunksRef = useRef<Blob[]>([]);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
+    const STORAGE_KEYS = {
+        microphone: 'hardware_selected_microphone',
+        speaker: 'hardware_selected_speaker',
+        camera: 'hardware_selected_camera',
+    };
+
     const getDevices = async () => {
         if (!navigator.mediaDevices?.enumerateDevices) {
-            console.warn("Media Devices API not supported.");
+            console.warn('Media Devices API not supported.');
             setDevicesLoading(false);
             return;
         }
+
         setDevicesLoading(true);
+
         try {
             try {
-                await navigator.mediaDevices.getUserMedia({ audio: true });
+            await navigator.mediaDevices.getUserMedia({
+                audio: true,
+            });
             } catch (err) {
-                console.warn("Could not get audio permissions:", err);
-            }
-            try {
-                await navigator.mediaDevices.getUserMedia({ video: true });
-            } catch (err) {
-                console.warn("Could not get video permissions:", err);
+            console.warn(
+                'Could not get audio permissions:',
+                err
+            );
             }
 
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const audioInputs = devices.filter(device => device.kind === 'audioinput');
-            const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
-            const videoInputs = devices.filter(device => device.kind === 'videoinput');
-            
+            try {
+            await navigator.mediaDevices.getUserMedia({
+                video: true,
+            });
+            } catch (err) {
+            console.warn(
+                'Could not get video permissions:',
+                err
+            );
+            }
+
+            const devices =
+            await navigator.mediaDevices.enumerateDevices();
+
+            const audioInputs = devices.filter(
+            (device) => device.kind === 'audioinput'
+            );
+
+            const audioOutputs = devices.filter(
+            (device) => device.kind === 'audiooutput'
+            );
+
+            const videoInputs = devices.filter(
+            (device) => device.kind === 'videoinput'
+            );
+
             setAudioInputDevices(audioInputs);
             setAudioOutputDevices(audioOutputs);
             setVideoInputDevices(videoInputs);
 
-            if (audioInputs.length > 0 && !selectedMicrophone) setSelectedMicrophone(audioInputs[0].deviceId);
-            if (audioOutputs.length > 0 && !selectedSpeaker) setSelectedSpeaker(audioOutputs[0].deviceId);
-            if (videoInputs.length > 0 && !selectedCamera) setSelectedCamera(videoInputs[0].deviceId);
-        } catch(err) {
-            console.error("Error enumerating devices", err);
+            const savedMic = localStorage.getItem(
+            STORAGE_KEYS.microphone
+            );
+
+            const savedSpeaker = localStorage.getItem(
+            STORAGE_KEYS.speaker
+            );
+
+            const savedCamera = localStorage.getItem(
+            STORAGE_KEYS.camera
+            );
+
+            const micExists = audioInputs.some(
+            (d) => d.deviceId === savedMic
+            );
+
+            const speakerExists = audioOutputs.some(
+            (d) => d.deviceId === savedSpeaker
+            );
+
+            const cameraExists = videoInputs.some(
+            (d) => d.deviceId === savedCamera
+            );
+
+            if (savedMic && micExists) {
+            setSelectedMicrophone(savedMic);
+            } else if (
+            audioInputs.length > 0 &&
+            !selectedMicrophone
+            ) {
+            setSelectedMicrophone(
+                audioInputs[0].deviceId
+            );
+            }
+
+            if (savedSpeaker && speakerExists) {
+            setSelectedSpeaker(savedSpeaker);
+            } else if (
+            audioOutputs.length > 0 &&
+            !selectedSpeaker
+            ) {
+            setSelectedSpeaker(
+                audioOutputs[0].deviceId
+            );
+            }
+
+            if (savedCamera && cameraExists) {
+            setSelectedCamera(savedCamera);
+            } else if (
+            videoInputs.length > 0 &&
+            !selectedCamera
+            ) {
+            setSelectedCamera(
+                videoInputs[0].deviceId
+            );
+            }
+        } catch (err) {
+            console.error(
+            'Error enumerating devices',
+            err
+            );
         } finally {
             setDevicesLoading(false);
         }
@@ -81,6 +166,50 @@ export default function HardwareSettings() {
             stopMicTest();
         }
     }, [isOpen]);
+
+    useEffect(() => {
+        const handleDeviceChange = () => {
+            getDevices();
+        };
+
+        navigator.mediaDevices?.addEventListener(
+            'devicechange',
+            handleDeviceChange
+        );
+
+        return () => {
+            navigator.mediaDevices?.removeEventListener(
+            'devicechange',
+            handleDeviceChange
+            );
+        };
+    }, []);
+
+    useEffect(() => {
+        const savedMic = localStorage.getItem(
+            STORAGE_KEYS.microphone
+        );
+
+        const savedSpeaker = localStorage.getItem(
+            STORAGE_KEYS.speaker
+        );
+
+        const savedCamera = localStorage.getItem(
+            STORAGE_KEYS.camera
+        );
+
+        if (savedMic) {
+            setSelectedMicrophone(savedMic);
+        }
+
+        if (savedSpeaker) {
+            setSelectedSpeaker(savedSpeaker);
+        }
+
+        if (savedCamera) {
+            setSelectedCamera(savedCamera);
+        }
+    }, []);
 
     // 🔹 Microphone Volume Test
     const startMicTest = async () => {
@@ -193,6 +322,39 @@ export default function HardwareSettings() {
         }
     };
 
+    const handleMicrophoneChange = (
+        value: string
+        ) => {
+        setSelectedMicrophone(value);
+
+        localStorage.setItem(
+            STORAGE_KEYS.microphone,
+            value
+        );
+    };
+
+    const handleSpeakerChange = (
+        value: string
+        ) => {
+        setSelectedSpeaker(value);
+
+        localStorage.setItem(
+            STORAGE_KEYS.speaker,
+            value
+        );
+    };
+
+    const handleCameraChange = (
+            value: string
+            ) => {
+            setSelectedCamera(value);
+
+            localStorage.setItem(
+                STORAGE_KEYS.camera,
+                value
+            );
+    };
+    
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
@@ -216,7 +378,7 @@ export default function HardwareSettings() {
                                 {isTestingMic ? 'Stop' : 'Test'}
                             </Button>
                         </div>
-                        <Select value={selectedMicrophone} onValueChange={setSelectedMicrophone} disabled={isTestingMic}>
+                        <Select value={selectedMicrophone} onValueChange={handleMicrophoneChange} disabled={isTestingMic}>
                             <SelectTrigger id="mic-select">
                                 <SelectValue placeholder="Select Microphone" />
                             </SelectTrigger>
@@ -244,7 +406,7 @@ export default function HardwareSettings() {
                                 Test
                             </Button>
                         </div>
-                        <Select value={selectedSpeaker} onValueChange={setSelectedSpeaker}>
+                        <Select value={selectedSpeaker} onValueChange={handleSpeakerChange}>
                             <SelectTrigger id="speaker-select">
                                 <SelectValue placeholder="Select Speaker" />
                             </SelectTrigger>
@@ -267,7 +429,7 @@ export default function HardwareSettings() {
                         {devicesLoading ? (
                             <Input disabled placeholder="Detecting cameras..." />
                         ) : videoInputDevices.length > 0 ? (
-                            <Select value={selectedCamera} onValueChange={setSelectedCamera}>
+                            <Select value={selectedCamera} onValueChange={handleCameraChange}>
                                 <SelectTrigger id="camera-select">
                                     <SelectValue placeholder="Select Camera" />
                                 </SelectTrigger>
@@ -305,4 +467,3 @@ export default function HardwareSettings() {
         </Popover>
     );
 }
-    
