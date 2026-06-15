@@ -7,7 +7,7 @@ import { getCommunicationThread, markRead } from "@/services/callLogService";
 import type { Communication, Contact, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, PanelRightClose, User } from "lucide-react";
+import { ArrowLeft, PanelRightClose, User, Phone } from "lucide-react";
 import CallLog from "@/components/call-log";
 import MessageComposer from "@/components/message-composer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -276,7 +276,7 @@ export default function ConversationDetailPage() {
         console.log("Request to call from conversation detail:", number);
     };
 
-    const handleSendMessage = async ({ body, mediaUrls }: { body: string; mediaUrls: string[] }) => {
+    const handleSendMessage = async ({ body, mediaFiles }: { body: string; mediaFiles: File[] }) => {
         const recipient = contact?.phone_no;
         if (!selectedFromNumber) {
             toast({ title: "Error", description: "Please select a 'from' number.", variant: "destructive" });
@@ -286,7 +286,7 @@ export default function ConversationDetailPage() {
             toast({ title: "Error", description: "Could not determine recipient.", variant: "destructive" });
             return;
         }
-        if (!body && mediaUrls.length === 0) {
+        if (!body && mediaFiles.length === 0) {
             toast({ title: "Error", description: "Add a message or media attachment to send.", variant: "destructive" });
             return;
         }
@@ -296,9 +296,9 @@ export default function ConversationDetailPage() {
                 selectedFromNumber,
                 recipient,
                 body,
-                mediaUrls.length ? mediaUrls : undefined
+                mediaFiles.length ? mediaFiles : undefined
             );
-            toast({ title: "Success", description: mediaUrls.length ? "MMS sent successfully." : "Message sent successfully." });
+            toast({ title: "Success", description: mediaFiles.length ? "MMS sent successfully." : "Message sent successfully." });
             const logs = await getCommunicationThread(from, to);
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);
@@ -308,10 +308,31 @@ export default function ConversationDetailPage() {
     };
 
 
+    const [dialerOpen, setDialerOpen] = useState(false);
+    const [dialerInitialValue, setDialerInitialValue] = useState("");
+
+    const handleMakeCallDialer = (number: string) => {
+        if (!device) {
+        toast({
+            title: "Twilio Error",
+            description: "Twilio Device not ready.",
+            variant: "destructive",
+        });
+        return;
+        }
+
+        setDialerInitialValue(number.replace(/^\+1/, ""));
+        setDialerOpen(true);
+    };
+
     return (
                  <div className="flex h-screen w-full bg-background text-foreground">
                     <div className="flex-1 flex flex-col">
-                        <AppHeader user={user} logout={logout} />
+                        <AppHeader user={user} logout={logout} 
+                            dialerOpen={dialerOpen}
+                            dialerInitialValue={dialerInitialValue}
+                            onDialerOpenChange={() => setDialerOpen(!dialerOpen)}
+                        />
                         <ResizablePanelGroup direction="horizontal" className="flex-1 flex overflow-hidden">
                            <ResizablePanel defaultSize={75}>
                                 <div className={cn("flex flex-col h-full bg-background text-foreground overflow-hidden")}>
@@ -319,6 +340,15 @@ export default function ConversationDetailPage() {
                                         <div className="flex items-center gap-4">
                                             <Button variant="ghost" size="icon" onClick={() => router.back()}>
                                                 <ArrowLeft />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                title="Call Now"
+                                                className="text-left"
+                                                onClick={() => handleMakeCallDialer(contact.phone_no)}
+                                            >
+                                                <Phone className="h-4 w-4" />
                                             </Button>
                                             <div className="relative flex-1">
                                                 <h1 className="text-xl font-bold">{contact?.name}</h1>

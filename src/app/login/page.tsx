@@ -13,11 +13,9 @@ import { Logo } from '@/components/icons';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { loginUser } from '@/store/slices/authSlice';
 
-
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [domain, setDomain] = useState('');
   const router = useRouter();
   const { toast } = useToast();
   const dispatch = useAppDispatch();
@@ -25,7 +23,7 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    dispatch(loginUser({ email, password, ...(domain.trim() ? { domain: domain.trim() } : {}) }));
+    dispatch(loginUser({ email, password }));
   };
 
   useEffect(() => {
@@ -60,17 +58,6 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="domain">Company domain</Label>
-              <Input
-                id="domain"
-                type="text"
-                placeholder="company"
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
                 disabled={loading}
               />
             </div>

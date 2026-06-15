@@ -95,7 +95,7 @@ export default function MessagesPage() {
       setFilteredContacts([]);
   };
 
-  const handleSendMessage = async ({ body, mediaUrls }: { body: string; mediaUrls: string[] }) => {
+  const handleSendMessage = async ({ body, mediaFiles }: { body: string; mediaFiles: File[] }) => {
     if (!selectedFromNumber) {
         toast({ title: "Error", description: "Please select a 'from' number.", variant: "destructive" });
         return;
@@ -104,7 +104,7 @@ export default function MessagesPage() {
         toast({ title: "Error", description: "Please enter a recipient.", variant: "destructive" });
         return;
     }
-    if (!body && mediaUrls.length === 0) {
+    if (!body && mediaFiles.length === 0) {
         toast({ title: "Error", description: "Add a message or media attachment to send.", variant: "destructive" });
         return;
     }
@@ -114,9 +114,9 @@ export default function MessagesPage() {
             selectedFromNumber,
             recipient,
             body,
-            mediaUrls.length ? mediaUrls : undefined
+            mediaFiles.length ? mediaFiles : undefined
         );
-        toast({ title: "Success", description: mediaUrls.length ? "MMS sent successfully." : "Message sent successfully." });
+        toast({ title: "Success", description: mediaFiles.length ? "MMS sent successfully." : "Message sent successfully." });
         setMessageBody("");
         router.push(`/conversations/${encodeURIComponent(selectedFromNumber)}/${encodeURIComponent(recipient)}`);
     } finally {

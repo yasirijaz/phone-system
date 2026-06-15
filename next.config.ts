@@ -1,8 +1,22 @@
+import path from 'node:path';
 import type {NextConfig} from 'next';
+
+const monorepoRoot = path.join(import.meta.dirname, '../..');
 
 const nextConfig: NextConfig = {
   /* config options here */
   distDir: 'build',
+  outputFileTracingRoot: monorepoRoot,
+  turbopack: {
+    root: monorepoRoot,
+  },
+  webpack: (config) => {
+    config.resolve.modules = [
+      path.join(monorepoRoot, 'node_modules'),
+      ...(config.resolve.modules ?? []),
+    ];
+    return config;
+  },
   async redirects() {
     return [
       {

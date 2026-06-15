@@ -50,8 +50,8 @@ export default function UserDevices() {
 
       const devicesData = Array.isArray(response)
         ? response
-        : Array.isArray(response?.data)
-        ? response.data
+        : Array.isArray(response)
+        ? response
         : [];
 
       setDevices(devicesData);

@@ -8,11 +8,9 @@ import { useToast } from '@/hooks/use-toast';
 import {
   MAX_MESSAGE_MEDIA,
   getMessageMediaKind,
-  prepareImageForMms,
   validateMessageMedia,
   type MessageMediaKind,
 } from '@/lib/message-media';
-import { uploadMmsMedia } from '@/services/twilioService';
 import { cn } from '@/lib/utils';
 
 interface PendingMedia {
@@ -25,7 +23,7 @@ interface PendingMedia {
 interface MessageComposerProps {
   messageBody: string;
   onMessageBodyChange: (value: string) => void;
-  onSend: (payload: { body: string; mediaUrls: string[] }) => Promise<void>;
+  onSend: (payload: { body: string; mediaFiles: File[] }) => Promise<void>;
   isSending?: boolean;
   placeholder?: string;
   className?: string;
@@ -113,26 +111,17 @@ export default function MessageComposer({
     });
   };
 
-  const prepareMediaUrl = async (item: PendingMedia): Promise<string> => {
-    if (item.kind === 'image') {
-      return prepareImageForMms(item.file);
-    }
-    return uploadMmsMedia(item.file);
-  };
 
   const handleSend = async () => {
     if (!canSend || busy) return;
 
     setIsProcessing(true);
     try {
-      const mediaUrls: string[] = [];
-      for (const item of pendingMedia) {
-        mediaUrls.push(await prepareMediaUrl(item));
-      }
+      const mediaFiles = pendingMedia.map((item) => item.file);
 
       await onSend({
         body: messageBody.trim(),
-        mediaUrls,
+        mediaFiles,
       });
 
       pendingMedia.forEach((item) => URL.revokeObjectURL(item.previewUrl));

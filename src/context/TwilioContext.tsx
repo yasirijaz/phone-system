@@ -426,6 +426,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       transcribe: false,
       recordingStatusCallback: recordingCallback,
       conferenceRecordingStatusCallback: conferenceEventCallback,
+      conferenceRecord: 'record-from-start', //[true, false, 'record-from-start', 'do-not-record']
     });
   };
 
