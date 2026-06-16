@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
 import { getCommunications, enrichThreadsWithLastAttendee } from "@/services/callLogService";
-import { getCompanyPhoneNumbers } from "@/services/phoneNumberService";
+import { getDepartmentPhoneNumbers } from "@/services/phoneNumberService";
 import CallLog from "@/components/call-log";
 import AppHeader from "@/components/app-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -170,7 +170,7 @@ export default function DepartmentDetailPage() {
             setDepartment(currentDept || null);
             
             const [numbers, dnd] = await Promise.all([
-                user.company_id ? getCompanyPhoneNumbers(user.company_id) : Promise.resolve([]),
+                getDepartmentPhoneNumbers(departmentId),
                 getDndStatus(departmentId, user.id),
             ]);
             
@@ -298,7 +298,7 @@ export default function DepartmentDetailPage() {
     }
   };
   
-  const assignedNumber = phoneNumbers.find((n) => n.department_id === departmentId) ?? phoneNumbers[0];
+  const assignedNumber = phoneNumbers[0];
   const departmentPhoneNumber = assignedNumber ? getPhoneNumberDisplayName(assignedNumber) : 'No number assigned';
 
   const renderTabContent = (tabName: TabName) => {
