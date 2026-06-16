@@ -21,7 +21,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, PlusCircle, Edit, Trash2 } from "lucide-react";
 import type { PhoneNumber } from "@/types";
-import { getPhoneNumbers, createPhoneNumber, updatePhoneNumber, deletePhoneNumber } from "@/services/phoneNumberService";
+import { getCompanyPhoneNumbers, createPhoneNumber, updatePhoneNumber, deletePhoneNumber } from "@/services/phoneNumberService";
 import AppHeader from "@/components/app-header";
 import { formatPhoneNumber } from "@/lib/utils";
 import {
@@ -40,6 +40,7 @@ export default function PhoneNumbersPage() {
   const router = useRouter();
   const params = useParams();
   const departmentId = Number(params.departmentId);
+  const companyId = user?.company_id;
 
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,15 +61,16 @@ export default function PhoneNumbersPage() {
         router.replace('/');
         return;
     }
-    if (departmentId && canView) {
+    if (companyId && canView) {
       fetchPhoneNumbers();
     }
-  }, [user, departmentId, router, canView]);
+  }, [user, companyId, router, canView]);
 
   const fetchPhoneNumbers = async () => {
+    if (!companyId) return;
     try {
       setLoading(true);
-      const data = await getPhoneNumbers(departmentId);
+      const data = await getCompanyPhoneNumbers(companyId);
       setPhoneNumbers(data || []);
     } catch (error) {
       toast({ title: "Error", description: "Could not fetch phone numbers.", variant: "destructive" });
@@ -102,10 +104,10 @@ export default function PhoneNumbersPage() {
       const payload = { ...values, phone_no: phoneWithCountryCode };
       
       if (editingNumber) {
-        await updatePhoneNumber(editingNumber.id, { ...payload, department_id: departmentId });
+        await updatePhoneNumber(editingNumber.id, { ...payload, company_id: companyId });
         toast({ title: "Success", description: "Phone number updated." });
       } else {
-        await createPhoneNumber({ ...payload, department_id: departmentId });
+        await createPhoneNumber({ ...payload, company_id: companyId });
         toast({ title: "Success", description: "Phone number added." });
       }
       fetchPhoneNumbers();
@@ -117,7 +119,7 @@ export default function PhoneNumbersPage() {
   
   const handleDelete = async (id: number) => {
     try {
-      await deletePhoneNumber(id);
+      await deletePhoneNumber(id, companyId);
       toast({ title: "Success", description: "Phone number deleted." });
       fetchPhoneNumbers();
     } catch (error) {
@@ -167,7 +169,7 @@ export default function PhoneNumbersPage() {
                <Button variant="ghost" size="icon" asChild>
                 <Link href="/departments"><ArrowLeft /></Link>
               </Button>
-              <h1 className="text-xl font-bold">Department Phone Numbers</h1>
+              <h1 className="text-xl font-bold">Company Phone Numbers</h1>
             </div>
             {canManage && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -225,8 +227,8 @@ export default function PhoneNumbersPage() {
           <main className="flex-1 p-4 md:p-8 bg-muted/40">
             <Card>
               <CardHeader>
-                <CardTitle>Assigned Numbers</CardTitle>
-                <CardDescription>Phone numbers assigned to this department.</CardDescription>
+                <CardTitle>Company Numbers</CardTitle>
+                <CardDescription>Phone numbers shared across your company. Add a label to identify each line.</CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? <p>Loading...</p> : (

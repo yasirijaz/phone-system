@@ -67,7 +67,30 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [activityName, setActivityName] = useState<string | null>(null);
   const audio = new Audio('/sounds/reservation.mp3');
   const incomingReservationRef = useRef<Reservation | null>(null);
+  const activeReservationRef = useRef<Reservation | null>(null);
   const connectionSourceRef = useRef<'device' | 'reservation' | null>(null);
+
+  useEffect(() => {
+    activeReservationRef.current = activeReservation;
+  }, [activeReservation]);
+
+  const clearActiveCallState = useCallback(() => {
+    setConnection(null);
+    setActiveReservation(null);
+    activeReservationRef.current = null;
+    setConferenceSid(null);
+    setFromNumber(null);
+    connectionSourceRef.current = null;
+  }, []);
+
+  const clearDeviceConnectionState = useCallback(() => {
+    setConnection(null);
+    if (!activeReservationRef.current) {
+      setConferenceSid(null);
+      setFromNumber(null);
+      connectionSourceRef.current = null;
+    }
+  }, []);
 
   const broadcastWorkerStatus = useCallback(
     (status: string) => {
@@ -149,20 +172,21 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         conn.on('disconnect', () => {
           console.log('Call disconnected.');
           if (connectionSourceRef.current === 'device') {
-            setConnection(null);
-            setActiveReservation(null);
-            setConferenceSid(null);
-            setFromNumber(null);
+            clearDeviceConnectionState();
+            if (!activeReservationRef.current) {
+              setActiveReservation(null);
+            }
           }
         });
 
         conn.on('reject', () => {
           console.log('Call rejected.');
           if (connectionSourceRef.current === 'device') {
-            setConnection(null);
-            setActiveReservation(null);
-            setConferenceSid(null);
-            setFromNumber(null);
+            if (activeReservationRef.current) {
+              clearDeviceConnectionState();
+            } else {
+              clearActiveCallState();
+            }
           }
         });
       };
@@ -178,10 +202,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       newDevice.on('disconnect', () => {
         console.log('Call disconnected (device event).');
         if (connectionSourceRef.current === 'device') {
-          setConnection(null);
-          setActiveReservation(null);
-          setConferenceSid(null);
-          setFromNumber(null);
+          clearDeviceConnectionState();
+          if (!activeReservationRef.current) {
+            setActiveReservation(null);
+          }
         }
       });
 
@@ -298,13 +322,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setIncomingReservation(null);
           setShowReservationModal(false);
           incomingReservationRef.current = null;
-          if (connectionSourceRef.current === 'reservation') {
-            setConnection(null);
-            setActiveReservation(null);
-            setConferenceSid(null);
-            setFromNumber(null);
-            connectionSourceRef.current = null;
-          }
+          clearActiveCallState();
           try {
             if (isElectron() && window.electronAPI) {
               window.electronAPI.send('dismiss-incoming-overlay');
@@ -330,7 +348,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsConnecting(false);
     }
-  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus]);
+  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, clearActiveCallState, clearDeviceConnectionState]);
 
   // Listen for accept/reject actions coming back from Electron main
   useEffect(() => {
@@ -379,20 +397,28 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       console.log(`Rejecting call`);
       connection.reject();
       toast({ title: "Call Rejected" });
-      setConnection(null);
-      setActiveReservation(null);
+      clearActiveCallState();
     }
   };
 
   const hangUp = () => {
+    const reservation = activeReservationRef.current;
     if (connection) {
-      connection.disconnect();
-      setConnection(null);
-      setActiveReservation(null);
-      setConferenceSid(null);
-      setFromNumber(null);
-      toast({ title: "Call Ended" });
+      try {
+        connection.disconnect();
+      } catch (error) {
+        console.warn('Failed to disconnect call leg:', error);
+      }
     }
+    if (reservation) {
+      try {
+        reservation.complete();
+      } catch (error) {
+        console.warn('Failed to complete reservation:', error);
+      }
+    }
+    clearActiveCallState();
+    toast({ title: "Call Ended" });
   };
 
   const acceptReservation = (reservation: Reservation) => {
@@ -412,12 +438,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         on: () => {}, // Mock event listeners
         removeListener: () => {},
         isMuted: () => false,
-        mute: () => {}
+        mute: () => {},
+        sendDigits: () => {},
     } as unknown as Call;
 
     connectionSourceRef.current = 'reservation';
     setConnection(fakeCall);
     setActiveReservation(reservation);
+    activeReservationRef.current = reservation;
     setShowReservationModal(false);
     setIncomingReservation(null);
 
@@ -460,25 +488,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const rejectReservation = (reservation: Reservation) => {
     console.log('rejecting reservation', reservation)
     reservation.reject();
-    if (connectionSourceRef.current === 'reservation') {
-      setConnection(null);
-      setActiveReservation(null);
-      setConferenceSid(null);
-      setFromNumber(null);
-      connectionSourceRef.current = null;
-    }
+    clearActiveCallState();
   };
 
   const completeReservation = (reservation: Reservation) => {
     console.log('completing reservation', reservation)
     reservation.complete();
-    if (connectionSourceRef.current === 'reservation') {
-      setConnection(null);
-      setActiveReservation(null);
-      setConferenceSid(null);
-      setFromNumber(null);
-      connectionSourceRef.current = null;
-    }
+    clearActiveCallState();
   };
 
   const toggleActivity = async (selectedActivityName?: string) => {

@@ -63,3 +63,23 @@ export function phonesMatch(
   if (!left || !right) return false;
   return left === right;
 }
+
+type PhoneNumberLike = {
+  phone_no: string;
+  label?: string | null;
+};
+
+/** Primary display name for a saved company number (label, else formatted number). */
+export function getPhoneNumberDisplayName(num: PhoneNumberLike): string {
+  const label = num.label?.trim();
+  if (label) return label;
+  return formatPhoneNumber(num.phone_no);
+}
+
+/** Dropdown label: show saved name with number, or just the number. */
+export function getPhoneNumberOptionLabel(num: PhoneNumberLike): string {
+  const formatted = formatPhoneNumber(num.phone_no);
+  const label = num.label?.trim();
+  if (label) return `${label} · ${formatted}`;
+  return formatted;
+}

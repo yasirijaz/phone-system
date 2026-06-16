@@ -191,11 +191,10 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   }, [isParticipantsModalOpen, conferenceSid]);
 
   const toggleMute = () => {
-    if (connection) {
-      const mute = !isMuted;
-      connection.mute(mute);
-      setIsMuted(mute);
-    }
+    if (!connection?.mute) return;
+    const mute = !isMuted;
+    connection.mute(mute);
+    setIsMuted(mute);
   };
   
   const toggleHold = async () => {
@@ -298,7 +297,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   };
 
   const handleSendDigits = (digit: string) => {
-  if (connection) {
+  if (connection?.sendDigits) {
       connection.sendDigits(digit);
       toast({ title: `Sent digit: ${digit}` });
   }
@@ -317,7 +316,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     <button
       type="button"
       onClick={() => setIsCollapsed((prev) => !prev)}
-      className="fixed bottom-4 right-4 z-[60] flex items-center gap-2.5 rounded-full bg-background px-4 py-2.5 shadow-2xl ring-1 ring-border hover:bg-muted/50 transition-colors"
+      className="fixed bottom-4 right-4 z-[110] flex items-center gap-2.5 rounded-full bg-background px-4 py-2.5 shadow-2xl ring-1 ring-border hover:bg-muted/50 transition-colors"
       aria-label={isCollapsed ? 'Expand active call controls' : 'Collapse active call controls'}
     >
       <span className="relative flex h-2.5 w-2.5">
@@ -340,7 +339,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
 
   return (
     <>
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-50">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-[100]">
         <div className="bg-background rounded-2xl shadow-2xl p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
                  <Avatar className="h-12 w-12">

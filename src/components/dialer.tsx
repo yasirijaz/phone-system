@@ -9,7 +9,7 @@ import { Phone, Delete } from "lucide-react";
 import type { Department, PhoneNumber, Contact } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
-import { formatPhoneNumber } from '@/lib/utils';
+import { formatPhoneNumber, getPhoneNumberOptionLabel } from '@/lib/utils';
 
 interface DialerProps {
     onMakeCall: (number: string, fromNumber?: string) => void;
@@ -162,13 +162,13 @@ export default function Dialer({
                                 ))}
                             </SelectContent>
                         </Select>
-                         <Select onValueChange={onSetSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
+                         <Select onValueChange={onSetSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers}>
                             <SelectTrigger variant="ghost">
                                 <SelectValue placeholder={loadingNumbers ? "Loading..." : "From Number"} />
                             </SelectTrigger>
                             <SelectContent>
                                 {phoneNumbers.map(num => (
-                                    <SelectItem key={num.id} value={num.phone_no}>{num.label}</SelectItem>
+                                    <SelectItem key={num.id} value={num.phone_no}>{getPhoneNumberOptionLabel(num)}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>

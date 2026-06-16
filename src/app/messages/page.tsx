@@ -3,10 +3,9 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getDepartments } from "@/services/departmentService";
-import { getPhoneNumbers } from "@/services/phoneNumberService";
+import { getCompanyPhoneNumbers } from "@/services/phoneNumberService";
 import { getContacts } from "@/services/contactService";
-import type { Department, PhoneNumber, Contact } from "@/types";
+import type { PhoneNumber, Contact } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { sendMms } from "@/services/twilioService";
 import { useRouter } from 'next/navigation';
@@ -15,22 +14,18 @@ import AppHeader from "@/components/app-header";
 import MessageComposer from "@/components/message-composer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatPhoneNumber } from "@/lib/utils";
+import { getPhoneNumberOptionLabel } from "@/lib/utils";
 
 export default function MessagesPage() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
 
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [loadingDepartments, setLoadingDepartments] = useState(true);
-  const [loadingNumbers, setLoadingNumbers] = useState(false);
+  const [loadingNumbers, setLoadingNumbers] = useState(true);
   
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("");
   const [selectedFromNumber, setSelectedFromNumber] = useState<string>("");
   const [recipient, setRecipient] = useState("");
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
@@ -41,41 +36,27 @@ export default function MessagesPage() {
   useEffect(() => {
     const fetchInitialData = async () => {
       if (!user?.company_id) return;
-      setLoadingDepartments(true);
+      setLoadingNumbers(true);
       try {
-        const [depts, fetchedContacts] = await Promise.all([
-            getDepartments(user.company_id),
+        const [fetchedContacts, numbers] = await Promise.all([
             getContacts(user.company_id),
+            getCompanyPhoneNumbers(user.company_id),
         ]);
-        setDepartments(Array.isArray(depts) ? depts : []);
         setContacts(Array.isArray(fetchedContacts) ? fetchedContacts : []);
+        const companyNumbers = Array.isArray(numbers) ? numbers : [];
+        setPhoneNumbers(companyNumbers);
+        if (companyNumbers.length > 0) {
+          setSelectedFromNumber(companyNumbers[0].phone_no);
+        }
       } catch (error) {
         toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
       } finally {
-        setLoadingDepartments(false);
+        setLoadingNumbers(false);
       }
     };
 
     fetchInitialData();
   }, [user, toast]);
-
-  const handleDepartmentChange = async (deptId: string) => {
-    setSelectedDepartmentId(deptId);
-    setLoadingNumbers(true);
-    try {
-        const numbers = await getPhoneNumbers(Number(deptId));
-        setPhoneNumbers(numbers);
-        if (numbers.length > 0) {
-            setSelectedFromNumber(numbers[0].phone_no);
-        } else {
-            setSelectedFromNumber("");
-        }
-    } catch (error) {
-        toast({ title: "Error", description: "Failed to load phone numbers.", variant: "destructive" });
-    } finally {
-        setLoadingNumbers(false);
-    }
-  };
   
   useEffect(() => {
     if (recipient.length > 2) {
@@ -131,32 +112,18 @@ export default function MessagesPage() {
             <AppHeader user={user} logout={logout} />
             <main className="flex-1 flex flex-col bg-muted/40">
                 <div className="p-4 border-b space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                        <Select onValueChange={handleDepartmentChange} disabled={loadingDepartments}>
-                            <SelectTrigger className="flex-1">
-                                <SelectValue placeholder="Select Department" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            {departments.map((dept) => (
-                                <SelectItem key={dept.id} value={String(dept.id)}>
-                                    {dept.name}
+                    <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers}>
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select Number" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {phoneNumbers.map((num) => (
+                                <SelectItem key={num.id} value={num.phone_no}>
+                                    {getPhoneNumberOptionLabel(num)}
                                 </SelectItem>
                             ))}
-                            </SelectContent>
-                        </Select>
-                        <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
-                            <SelectTrigger className="flex-1">
-                                <SelectValue placeholder="Select Number" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {phoneNumbers.map((num) => (
-                                    <SelectItem key={num.id} value={num.phone_no}>
-                                        {formatPhoneNumber(num.phone_no)} ({num.label})
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                        </SelectContent>
+                    </Select>
                     <div className="relative flex items-center gap-2">
                          <div className="relative flex-1">
                              <Input 

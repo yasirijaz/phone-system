@@ -16,12 +16,12 @@ import { useToast } from "@/hooks/use-toast";
 import AppHeader from "@/components/app-header";
 import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
-import { getPhoneNumbers } from "@/services/phoneNumberService";
+import { getCompanyPhoneNumbers } from "@/services/phoneNumberService";
 import { sendMms } from "@/services/twilioService";
 import { getContacts } from "@/services/contactService";
 import { events } from "@/lib/events";
 import ContactProfile from "@/components/contact-profile";
-import { cn, formatPhoneNumber, phonesMatch } from "@/lib/utils";
+import { cn, formatPhoneNumber, phonesMatch, getPhoneNumberOptionLabel } from "@/lib/utils";
 import { buildThreadContactState } from "@/lib/contact-display";
 import { canListAllCompanyDepartments } from "@/lib/roles";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -90,50 +90,31 @@ export default function ConversationDetailPage() {
         }
     }, [from, to, user]);
 
-     const handleDepartmentChange = useCallback(async (departmentId: string) => {
+     const handleDepartmentChange = useCallback((departmentId: string) => {
         setSelectedDepartmentId(departmentId);
-        if (!departmentId) {
-            setPhoneNumbers([]);
-            setSelectedFromNumber('');
-            return;
-        }
-        setLoadingNumbers(true);
-        try {
-            const numbers = await getPhoneNumbers(Number(departmentId));
-            setPhoneNumbers(numbers);
-            if (numbers.length > 0) {
-                // Try to keep the previously selected number if it exists in the new list
-                const currentNumberIsValid = numbers.some(n => n.phone_no === selectedFromNumber);
-                if (!currentNumberIsValid) {
-                    setSelectedFromNumber(numbers[0].phone_no);
-                }
-            } else {
-                setSelectedFromNumber('');
-            }
-        } catch (error) {
-            toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
-        } finally {
-            setLoadingNumbers(false);
-        }
-    }, [toast, selectedFromNumber]);
+    }, []);
 
     useEffect(() => {
         const fetchInitialData = async () => {
             if (!user) return;
             setLoading(true);
             setLoadingDepartments(true);
+            setLoadingNumbers(true);
 
             try {
                 const canFetchAllDepts = canListAllCompanyDepartments(user.role_id);
-                const [fetchedDepts, fetchedContacts, logs] = await Promise.all([
+                const [fetchedDepts, fetchedContacts, logs, companyNumbers] = await Promise.all([
                     canFetchAllDepts && user.company_id
                         ? getDepartments(user.company_id)
                         : getUserDepartments(user.id),
                     user.company_id ? getContacts(user.company_id) : Promise.resolve([]),
-                    getCommunicationThread(from, to)
+                    getCommunicationThread(from, to),
+                    user.company_id ? getCompanyPhoneNumbers(user.company_id) : Promise.resolve([]),
                 ]);
                 const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
+                const numbers = Array.isArray(companyNumbers) ? companyNumbers : [];
                 setDepartments(depts);
+                setPhoneNumbers(numbers);
 
                 const contactList = Array.isArray(fetchedContacts) ? fetchedContacts : [];
                 setContacts(contactList);
@@ -150,28 +131,18 @@ export default function ConversationDetailPage() {
                     try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
                 }
                 
-                // Load phone numbers once per department (cached at service layer)
-                const numbersByDept = await Promise.all(
-                    depts.map(async (dept) => {
-                        try {
-                            const nums = await getPhoneNumbers(dept.id);
-                            return { dept, nums };
-                        } catch {
-                            return { dept, nums: [] as PhoneNumber[] };
-                        }
-                    })
-                );
-
                 const allCompanyNumbers = new Set<string>();
                 const numberToDeptMap: Record<string, string> = {};
                 const numberToDeptIdMap: Record<string, string> = {};
-                for (const { dept, nums } of numbersByDept) {
-                    nums.forEach((n) => {
-                        allCompanyNumbers.add(n.phone_no);
-                        numberToDeptMap[n.phone_no] = dept.name;
-                        numberToDeptIdMap[n.phone_no] = String(dept.id);
-                    });
-                }
+                numbers.forEach((n) => {
+                    allCompanyNumbers.add(n.phone_no);
+                    if (n.department?.name) {
+                        numberToDeptMap[n.phone_no] = n.department.name;
+                    }
+                    if (n.department_id) {
+                        numberToDeptIdMap[n.phone_no] = String(n.department_id);
+                    }
+                });
 
                 let otherPartyNumber: string;
                 let ourNumber: string;
@@ -216,14 +187,12 @@ export default function ConversationDetailPage() {
 
                 if (resolvedDeptId) {
                     setSelectedDepartmentId(resolvedDeptId);
-                    const numsForDept =
-                        numbersByDept.find((entry) => String(entry.dept.id) === resolvedDeptId)?.nums ?? [];
-                    setPhoneNumbers(numsForDept);
-                    if (numsForDept.some((n) => n.phone_no === ourNumber)) {
-                        setSelectedFromNumber(ourNumber);
-                    } else if (numsForDept.length > 0) {
-                        setSelectedFromNumber(numsForDept[0].phone_no);
-                    }
+                }
+
+                if (numbers.some((n) => n.phone_no === ourNumber)) {
+                    setSelectedFromNumber(ourNumber);
+                } else if (numbers.length > 0) {
+                    setSelectedFromNumber(numbers[0].phone_no);
                 }
 
 
@@ -233,6 +202,7 @@ export default function ConversationDetailPage() {
             } finally {
                 setLoading(false);
                 setLoadingDepartments(false);
+                setLoadingNumbers(false);
             }
         };
 
@@ -381,14 +351,14 @@ export default function ConversationDetailPage() {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
+                                            <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers}>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select Number" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {phoneNumbers.map((num) => (
                                                         <SelectItem key={num.id} value={num.phone_no}>
-                                                            {formatPhoneNumber(num.phone_no)} ({num.label})
+                                                            {getPhoneNumberOptionLabel(num)}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>

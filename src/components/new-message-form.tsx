@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from './ui/scroll-area';
+import { getPhoneNumberOptionLabel } from '@/lib/utils';
 
 
 interface NewMessageFormProps {
@@ -152,7 +153,7 @@ export default function NewMessageForm({
                      <FormField control={form.control} name="fromNumber" render={({ field }) => (
                         <FormItem>
                             <FormLabel>From Number</FormLabel>
-                             <Select onValueChange={field.onChange} value={field.value} disabled={loadingNumbers || !watchedDepartmentId}>
+                             <Select onValueChange={field.onChange} value={field.value} disabled={loadingNumbers}>
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder={loadingNumbers ? "Loading..." : "Select Number"} />
@@ -160,7 +161,7 @@ export default function NewMessageForm({
                                 </FormControl>
                                 <SelectContent>
                                     {phoneNumbers.map(num => (
-                                        <SelectItem key={num.id} value={num.phone_no}>{num.label}</SelectItem>
+                                        <SelectItem key={num.id} value={num.phone_no}>{getPhoneNumberOptionLabel(num)}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

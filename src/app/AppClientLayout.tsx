@@ -68,10 +68,12 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     });
   }
 
-  const callStatus = connection?.status ? connection.status() : undefined;
+  const callStatus = connection?.status?.();
+  const hasLiveConnection =
+    !!connection && !['pending', 'ringing', 'closed'].includes(String(callStatus ?? ''));
   const isIncomingCall = !!connection && (callStatus === 'pending' || callStatus === 'ringing');
-  // Consider active when we have a connection and it's not in a ringing/pending/closed state.
-  const isActiveCall = !!connection && !['pending', 'ringing', 'closed'].includes(String(callStatus || ''));
+  // Keep the bar visible for reservation-based calls even if the device leg disconnects.
+  const isActiveCall = hasLiveConnection || !!activeReservation;
   
   // For reservation-based calls, get customer info from reservation
   // For regular calls, get customer info from connection parameters
