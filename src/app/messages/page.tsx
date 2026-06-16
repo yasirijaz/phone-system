@@ -126,7 +126,7 @@ export default function MessagesPage() {
 
 
   return (
-        <div className="flex h-screen w-full bg-background text-foreground">
+        <div className="flex h-full min-h-0 w-full bg-background text-foreground">
           <div className="flex flex-1 flex-col">
             <AppHeader user={user} logout={logout} />
             <main className="flex-1 flex flex-col bg-muted/40">

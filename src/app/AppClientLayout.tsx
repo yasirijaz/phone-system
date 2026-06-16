@@ -77,6 +77,10 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   // For regular calls, get customer info from connection parameters
   const callerName = activeReservation?.task?.attributes?.contact_name || connection?.parameters?.FriendlyName || "Unknown Caller";
   const callerNumber = activeReservation?.task?.attributes?.from || connection?.parameters?.From || "";
+  const departmentName =
+    activeReservation?.task?.attributes?.department_name ||
+    incomingReservation?.task?.attributes?.department_name ||
+    null;
   
   // Use customer number (From) for active call display
   const activeCallContact = activeReservation?.task?.attributes?.from || connection?.parameters?.From || connection?.parameters?.To || "Unknown";
@@ -89,6 +93,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         onClose={rejectCall}
         callerName={callerName}
         callerNumber={callerNumber}
+        departmentName={departmentName}
         onAccept={acceptCall}
         onReject={rejectCall}
       />
@@ -96,6 +101,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         isOpen={!!isActiveCall}
         contactNumber={callerNumber}
         callerName={callerName}
+        departmentName={departmentName}
         onHangUp={hangUp}
         connection={connection}
         conferenceSid={conferenceSid}

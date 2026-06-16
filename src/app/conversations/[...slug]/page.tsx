@@ -326,7 +326,7 @@ export default function ConversationDetailPage() {
     };
 
     return (
-                 <div className="flex h-screen w-full bg-background text-foreground">
+                 <div className="flex h-full min-h-0 w-full bg-background text-foreground">
                     <div className="flex-1 flex flex-col">
                         <AppHeader user={user} logout={logout} 
                             dialerOpen={dialerOpen}

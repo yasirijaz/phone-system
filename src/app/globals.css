@@ -86,3 +86,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  [data-sidebar="gap"] {
+    width: var(--sidebar-width);
+  }
+
+  .group[data-collapsible="icon"] [data-sidebar="gap"] {
+    width: var(--sidebar-width-icon);
+  }
+
+  [data-sidebar="container"] {
+    width: var(--sidebar-width);
+  }
+
+  .group[data-collapsible="icon"] [data-sidebar="container"] {
+    width: var(--sidebar-width-icon);
+  }
+}

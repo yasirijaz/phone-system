@@ -87,6 +87,7 @@ export default function AppHeader({
     const [activeCall, setActiveCall] = useState<Call | null>(null);
     const [isActiveCallOpen, setIsActiveCallOpen] = useState(false);
     const [activeContactName, setActiveContactName] = useState('');
+    const [activeDepartmentName, setActiveDepartmentName] = useState<string | null>(null);
     const [activeConferenceSid, setActiveConferenceSid] = useState<string | null>(null);
 
     // Search state
@@ -428,6 +429,8 @@ export default function AppHeader({
             setDialerOpen(false);
 
             setActiveContactName(number);
+            const selectedDepartment = departments.find((dept) => String(dept.id) === selectedDepartmentId);
+            setActiveDepartmentName(selectedDepartment?.name || null);
             setActiveCall(connection);
             setIsActiveCallOpen(true);
 
@@ -450,18 +453,21 @@ export default function AppHeader({
             connection.on('disconnect', () => {
                 setIsActiveCallOpen(false);
                 setActiveCall(null);
+                setActiveDepartmentName(null);
                 setActiveConferenceSid(null);
             });
 
             connection.on('cancel', () => {
                 setIsActiveCallOpen(false);
                 setActiveCall(null);
+                setActiveDepartmentName(null);
                 setActiveConferenceSid(null);
             });
 
             connection.on('reject', () => {
                 setIsActiveCallOpen(false);
                 setActiveCall(null);
+                setActiveDepartmentName(null);
                 setActiveConferenceSid(null);
             });
         } catch (error) {
@@ -749,12 +755,14 @@ export default function AppHeader({
               isOpen={isActiveCallOpen}
               contactNumber={activeContactName}
               callerName={activeContactName}
+              departmentName={activeDepartmentName}
               connection={activeCall}
               conferenceSid={activeConferenceSid}
               onHangUp={() => {
                 activeCall?.disconnect();
                 setIsActiveCallOpen(false);
                 setActiveCall(null);
+                setActiveDepartmentName(null);
                 setActiveConferenceSid(null);
               }}
             />

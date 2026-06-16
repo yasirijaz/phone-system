@@ -11,6 +11,7 @@ interface IncomingCallModalProps {
   onClose: () => void;
   callerName: string;
   callerNumber: string;
+  departmentName?: string | null;
   onAccept: () => void;
   onReject: () => void;
 }
@@ -26,6 +27,7 @@ export default function IncomingCallModal({
   isOpen,
   callerName,
   callerNumber,
+  departmentName,
   onAccept,
   onReject,
 }: IncomingCallModalProps) {
@@ -70,6 +72,11 @@ export default function IncomingCallModal({
               <p className="truncate text-sm text-muted-foreground">
                 {formatCallerNumber(callerNumber)}
               </p>
+              {departmentName ? (
+                <p className="truncate text-sm text-muted-foreground">
+                  Department: {departmentName}
+                </p>
+              ) : null}
             </div>
           </div>
 

@@ -26,6 +26,7 @@ interface ActiveCallBarProps {
   isOpen: boolean;
   contactNumber: string;
   callerName: string;
+  departmentName?: string | null;
   onHangUp: () => void;
   connection: Call | null;
   conferenceSid: string | null;
@@ -41,7 +42,7 @@ const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { ico
 );
 
 
-export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHangUp, connection, conferenceSid }: ActiveCallBarProps) {
+export default function ActiveCallBar({ isOpen, contactNumber, callerName, departmentName, onHangUp, connection, conferenceSid }: ActiveCallBarProps) {
   const { user: authUser } = useAuth();
   const { fromNumber, setConferenceSid } = useTwilio();
   const [duration, setDuration] = useState(0);
@@ -62,6 +63,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [resolvedDepartmentName, setResolvedDepartmentName] = useState<string | null>(departmentName || null);
   
   const dialpadKeys = [
     '1', '2', '3',
@@ -71,8 +73,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
   ];
 
    useEffect(() => {
-    if (isOpen && contactNumber.startsWith('client:')) {
-      console.log("Fetching user name for active call:", contactNumber);
+    if (isOpen && connection?.parameters?.CallSid) {
       const fetchUserName = async () => {
         try {
           const currentCallSid = connection?.parameters?.CallSid || '';
@@ -88,6 +89,12 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
             if (matchingCall?.department_id) {
               const deptSettings = await getDepartmentSettings(matchingCall.department_id);
               setDepartmentSettings(deptSettings);
+            }
+
+            if (matchingCall?.department?.name) {
+              setResolvedDepartmentName(matchingCall.department.name);
+            } else if (departmentName) {
+              setResolvedDepartmentName(departmentName);
             }
 
             if (matchingCall?.company_id) {
@@ -107,8 +114,15 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
     if (!isOpen) {
       setDepartmentSettings(null);
       setCompanySettings(null);
+      setResolvedDepartmentName(null);
     }
-  }, [isOpen, contactNumber, connection]);
+  }, [isOpen, contactNumber, connection, departmentName]);
+
+  useEffect(() => {
+    if (departmentName) {
+      setResolvedDepartmentName(departmentName);
+    }
+  }, [departmentName]);
   
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
@@ -343,6 +357,11 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
                       : formatPhoneNumber(contactNumber)
                     }
                        &bull; {formatTime(duration)}</p>
+                    {resolvedDepartmentName ? (
+                      <p className="text-sm text-muted-foreground truncate max-w-[200px]">
+                        Department: {resolvedDepartmentName}
+                      </p>
+                    ) : null}
                 </div>
             </div>
 

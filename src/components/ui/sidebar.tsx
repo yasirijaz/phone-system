@@ -180,8 +180,9 @@ const Sidebar = React.forwardRef<
     if (collapsible === "none") {
       return (
         <div
+          data-sidebar="container"
           className={cn(
-            "flex h-full w-[--sidebar-width] flex-col bg-card text-card-foreground",
+            "flex h-full flex-col bg-card text-card-foreground",
             className
           )}
           ref={ref}
@@ -198,10 +199,11 @@ const Sidebar = React.forwardRef<
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width] bg-card p-0 text-card-foreground [&>button]:hidden"
+            className="bg-card p-0 text-card-foreground [&>button]:hidden"
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+                width: "var(--sidebar-width)",
               } as React.CSSProperties
             }
             side={side}
@@ -222,15 +224,13 @@ const Sidebar = React.forwardRef<
         data-side={side}
       >
         <div
-          className={cn(
-            "duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-in-out",
-            "group-data-[collapsible=icon]:w-[--sidebar-width-icon]"
-          )}
+          data-sidebar="gap"
+          className="duration-200 relative h-svh bg-transparent transition-[width] ease-in-out"
         />
         <div
+          data-sidebar="container"
           className={cn(
-            "duration-200 fixed inset-y-0 z-40 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-in-out md:flex",
-            "group-data-[collapsible=icon]:w-[--sidebar-width-icon]",
+            "duration-200 fixed inset-y-0 z-40 hidden h-svh transition-[left,right,width] ease-in-out md:flex",
             side === "left" ? "left-0 border-r" : "right-0 border-l",
             className
           )}
@@ -309,7 +309,7 @@ const SidebarInset = React.forwardRef<
     <main
       ref={ref}
       className={cn(
-        "relative flex min-h-svh flex-1 flex-col bg-muted/40",
+        "relative flex min-h-svh min-w-0 flex-1 flex-col bg-muted/40",
         className
       )}
       {...props}

@@ -25,6 +25,7 @@ export default function ReservationModal({
 
   const callerName = reservation.task.attributes.contact_name || 'Unknown Caller';
   const callerNumber = reservation.task.attributes.from || '';
+  const departmentName = reservation.task.attributes.department_name || '';
   const contactInitial = callerName.charAt(0).toUpperCase();
 
   return (
@@ -62,6 +63,11 @@ export default function ReservationModal({
               <p className="truncate text-sm text-muted-foreground">
                 {formatPhoneNumber(callerNumber)}
               </p>
+              {departmentName ? (
+                <p className="truncate text-sm text-muted-foreground">
+                  Department: {departmentName}
+                </p>
+              ) : null}
             </div>
           </div>
 
