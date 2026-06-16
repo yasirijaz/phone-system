@@ -24,7 +24,6 @@ import ContactProfile from "@/components/contact-profile";
 import { cn, formatPhoneNumber, phonesMatch, getPhoneNumberOptionLabel } from "@/lib/utils";
 import { buildThreadContactState } from "@/lib/contact-display";
 import { canListAllCompanyDepartments } from "@/lib/roles";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -303,9 +302,8 @@ export default function ConversationDetailPage() {
                             dialerInitialValue={dialerInitialValue}
                             onDialerOpenChange={() => setDialerOpen(!dialerOpen)}
                         />
-                        <ResizablePanelGroup orientation="horizontal" className="flex-1 flex overflow-hidden">
-                           <ResizablePanel defaultSize={75}>
-                                <div className={cn("flex flex-col h-full bg-background text-foreground overflow-hidden")}>
+                        <div className="flex-1 flex overflow-hidden">
+                                <div className={cn("flex flex-1 min-w-0 flex-col h-full bg-background text-foreground overflow-hidden")}>
                                     <header className="flex-shrink-0 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
                                         <div className="flex items-center gap-4">
                                             <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -373,23 +371,17 @@ export default function ConversationDetailPage() {
                                         />
                                     </footer>
                                 </div>
-                            </ResizablePanel>
-                             {isProfileSidebarOpen && (
-                                <>
-                                    <ResizableHandle withHandle />
-                                    <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-                                        <aside className="border-l bg-background overflow-y-auto h-full">
-                                            <ContactProfile
-                                              contact={contact}
-                                              contacts={contacts}
-                                              onContactUpdate={refreshThread}
-                                              onCollapse={() => setIsProfileSidebarOpen(false)}
-                                            />
-                                        </aside>
-                                    </ResizablePanel>
-                                </>
+                            {isProfileSidebarOpen && (
+                                <aside className="h-full w-full max-w-[380px] border-l bg-background overflow-y-auto">
+                                    <ContactProfile
+                                      contact={contact}
+                                      contacts={contacts}
+                                      onContactUpdate={refreshThread}
+                                      onCollapse={() => setIsProfileSidebarOpen(false)}
+                                    />
+                                </aside>
                             )}
-                        </ResizablePanelGroup>
+                        </div>
                     </div>
                 </div>
     );
