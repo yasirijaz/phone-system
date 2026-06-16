@@ -333,7 +333,7 @@ export default function ConversationDetailPage() {
                             dialerInitialValue={dialerInitialValue}
                             onDialerOpenChange={() => setDialerOpen(!dialerOpen)}
                         />
-                        <ResizablePanelGroup direction="horizontal" className="flex-1 flex overflow-hidden">
+                        <ResizablePanelGroup orientation="horizontal" className="flex-1 flex overflow-hidden">
                            <ResizablePanel defaultSize={75}>
                                 <div className={cn("flex flex-col h-full bg-background text-foreground overflow-hidden")}>
                                     <header className="flex-shrink-0 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">

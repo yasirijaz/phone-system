@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
 config();
 
-import '@/ai/flows/categorize-call.ts';
-import '@/ai/flows/transcribe-audio.ts';
+import '@/ai/flows/categorize-call';
+import '@/ai/flows/transcribe-audio';
