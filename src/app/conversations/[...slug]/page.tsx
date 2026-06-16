@@ -47,6 +47,7 @@ export default function ConversationDetailPage() {
     const [loadingDepartments, setLoadingDepartments] = useState(true);
     const [loadingNumbers, setLoadingNumbers] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const chatScrollRef = useRef<HTMLElement>(null);
     const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
     const [departmentName, setDepartmentName] = useState<string | null>(null);
     
@@ -231,8 +232,14 @@ export default function ConversationDetailPage() {
     }, [from, to, refreshThread]);
     
     useEffect(() => {
+        if (loading) return;
+
+        if (chatScrollRef.current) {
+            chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+        }
+
         if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+            messagesEndRef.current.scrollIntoView({ behavior: "auto", block: "end" });
         }
     }, [allComms, loading]);
 
@@ -295,7 +302,7 @@ export default function ConversationDetailPage() {
     };
 
     return (
-                 <div className="flex h-full min-h-0 w-full bg-background text-foreground">
+                 <div className="flex h-[100dvh] min-h-0 w-full overflow-hidden bg-background text-foreground">
                     <div className="flex-1 flex flex-col">
                         <AppHeader user={user} logout={logout} 
                             dialerOpen={dialerOpen}
@@ -304,7 +311,7 @@ export default function ConversationDetailPage() {
                         />
                         <div className="flex-1 flex overflow-hidden">
                                 <div className={cn("flex flex-1 min-w-0 flex-col h-full bg-background text-foreground overflow-hidden")}>
-                                    <header className="flex-shrink-0 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
+                                    <header className="sticky top-0 z-20 flex h-16 flex-shrink-0 items-center justify-between border-b bg-background/95 px-4 backdrop-blur-sm md:px-8">
                                         <div className="flex items-center gap-4">
                                             <Button variant="ghost" size="icon" onClick={() => router.back()}>
                                                 <ArrowLeft />
@@ -331,7 +338,7 @@ export default function ConversationDetailPage() {
                                             {isProfileSidebarOpen ? <PanelRightClose /> : <User />}
                                         </Button>
                                     </header>
-                                    <main className="flex-1 overflow-y-auto">
+                                    <main ref={chatScrollRef} className="flex-1 overflow-y-auto overscroll-contain">
                                     {loading ? <p className="p-4">Loading...</p> : <CallLog calls={allComms} contacts={contacts} onMakeCall={handleMakeCall} isClickable={false} />}
                                     <div ref={messagesEndRef} />
                                     </main>
