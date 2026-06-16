@@ -1,6 +1,7 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../../tailwind.config.ts";
+
+@custom-variant dark (&:is(.dark *));
 
 @layer base {
   body {
@@ -83,5 +84,23 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  [data-sidebar="gap"] {
+    width: var(--sidebar-width);
+  }
+
+  .group[data-collapsible="icon"] [data-sidebar="gap"] {
+    width: var(--sidebar-width-icon);
+  }
+
+  [data-sidebar="container"] {
+    width: var(--sidebar-width);
+  }
+
+  .group[data-collapsible="icon"] [data-sidebar="container"] {
+    width: var(--sidebar-width-icon);
   }
 }

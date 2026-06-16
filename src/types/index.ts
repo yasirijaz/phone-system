@@ -121,10 +121,12 @@ export interface Department {
 
 export interface PhoneNumber {
   id: number;
-  department_id: number;
+  company_id?: number;
+  department_id?: number | null;
   phone_no: string;
   type: string;
   label: string;
+  department?: Pick<Department, 'id' | 'name' | 'company_id'>;
 }
 
 export interface Holiday {

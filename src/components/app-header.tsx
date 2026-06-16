@@ -7,7 +7,7 @@ import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
 import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments, stopImpersonation } from "@/services/userService";
-import { getPhoneNumbers, getconferenceSid } from "@/services/phoneNumberService";
+import { getCompanyPhoneNumbers, getconferenceSid } from "@/services/phoneNumberService";
 import { getContacts } from "@/services/contactService";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,7 @@ export default function AppHeader({
     const [activeCall, setActiveCall] = useState<Call | null>(null);
     const [isActiveCallOpen, setIsActiveCallOpen] = useState(false);
     const [activeContactName, setActiveContactName] = useState('');
+    const [activeDepartmentName, setActiveDepartmentName] = useState<string | null>(null);
     const [activeConferenceSid, setActiveConferenceSid] = useState<string | null>(null);
 
     // Search state
@@ -299,100 +300,93 @@ export default function AppHeader({
     }, [user, toast, router]);
 
 
-    const handleDepartmentChange = useCallback(async (departmentId: string) => {
+    const handleDepartmentChange = useCallback((departmentId: string) => {
         setSelectedDepartmentId(departmentId);
-        if (!departmentId) {
-            setPhoneNumbers([]);
-            setSelectedFromNumber('');
-            return;
+    }, []);
+
+    const filteredPhoneNumbers = selectedDepartmentId
+        ? phoneNumbers.filter(
+            (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
+          )
+        : phoneNumbers;
+
+    useEffect(() => {
+        if (!selectedDepartmentId) return;
+        const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
+        if (!hasSelectedNumber) {
+            setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
         }
-        setLoadingNumbers(true);
-        try {
-            const numbers = await getPhoneNumbers(Number(departmentId));
-            setPhoneNumbers(numbers);
-            if (numbers.length > 0) {
-                setSelectedFromNumber(numbers[0].phone_no);
-            } else {
-                setSelectedFromNumber('');
-            }
-        } catch (error) {
-            toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
-        } finally {
-            setLoadingNumbers(false);
-        }
-    }, [toast]);
+    }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
     
     useEffect(() => {
         const fetchInitialData = async () => {
-            if (!user) return;
+            if (!user?.company_id) return;
 
             const cacheKey = `header-init:${user.id}`;
             const cached = cacheGet<{
               departments: Department[];
               contacts: Contact[];
+              phoneNumbers: PhoneNumber[];
               firstDeptId?: string;
             }>(cacheKey);
             if (cached) {
               setDepartments(cached.departments);
               setContacts(cached.contacts);
+              setPhoneNumbers(cached.phoneNumbers);
               if (cached.firstDeptId) {
                 setSelectedDepartmentId(cached.firstDeptId);
-                setLoadingNumbers(true);
-                try {
-                  const numbers = await getPhoneNumbers(Number(cached.firstDeptId));
-                  setPhoneNumbers(numbers);
-                  if (numbers.length > 0) {
-                    setSelectedFromNumber(numbers[0].phone_no);
-                  }
-                } catch {
-                  // ignore cached phone number load failure
-                } finally {
-                  setLoadingNumbers(false);
-                }
+                const numbersForDept = cached.phoneNumbers.filter(
+                  (num) => num.department_id != null && String(num.department_id) === cached.firstDeptId
+                );
+                setSelectedFromNumber(numbersForDept[0]?.phone_no ?? cached.phoneNumbers[0]?.phone_no ?? "");
+              } else if (cached.phoneNumbers.length > 0) {
+                setSelectedFromNumber(cached.phoneNumbers[0].phone_no);
               }
               setLoadingDepartments(false);
               return;
             }
 
             setLoadingDepartments(true);
+            setLoadingNumbers(true);
             try {
                 const canFetchAllDepts = canListAllCompanyDepartments(user.role_id);
-                const [fetchedDepts, fetchedContacts] = await Promise.all([
-                    canFetchAllDepts && user.company_id
+                const [fetchedDepts, fetchedContacts, fetchedNumbers] = await Promise.all([
+                    canFetchAllDepts
                         ? getDepartments(user.company_id)
                         : getUserDepartments(user.id),
-                    user.company_id ? getContacts(user.company_id) : Promise.resolve([])
+                    getContacts(user.company_id),
+                    getCompanyPhoneNumbers(user.company_id),
                 ]);
                 const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
                 const contactList = Array.isArray(fetchedContacts) ? fetchedContacts : [];
+                const numbers = Array.isArray(fetchedNumbers) ? fetchedNumbers : [];
                 setDepartments(depts);
                 setContacts(contactList);
+                setPhoneNumbers(numbers);
 
                 let firstDeptId: string | undefined;
                 if (depts.length > 0) {
                     firstDeptId = String(depts[0].id);
                     setSelectedDepartmentId(firstDeptId);
-                    setLoadingNumbers(true);
-                    try {
-                      const numbers = await getPhoneNumbers(depts[0].id);
-                      setPhoneNumbers(numbers);
-                      if (numbers.length > 0) {
-                        setSelectedFromNumber(numbers[0].phone_no);
-                      }
-                    } finally {
-                      setLoadingNumbers(false);
-                    }
+                    const numbersForDept = numbers.filter(
+                      (num) => num.department_id != null && String(num.department_id) === firstDeptId
+                    );
+                    setSelectedFromNumber(numbersForDept[0]?.phone_no ?? numbers[0]?.phone_no ?? "");
+                } else if (numbers.length > 0) {
+                    setSelectedFromNumber(numbers[0].phone_no);
                 }
 
                 cacheSet(cacheKey, {
                   departments: depts,
                   contacts: contactList,
+                  phoneNumbers: numbers,
                   firstDeptId,
                 }, 60_000);
             } catch (error) {
                 toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
             } finally {
                 setLoadingDepartments(false);
+                setLoadingNumbers(false);
             }
         };
         fetchInitialData();
@@ -428,6 +422,8 @@ export default function AppHeader({
             setDialerOpen(false);
 
             setActiveContactName(number);
+            const selectedDepartment = departments.find((dept) => String(dept.id) === selectedDepartmentId);
+            setActiveDepartmentName(selectedDepartment?.name || null);
             setActiveCall(connection);
             setIsActiveCallOpen(true);
 
@@ -450,18 +446,21 @@ export default function AppHeader({
             connection.on('disconnect', () => {
                 setIsActiveCallOpen(false);
                 setActiveCall(null);
+                setActiveDepartmentName(null);
                 setActiveConferenceSid(null);
             });
 
             connection.on('cancel', () => {
                 setIsActiveCallOpen(false);
                 setActiveCall(null);
+                setActiveDepartmentName(null);
                 setActiveConferenceSid(null);
             });
 
             connection.on('reject', () => {
                 setIsActiveCallOpen(false);
                 setActiveCall(null);
+                setActiveDepartmentName(null);
                 setActiveConferenceSid(null);
             });
         } catch (error) {
@@ -749,12 +748,14 @@ export default function AppHeader({
               isOpen={isActiveCallOpen}
               contactNumber={activeContactName}
               callerName={activeContactName}
+              departmentName={activeDepartmentName}
               connection={activeCall}
               conferenceSid={activeConferenceSid}
               onHangUp={() => {
                 activeCall?.disconnect();
                 setIsActiveCallOpen(false);
                 setActiveCall(null);
+                setActiveDepartmentName(null);
                 setActiveConferenceSid(null);
               }}
             />

@@ -26,6 +26,7 @@ interface ActiveCallBarProps {
   isOpen: boolean;
   contactNumber: string;
   callerName: string;
+  departmentName?: string | null;
   onHangUp: () => void;
   connection: Call | null;
   conferenceSid: string | null;
@@ -41,7 +42,7 @@ const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { ico
 );
 
 
-export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHangUp, connection, conferenceSid }: ActiveCallBarProps) {
+export default function ActiveCallBar({ isOpen, contactNumber, callerName, departmentName, onHangUp, connection, conferenceSid }: ActiveCallBarProps) {
   const { user: authUser } = useAuth();
   const { fromNumber, setConferenceSid } = useTwilio();
   const [duration, setDuration] = useState(0);
@@ -62,6 +63,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [resolvedDepartmentName, setResolvedDepartmentName] = useState<string | null>(departmentName || null);
   
   const dialpadKeys = [
     '1', '2', '3',
@@ -71,8 +73,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
   ];
 
    useEffect(() => {
-    if (isOpen && contactNumber.startsWith('client:')) {
-      console.log("Fetching user name for active call:", contactNumber);
+    if (isOpen && connection?.parameters?.CallSid) {
       const fetchUserName = async () => {
         try {
           const currentCallSid = connection?.parameters?.CallSid || '';
@@ -88,6 +89,12 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
             if (matchingCall?.department_id) {
               const deptSettings = await getDepartmentSettings(matchingCall.department_id);
               setDepartmentSettings(deptSettings);
+            }
+
+            if (matchingCall?.department?.name) {
+              setResolvedDepartmentName(matchingCall.department.name);
+            } else if (departmentName) {
+              setResolvedDepartmentName(departmentName);
             }
 
             if (matchingCall?.company_id) {
@@ -107,8 +114,15 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
     if (!isOpen) {
       setDepartmentSettings(null);
       setCompanySettings(null);
+      setResolvedDepartmentName(null);
     }
-  }, [isOpen, contactNumber, connection]);
+  }, [isOpen, contactNumber, connection, departmentName]);
+
+  useEffect(() => {
+    if (departmentName) {
+      setResolvedDepartmentName(departmentName);
+    }
+  }, [departmentName]);
   
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
@@ -177,11 +191,10 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
   }, [isParticipantsModalOpen, conferenceSid]);
 
   const toggleMute = () => {
-    if (connection) {
-      const mute = !isMuted;
-      connection.mute(mute);
-      setIsMuted(mute);
-    }
+    if (!connection?.mute) return;
+    const mute = !isMuted;
+    connection.mute(mute);
+    setIsMuted(mute);
   };
   
   const toggleHold = async () => {
@@ -284,7 +297,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
   };
 
   const handleSendDigits = (digit: string) => {
-  if (connection) {
+  if (connection?.sendDigits) {
       connection.sendDigits(digit);
       toast({ title: `Sent digit: ${digit}` });
   }
@@ -303,7 +316,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
     <button
       type="button"
       onClick={() => setIsCollapsed((prev) => !prev)}
-      className="fixed bottom-4 right-4 z-[60] flex items-center gap-2.5 rounded-full bg-background px-4 py-2.5 shadow-2xl ring-1 ring-border hover:bg-muted/50 transition-colors"
+      className="fixed bottom-4 right-4 z-[110] flex items-center gap-2.5 rounded-full bg-background px-4 py-2.5 shadow-2xl ring-1 ring-border hover:bg-muted/50 transition-colors"
       aria-label={isCollapsed ? 'Expand active call controls' : 'Collapse active call controls'}
     >
       <span className="relative flex h-2.5 w-2.5">
@@ -326,7 +339,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
 
   return (
     <>
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-50">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-[100]">
         <div className="bg-background rounded-2xl shadow-2xl p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
                  <Avatar className="h-12 w-12">
@@ -343,6 +356,11 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, onHan
                       : formatPhoneNumber(contactNumber)
                     }
                        &bull; {formatTime(duration)}</p>
+                    {resolvedDepartmentName ? (
+                      <p className="text-sm text-muted-foreground truncate max-w-[200px]">
+                        Department: {resolvedDepartmentName}
+                      </p>
+                    ) : null}
                 </div>
             </div>
 

@@ -21,7 +21,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, PlusCircle, Edit, Trash2 } from "lucide-react";
 import type { PhoneNumber } from "@/types";
-import { getPhoneNumbers, createPhoneNumber, updatePhoneNumber, deletePhoneNumber } from "@/services/phoneNumberService";
+import { getDepartmentPhoneNumbers, createPhoneNumber, updatePhoneNumber, deletePhoneNumber } from "@/services/phoneNumberService";
 import AppHeader from "@/components/app-header";
 import { formatPhoneNumber } from "@/lib/utils";
 import {
@@ -40,6 +40,7 @@ export default function PhoneNumbersPage() {
   const router = useRouter();
   const params = useParams();
   const departmentId = Number(params.departmentId);
+  const companyId = user?.company_id;
 
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,16 +61,21 @@ export default function PhoneNumbersPage() {
         router.replace('/');
         return;
     }
-    if (departmentId && canView) {
+    if (companyId && departmentId && canView) {
       fetchPhoneNumbers();
     }
-  }, [user, departmentId, router, canView]);
+  }, [user, companyId, departmentId, router, canView]);
 
   const fetchPhoneNumbers = async () => {
+    if (!departmentId) return;
     try {
       setLoading(true);
-      const data = await getPhoneNumbers(departmentId);
-      setPhoneNumbers(data || []);
+      const data = await getDepartmentPhoneNumbers(departmentId);
+      setPhoneNumbers(
+        (data || []).filter((num) =>
+          Number(num.department_id ?? num.department?.id) === departmentId
+        )
+      );
     } catch (error) {
       toast({ title: "Error", description: "Could not fetch phone numbers.", variant: "destructive" });
     } finally {
@@ -102,10 +108,10 @@ export default function PhoneNumbersPage() {
       const payload = { ...values, phone_no: phoneWithCountryCode };
       
       if (editingNumber) {
-        await updatePhoneNumber(editingNumber.id, { ...payload, department_id: departmentId });
+        await updatePhoneNumber(editingNumber.id, { ...payload, company_id: companyId, department_id: departmentId });
         toast({ title: "Success", description: "Phone number updated." });
       } else {
-        await createPhoneNumber({ ...payload, department_id: departmentId });
+        await createPhoneNumber({ ...payload, company_id: companyId, department_id: departmentId });
         toast({ title: "Success", description: "Phone number added." });
       }
       fetchPhoneNumbers();
@@ -117,7 +123,7 @@ export default function PhoneNumbersPage() {
   
   const handleDelete = async (id: number) => {
     try {
-      await deletePhoneNumber(id);
+      await deletePhoneNumber(id, { companyId, departmentId });
       toast({ title: "Success", description: "Phone number deleted." });
       fetchPhoneNumbers();
     } catch (error) {
@@ -225,7 +231,7 @@ export default function PhoneNumbersPage() {
           <main className="flex-1 p-4 md:p-8 bg-muted/40">
             <Card>
               <CardHeader>
-                <CardTitle>Assigned Numbers</CardTitle>
+                <CardTitle>Department Numbers</CardTitle>
                 <CardDescription>Phone numbers assigned to this department.</CardDescription>
               </CardHeader>
               <CardContent>

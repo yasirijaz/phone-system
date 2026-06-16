@@ -16,15 +16,14 @@ import { useToast } from "@/hooks/use-toast";
 import AppHeader from "@/components/app-header";
 import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
-import { getPhoneNumbers } from "@/services/phoneNumberService";
+import { getCompanyPhoneNumbers } from "@/services/phoneNumberService";
 import { sendMms } from "@/services/twilioService";
 import { getContacts } from "@/services/contactService";
 import { events } from "@/lib/events";
 import ContactProfile from "@/components/contact-profile";
-import { cn, formatPhoneNumber, phonesMatch } from "@/lib/utils";
+import { cn, formatPhoneNumber, phonesMatch, getPhoneNumberOptionLabel } from "@/lib/utils";
 import { buildThreadContactState } from "@/lib/contact-display";
 import { canListAllCompanyDepartments } from "@/lib/roles";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -48,6 +47,7 @@ export default function ConversationDetailPage() {
     const [loadingDepartments, setLoadingDepartments] = useState(true);
     const [loadingNumbers, setLoadingNumbers] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const chatScrollRef = useRef<HTMLElement>(null);
     const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
     const [departmentName, setDepartmentName] = useState<string | null>(null);
     
@@ -90,50 +90,45 @@ export default function ConversationDetailPage() {
         }
     }, [from, to, user]);
 
-     const handleDepartmentChange = useCallback(async (departmentId: string) => {
+     const handleDepartmentChange = useCallback((departmentId: string) => {
         setSelectedDepartmentId(departmentId);
-        if (!departmentId) {
-            setPhoneNumbers([]);
-            setSelectedFromNumber('');
-            return;
+    }, []);
+
+    const filteredPhoneNumbers = selectedDepartmentId
+        ? phoneNumbers.filter(
+            (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
+          )
+        : phoneNumbers;
+
+    useEffect(() => {
+        if (!selectedDepartmentId) return;
+        const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
+        if (!hasSelectedNumber) {
+            setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
         }
-        setLoadingNumbers(true);
-        try {
-            const numbers = await getPhoneNumbers(Number(departmentId));
-            setPhoneNumbers(numbers);
-            if (numbers.length > 0) {
-                // Try to keep the previously selected number if it exists in the new list
-                const currentNumberIsValid = numbers.some(n => n.phone_no === selectedFromNumber);
-                if (!currentNumberIsValid) {
-                    setSelectedFromNumber(numbers[0].phone_no);
-                }
-            } else {
-                setSelectedFromNumber('');
-            }
-        } catch (error) {
-            toast({ title: "Error", description: "Failed to load phone numbers for this department.", variant: "destructive" });
-        } finally {
-            setLoadingNumbers(false);
-        }
-    }, [toast, selectedFromNumber]);
+    }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
 
     useEffect(() => {
         const fetchInitialData = async () => {
             if (!user) return;
             setLoading(true);
             setLoadingDepartments(true);
+            setLoadingNumbers(true);
 
             try {
                 const canFetchAllDepts = canListAllCompanyDepartments(user.role_id);
-                const [fetchedDepts, fetchedContacts, logs] = await Promise.all([
+                const [fetchedDepts, fetchedContacts, logs, companyNumbers] = await Promise.all([
                     canFetchAllDepts && user.company_id
                         ? getDepartments(user.company_id)
                         : getUserDepartments(user.id),
                     user.company_id ? getContacts(user.company_id) : Promise.resolve([]),
-                    getCommunicationThread(from, to)
+                    getCommunicationThread(from, to),
+                    user.company_id ? getCompanyPhoneNumbers(user.company_id) : Promise.resolve([]),
                 ]);
                 const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
+                const numbers = Array.isArray(companyNumbers) ? companyNumbers : [];
                 setDepartments(depts);
+                setPhoneNumbers(numbers);
 
                 const contactList = Array.isArray(fetchedContacts) ? fetchedContacts : [];
                 setContacts(contactList);
@@ -150,28 +145,18 @@ export default function ConversationDetailPage() {
                     try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
                 }
                 
-                // Load phone numbers once per department (cached at service layer)
-                const numbersByDept = await Promise.all(
-                    depts.map(async (dept) => {
-                        try {
-                            const nums = await getPhoneNumbers(dept.id);
-                            return { dept, nums };
-                        } catch {
-                            return { dept, nums: [] as PhoneNumber[] };
-                        }
-                    })
-                );
-
                 const allCompanyNumbers = new Set<string>();
                 const numberToDeptMap: Record<string, string> = {};
                 const numberToDeptIdMap: Record<string, string> = {};
-                for (const { dept, nums } of numbersByDept) {
-                    nums.forEach((n) => {
-                        allCompanyNumbers.add(n.phone_no);
-                        numberToDeptMap[n.phone_no] = dept.name;
-                        numberToDeptIdMap[n.phone_no] = String(dept.id);
-                    });
-                }
+                numbers.forEach((n) => {
+                    allCompanyNumbers.add(n.phone_no);
+                    if (n.department?.name) {
+                        numberToDeptMap[n.phone_no] = n.department.name;
+                    }
+                    if (n.department_id) {
+                        numberToDeptIdMap[n.phone_no] = String(n.department_id);
+                    }
+                });
 
                 let otherPartyNumber: string;
                 let ourNumber: string;
@@ -216,14 +201,12 @@ export default function ConversationDetailPage() {
 
                 if (resolvedDeptId) {
                     setSelectedDepartmentId(resolvedDeptId);
-                    const numsForDept =
-                        numbersByDept.find((entry) => String(entry.dept.id) === resolvedDeptId)?.nums ?? [];
-                    setPhoneNumbers(numsForDept);
-                    if (numsForDept.some((n) => n.phone_no === ourNumber)) {
-                        setSelectedFromNumber(ourNumber);
-                    } else if (numsForDept.length > 0) {
-                        setSelectedFromNumber(numsForDept[0].phone_no);
-                    }
+                }
+
+                if (numbers.some((n) => n.phone_no === ourNumber)) {
+                    setSelectedFromNumber(ourNumber);
+                } else if (numbers.length > 0) {
+                    setSelectedFromNumber(numbers[0].phone_no);
                 }
 
 
@@ -233,6 +216,7 @@ export default function ConversationDetailPage() {
             } finally {
                 setLoading(false);
                 setLoadingDepartments(false);
+                setLoadingNumbers(false);
             }
         };
 
@@ -262,8 +246,14 @@ export default function ConversationDetailPage() {
     }, [from, to, refreshThread]);
     
     useEffect(() => {
+        if (loading) return;
+
+        if (chatScrollRef.current) {
+            chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+        }
+
         if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+            messagesEndRef.current.scrollIntoView({ behavior: "auto", block: "end" });
         }
     }, [allComms, loading]);
 
@@ -326,17 +316,16 @@ export default function ConversationDetailPage() {
     };
 
     return (
-                 <div className="flex h-screen w-full bg-background text-foreground">
+                 <div className="flex h-[100dvh] min-h-0 w-full overflow-hidden bg-background text-foreground">
                     <div className="flex-1 flex flex-col">
                         <AppHeader user={user} logout={logout} 
                             dialerOpen={dialerOpen}
                             dialerInitialValue={dialerInitialValue}
                             onDialerOpenChange={() => setDialerOpen(!dialerOpen)}
                         />
-                        <ResizablePanelGroup direction="horizontal" className="flex-1 flex overflow-hidden">
-                           <ResizablePanel defaultSize={75}>
-                                <div className={cn("flex flex-col h-full bg-background text-foreground overflow-hidden")}>
-                                    <header className="flex-shrink-0 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">
+                        <div className="flex-1 flex overflow-hidden">
+                                <div className={cn("flex flex-1 min-w-0 flex-col h-full bg-background text-foreground overflow-hidden")}>
+                                    <header className="sticky top-0 z-20 flex h-16 flex-shrink-0 items-center justify-between border-b bg-background/95 px-4 backdrop-blur-sm md:px-8">
                                         <div className="flex items-center gap-4">
                                             <Button variant="ghost" size="icon" onClick={() => router.back()}>
                                                 <ArrowLeft />
@@ -363,7 +352,7 @@ export default function ConversationDetailPage() {
                                             {isProfileSidebarOpen ? <PanelRightClose /> : <User />}
                                         </Button>
                                     </header>
-                                    <main className="flex-1 overflow-y-auto">
+                                    <main ref={chatScrollRef} className="flex-1 overflow-y-auto overscroll-contain">
                                     {loading ? <p className="p-4">Loading...</p> : <CallLog calls={allComms} contacts={contacts} onMakeCall={handleMakeCall} isClickable={false} />}
                                     <div ref={messagesEndRef} />
                                     </main>
@@ -381,14 +370,14 @@ export default function ConversationDetailPage() {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
+                                            <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers}>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select Number" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {phoneNumbers.map((num) => (
+                                                    {filteredPhoneNumbers.map((num) => (
                                                         <SelectItem key={num.id} value={num.phone_no}>
-                                                            {formatPhoneNumber(num.phone_no)} ({num.label})
+                                                            {getPhoneNumberOptionLabel(num)}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
@@ -403,23 +392,17 @@ export default function ConversationDetailPage() {
                                         />
                                     </footer>
                                 </div>
-                            </ResizablePanel>
-                             {isProfileSidebarOpen && (
-                                <>
-                                    <ResizableHandle withHandle />
-                                    <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-                                        <aside className="border-l bg-background overflow-y-auto h-full">
-                                            <ContactProfile
-                                              contact={contact}
-                                              contacts={contacts}
-                                              onContactUpdate={refreshThread}
-                                              onCollapse={() => setIsProfileSidebarOpen(false)}
-                                            />
-                                        </aside>
-                                    </ResizablePanel>
-                                </>
+                            {isProfileSidebarOpen && (
+                                <aside className="h-full w-full max-w-[380px] border-l bg-background overflow-y-auto">
+                                    <ContactProfile
+                                      contact={contact}
+                                      contacts={contacts}
+                                      onContactUpdate={refreshThread}
+                                      onCollapse={() => setIsProfileSidebarOpen(false)}
+                                    />
+                                </aside>
                             )}
-                        </ResizablePanelGroup>
+                        </div>
                     </div>
                 </div>
     );

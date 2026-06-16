@@ -3,10 +3,10 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getDepartments } from "@/services/departmentService";
-import { getPhoneNumbers } from "@/services/phoneNumberService";
+import { getCompanyPhoneNumbers } from "@/services/phoneNumberService";
 import { getContacts } from "@/services/contactService";
-import type { Department, PhoneNumber, Contact } from "@/types";
+import { getDepartments } from "@/services/departmentService";
+import type { PhoneNumber, Contact, Department } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { sendMms } from "@/services/twilioService";
 import { useRouter } from 'next/navigation';
@@ -15,20 +15,19 @@ import AppHeader from "@/components/app-header";
 import MessageComposer from "@/components/message-composer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatPhoneNumber } from "@/lib/utils";
+import { getPhoneNumberOptionLabel } from "@/lib/utils";
 
 export default function MessagesPage() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
 
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loadingNumbers, setLoadingNumbers] = useState(true);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
-  const [loadingNumbers, setLoadingNumbers] = useState(false);
   
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("");
   const [selectedFromNumber, setSelectedFromNumber] = useState<string>("");
@@ -41,41 +40,40 @@ export default function MessagesPage() {
   useEffect(() => {
     const fetchInitialData = async () => {
       if (!user?.company_id) return;
+      setLoadingNumbers(true);
       setLoadingDepartments(true);
       try {
-        const [depts, fetchedContacts] = await Promise.all([
-            getDepartments(user.company_id),
+        const [fetchedContacts, numbers, fetchedDepartments] = await Promise.all([
             getContacts(user.company_id),
+            getCompanyPhoneNumbers(user.company_id),
+            getDepartments(user.company_id),
         ]);
-        setDepartments(Array.isArray(depts) ? depts : []);
         setContacts(Array.isArray(fetchedContacts) ? fetchedContacts : []);
+        const depts = Array.isArray(fetchedDepartments) ? fetchedDepartments : [];
+        setDepartments(depts);
+        const companyNumbers = Array.isArray(numbers) ? numbers : [];
+        setPhoneNumbers(companyNumbers);
+
+        if (depts.length > 0) {
+          const firstDeptId = String(depts[0].id);
+          setSelectedDepartmentId(firstDeptId);
+          const numbersForDepartment = companyNumbers.filter(
+            (num) => num.department_id != null && String(num.department_id) === firstDeptId
+          );
+          setSelectedFromNumber(numbersForDepartment[0]?.phone_no ?? "");
+        } else if (companyNumbers.length > 0) {
+          setSelectedFromNumber(companyNumbers[0].phone_no);
+        }
       } catch (error) {
         toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
       } finally {
+        setLoadingNumbers(false);
         setLoadingDepartments(false);
       }
     };
 
     fetchInitialData();
   }, [user, toast]);
-
-  const handleDepartmentChange = async (deptId: string) => {
-    setSelectedDepartmentId(deptId);
-    setLoadingNumbers(true);
-    try {
-        const numbers = await getPhoneNumbers(Number(deptId));
-        setPhoneNumbers(numbers);
-        if (numbers.length > 0) {
-            setSelectedFromNumber(numbers[0].phone_no);
-        } else {
-            setSelectedFromNumber("");
-        }
-    } catch (error) {
-        toast({ title: "Error", description: "Failed to load phone numbers.", variant: "destructive" });
-    } finally {
-        setLoadingNumbers(false);
-    }
-  };
   
   useEffect(() => {
     if (recipient.length > 2) {
@@ -89,6 +87,20 @@ export default function MessagesPage() {
         setFilteredContacts([]);
     }
 }, [recipient, contacts]);
+
+  const filteredPhoneNumbers = selectedDepartmentId
+    ? phoneNumbers.filter(
+        (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
+      )
+    : phoneNumbers;
+
+  useEffect(() => {
+    if (!selectedDepartmentId) return;
+    const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
+    if (!hasSelectedNumber) {
+      setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
+    }
+  }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
 
   const handleContactSelect = (contact: Contact) => {
       setRecipient(contact.phone_no);
@@ -126,32 +138,36 @@ export default function MessagesPage() {
 
 
   return (
-        <div className="flex h-screen w-full bg-background text-foreground">
+        <div className="flex h-full min-h-0 w-full bg-background text-foreground">
           <div className="flex flex-1 flex-col">
             <AppHeader user={user} logout={logout} />
             <main className="flex-1 flex flex-col bg-muted/40">
                 <div className="p-4 border-b space-y-2">
                     <div className="grid grid-cols-2 gap-2">
-                        <Select onValueChange={handleDepartmentChange} disabled={loadingDepartments}>
-                            <SelectTrigger className="flex-1">
+                        <Select
+                          onValueChange={setSelectedDepartmentId}
+                          value={selectedDepartmentId}
+                          disabled={loadingDepartments}
+                        >
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select Department" />
                             </SelectTrigger>
                             <SelectContent>
-                            {departments.map((dept) => (
-                                <SelectItem key={dept.id} value={String(dept.id)}>
-                                    {dept.name}
-                                </SelectItem>
-                            ))}
+                                {departments.map((dept) => (
+                                    <SelectItem key={dept.id} value={String(dept.id)}>
+                                        {dept.name}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
-                        <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
-                            <SelectTrigger className="flex-1">
+                        <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers}>
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select Number" />
                             </SelectTrigger>
                             <SelectContent>
-                                {phoneNumbers.map((num) => (
+                                {filteredPhoneNumbers.map((num) => (
                                     <SelectItem key={num.id} value={num.phone_no}>
-                                        {formatPhoneNumber(num.phone_no)} ({num.label})
+                                        {getPhoneNumberOptionLabel(num)}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

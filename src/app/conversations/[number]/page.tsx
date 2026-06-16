@@ -120,7 +120,7 @@ export default function ConversationDetailPage() {
     };
 
     return (
-                <div className="flex h-screen w-full bg-background text-foreground">
+                <div className="flex h-full min-h-0 w-full bg-background text-foreground">
                     <div className="flex flex-1 flex-col">
                          <AppHeader user={user} logout={logout} />
                          <header className="sticky top-16 z-20 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background/80 backdrop-blur-sm">

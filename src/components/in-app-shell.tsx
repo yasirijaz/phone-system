@@ -9,7 +9,7 @@ export function InAppShell({ children }: { children: React.ReactNode }) {
       <Sidebar>
         <InAppSidebar />
       </Sidebar>
-      <SidebarInset>{children}</SidebarInset>
+      <SidebarInset className="min-w-0 overflow-hidden">{children}</SidebarInset>
     </SidebarProvider>
   );
 }

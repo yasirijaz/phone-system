@@ -6,6 +6,7 @@ const monorepoRoot = path.join(import.meta.dirname, '../..');
 const nextConfig: NextConfig = {
   /* config options here */
   distDir: 'build',
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
   outputFileTracingRoot: monorepoRoot,
   turbopack: {
     root: monorepoRoot,

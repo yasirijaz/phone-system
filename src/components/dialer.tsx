@@ -9,7 +9,7 @@ import { Phone, Delete } from "lucide-react";
 import type { Department, PhoneNumber, Contact } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
-import { formatPhoneNumber } from '@/lib/utils';
+import { formatPhoneNumber, getPhoneNumberOptionLabel } from '@/lib/utils';
 
 interface DialerProps {
     onMakeCall: (number: string, fromNumber?: string) => void;
@@ -129,7 +129,21 @@ export default function Dialer({
 
     const handleDepartmentSelection = (id: string) => {
         onDepartmentChange(id);
-    }
+    };
+
+    const filteredPhoneNumbers = selectedDepartmentId
+        ? phoneNumbers.filter(
+            (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
+          )
+        : phoneNumbers;
+
+    useEffect(() => {
+        if (!selectedDepartmentId) return;
+        const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
+        if (!hasSelectedNumber) {
+            onSetSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
+        }
+    }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber, onSetSelectedFromNumber]);
     
     const dialpadKeys = [
         '1', '2', '3',
@@ -162,13 +176,13 @@ export default function Dialer({
                                 ))}
                             </SelectContent>
                         </Select>
-                         <Select onValueChange={onSetSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
+                         <Select onValueChange={onSetSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers}>
                             <SelectTrigger variant="ghost">
                                 <SelectValue placeholder={loadingNumbers ? "Loading..." : "From Number"} />
                             </SelectTrigger>
                             <SelectContent>
-                                {phoneNumbers.map(num => (
-                                    <SelectItem key={num.id} value={num.phone_no}>{num.label}</SelectItem>
+                                {filteredPhoneNumbers.map(num => (
+                                    <SelectItem key={num.id} value={num.phone_no}>{getPhoneNumberOptionLabel(num)}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>

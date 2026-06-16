@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from './ui/scroll-area';
+import { getPhoneNumberOptionLabel } from '@/lib/utils';
 
 
 interface NewMessageFormProps {
@@ -63,12 +64,23 @@ export default function NewMessageForm({
 
     const watchedDepartmentId = form.watch("departmentId");
 
+    const filteredPhoneNumbers = watchedDepartmentId
+        ? phoneNumbers.filter(
+            (num) => num.department_id != null && String(num.department_id) === watchedDepartmentId
+          )
+        : phoneNumbers;
+
     useEffect(() => {
         if (watchedDepartmentId && watchedDepartmentId !== selectedDepartmentId) {
             onDepartmentChange(watchedDepartmentId);
-            form.setValue("fromNumber", ""); // Reset from number when department changes
+            const numbersForDepartment = phoneNumbers.filter(
+                (num) => num.department_id != null && String(num.department_id) === watchedDepartmentId
+            );
+            const nextNumber = numbersForDepartment[0]?.phone_no ?? "";
+            form.setValue("fromNumber", nextNumber);
+            onSetSelectedFromNumber(nextNumber);
         }
-    }, [watchedDepartmentId, onDepartmentChange, selectedDepartmentId, form]);
+    }, [watchedDepartmentId, onDepartmentChange, selectedDepartmentId, phoneNumbers, form, onSetSelectedFromNumber]);
 
     const watchedFromNumber = form.watch("fromNumber");
     const watchedRecipient = form.watch("recipient");
@@ -152,15 +164,15 @@ export default function NewMessageForm({
                      <FormField control={form.control} name="fromNumber" render={({ field }) => (
                         <FormItem>
                             <FormLabel>From Number</FormLabel>
-                             <Select onValueChange={field.onChange} value={field.value} disabled={loadingNumbers || !watchedDepartmentId}>
+                             <Select onValueChange={field.onChange} value={field.value} disabled={loadingNumbers}>
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder={loadingNumbers ? "Loading..." : "Select Number"} />
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    {phoneNumbers.map(num => (
-                                        <SelectItem key={num.id} value={num.phone_no}>{num.label}</SelectItem>
+                                    {filteredPhoneNumbers.map(num => (
+                                        <SelectItem key={num.id} value={num.phone_no}>{getPhoneNumberOptionLabel(num)}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
