@@ -94,6 +94,20 @@ export default function ConversationDetailPage() {
         setSelectedDepartmentId(departmentId);
     }, []);
 
+    const filteredPhoneNumbers = selectedDepartmentId
+        ? phoneNumbers.filter(
+            (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
+          )
+        : phoneNumbers;
+
+    useEffect(() => {
+        if (!selectedDepartmentId) return;
+        const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
+        if (!hasSelectedNumber) {
+            setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
+        }
+    }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
+
     useEffect(() => {
         const fetchInitialData = async () => {
             if (!user) return;
@@ -361,7 +375,7 @@ export default function ConversationDetailPage() {
                                                     <SelectValue placeholder="Select Number" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {phoneNumbers.map((num) => (
+                                                    {filteredPhoneNumbers.map((num) => (
                                                         <SelectItem key={num.id} value={num.phone_no}>
                                                             {getPhoneNumberOptionLabel(num)}
                                                         </SelectItem>

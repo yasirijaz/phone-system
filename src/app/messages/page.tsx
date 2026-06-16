@@ -5,7 +5,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getCompanyPhoneNumbers } from "@/services/phoneNumberService";
 import { getContacts } from "@/services/contactService";
-import type { PhoneNumber, Contact } from "@/types";
+import { getDepartments } from "@/services/departmentService";
+import type { PhoneNumber, Contact, Department } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { sendMms } from "@/services/twilioService";
 import { useRouter } from 'next/navigation';
@@ -23,9 +24,12 @@ export default function MessagesPage() {
   const router = useRouter();
 
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loadingNumbers, setLoadingNumbers] = useState(true);
+  const [loadingDepartments, setLoadingDepartments] = useState(true);
   
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("");
   const [selectedFromNumber, setSelectedFromNumber] = useState<string>("");
   const [recipient, setRecipient] = useState("");
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
@@ -37,21 +41,34 @@ export default function MessagesPage() {
     const fetchInitialData = async () => {
       if (!user?.company_id) return;
       setLoadingNumbers(true);
+      setLoadingDepartments(true);
       try {
-        const [fetchedContacts, numbers] = await Promise.all([
+        const [fetchedContacts, numbers, fetchedDepartments] = await Promise.all([
             getContacts(user.company_id),
             getCompanyPhoneNumbers(user.company_id),
+            getDepartments(user.company_id),
         ]);
         setContacts(Array.isArray(fetchedContacts) ? fetchedContacts : []);
+        const depts = Array.isArray(fetchedDepartments) ? fetchedDepartments : [];
+        setDepartments(depts);
         const companyNumbers = Array.isArray(numbers) ? numbers : [];
         setPhoneNumbers(companyNumbers);
-        if (companyNumbers.length > 0) {
+
+        if (depts.length > 0) {
+          const firstDeptId = String(depts[0].id);
+          setSelectedDepartmentId(firstDeptId);
+          const numbersForDepartment = companyNumbers.filter(
+            (num) => num.department_id != null && String(num.department_id) === firstDeptId
+          );
+          setSelectedFromNumber(numbersForDepartment[0]?.phone_no ?? "");
+        } else if (companyNumbers.length > 0) {
           setSelectedFromNumber(companyNumbers[0].phone_no);
         }
       } catch (error) {
         toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
       } finally {
         setLoadingNumbers(false);
+        setLoadingDepartments(false);
       }
     };
 
@@ -70,6 +87,20 @@ export default function MessagesPage() {
         setFilteredContacts([]);
     }
 }, [recipient, contacts]);
+
+  const filteredPhoneNumbers = selectedDepartmentId
+    ? phoneNumbers.filter(
+        (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
+      )
+    : phoneNumbers;
+
+  useEffect(() => {
+    if (!selectedDepartmentId) return;
+    const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
+    if (!hasSelectedNumber) {
+      setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
+    }
+  }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
 
   const handleContactSelect = (contact: Contact) => {
       setRecipient(contact.phone_no);
@@ -112,18 +143,36 @@ export default function MessagesPage() {
             <AppHeader user={user} logout={logout} />
             <main className="flex-1 flex flex-col bg-muted/40">
                 <div className="p-4 border-b space-y-2">
-                    <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers}>
-                        <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select Number" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {phoneNumbers.map((num) => (
-                                <SelectItem key={num.id} value={num.phone_no}>
-                                    {getPhoneNumberOptionLabel(num)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <div className="grid grid-cols-2 gap-2">
+                        <Select
+                          onValueChange={setSelectedDepartmentId}
+                          value={selectedDepartmentId}
+                          disabled={loadingDepartments}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select Department" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {departments.map((dept) => (
+                                    <SelectItem key={dept.id} value={String(dept.id)}>
+                                        {dept.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select Number" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {filteredPhoneNumbers.map((num) => (
+                                    <SelectItem key={num.id} value={num.phone_no}>
+                                        {getPhoneNumberOptionLabel(num)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <div className="relative flex items-center gap-2">
                          <div className="relative flex-1">
                              <Input 

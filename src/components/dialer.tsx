@@ -129,7 +129,21 @@ export default function Dialer({
 
     const handleDepartmentSelection = (id: string) => {
         onDepartmentChange(id);
-    }
+    };
+
+    const filteredPhoneNumbers = selectedDepartmentId
+        ? phoneNumbers.filter(
+            (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
+          )
+        : phoneNumbers;
+
+    useEffect(() => {
+        if (!selectedDepartmentId) return;
+        const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
+        if (!hasSelectedNumber) {
+            onSetSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
+        }
+    }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber, onSetSelectedFromNumber]);
     
     const dialpadKeys = [
         '1', '2', '3',
@@ -167,7 +181,7 @@ export default function Dialer({
                                 <SelectValue placeholder={loadingNumbers ? "Loading..." : "From Number"} />
                             </SelectTrigger>
                             <SelectContent>
-                                {phoneNumbers.map(num => (
+                                {filteredPhoneNumbers.map(num => (
                                     <SelectItem key={num.id} value={num.phone_no}>{getPhoneNumberOptionLabel(num)}</SelectItem>
                                 ))}
                             </SelectContent>

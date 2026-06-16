@@ -303,6 +303,20 @@ export default function AppHeader({
     const handleDepartmentChange = useCallback((departmentId: string) => {
         setSelectedDepartmentId(departmentId);
     }, []);
+
+    const filteredPhoneNumbers = selectedDepartmentId
+        ? phoneNumbers.filter(
+            (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
+          )
+        : phoneNumbers;
+
+    useEffect(() => {
+        if (!selectedDepartmentId) return;
+        const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
+        if (!hasSelectedNumber) {
+            setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
+        }
+    }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
     
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -319,11 +333,14 @@ export default function AppHeader({
               setDepartments(cached.departments);
               setContacts(cached.contacts);
               setPhoneNumbers(cached.phoneNumbers);
-              if (cached.phoneNumbers.length > 0) {
-                setSelectedFromNumber(cached.phoneNumbers[0].phone_no);
-              }
               if (cached.firstDeptId) {
                 setSelectedDepartmentId(cached.firstDeptId);
+                const numbersForDept = cached.phoneNumbers.filter(
+                  (num) => num.department_id != null && String(num.department_id) === cached.firstDeptId
+                );
+                setSelectedFromNumber(numbersForDept[0]?.phone_no ?? cached.phoneNumbers[0]?.phone_no ?? "");
+              } else if (cached.phoneNumbers.length > 0) {
+                setSelectedFromNumber(cached.phoneNumbers[0].phone_no);
               }
               setLoadingDepartments(false);
               return;
@@ -351,8 +368,11 @@ export default function AppHeader({
                 if (depts.length > 0) {
                     firstDeptId = String(depts[0].id);
                     setSelectedDepartmentId(firstDeptId);
-                }
-                if (numbers.length > 0) {
+                    const numbersForDept = numbers.filter(
+                      (num) => num.department_id != null && String(num.department_id) === firstDeptId
+                    );
+                    setSelectedFromNumber(numbersForDept[0]?.phone_no ?? numbers[0]?.phone_no ?? "");
+                } else if (numbers.length > 0) {
                     setSelectedFromNumber(numbers[0].phone_no);
                 }
 
