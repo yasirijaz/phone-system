@@ -243,6 +243,7 @@ export interface Assignment {
     department_id: number;
     user_name: string;
     department_name: string;
+    role_id?: number;
 }
 
 export interface Package {

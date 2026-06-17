@@ -25,6 +25,7 @@ export interface DepartmentUserAssignment {
     id: number;
     user_id: number;
     department_id: number;
+    role_id?: number;
     is_dnd?: boolean | number;
     user: User;
 }

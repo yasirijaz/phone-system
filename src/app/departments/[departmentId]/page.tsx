@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import PaginationControls from "@/components/pagination-controls";
 import { events } from '@/lib/events';
 import { getPhoneNumberDisplayName } from "@/lib/utils";
-import { getRoleName } from '@/lib/roles';
+import { getRoleName, ROLES } from '@/lib/roles';
 import {
   getWorkerStatusFromUser,
   getWorkerStatusBadgeVariant,
@@ -382,8 +382,8 @@ export default function DepartmentDetailPage() {
                                                     <TableCell>{operatorUser.name ?? '—'}</TableCell>
                                                     <TableCell>{operatorUser.email ?? '—'}</TableCell>
                                                     <TableCell>
-                                                        <Badge variant={operatorUser.role_id === 2 ? 'default' : 'secondary'}>
-                                                            {getRoleName(operatorUser.role_id)}
+                                                        <Badge variant={op.role_id === ROLES.COMPANY_ADMIN || op.role_id === ROLES.MANAGER ? 'default' : 'secondary'}>
+                                                            {getRoleName(op.role_id ?? operatorUser.role_id)}
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
