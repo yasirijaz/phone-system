@@ -119,6 +119,24 @@ export interface Department {
   unread_count: number;
 }
 
+export interface OperatorDepartment {
+  id: number;
+  name: string;
+  role_id?: number;
+  is_dnd?: boolean | number;
+}
+
+export interface Operator {
+  id: number;
+  name: string;
+  email: string;
+  role_id?: number;
+  do_not_disturb?: number;
+  in_call?: number;
+  worker_status?: string;
+  departments?: OperatorDepartment[];
+}
+
 export interface PhoneNumber {
   id: number;
   company_id?: number;

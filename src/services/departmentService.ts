@@ -1,6 +1,6 @@
 
 import axios from '@/lib/axios';
-import type { Department, User } from '@/types';
+import type { Department, Operator, User } from '@/types';
 
 export const getDepartments = async (companyId: number): Promise<Department[]> => {
   const response = await axios.get(`/api/companies/${companyId}/departments`);
@@ -51,3 +51,18 @@ export const getDndStatus = async (departmentId: number, userId: number): Promis
     });
     return response.data.data;
 }
+
+export type OperatorsScope = 'department' | 'assigned_departments' | 'company';
+
+export interface OperatorsResponse {
+  status: string;
+  scope: OperatorsScope;
+  operators: Operator[];
+}
+
+export const getOperators = async (departmentId?: number): Promise<OperatorsResponse> => {
+  const response = await axios.get('/api/operators', {
+    params: departmentId ? { department_id: departmentId } : undefined,
+  });
+  return response.data;
+};
