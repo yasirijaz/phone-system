@@ -36,6 +36,7 @@ import { canListAllCompanyDepartments } from '@/lib/roles';
 import { cacheGet, cacheSet } from '@/lib/simpleCache';
 import { useAppDispatch } from "@/store";
 import { setUser } from "@/store/slices/authSlice";
+import { initiateConsultCall } from "@/services/twilioService";
 
 type AppInfo = { version?: string; updateReady?: boolean };
 
@@ -62,7 +63,7 @@ export default function AppHeader({
 }: AppHeaderProps) {
     const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
     const [isVideoOpen, setIsVideoOpen] = useState(false);
-    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid } = useTwilio();
+    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid, connection: twilioConnection, conferenceSid: twilioConferenceSid } = useTwilio();
     const { toast } = useToast();
     const router = useRouter();
 
@@ -405,6 +406,34 @@ export default function AppHeader({
                 setInternalDialerInitialValue(number.replace(/^\+1/, ""));
             } else { // If controlled, expect parent to handle it
                  setControlledDialerOpen(true);
+            }
+            return;
+        }
+
+        const inCallConnection = activeCall || twilioConnection;
+        const inCallConferenceSid = activeConferenceSid || twilioConferenceSid;
+
+        if (inCallConnection && inCallConferenceSid) {
+            try {
+                const consultResult = await initiateConsultCall(inCallConferenceSid, fromNumber, number);
+                if (!consultResult?.status) {
+                    throw new Error(consultResult?.msg || 'Failed to start consult call.');
+                }
+                if (consultResult?.data?.conference_sid) {
+                    setConferenceSid(consultResult.data.conference_sid);
+                    setActiveConferenceSid(consultResult.data.conference_sid);
+                }
+                setDialerOpen(false);
+                toast({
+                    title: 'Consult call started',
+                    description: `${formatPhoneNumber(number)} is being called as a consult leg.`,
+                });
+            } catch (error: any) {
+                toast({
+                    title: "Consult Error",
+                    description: error?.response?.data?.msg || error?.message || "Failed to start consult call.",
+                    variant: "destructive",
+                });
             }
             return;
         }

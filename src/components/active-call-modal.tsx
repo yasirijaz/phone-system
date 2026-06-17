@@ -21,6 +21,8 @@ import { getCompanySettings } from '@/services/companySettingsService';
 import { getCallLogsBySid } from '@/services/callLogService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
+import { getconferenceSid } from '@/services/phoneNumberService';
+import { initiateConsultCall } from '@/services/twilioService';
 
 interface ActiveCallBarProps {
   isOpen: boolean;
@@ -44,7 +46,7 @@ const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { ico
 
 export default function ActiveCallBar({ isOpen, contactNumber, callerName, departmentName, onHangUp, connection, conferenceSid }: ActiveCallBarProps) {
   const { user: authUser } = useAuth();
-  const { fromNumber, setConferenceSid } = useTwilio();
+  const { fromNumber, setConferenceSid, conferenceSid: contextConferenceSid } = useTwilio();
   const [duration, setDuration] = useState(0);
   const [selectedParticipant, setSelectedParticipant] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -64,6 +66,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [isTransferring, setIsTransferring] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [resolvedDepartmentName, setResolvedDepartmentName] = useState<string | null>(departmentName || null);
+  const effectiveConferenceSid = conferenceSid || contextConferenceSid;
   
   const dialpadKeys = [
     '1', '2', '3',
@@ -173,9 +176,9 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   }, [isOpen]);
   
   const fetchParticipants = async () => {
-      if (!conferenceSid) return;
+      if (!effectiveConferenceSid) return;
       try {
-        const response = await allParticipant(conferenceSid);
+        const response = await allParticipant(effectiveConferenceSid);
         const participantList = Array.isArray(response?.data) ? response.data : [];
         setCurrentParticipants(participantList);
       } catch (error) {
@@ -188,7 +191,30 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       if (isParticipantsModalOpen) {
           fetchParticipants();
       }
-  }, [isParticipantsModalOpen, conferenceSid]);
+  }, [isParticipantsModalOpen, effectiveConferenceSid]);
+
+  const ensureConferenceSid = async () => {
+    if (effectiveConferenceSid) {
+      return effectiveConferenceSid;
+    }
+    const callSid = connection?.parameters?.CallSid;
+    if (!callSid) {
+      return null;
+    }
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await getconferenceSid(callSid);
+        if (response?.conferenceSid) {
+          setConferenceSid(response.conferenceSid);
+          return response.conferenceSid;
+        }
+      } catch (error) {
+        // retry a few times because conference SID may not be persisted yet
+      }
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    return null;
+  };
 
   const toggleMute = () => {
     if (!connection?.mute) return;
@@ -198,12 +224,17 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   };
   
   const toggleHold = async () => {
-    if (!connection || !conferenceSid) return;
+    if (!connection) return;
     const hold = !isOnHold;
     const callSidToHold = connection.parameters.CallSid;
     
     try {
-        await holdParticipant(conferenceSid, callSidToHold, hold);
+        const sid = await ensureConferenceSid();
+        if (!sid) {
+          toast({ title: "Error", description: "Cannot update hold. Active conference session not found.", variant: 'destructive' });
+          return;
+        }
+        await holdParticipant(sid, callSidToHold, hold);
         setIsOnHold(hold);
         toast({ title: hold ? "Call on Hold" : "Call Resumed"});
     } catch (err) {
@@ -217,9 +248,15 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       return;
     }
     
-    if (!connection || !conferenceSid) {
+    if (!connection) {
         toast({ title: "Error", description: "Cannot add participant. Active call session not found.", variant: 'destructive' });
         return;
+    }
+
+    const sid = await ensureConferenceSid();
+    if (!sid) {
+      toast({ title: "Error", description: "Cannot add participant. Conference session not ready yet.", variant: 'destructive' });
+      return;
     }
 
     const savedFromNumber = localStorage.getItem("twilioFromNumber");
@@ -236,7 +273,9 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
         const phoneNumber = dialerNumber ? `+1${dialerNumber.replace(/\D/g, '')}` : undefined;
         const userId = selectedParticipant || undefined;
         
-        const response = await addParticipant(conferenceSid, twilioNumber, userId, phoneNumber);
+        const response = phoneNumber
+          ? await initiateConsultCall(sid, twilioNumber, phoneNumber)
+          : await addParticipant(sid, twilioNumber, userId, phoneNumber);
 
         if (response?.data?.conference_sid) {
           setConferenceSid(response.data.conference_sid);
@@ -245,7 +284,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
         if (isTransferring) {
           setTimeout(async () => {
             const myCallSid = connection.parameters.CallSid;
-            await removeParticipant(conferenceSid, myCallSid);
+            await removeParticipant(sid, myCallSid);
             toast({
               title: "Transfer complete",
               description: "You have been removed from the call."
@@ -268,9 +307,10 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   }
   
   const handleRemoveParticipant = async (callSid: string) => {
-    if (!conferenceSid) return;
+    const sid = await ensureConferenceSid();
+    if (!sid) return;
     try {
-      await removeParticipant(conferenceSid, callSid);
+      await removeParticipant(sid, callSid);
       toast({ title: "Success", description: "Participant removed." });
       fetchParticipants(); // Refresh list
     } catch (error) {

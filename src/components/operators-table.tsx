@@ -71,7 +71,7 @@ function resolveDepartmentRole(
 function withCurrentUserStatus(
   list: Operator[],
   currentUserId?: number,
-  activityName?: string
+  activityName?: string | null
 ): Operator[] {
   if (!activityName || !currentUserId) return list;
   return list.map((operator) =>

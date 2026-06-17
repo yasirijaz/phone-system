@@ -48,7 +48,7 @@ export default function DepartmentUsersPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [addUserSearch, setAddUserSearch] = useState("");
   const [departmentUserSearch, setDepartmentUserSearch] = useState("");
-  const [defaultAssignRoleId, setDefaultAssignRoleId] = useState(ROLES.USER);
+  const [defaultAssignRoleId, setDefaultAssignRoleId] = useState<number>(ROLES.USER);
   const [updatingRoleUserId, setUpdatingRoleUserId] = useState<number | null>(null);
   const { toast } = useToast();
 
