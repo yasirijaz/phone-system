@@ -111,6 +111,11 @@ export function canListAllCompanyDepartments(roleId?: number | null): boolean {
   return isPlatformAdmin(roleId) || hasCompanyWideAccess(roleId);
 }
 
+/** Access the departments screen (company-scoped users, including operators). */
+export function canAccessDepartments(roleId?: number | null): boolean {
+  return isCompanyAdmin(roleId) || isManager(roleId) || isRegularUser(roleId);
+}
+
 export function getAssignableRolesForCreator(creatorRoleId?: number | null): number[] {
   if (isPlatformAdmin(creatorRoleId)) {
     return [ROLES.COMPANY_ADMIN, ROLES.MANAGER, ROLES.USER];
