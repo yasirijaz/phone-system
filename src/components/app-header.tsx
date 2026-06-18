@@ -63,7 +63,7 @@ export default function AppHeader({
 }: AppHeaderProps) {
     const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
     const [isVideoOpen, setIsVideoOpen] = useState(false);
-    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid, connection: twilioConnection, conferenceSid: twilioConferenceSid } = useTwilio();
+    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid, connection: twilioConnection, conferenceSid: twilioConferenceSid, leaveCall, endCallForAll } = useTwilio();
     const { toast } = useToast();
     const router = useRouter();
 
@@ -810,8 +810,16 @@ export default function AppHeader({
               departmentName={activeDepartmentName}
               connection={activeCall}
               conferenceSid={activeConferenceSid}
-              onHangUp={() => {
-                activeCall?.disconnect();
+              onLeaveCall={async (sid, callSid) => {
+                await leaveCall(sid, callSid);
+                setIsActiveCallOpen(false);
+                setActiveCall(null);
+                setActiveDepartmentName(null);
+                setActiveConferenceSid(null);
+                setConferenceSid(null);
+              }}
+              onEndCallForAll={async (sid) => {
+                await endCallForAll(sid ?? activeConferenceSid);
                 setIsActiveCallOpen(false);
                 setActiveCall(null);
                 setActiveDepartmentName(null);

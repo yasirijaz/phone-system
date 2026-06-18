@@ -6,6 +6,7 @@ import type { Device, Call } from '@twilio/voice-sdk';
 import type { Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
 
 import axios from '@/lib/axios';
+import { leaveConference as leaveConferenceApi, endConference as endConferenceApi } from '@/services/twilioService';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { isElectron } from '@/lib/is-electron';
@@ -28,6 +29,8 @@ interface TwilioContextType {
   acceptCall: () => void;
   rejectCall: () => void;
   hangUp: () => void;
+  leaveCall: (conferenceSid: string, callSid: string) => Promise<void>;
+  endCallForAll: (conferenceSid?: string | null) => Promise<void>;
   acceptReservation: (reservation: Reservation) => void;
   rejectReservation: (reservation: Reservation) => void;
   completeReservation: (reservation: Reservation) => void;
@@ -418,15 +421,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const hangUp = () => {
+  const completeActiveReservation = () => {
     const reservation = activeReservationRef.current;
-    if (connection) {
-      try {
-        connection.disconnect();
-      } catch (error) {
-        console.warn('Failed to disconnect call leg:', error);
-      }
-    }
     if (reservation) {
       try {
         reservation.complete();
@@ -434,8 +430,51 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.warn('Failed to complete reservation:', error);
       }
     }
+  };
+
+  const leaveCall = async (conferenceSid: string, callSid: string) => {
+    try {
+      await leaveConferenceApi(conferenceSid, callSid);
+    } catch (error) {
+      console.warn('Failed to leave conference via API:', error);
+      if (connection) {
+        try {
+          connection.disconnect();
+        } catch (disconnectError) {
+          console.warn('Failed to disconnect call leg:', disconnectError);
+        }
+      }
+    }
+
+    completeActiveReservation();
     clearActiveCallState();
-    toast({ title: "Call Ended" });
+    toast({ title: 'Left call' });
+  };
+
+  const endCallForAll = async (conferenceSid?: string | null) => {
+    if (conferenceSid) {
+      try {
+        await endConferenceApi(conferenceSid);
+      } catch (error) {
+        console.warn('Failed to end conference via API:', error);
+      }
+    }
+
+    if (connection) {
+      try {
+        connection.disconnect();
+      } catch (error) {
+        console.warn('Failed to disconnect call leg:', error);
+      }
+    }
+
+    completeActiveReservation();
+    clearActiveCallState();
+    toast({ title: 'Call Ended' });
+  };
+
+  const hangUp = () => {
+    void endCallForAll(conferenceSid);
   };
 
   const acceptReservation = (reservation: Reservation) => {
@@ -545,6 +584,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     acceptCall,
     rejectCall,
     hangUp,
+    leaveCall,
+    endCallForAll,
     acceptReservation,
     rejectReservation,
     completeReservation,

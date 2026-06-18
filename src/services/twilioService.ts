@@ -38,6 +38,21 @@ export const removeParticipant = async (conferenceSid: string, callSid: string):
     return response.data;
 }
 
+export const leaveConference = async (conferenceSid: string, callSid: string): Promise<any> => {
+    const response = await axios.post('/api/twilio/leave-conference', {
+        conference_sid: conferenceSid,
+        call_sid: callSid,
+    });
+    return response.data;
+};
+
+export const endConference = async (conferenceSid: string): Promise<any> => {
+    const response = await axios.post('/api/twilio/end-conference', {
+        conference_sid: conferenceSid,
+    });
+    return response.data;
+};
+
 export const allParticipant = async (conferenceSid: string): Promise<any> => {
     const response = await axios.post('/api/twilio/participants', {
         conference_sid: conferenceSid,

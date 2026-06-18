@@ -15,6 +15,7 @@ import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn, formatPhoneNumber } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 import { allParticipant, removeParticipant, addParticipant, holdParticipant, initiateConsultCall, consultSwap, consultMerge, consultSwitch, consultEnsureAgent, type ConferenceParticipant } from '@/services/twilioService';
 import { getDepartmentSettings } from '@/services/departmentSettingsService';
 import { getCompanySettings } from '@/services/companySettingsService';
@@ -28,7 +29,8 @@ interface ActiveCallBarProps {
   contactNumber: string;
   callerName: string;
   departmentName?: string | null;
-  onHangUp: () => void;
+  onLeaveCall: (conferenceSid: string, callSid: string) => Promise<void>;
+  onEndCallForAll: (conferenceSid?: string | null) => Promise<void>;
   connection: Call | null;
   conferenceSid: string | null;
 }
@@ -43,7 +45,7 @@ const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { ico
 );
 
 
-export default function ActiveCallBar({ isOpen, contactNumber, callerName, departmentName, onHangUp, connection, conferenceSid }: ActiveCallBarProps) {
+export default function ActiveCallBar({ isOpen, contactNumber, callerName, departmentName, onLeaveCall, onEndCallForAll, connection, conferenceSid }: ActiveCallBarProps) {
   const { user: authUser } = useAuth();
   const { fromNumber, setConferenceSid } = useTwilio();
   const [duration, setDuration] = useState(0);
@@ -70,10 +72,15 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [resolvedDepartmentName, setResolvedDepartmentName] = useState<string | null>(departmentName || null);
   const [verifiedConferenceSid, setVerifiedConferenceSid] = useState<string | null>(null);
+  const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
+  const [isEndingCall, setIsEndingCall] = useState(false);
   const effectiveConferenceSid = conferenceSid || verifiedConferenceSid;
   const agentCallSid = connection?.parameters?.CallSid ?? null;
   const externalParticipants = (currentParticipants as ConferenceParticipant[]).filter(
     (participant) => !participant.is_agent && participant.call_sid !== agentCallSid
+  );
+  const otherAgents = (currentParticipants as ConferenceParticipant[]).filter(
+    (participant) => participant.is_agent && participant.call_sid !== agentCallSid
   );
   const hasConsultCall = externalParticipants.length >= 2;
   const activeExternalParticipant = externalParticipants.find((p) => p.call_sid === activeExternalCallSid)
@@ -433,12 +440,11 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     const answered = await waitForTransferAnswer(conferenceSid, targetCallSid);
 
     if (answered) {
-      await removeParticipant(conferenceSid, myCallSid);
       toast({
         title: 'Transfer complete',
         description: 'Your colleague is now connected with the customer.',
       });
-      onHangUp();
+      await onLeaveCall(conferenceSid, myCallSid);
       return;
     }
 
@@ -575,6 +581,40 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     setIsAddParticipantModalOpen(true);
   };
 
+
+  const handleEndClick = () => {
+    if (otherAgents.length > 0 && effectiveConferenceSid && agentCallSid) {
+      setIsEndDialogOpen(true);
+      return;
+    }
+
+    void handleEndCallForAll();
+  };
+
+  const handleEndCallForAll = async () => {
+    setIsEndingCall(true);
+    try {
+      await onEndCallForAll(effectiveConferenceSid);
+    } finally {
+      setIsEndingCall(false);
+      setIsEndDialogOpen(false);
+    }
+  };
+
+  const handleLeaveCall = async () => {
+    if (!effectiveConferenceSid || !agentCallSid) {
+      await handleEndCallForAll();
+      return;
+    }
+
+    setIsEndingCall(true);
+    try {
+      await onLeaveCall(effectiveConferenceSid, agentCallSid);
+    } finally {
+      setIsEndingCall(false);
+      setIsEndDialogOpen(false);
+    }
+  };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -827,10 +867,43 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                 </Dialog>
             </div>
 
-            <Button size="lg" variant="destructive" className="rounded-full h-12" onClick={onHangUp}>
+            <Button size="lg" variant="destructive" className="rounded-full h-12" onClick={handleEndClick} disabled={isEndingCall}>
                 <PhoneOff className="mr-2" />
                 End
             </Button>
+
+            <AlertDialog open={isEndDialogOpen} onOpenChange={setIsEndDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Leave or end this call?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Another agent is on this call. You can leave and let them continue with the customer, or end the call for everyone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isEndingCall}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={isEndingCall}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void handleLeaveCall();
+                    }}
+                  >
+                    Leave call
+                  </AlertDialogAction>
+                  <AlertDialogAction
+                    disabled={isEndingCall}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void handleEndCallForAll();
+                    }}
+                  >
+                    End for everyone
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
         </div>
     </div>
     {floatingToggle}

@@ -20,7 +20,8 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     conferenceSid,
     acceptCall,
     rejectCall,
-    hangUp,
+    leaveCall,
+    endCallForAll,
     incomingReservation,
     activeReservation,
     showReservationModal,
@@ -108,7 +109,8 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         contactNumber={callerNumber}
         callerName={callerName}
         departmentName={departmentName}
-        onHangUp={hangUp}
+        onLeaveCall={leaveCall}
+        onEndCallForAll={endCallForAll}
         connection={connection}
         conferenceSid={conferenceSid}
       />
