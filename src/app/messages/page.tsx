@@ -80,7 +80,7 @@ export default function MessagesPage() {
         const searchTerm = recipient.toLowerCase();
         const matchingContacts = contacts.filter(contact => 
             contact.name.toLowerCase().includes(searchTerm) ||
-            contact.phone_no.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, ''))
+            contact.phone_no.includes(searchTerm)
         );
         setFilteredContacts(matchingContacts);
     } else {
