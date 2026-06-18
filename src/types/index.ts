@@ -11,6 +11,7 @@ export interface Communication {
   contact_id?: number | null;
   user_id?: number | null;
   call_sid?: string;
+  customer_sid?: string;
   conference_sid?: string;
   account_sid?: string;
   to: string;
