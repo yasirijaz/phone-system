@@ -107,6 +107,35 @@ export const initiateConsultCall = async (conferenceSid: string, from: string, p
     return response.data;
 };
 
+export const consultSwap = async (conferenceSid: string): Promise<any> => {
+    const response = await axios.post('/api/twilio/consult-swap', {
+        conference_sid: conferenceSid,
+    });
+    return response.data;
+};
+
+export const consultMerge = async (conferenceSid: string): Promise<any> => {
+    const response = await axios.post('/api/twilio/consult-merge', {
+        conference_sid: conferenceSid,
+    });
+    return response.data;
+};
+
+export const consultSwitch = async (conferenceSid: string, targetCallSid: string): Promise<any> => {
+    const response = await axios.post('/api/twilio/consult-switch', {
+        conference_sid: conferenceSid,
+        target_call_sid: targetCallSid,
+    });
+    return response.data;
+};
+
+export const consultEnsureAgent = async (conferenceSid: string): Promise<any> => {
+    const response = await axios.post('/api/twilio/consult-ensure-agent', {
+        conference_sid: conferenceSid,
+    });
+    return response.data;
+};
+
 export interface ConferenceParticipant {
     call_sid: string;
     label: string;

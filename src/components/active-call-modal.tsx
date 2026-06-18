@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Users, Trash2, Delete, ChevronDown, ChevronUp, Phone } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Users, Trash2, Delete, ChevronDown, ChevronUp, Phone, ArrowLeftRight, GitMerge, PhoneCall } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
 import type { User, Contact, DepartmentSettings, CompanySettings } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -15,14 +15,13 @@ import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn, formatPhoneNumber } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
-import { allParticipant, removeParticipant, addParticipant, holdParticipant, type ConferenceParticipant } from '@/services/twilioService';
+import { allParticipant, removeParticipant, addParticipant, holdParticipant, initiateConsultCall, consultSwap, consultMerge, consultSwitch, consultEnsureAgent, type ConferenceParticipant } from '@/services/twilioService';
 import { getDepartmentSettings } from '@/services/departmentSettingsService';
 import { getCompanySettings } from '@/services/companySettingsService';
 import { getCallLogsBySid } from '@/services/callLogService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { getconferenceSid } from '@/services/phoneNumberService';
-import { initiateConsultCall } from '@/services/twilioService';
 
 interface ActiveCallBarProps {
   isOpen: boolean;
@@ -46,7 +45,7 @@ const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { ico
 
 export default function ActiveCallBar({ isOpen, contactNumber, callerName, departmentName, onHangUp, connection, conferenceSid }: ActiveCallBarProps) {
   const { user: authUser } = useAuth();
-  const { fromNumber, setConferenceSid, conferenceSid: contextConferenceSid } = useTwilio();
+  const { fromNumber, setConferenceSid } = useTwilio();
   const [duration, setDuration] = useState(0);
   const [selectedParticipant, setSelectedParticipant] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -64,9 +63,22 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [departmentSettings, setDepartmentSettings] = useState<DepartmentSettings | null>(null);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
+  const [isConsultActionLoading, setIsConsultActionLoading] = useState(false);
+  const [customerCallSid, setCustomerCallSid] = useState<string | null>(null);
+  const [consultCallSid, setConsultCallSid] = useState<string | null>(null);
+  const [activeExternalCallSid, setActiveExternalCallSid] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [resolvedDepartmentName, setResolvedDepartmentName] = useState<string | null>(departmentName || null);
-  const effectiveConferenceSid = conferenceSid || contextConferenceSid;
+  const [verifiedConferenceSid, setVerifiedConferenceSid] = useState<string | null>(null);
+  const effectiveConferenceSid = conferenceSid || verifiedConferenceSid;
+  const agentCallSid = connection?.parameters?.CallSid ?? null;
+  const externalParticipants = (currentParticipants as ConferenceParticipant[]).filter(
+    (participant) => !participant.is_agent && participant.call_sid !== agentCallSid
+  );
+  const hasConsultCall = externalParticipants.length >= 2;
+  const activeExternalParticipant = externalParticipants.find((p) => p.call_sid === activeExternalCallSid)
+    ?? externalParticipants.find((p) => !p.hold)
+    ?? externalParticipants[0];
   
   const dialpadKeys = [
     '1', '2', '3',
@@ -86,7 +98,12 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
 
           if (currentCallSid) {
             if (matchingCall?.conference_sid) {
+                setVerifiedConferenceSid(matchingCall.conference_sid);
                 setConferenceSid(matchingCall.conference_sid);
+            }
+
+            if (matchingCall?.customer_sid) {
+              setCustomerCallSid(matchingCall.customer_sid);
             }
 
             if (matchingCall?.department_id) {
@@ -118,6 +135,12 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       setDepartmentSettings(null);
       setCompanySettings(null);
       setResolvedDepartmentName(null);
+      setCustomerCallSid(null);
+      setConsultCallSid(null);
+      setActiveExternalCallSid(null);
+      setCurrentParticipants([]);
+      setIsOnHold(false);
+      setVerifiedConferenceSid(null);
     }
   }, [isOpen, contactNumber, connection, departmentName]);
 
@@ -175,23 +198,68 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     }
   }, [isOpen]);
   
-  const fetchParticipants = async () => {
+  const syncParticipantState = (participantList: ConferenceParticipant[]) => {
+    setCurrentParticipants(participantList);
+
+    const externals = participantList.filter(
+      (participant) => !participant.is_agent && participant.call_sid !== agentCallSid
+    );
+
+    if (externals.length === 0) {
+      return;
+    }
+
+    const primary = externals.find((participant) => participant.call_sid === customerCallSid) ?? externals[0];
+    const consult = externals.find((participant) => participant.call_sid === consultCallSid)
+      ?? externals.find((participant) => participant.call_sid !== primary.call_sid);
+
+    if (primary?.call_sid) {
+      setCustomerCallSid(primary.call_sid);
+    }
+    if (consult?.call_sid && consult.call_sid !== primary?.call_sid) {
+      setConsultCallSid(consult.call_sid);
+    }
+
+    const liveActive = externals.find((participant) => !participant.hold);
+    if (liveActive?.call_sid) {
+      setActiveExternalCallSid(liveActive.call_sid);
+      setIsOnHold(false);
+    } else if (primary?.hold) {
+      setActiveExternalCallSid(consult?.call_sid ?? null);
+      setIsOnHold(true);
+    }
+  };
+
+  const fetchParticipants = async (options: { silent?: boolean } = {}) => {
       if (!effectiveConferenceSid) return;
       try {
         const response = await allParticipant(effectiveConferenceSid);
-        const participantList = Array.isArray(response?.data) ? response.data : [];
-        setCurrentParticipants(participantList);
+        const participantList = Array.isArray(response?.data) ? response.data as ConferenceParticipant[] : [];
+        syncParticipantState(participantList);
       } catch (error) {
-        toast({ title: "Error", description: "Could not fetch participants.", variant: 'destructive' });
+        if (!options.silent) {
+          toast({ title: "Error", description: "Could not fetch participants.", variant: 'destructive' });
+        }
       }
     };
 
 
   useEffect(() => {
+    if (!isOpen || !effectiveConferenceSid) return;
+    fetchParticipants({ silent: true });
+    const interval = setInterval(() => fetchParticipants({ silent: true }), 3000);
+    return () => clearInterval(interval);
+  }, [isOpen, effectiveConferenceSid, agentCallSid]);
+
+  useEffect(() => {
       if (isParticipantsModalOpen) {
-          fetchParticipants();
+          fetchParticipants({ silent: true });
       }
   }, [isParticipantsModalOpen, effectiveConferenceSid]);
+
+  useEffect(() => {
+    setVerifiedConferenceSid(conferenceSid || null);
+  }, [conferenceSid, agentCallSid]);
 
   const ensureConferenceSid = async () => {
     if (effectiveConferenceSid) {
@@ -205,6 +273,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       try {
         const response = await getconferenceSid(callSid);
         if (response?.conferenceSid) {
+          setVerifiedConferenceSid(response.conferenceSid);
           setConferenceSid(response.conferenceSid);
           return response.conferenceSid;
         }
@@ -225,20 +294,108 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   
   const toggleHold = async () => {
     if (!connection) return;
-    const hold = !isOnHold;
-    const callSidToHold = connection.parameters.CallSid;
-    
+
+    const sid = await ensureConferenceSid();
+    if (!sid) {
+      toast({ title: "Error", description: "Cannot update hold. Active conference session not found.", variant: 'destructive' });
+      return;
+    }
+
+    const targetSid = activeExternalParticipant?.call_sid || customerCallSid || connection.parameters.CallSid;
+    const hold = !activeExternalParticipant?.hold;
+
     try {
-        const sid = await ensureConferenceSid();
-        if (!sid) {
-          toast({ title: "Error", description: "Cannot update hold. Active conference session not found.", variant: 'destructive' });
-          return;
-        }
-        await holdParticipant(sid, callSidToHold, hold);
+        await holdParticipant(sid, targetSid, hold);
+        await consultEnsureAgent(sid);
         setIsOnHold(hold);
-        toast({ title: hold ? "Call on Hold" : "Call Resumed"});
+        if (hold) {
+          setActiveExternalCallSid(consultCallSid);
+        } else {
+          setActiveExternalCallSid(targetSid);
+        }
+        await fetchParticipants({ silent: true });
+        toast({ title: hold ? "Caller on Hold" : "Caller Resumed"});
     } catch (err) {
         toast({ title: "Error", description: "Failed to toggle hold status.", variant: 'destructive' });
+    }
+  };
+
+  const handleConsultSwap = async () => {
+    const sid = await ensureConferenceSid();
+    if (!sid) return;
+    setIsConsultActionLoading(true);
+    try {
+      const result = await consultSwap(sid);
+      if (!result?.status) {
+        throw new Error(result?.msg || 'Failed to swap calls.');
+      }
+      await consultEnsureAgent(sid);
+      await fetchParticipants({ silent: true });
+      toast({ title: "Calls swapped", description: "You are now talking to the other caller." });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to swap calls.';
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setIsConsultActionLoading(false);
+    }
+  };
+
+  const handleConsultMerge = async () => {
+    const sid = await ensureConferenceSid();
+    if (!sid) return;
+    setIsConsultActionLoading(true);
+    try {
+      const result = await consultMerge(sid);
+      if (!result?.status) {
+        throw new Error(result?.msg || 'Failed to merge calls.');
+      }
+      setIsOnHold(false);
+      setConsultCallSid(null);
+      await fetchParticipants({ silent: true });
+      toast({ title: "Calls merged", description: "All callers are now connected." });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to merge calls.';
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setIsConsultActionLoading(false);
+    }
+  };
+
+  const handleSwitchToCall = async (targetCallSid: string) => {
+    const sid = await ensureConferenceSid();
+    if (!sid) return;
+    setIsConsultActionLoading(true);
+    try {
+      const result = await consultSwitch(sid, targetCallSid);
+      if (!result?.status) {
+        throw new Error(result?.msg || 'Failed to switch calls.');
+      }
+      await consultEnsureAgent(sid);
+      setActiveExternalCallSid(targetCallSid);
+      setIsOnHold(false);
+      await fetchParticipants({ silent: true });
+      toast({ title: "Switched call", description: "The other caller is now on hold." });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to switch calls.';
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setIsConsultActionLoading(false);
+    }
+  };
+
+  const handleParticipantHoldToggle = async (participant: ConferenceParticipant) => {
+    const sid = await ensureConferenceSid();
+    if (!sid) return;
+    try {
+      if (!participant.hold) {
+        await consultSwitch(sid, participant.call_sid);
+      } else {
+        await holdParticipant(sid, participant.call_sid, false);
+        await consultEnsureAgent(sid);
+      }
+      await fetchParticipants({ silent: true });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update hold status.", variant: "destructive" });
     }
   };
 
@@ -366,7 +523,23 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
           : await addParticipant(sid, twilioNumber, userId, phoneNumber);
 
         if (response?.data?.conference_sid) {
+          setVerifiedConferenceSid(response.data.conference_sid);
           setConferenceSid(response.data.conference_sid);
+        }
+
+        if (phoneNumber && response?.consult) {
+          if (response.consult.primary_call_sid) {
+            setCustomerCallSid(response.consult.primary_call_sid);
+          }
+          if (response.consult.consult_call_sid) {
+            setConsultCallSid(response.consult.consult_call_sid);
+          }
+          await consultEnsureAgent(sid);
+          await fetchParticipants({ silent: true });
+          toast({
+            title: "Second call started",
+            description: "The first caller is on hold. Use Swap or Switch when the new caller answers.",
+          });
         }
 
         setIsAddParticipantModalOpen(false);
@@ -486,6 +659,22 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
             <div className="flex items-center gap-4">
                 <ActionButton icon={isMuted ? MicOff : Mic} label="Mute" onClick={toggleMute} isActive={isMuted} />
                 <ActionButton icon={isOnHold ? Play : Pause} label="Hold" onClick={toggleHold} isActive={isOnHold} />
+                {hasConsultCall ? (
+                  <>
+                    <ActionButton
+                      icon={ArrowLeftRight}
+                      label="Swap"
+                      onClick={handleConsultSwap}
+                      isActive={isConsultActionLoading}
+                    />
+                    <ActionButton
+                      icon={GitMerge}
+                      label="Merge"
+                      onClick={handleConsultMerge}
+                      isActive={isConsultActionLoading}
+                    />
+                  </>
+                ) : null}
                 <ActionButton icon={PhoneForwarded} label="Transfer" onClick={handleTransferClick} />
                 <Dialog open={isKeypadModalOpen} onOpenChange={setIsKeypadModalOpen}>
                     <DialogTrigger asChild>
@@ -596,12 +785,41 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                             </DialogDescription>
                         </DialogHeader>
                         <div className="py-4 space-y-2">
-                            {currentParticipants.map((p) => (
+                            {currentParticipants.map((p: ConferenceParticipant) => (
                                 <div key={p.call_sid} className="flex items-center justify-between p-2 rounded-md border">
-                                    <span>{p.label}</span>
-                                    <Button variant="ghost" size="icon" onClick={() => handleRemoveParticipant(p.call_sid)}>
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="truncate">{p.label}</span>
+                                      {p.is_agent ? (
+                                        <span className="text-xs text-muted-foreground">You</span>
+                                      ) : p.hold ? (
+                                        <span className="text-xs text-amber-600">On hold</span>
+                                      ) : (
+                                        <span className="text-xs text-green-600">Active</span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {!p.is_agent ? (
+                                        <>
+                                          <Button
+                                            variant={p.call_sid === activeExternalCallSid && !p.hold ? "secondary" : "ghost"}
+                                            size="sm"
+                                            onClick={() => handleSwitchToCall(p.call_sid)}
+                                            disabled={isConsultActionLoading || (!p.hold && p.call_sid === activeExternalCallSid)}
+                                          >
+                                            <PhoneCall className="h-4 w-4 mr-1" />
+                                            Switch
+                                          </Button>
+                                          <Button variant="ghost" size="icon" onClick={() => handleParticipantHoldToggle(p)}>
+                                            {p.hold ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                                          </Button>
+                                        </>
+                                      ) : null}
+                                      {!p.is_agent ? (
+                                        <Button variant="ghost" size="icon" onClick={() => handleRemoveParticipant(p.call_sid)}>
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      ) : null}
+                                    </div>
                                 </div>
                             ))}
                         </div>

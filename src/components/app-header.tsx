@@ -36,7 +36,7 @@ import { canListAllCompanyDepartments } from '@/lib/roles';
 import { cacheGet, cacheSet } from '@/lib/simpleCache';
 import { useAppDispatch } from "@/store";
 import { setUser } from "@/store/slices/authSlice";
-import { initiateConsultCall } from "@/services/twilioService";
+import { initiateConsultCall, consultEnsureAgent } from "@/services/twilioService";
 
 type AppInfo = { version?: string; updateReady?: boolean };
 
@@ -444,10 +444,11 @@ export default function AppHeader({
                     setConferenceSid(consultResult.data.conference_sid);
                     setActiveConferenceSid(consultResult.data.conference_sid);
                 }
+                await consultEnsureAgent(conferenceSidForConsult);
                 setDialerOpen(false);
                 toast({
-                    title: 'Consult call started',
-                    description: `${formatPhoneNumber(number)} is being called as a consult leg.`,
+                    title: 'Second call started',
+                    description: `${formatPhoneNumber(number)} is being dialed. The first caller is on hold — use Swap or Switch when they answer.`,
                 });
             } catch (error: any) {
                 toast({
