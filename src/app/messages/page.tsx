@@ -182,7 +182,7 @@ export default function MessagesPage() {
                              />
                              {filteredContacts.length > 0 && (
                                 <div className="absolute z-10 top-full mt-1 w-full bg-background border rounded-md shadow-lg">
-                                    <ScrollArea className="max-h-60">
+                                    <ScrollArea className="overflow-y-auto max-h-60">
                                         {filteredContacts.map(contact => (
                                             <div 
                                                 key={contact.id}

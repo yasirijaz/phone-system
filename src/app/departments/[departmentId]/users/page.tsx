@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from "react";
 import type { User } from "@/types";
 import { getDepartmentUsers, getDepartments } from "@/services/departmentService";
-import { getUsersByCompany, assignUsersToDepartment, removeUserFromDepartment } from "@/services/userService";
+import { getUsersByCompany, assignUsersToDepartment, removeUserFromDepartment, updateDepartmentUserRole } from "@/services/userService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,9 +19,10 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AppHeader from "@/components/app-header";
-import { getRoleName } from '@/lib/roles';
+import { getRoleName, getAssignableRolesForCreator, ROLES } from '@/lib/roles';
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { events } from '@/lib/events';
 
 function matchesSearch(user: { name: string; email: string }, query: string): boolean {
@@ -47,7 +48,11 @@ export default function DepartmentUsersPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [addUserSearch, setAddUserSearch] = useState("");
   const [departmentUserSearch, setDepartmentUserSearch] = useState("");
+  const [defaultAssignRoleId, setDefaultAssignRoleId] = useState<number>(ROLES.USER);
+  const [updatingRoleUserId, setUpdatingRoleUserId] = useState<number | null>(null);
   const { toast } = useToast();
+
+  const assignableRoles = getAssignableRolesForCreator(authUser?.role_id);
 
   useEffect(() => {
     if (companyId && !isNaN(departmentId)) {
@@ -179,7 +184,7 @@ export default function DepartmentUsersPage() {
 
     setAssigning(true);
     try {
-      const result = await assignUsersToDepartment(companyId, departmentId, selectedUserIds);
+      const result = await assignUsersToDepartment(companyId, departmentId, selectedUserIds, defaultAssignRoleId);
       setSelectedUserIds([]);
       fetchAllData();
 
@@ -216,6 +221,30 @@ export default function DepartmentUsersPage() {
       toast({ title: "Error", description: "Failed to remove user from department.", variant: "destructive" });
     }
   };
+
+  const handleRoleChange = async (userId: number, roleId: number) => {
+    if (!companyId) return;
+    setUpdatingRoleUserId(userId);
+    try {
+      await updateDepartmentUserRole(companyId, departmentId, userId, roleId);
+      setDepartmentUsers((prev) =>
+        prev.map((entry) =>
+          entry.user?.id === userId ? { ...entry, role_id: roleId } : entry
+        )
+      );
+      toast({ title: "Success", description: "Department role updated." });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to update department role.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingRoleUserId(null);
+    }
+  };
+
+  const departmentRoleId = (entry: { role_id?: number }) => entry.role_id ?? ROLES.USER;
 
   const departmentLabel = departmentName || 'Department';
 
@@ -270,6 +299,27 @@ export default function DepartmentUsersPage() {
                   </p>
                 ) : (
                   <>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Role for new users</p>
+                        <Select
+                          value={String(defaultAssignRoleId)}
+                          onValueChange={(value) => setDefaultAssignRoleId(Number(value))}
+                        >
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {assignableRoles.map((roleId) => (
+                              <SelectItem key={roleId} value={String(roleId)}>
+                                {getRoleName(roleId)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <Checkbox
@@ -308,8 +358,8 @@ export default function DepartmentUsersPage() {
                                 <p className="font-medium truncate">{user.name}</p>
                                 <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                               </div>
-                              <Badge variant={user.role_id === 2 ? 'default' : 'secondary'}>
-                                {getRoleName(user.role_id)}
+                              <Badge variant="outline">
+                                Company: {getRoleName(user.role_id)}
                               </Badge>
                             </label>
                           ))
@@ -361,7 +411,7 @@ export default function DepartmentUsersPage() {
                         <TableRow>
                           <TableHead>Name</TableHead>
                           <TableHead>Email</TableHead>
-                          <TableHead>Role</TableHead>
+                          <TableHead>Department Role</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -371,9 +421,22 @@ export default function DepartmentUsersPage() {
                             <TableCell className="font-medium">{u.user.name}</TableCell>
                             <TableCell>{u.user.email}</TableCell>
                             <TableCell>
-                              <Badge variant={u.user.role_id === 2 ? 'default' : 'secondary'}>
-                                {getRoleName(u.user.role_id)}
-                              </Badge>
+                              <Select
+                                value={String(departmentRoleId(u))}
+                                onValueChange={(value) => handleRoleChange(u.user.id, Number(value))}
+                                disabled={updatingRoleUserId === u.user.id || assignableRoles.length === 0}
+                              >
+                                <SelectTrigger className="w-[160px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {assignableRoles.map((roleId) => (
+                                    <SelectItem key={roleId} value={String(roleId)}>
+                                      {getRoleName(roleId)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </TableCell>
                             <TableCell className="text-right">
                               <AlertDialog>

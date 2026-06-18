@@ -66,11 +66,26 @@ export const deleteUser = async (id: number): Promise<void> => {
   await axios.delete(`/api/users/${id}`);
 };
 
-export const assignUserToDepartment = async (companyId: number, departmentId: number, userId: number): Promise<any> => {
+export const assignUserToDepartment = async (
+  companyId: number,
+  departmentId: number,
+  userId: number,
+  roleId?: number
+): Promise<any> => {
     const response = await axios.post(`/api/companies/${companyId}/departments/${departmentId}/users`, {
         user_id: userId,
+        role_id: roleId,
     });
     return response.data;
+};
+
+export const updateDepartmentUserRole = async (
+  companyId: number,
+  departmentId: number,
+  userId: number,
+  roleId: number
+): Promise<any> => {
+  return assignUserToDepartment(companyId, departmentId, userId, roleId);
 };
 
 export interface BulkAssignResult {
@@ -81,14 +96,15 @@ export interface BulkAssignResult {
 export const assignUsersToDepartment = async (
   companyId: number,
   departmentId: number,
-  userIds: number[]
+  userIds: number[],
+  roleId?: number
 ): Promise<BulkAssignResult> => {
   const success: number[] = [];
   const failed: BulkAssignResult['failed'] = [];
 
   for (const userId of userIds) {
     try {
-      await assignUserToDepartment(companyId, departmentId, userId);
+      await assignUserToDepartment(companyId, departmentId, userId, roleId);
       success.push(userId);
     } catch (error: any) {
       failed.push({

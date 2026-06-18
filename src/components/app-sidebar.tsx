@@ -28,6 +28,7 @@ import {
   isManager,
   isRegularUser,
   isCompanyScopedAdmin,
+  canAccessDepartments,
   canAccessBilling,
   canAccessCompanySettings,
 } from '@/lib/roles';
@@ -117,7 +118,7 @@ export function AppSidebar() {
                
             </>
           )}
-           {isScopedAdmin && (
+           {canAccessDepartments(user?.role_id) && (
              <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === '/departments'} tooltip="Departments">
                   <Link href="/departments">

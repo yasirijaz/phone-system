@@ -6,22 +6,24 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
-import type { Communication, Contact, PaginatedCommunicationsResponse, User } from "@/types";
+import type { Communication, Contact, Operator, PaginatedCommunicationsResponse, User } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
 import { getCommunications, enrichThreadsWithLastAttendee } from "@/services/callLogService";
+import { getOperators, type OperatorsScope } from "@/services/departmentService";
 import { getContacts } from "@/services/contactService";
 import { getUsersByCompany } from "@/services/userService";
 import CallLog from "@/components/call-log";
 import AppHeader from "@/components/app-header";
+import OperatorsTable from "@/components/operators-table";
 import { events } from '@/lib/events';
 import PaginationControls from "@/components/pagination-controls";
 import { cacheGet, cacheSet } from "@/lib/simpleCache";
 import { useRef } from "react";
 import { debounce } from "@/lib/utils";
 
-type TabName = 'all' | 'unread' | 'calls' | 'missed' | 'meetings' | 'voicemails' | 'recordings' | 'messages' | 'starred' | 'spam' | 'unlogged';
+type TabName = 'all' | 'unread' | 'calls' | 'missed' | 'meetings' | 'voicemails' | 'recordings' | 'messages' | 'operators' | 'starred' | 'spam' | 'unlogged';
 
 type PaginationState = {
     currentPage: number;
@@ -47,14 +49,16 @@ export default function AppUIPage() {
   const [activeTab, setActiveTab] = useState<TabName>('all');
   const [data, setData] = useState<Record<TabName, Communication[]>>({
     all: [], unread: [], calls: [], missed: [], meetings: [],
-    voicemails: [], recordings: [], messages: [], starred: [], spam: [], unlogged: []
+    voicemails: [], recordings: [], messages: [], operators: [], starred: [], spam: [], unlogged: []
   });
+  const [operators, setOperators] = useState<Operator[]>([]);
+  const [operatorsScope, setOperatorsScope] = useState<OperatorsScope>('assigned_departments');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companyUsers, setCompanyUsers] = useState<User[]>([]);
   const [pagination, setPagination] = useState<Record<TabName, PaginationState>>({
     all: { ...initialPaginationState }, unread: { ...initialPaginationState }, calls: { ...initialPaginationState },
     missed: { ...initialPaginationState }, meetings: { ...initialPaginationState }, voicemails: { ...initialPaginationState },
-    recordings: { ...initialPaginationState }, messages: { ...initialPaginationState }, starred: { ...initialPaginationState },
+    recordings: { ...initialPaginationState }, messages: { ...initialPaginationState }, operators: { ...initialPaginationState }, starred: { ...initialPaginationState },
     spam: { ...initialPaginationState }, unlogged: { ...initialPaginationState },
   });
 
@@ -93,6 +97,26 @@ export default function AppUIPage() {
     setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
     
     try {
+        if (tab === 'operators') {
+          const operatorsResponse = await getOperators();
+          const operatorList = Array.isArray(operatorsResponse.operators)
+            ? operatorsResponse.operators
+            : [];
+
+          setOperators(operatorList);
+          setOperatorsScope(operatorsResponse.scope);
+          setPagination(prev => ({
+            ...prev,
+            operators: {
+              ...initialPaginationState,
+              loading: false,
+              totalRecords: operatorList.length,
+              totalPages: 1,
+            },
+          }));
+          return;
+        }
+
         let filters: Record<string, any> = { page, limit };
         if (tab !== 'all') {
             if (tab === 'starred') {
@@ -195,6 +219,26 @@ export default function AppUIPage() {
   };
 
   const renderTabContent = (tabName: TabName) => {
+    if (tabName === 'operators') {
+      return (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {operatorsScope === 'company'
+              ? 'Showing all company operators'
+              : operatorsScope === 'department'
+              ? 'Showing operators in this department'
+              : 'Showing operators in your departments'}
+          </p>
+          <OperatorsTable
+            operators={operators}
+            scope="company"
+            currentUserId={user?.id}
+            emptyMessage="No operators found"
+          />
+        </div>
+      );
+    }
+
     const currentData = data[tabName];
     const currentPagination = pagination[tabName];
     
@@ -237,6 +281,7 @@ export default function AppUIPage() {
                         <TabsTrigger value="voicemails">Voicemails</TabsTrigger>
                         <TabsTrigger value="recordings">Recordings</TabsTrigger>
                         <TabsTrigger value="messages">Messages</TabsTrigger>
+                        <TabsTrigger value="operators">Operators</TabsTrigger>
                         <TabsTrigger value="starred">Starred</TabsTrigger>
                         {/* <TabsTrigger value="spam">Spam</TabsTrigger>
                         <TabsTrigger value="unlogged">Unlogged</TabsTrigger> */}

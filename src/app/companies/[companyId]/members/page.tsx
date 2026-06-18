@@ -9,7 +9,7 @@ import type { User, Company, Department, Assignment } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { getCompany } from "@/services/companyService";
 import { getDepartments } from "@/services/departmentService";
-import { getUsersByCompany, addUserToCompany, assignUserToDepartment, removeUserFromDepartment, updateUser, deleteUser, importUsersToCompany, type UserImportPayload, impersonateUser } from "@/services/userService";
+import { getUsersByCompany, addUserToCompany, assignUserToDepartment, removeUserFromDepartment, updateUser, deleteUser, importUsersToCompany, getUserAssignments, type UserImportPayload, impersonateUser } from "@/services/userService";
 import { parseCsv, getCsvValue } from "@/lib/csvParser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,7 @@ const userSchema = z.object({
 
 const assignmentSchema = z.object({
   department_id: z.coerce.number().min(1, "Please select a department."),
+  role_id: z.coerce.number().min(1, "Please select a role."),
 });
 
 const importRowSchema = z.object({
@@ -120,6 +121,7 @@ export default function ManageUsersPage() {
 
   const assignmentForm = useForm<z.infer<typeof assignmentSchema>>({
     resolver: zodResolver(assignmentSchema),
+    defaultValues: { role_id: 3 },
   });
 
   useEffect(() => {
@@ -188,14 +190,16 @@ export default function ManageUsersPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [companyData, usersResponse, departmentsResponse] = await Promise.all([
+      const [companyData, usersResponse, departmentsResponse, assignmentsResponse] = await Promise.all([
         getCompany(companyId),
         getUsersByCompany(companyId),
-        getDepartments(companyId)
+        getDepartments(companyId),
+        getUserAssignments(companyId).catch(() => ({ data: [] as Assignment[] })),
       ]);
       setCompany(companyData);
       setUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
       setDepartments(Array.isArray(departmentsResponse) ? departmentsResponse : []);
+      setAssignments(Array.isArray(assignmentsResponse.data) ? assignmentsResponse.data : []);
     } catch (error) {
       toast({
         title: "Error fetching data",
@@ -237,8 +241,29 @@ export default function ManageUsersPage() {
   
   const handleOpenAssignmentDialog = (user: User) => {
     setSelectedUser(user);
+    assignmentForm.reset({ role_id: 3 });
     setIsAssignmentDialogOpen(true);
   };
+
+  const selectedUserAssignments = selectedUser
+    ? assignments.filter((assignment) => assignment.user_id === selectedUser.id)
+    : [];
+
+  const watchedDepartmentId = assignmentForm.watch('department_id');
+
+  useEffect(() => {
+    if (!isAssignmentDialogOpen || !watchedDepartmentId || !selectedUser) return;
+
+    const existing = assignments.find(
+      (assignment) =>
+        assignment.user_id === selectedUser.id &&
+        assignment.department_id === Number(watchedDepartmentId)
+    );
+
+    if (existing?.role_id) {
+      assignmentForm.setValue('role_id', existing.role_id);
+    }
+  }, [isAssignmentDialogOpen, watchedDepartmentId, selectedUser, assignments, assignmentForm]);
 
   const onUserSubmit = async (values: z.infer<typeof userSchema>) => {
     if (editingUser && values.password && values.password !== values.password_confirmation) {
@@ -432,7 +457,7 @@ export default function ManageUsersPage() {
   const onAssignmentSubmit = async (values: z.infer<typeof assignmentSchema>) => {
     if (!selectedUser) return;
     try {
-      await assignUserToDepartment(companyId, values.department_id, selectedUser.id);
+      await assignUserToDepartment(companyId, values.department_id, selectedUser.id, values.role_id);
       toast({ title: "Success", description: "User assigned to department." });
       fetchData();
       handleAssignmentDialogClose();
@@ -676,7 +701,8 @@ export default function ManageUsersPage() {
                         <TableRow>
                           <TableHead>Name</TableHead>
                           <TableHead>Email</TableHead>
-                          <TableHead>Role</TableHead>
+                          <TableHead>Company Role</TableHead>
+                          <TableHead>Departments</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -689,6 +715,20 @@ export default function ManageUsersPage() {
                               <Badge variant={u.role_id === ROLES.COMPANY_ADMIN ? 'default' : 'secondary'}>
                                 {getRoleName(u.role_id)}
                               </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {assignments
+                                  .filter((assignment) => assignment.user_id === u.id)
+                                  .map((assignment) => (
+                                    <Badge key={assignment.id} variant="outline">
+                                      {assignment.department_name}: {getRoleName(assignment.role_id)}
+                                    </Badge>
+                                  ))}
+                                {assignments.filter((assignment) => assignment.user_id === u.id).length === 0 && (
+                                  <span className="text-sm text-muted-foreground">None</span>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
                               <Button variant="ghost" size="icon" onClick={() => handleOpenAssignmentDialog(u)}><Briefcase className="h-4 w-4" /></Button>
@@ -732,7 +772,7 @@ export default function ManageUsersPage() {
                           </TableRow>
                         ))}
                         {(!Array.isArray(users) || users.length === 0) && (
-                          <TableRow><TableCell colSpan={4} className="text-center h-24">No users found for this company.</TableCell></TableRow>
+                          <TableRow><TableCell colSpan={5} className="text-center h-24">No users found for this company.</TableCell></TableRow>
                         )}
                       </TableBody>
                     </Table>
@@ -747,8 +787,22 @@ export default function ManageUsersPage() {
           <DialogContent onInteractOutside={handleAssignmentDialogClose}>
             <DialogHeader>
               <DialogTitle>Assign Department for {selectedUser?.name}</DialogTitle>
-              <DialogDescription>Select a department to assign this user to.</DialogDescription>
+              <DialogDescription>
+                Select a department and role. Updating an existing assignment changes the user&apos;s role in that department.
+              </DialogDescription>
             </DialogHeader>
+            {selectedUserAssignments.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Current department roles</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedUserAssignments.map((assignment) => (
+                    <Badge key={assignment.id} variant="secondary">
+                      {assignment.department_name}: {getRoleName(assignment.role_id)}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
             <Form {...assignmentForm}>
               <form onSubmit={assignmentForm.handleSubmit(onAssignmentSubmit)} className="space-y-4">
                 <FormField
@@ -757,7 +811,7 @@ export default function ManageUsersPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Department</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue="">
+                      <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a department" />
@@ -766,6 +820,30 @@ export default function ManageUsersPage() {
                         <SelectContent>
                           {departments.map((dept) => (
                             <SelectItem key={dept.id} value={String(dept.id)}>{dept.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={assignmentForm.control}
+                  name="role_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role in Department</FormLabel>
+                      <Select onValueChange={field.onChange} value={String(field.value ?? 3)}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {assignableRoles.map((roleId) => (
+                            <SelectItem key={roleId} value={String(roleId)}>
+                              {getRoleName(roleId)}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

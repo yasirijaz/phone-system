@@ -96,6 +96,15 @@ export const holdParticipant = async (conferenceSid: string, callSid: string, ho
     return response.data;
 };
 
+export const initiateConsultCall = async (conferenceSid: string, from: string, phone_number: string): Promise<any> => {
+    const response = await axios.post('/api/twilio/consult-initiate', {
+        conference_sid: conferenceSid,
+        from,
+        phone_number,
+    });
+    return response.data;
+};
+
 export const recordConference = async (conferenceSid: string, action: 'start' | 'stop'): Promise<any> => {
     const response = await axios.post('/api/twilio/record', {
         conference_sid: conferenceSid,
