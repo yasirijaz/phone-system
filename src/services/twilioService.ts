@@ -1,7 +1,7 @@
 
 import axios from '@/lib/axios';
 
-export const addParticipant = async (conferenceSid: string, from: string, user_id?: string, phone_number?: string, options: { silent?: boolean, coach?: boolean } = {}): Promise<any> => {
+export const addParticipant = async (conferenceSid: string, from: string, user_id?: string, phone_number?: string, options: { silent?: boolean, coach?: boolean, transfer?: boolean } = {}): Promise<any> => {
     const payload: {
         conference_sid: string;
         from: string;
@@ -9,11 +9,13 @@ export const addParticipant = async (conferenceSid: string, from: string, user_i
         phone_number?: string;
         silent?: boolean;
         coach?: boolean;
+        transfer?: boolean;
     } = {
         conference_sid: conferenceSid,
         from,
         silent: options.silent,
         coach: options.coach,
+        transfer: options.transfer,
     };
 
     if (user_id) {
@@ -104,6 +106,15 @@ export const initiateConsultCall = async (conferenceSid: string, from: string, p
     });
     return response.data;
 };
+
+export interface ConferenceParticipant {
+    call_sid: string;
+    label: string;
+    hold?: boolean;
+    muted?: boolean;
+    is_agent?: boolean;
+    call_status?: string | null;
+}
 
 export const recordConference = async (conferenceSid: string, action: 'start' | 'stop'): Promise<any> => {
     const response = await axios.post('/api/twilio/record', {

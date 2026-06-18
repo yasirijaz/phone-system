@@ -15,7 +15,7 @@ import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn, formatPhoneNumber } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
-import { allParticipant, removeParticipant, addParticipant, holdParticipant } from '@/services/twilioService';
+import { allParticipant, removeParticipant, addParticipant, holdParticipant, type ConferenceParticipant } from '@/services/twilioService';
 import { getDepartmentSettings } from '@/services/departmentSettingsService';
 import { getCompanySettings } from '@/services/companySettingsService';
 import { getCallLogsBySid } from '@/services/callLogService';
@@ -242,9 +242,75 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     }
   };
 
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const waitForTransferAnswer = async (conferenceSid: string, targetCallSid: string, maxWaitMs = 45000) => {
+    const started = Date.now();
+    while (Date.now() - started < maxWaitMs) {
+      try {
+        const response = await allParticipant(conferenceSid);
+        const participants = Array.isArray(response?.data) ? response.data as ConferenceParticipant[] : [];
+        const target = participants.find((participant) => participant.call_sid === targetCallSid);
+        if (target?.call_status === 'in-progress') {
+          return true;
+        }
+      } catch {
+        // Keep polling until timeout.
+      }
+      await sleep(2000);
+    }
+    return false;
+  };
+
+  const completeWarmTransfer = async (conferenceSid: string, targetCallSid: string) => {
+    const myCallSid = connection?.parameters?.CallSid;
+    if (!myCallSid) {
+      throw new Error('Active call session not found.');
+    }
+
+    toast({
+      title: 'Transferring',
+      description: 'Waiting for your colleague to join the call...',
+    });
+
+    const answered = await waitForTransferAnswer(conferenceSid, targetCallSid);
+
+    if (answered) {
+      await removeParticipant(conferenceSid, myCallSid);
+      toast({
+        title: 'Transfer complete',
+        description: 'Your colleague is now connected with the customer.',
+      });
+      onHangUp();
+      return;
+    }
+
+    try {
+      await removeParticipant(conferenceSid, targetCallSid);
+    } catch {
+      // Target leg may have already ended.
+    }
+
+    await holdParticipant(conferenceSid, myCallSid, false);
+    toast({
+      title: 'Transfer failed',
+      description: 'Your colleague did not answer. You are still on the call with the customer.',
+      variant: 'destructive',
+    });
+  };
+
   const handleAddParticipant = async () => {
     if (!selectedParticipant && !dialerNumber) {
       toast({ title: "Error", description: "Please select a user or enter a number.", variant: 'destructive' });
+      return;
+    }
+
+    if (isTransferring && !selectedParticipant) {
+      toast({
+        title: "Transfer unavailable",
+        description: "Please select an internal colleague to transfer this call.",
+        variant: 'destructive',
+      });
       return;
     }
     
@@ -272,6 +338,28 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     try {
         const phoneNumber = dialerNumber ? `+1${dialerNumber.replace(/\D/g, '')}` : undefined;
         const userId = selectedParticipant || undefined;
+
+        if (isTransferring && userId) {
+          await holdParticipant(sid, connection.parameters.CallSid, true);
+          setIsOnHold(true);
+
+          const response = await addParticipant(sid, twilioNumber, userId, undefined, { transfer: true });
+          const targetCallSid = response?.data?.call_sid;
+
+          if (!response?.status || !targetCallSid) {
+            await holdParticipant(sid, connection.parameters.CallSid, false);
+            setIsOnHold(false);
+            throw new Error(response?.msg || 'Failed to reach your colleague.');
+          }
+
+          setIsAddParticipantModalOpen(false);
+          setDialerNumber('');
+          setSelectedParticipant('');
+          setIsTransferring(false);
+
+          await completeWarmTransfer(sid, targetCallSid);
+          return;
+        }
         
         const response = phoneNumber
           ? await initiateConsultCall(sid, twilioNumber, phoneNumber)
@@ -281,26 +369,17 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
           setConferenceSid(response.data.conference_sid);
         }
 
-        if (isTransferring) {
-          setTimeout(async () => {
-            const myCallSid = connection.parameters.CallSid;
-            await removeParticipant(sid, myCallSid);
-            toast({
-              title: "Transfer complete",
-              description: "You have been removed from the call."
-            });
-
-            onHangUp();
-            
-          }, 60 * 1000); // 1 minute = 60,000 ms
-        }
-
         setIsAddParticipantModalOpen(false);
         setDialerNumber('');
         setSelectedParticipant('');
         setIsTransferring(false);
-    } catch (err) {
-       toast({ title: "Error", description: "Failed to add participant.", variant: 'destructive' });
+    } catch (err: any) {
+       toast({
+         title: isTransferring ? "Transfer failed" : "Error",
+         description: err?.response?.data?.msg || err?.message || "Failed to add participant.",
+         variant: 'destructive',
+       });
+       setIsTransferring(false);
     } finally {
         setIsAdding(false);
     }
@@ -432,12 +511,19 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Add Participant</DialogTitle>
+                            <DialogTitle>{isTransferring ? 'Transfer Call' : 'Add Participant'}</DialogTitle>
+                            {isTransferring ? (
+                              <DialogDescription>
+                                Select a colleague. The customer will be placed on hold until they answer.
+                              </DialogDescription>
+                            ) : null}
                         </DialogHeader>
                         <Tabs defaultValue="internal">
-                            <TabsList className="grid w-full grid-cols-2">
+                            <TabsList className={`grid w-full ${isTransferring ? 'grid-cols-1' : 'grid-cols-2'}`}>
                                 <TabsTrigger value="internal">Internal User</TabsTrigger>
-                                <TabsTrigger value="external">Dial Number</TabsTrigger>
+                                {!isTransferring ? (
+                                  <TabsTrigger value="external">Dial Number</TabsTrigger>
+                                ) : null}
                             </TabsList>
                             <TabsContent value="internal" className="py-4">
                                <Select onValueChange={setSelectedParticipant} disabled={loadingUsers}>
@@ -455,6 +541,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                                     </SelectContent>
                                 </Select>
                             </TabsContent>
+                            {!isTransferring ? (
                             <TabsContent value="external" className="py-4 space-y-4">
                                <Select onValueChange={setDialerNumber} disabled={loadingUsers}>
                                     <SelectTrigger>
@@ -489,10 +576,11 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                                     ))}
                                 </div>
                             </TabsContent>
+                            ) : null}
                         </Tabs>
                          <Button onClick={handleAddParticipant} disabled={isAdding || (!selectedParticipant && !dialerNumber)}>
                             <UserPlus className="mr-2 h-4 w-4" />
-                            Add Participant
+                            {isTransferring ? 'Transfer Call' : 'Add Participant'}
                         </Button>
                     </DialogContent>
                 </Dialog>

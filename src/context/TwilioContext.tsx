@@ -167,9 +167,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         setConnection(conn);
 
         const autoAccept = conn.customParameters.get('autoAccept');
+        const isTransferLeg = conn.customParameters.get('transfer') === '1';
         const isReservationLeg =
           expectingReservationDeviceLegRef.current || activeReservationRef.current !== null;
-        const shouldAutoAccept = isReservationLeg || autoAccept !== '0';
+        const shouldAutoAccept = isReservationLeg || isTransferLeg || autoAccept !== '0';
 
         if (shouldAutoAccept) {
           conn.accept();
