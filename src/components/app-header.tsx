@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import { cn, formatPhoneNumber } from "@/lib/utils";
+import { dispatchOperatorStatusUpdate } from "@/lib/worker-status";
 import { isElectron } from '@/lib/is-electron';
 import { canListAllCompanyDepartments } from '@/lib/roles';
 import { cacheGet, cacheSet } from '@/lib/simpleCache';
@@ -215,9 +216,17 @@ export default function AppHeader({
                 const data = JSON.parse(evt.data);
                 console.log("📩 WebSocket message received:", data);
 
-                if (data.method_type === "status_change") {
-                    if (data.data) {
-                        events.emit("refreshWorkerStatus", data.data);
+                if (data.method_type === "operator_status_notification" && data.data) {
+                    dispatchOperatorStatusUpdate(data.data);
+                }
+
+                if (data.method_type === "status_change" && data.data) {
+                    if (
+                        data.data.worker_status ||
+                        data.data.activity_name ||
+                        data.data.activity
+                    ) {
+                        dispatchOperatorStatusUpdate(data.data);
                     }
                 }
 

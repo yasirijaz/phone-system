@@ -7,6 +7,11 @@ import type { Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
 
 import axios from '@/lib/axios';
 import { leaveConference as leaveConferenceApi, endConference as endConferenceApi } from '@/services/twilioService';
+import {
+  broadcastOperatorPresence,
+  broadcastOperatorPresenceKeepalive,
+  type OperatorPresenceEvent,
+} from '@/services/operatorPresenceService';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { isElectron } from '@/lib/is-electron';
@@ -98,12 +103,30 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const broadcastWorkerStatus = useCallback(
-    (status: string) => {
+    async (status: string, event: OperatorPresenceEvent = 'status_change') => {
       if (!user?.id || !status) return;
       events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: status });
+      try {
+        await broadcastOperatorPresence({ event, worker_status: status });
+      } catch (error) {
+        console.warn('Failed to broadcast operator presence:', error);
+      }
     },
     [user?.id]
   );
+
+  useEffect(() => {
+    if (!user?.id || user.role_id === 1) return;
+
+    const handlePageHide = () => {
+      broadcastOperatorPresenceKeepalive({ event: 'offline', worker_status: 'Offline' });
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [user?.id, user?.role_id]);
 
   useEffect(() => {
     const loadTwilio = async () => {
@@ -266,13 +289,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         setIsWorkerReady(true);
         const status = worker.activity?.name || null;
         setActivityName(status);
-        if (status) broadcastWorkerStatus(status);
+        if (status) void broadcastWorkerStatus(status, 'online');
       });
 
       newWorker.on('activityUpdated', (worker: TwilioWorker) => {
         const status = worker.activity?.name || null;
         setActivityName(status);
-        if (status) broadcastWorkerStatus(status);
+        if (status) void broadcastWorkerStatus(status, 'status_change');
       });
 
       newWorker.on('reservationCreated', (reservation: Reservation) => {
