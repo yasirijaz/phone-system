@@ -231,6 +231,14 @@ export interface DepartmentSettings {
     holiday_schedule: {
         holidays: Holiday[];
     };
+    slack_settings?: {
+        enabled?: boolean;
+        notify_missed_calls?: boolean;
+        has_bot_token?: boolean;
+        channel_id?: string;
+        channel_name?: string;
+        bot_token?: string;
+    };
 }
 
 export type DepartmentSettingsPayload = Omit<DepartmentSettings, 'id'>;

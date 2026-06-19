@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, PlusCircle, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { getDepartmentSettings, createOrUpdateDepartmentSettings } from "@/services/departmentSettingsService";
+import { getDepartmentSettings, createOrUpdateDepartmentSettings, createDepartmentSlackGroup } from "@/services/departmentSettingsService";
 import type { DepartmentSettings } from "@/types";
 import AppHeader from "@/components/app-header";
 
@@ -65,6 +65,11 @@ const settingsSchema = z.object({
   holiday_schedule: z.object({
     holidays: z.array(holidaySchema),
   }),
+  slack_settings: z.object({
+    enabled: z.boolean().default(false),
+    notify_missed_calls: z.boolean().default(true),
+    bot_token: z.string().optional(),
+  }).optional(),
 });
 
 
@@ -76,6 +81,7 @@ export default function DepartmentSettingsPage() {
 
   const [settings, setSettings] = useState<DepartmentSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [creatingSlackGroup, setCreatingSlackGroup] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof settingsSchema>>({
@@ -98,6 +104,7 @@ export default function DepartmentSettingsPage() {
       ivr_menu: { enabled: false, greeting: "", options: [] },
       break_handling: { enabled: false, max_break_duration: 15 },
       holiday_schedule: { holidays: [] },
+      slack_settings: { enabled: false, notify_missed_calls: true, bot_token: "" },
     },
   });
 
@@ -106,6 +113,8 @@ export default function DepartmentSettingsPage() {
   const { fields: holidays, append: appendHoliday, remove: removeHoliday } = useFieldArray({ control: form.control, name: "holiday_schedule.holidays" });
   const is247 = form.watch("business_hours.is_24_7");
   const isIvrEnabled = form.watch("ivr_menu.enabled");
+  const isSlackEnabled = form.watch("slack_settings.enabled");
+  const slackChannelName = settings?.slack_settings?.channel_name;
 
   useEffect(() => {
     if (user && departmentId) fetchSettings();
@@ -132,6 +141,11 @@ export default function DepartmentSettingsPage() {
         holiday_schedule: {
             holidays: settings.holiday_schedule?.holidays || []
         },
+        slack_settings: {
+            enabled: settings.slack_settings?.enabled || false,
+            notify_missed_calls: settings.slack_settings?.notify_missed_calls ?? true,
+            bot_token: "",
+        },
       });
     }
   }, [settings, form]);
@@ -151,8 +165,26 @@ export default function DepartmentSettingsPage() {
 
   const onSubmit = async (values: z.infer<typeof settingsSchema>) => {
     try {
-      const payload = { ...values, department_id: departmentId };
-      await createOrUpdateDepartmentSettings(settings?.id, payload);
+      const slackSettings = values.slack_settings ? { ...values.slack_settings } : undefined;
+      if (slackSettings && !slackSettings.bot_token) {
+        delete slackSettings.bot_token;
+      }
+
+      const payload = {
+        ...values,
+        department_id: departmentId,
+        slack_settings: slackSettings
+          ? {
+              ...slackSettings,
+              channel_id: settings?.slack_settings?.channel_id,
+              channel_name: settings?.slack_settings?.channel_name,
+            }
+          : undefined,
+      };
+      const response = await createOrUpdateDepartmentSettings(settings?.id, payload);
+      if (response?.settings) {
+        setSettings(response.settings);
+      }
       toast({ title: "Success", description: "Department settings saved successfully." });
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || "An unexpected error occurred.";
@@ -161,6 +193,47 @@ export default function DepartmentSettingsPage() {
         description: errorMessage,
         variant: "destructive",
       });
+    }
+  };
+
+  const handleCreateSlackGroup = async () => {
+    const botToken = form.getValues("slack_settings.bot_token");
+    if (!botToken && !settings?.slack_settings?.has_bot_token) {
+      toast({
+        title: "Slack bot token required",
+        description: "Enter your Slack bot token before creating a group.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setCreatingSlackGroup(true);
+      const result = await createDepartmentSlackGroup(departmentId, botToken || undefined);
+      if (result.settings) {
+        setSettings(result.settings);
+      } else {
+        setSettings((prev) => ({
+          ...(prev || { id: 0, department_id: departmentId, timezone: "UTC", call_settings: { greeting_message: "" }, business_hours: { is_24_7: false, days: [] }, ivr_menu: { enabled: false, greeting: "", options: [] }, break_handling: { enabled: false, max_break_duration: 15 }, holiday_schedule: { holidays: [] } }),
+          slack_settings: result.slack_settings,
+        }));
+      }
+      form.setValue("slack_settings.enabled", true);
+      form.setValue("slack_settings.notify_missed_calls", true);
+      form.setValue("slack_settings.bot_token", "");
+      toast({
+        title: "Slack group created",
+        description: result.message || "Missed-call notifications will be sent to the new Slack group.",
+      });
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || "Could not create the Slack group.";
+      toast({
+        title: "Slack group creation failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingSlackGroup(false);
     }
   };
 
@@ -186,11 +259,12 @@ export default function DepartmentSettingsPage() {
             <Form {...form}>
               <form id="dept-settings-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                 <Tabs defaultValue="general" className="w-full">
-                  <TabsList className="grid w-full grid-cols-4">
+                  <TabsList className="grid w-full grid-cols-5">
                     <TabsTrigger value="general">General</TabsTrigger>
                     <TabsTrigger value="business-hours">Business Hours</TabsTrigger>
                     <TabsTrigger value="ivr">IVR Menu</TabsTrigger>
                     <TabsTrigger value="schedules">Schedules</TabsTrigger>
+                    <TabsTrigger value="slack">Slack</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="general">
@@ -301,6 +375,79 @@ export default function DepartmentSettingsPage() {
                                 <PlusCircle className="mr-2 h-4 w-4" /> Add Holiday
                            </Button>
                          </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="slack">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Slack Notifications</CardTitle>
+                        <CardDescription>
+                          Create a Slack group for this department and receive missed-call alerts, similar to Dialpad.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        <FormField control={form.control} name="slack_settings.enabled" render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-1">
+                              <FormLabel className="text-base">Enable Slack Integration</FormLabel>
+                              <p className="text-sm text-muted-foreground">Turn on Slack notifications for this department.</p>
+                            </div>
+                            <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                          </FormItem>
+                        )}/>
+
+                        {isSlackEnabled && (
+                          <>
+                            <FormField control={form.control} name="slack_settings.bot_token" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Slack Bot Token</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="password"
+                                    placeholder={settings?.slack_settings?.has_bot_token ? "Token saved — enter a new value to replace" : "xoxb-..."}
+                                    {...field}
+                                    value={field.value || ""}
+                                  />
+                                </FormControl>
+                                <p className="text-sm text-muted-foreground">
+                                  Use a Slack bot token with <code>channels:manage</code> and <code>chat:write</code> scopes.
+                                </p>
+                                <FormMessage />
+                              </FormItem>
+                            )}/>
+
+                            <FormField control={form.control} name="slack_settings.notify_missed_calls" render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-1">
+                                  <FormLabel className="text-base">Notify on Missed Calls</FormLabel>
+                                  <p className="text-sm text-muted-foreground">Post a message to the Slack group when a call is missed.</p>
+                                </div>
+                                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                              </FormItem>
+                            )}/>
+
+                            <div className="rounded-lg border p-4 space-y-3">
+                              <div>
+                                <p className="font-medium">Slack Group</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {slackChannelName
+                                    ? `Connected to #${slackChannelName}`
+                                    : "No Slack group has been created for this department yet."}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleCreateSlackGroup}
+                                disabled={creatingSlackGroup}
+                              >
+                                {creatingSlackGroup ? "Creating..." : slackChannelName ? "Recreate Slack Group" : "Create Slack Group"}
+                              </Button>
+                            </div>
+                          </>
+                        )}
                       </CardContent>
                     </Card>
                   </TabsContent>
