@@ -36,7 +36,7 @@ import { canListAllCompanyDepartments } from '@/lib/roles';
 import { cacheGet, cacheSet } from '@/lib/simpleCache';
 import { useAppDispatch } from "@/store";
 import { setUser } from "@/store/slices/authSlice";
-import { initiateConsultCall } from "@/services/twilioService";
+import { initiateConsultCall, consultEnsureAgent } from "@/services/twilioService";
 
 type AppInfo = { version?: string; updateReady?: boolean };
 
@@ -63,7 +63,7 @@ export default function AppHeader({
 }: AppHeaderProps) {
     const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
     const [isVideoOpen, setIsVideoOpen] = useState(false);
-    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid, connection: twilioConnection, conferenceSid: twilioConferenceSid } = useTwilio();
+    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid, connection: twilioConnection, conferenceSid: twilioConferenceSid, leaveCall, endCallForAll } = useTwilio();
     const { toast } = useToast();
     const router = useRouter();
 
@@ -410,12 +410,33 @@ export default function AppHeader({
             return;
         }
 
-        const inCallConnection = activeCall || twilioConnection;
-        const inCallConferenceSid = activeConferenceSid || twilioConferenceSid;
+        const liveConnection = activeCall || twilioConnection;
+        const callStatus = liveConnection?.status?.();
+        const isInLiveCall = callStatus === 'open';
+        const isCallConnecting =
+          !!callStatus && !['closed', 'disconnected'].includes(callStatus) && !isInLiveCall;
+        const conferenceSidForConsult = activeConferenceSid || twilioConferenceSid;
 
-        if (inCallConnection && inCallConferenceSid) {
+        if (isCallConnecting) {
+            toast({
+                title: "Call connecting",
+                description: "Please wait for the current call to connect before dialing another number.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        if (isInLiveCall && liveConnection) {
+            if (!conferenceSidForConsult) {
+                toast({
+                    title: "Call not ready",
+                    description: "The conference is still being set up. Please try again in a moment.",
+                    variant: "destructive",
+                });
+                return;
+            }
             try {
-                const consultResult = await initiateConsultCall(inCallConferenceSid, fromNumber, number);
+                const consultResult = await initiateConsultCall(conferenceSidForConsult, fromNumber, number);
                 if (!consultResult?.status) {
                     throw new Error(consultResult?.msg || 'Failed to start consult call.');
                 }
@@ -423,10 +444,11 @@ export default function AppHeader({
                     setConferenceSid(consultResult.data.conference_sid);
                     setActiveConferenceSid(consultResult.data.conference_sid);
                 }
+                await consultEnsureAgent(conferenceSidForConsult);
                 setDialerOpen(false);
                 toast({
-                    title: 'Consult call started',
-                    description: `${formatPhoneNumber(number)} is being called as a consult leg.`,
+                    title: 'Second call started',
+                    description: `${formatPhoneNumber(number)} is being dialed. The first caller is on hold — use Swap or Switch when they answer.`,
                 });
             } catch (error: any) {
                 toast({
@@ -439,15 +461,20 @@ export default function AppHeader({
         }
     
         try {
-            const params: { To: string, From?: string, conferenceSid?: string, direction?: string, autoAccept?: string } = { To: number };
+            setConferenceSid(null);
+            setActiveConferenceSid(null);
+
+            const params: { To: string, From?: string, conferenceSid?: string, direction?: string } = { To: number };
             if (fromNumber) {
-                params.autoAccept = "0";
                 params.From = fromNumber;
                 params.direction = "outbound";
                 setFromNumber(fromNumber);
                 localStorage.setItem("twilioFromNumber", fromNumber);
             }
             const connection = await device.connect({ params });
+            if (connection.status() === 'pending') {
+                connection.accept();
+            }
             setDialerOpen(false);
 
             setActiveContactName(number);
@@ -477,6 +504,7 @@ export default function AppHeader({
                 setActiveCall(null);
                 setActiveDepartmentName(null);
                 setActiveConferenceSid(null);
+                setConferenceSid(null);
             });
 
             connection.on('cancel', () => {
@@ -484,6 +512,7 @@ export default function AppHeader({
                 setActiveCall(null);
                 setActiveDepartmentName(null);
                 setActiveConferenceSid(null);
+                setConferenceSid(null);
             });
 
             connection.on('reject', () => {
@@ -491,6 +520,7 @@ export default function AppHeader({
                 setActiveCall(null);
                 setActiveDepartmentName(null);
                 setActiveConferenceSid(null);
+                setConferenceSid(null);
             });
         } catch (error) {
             console.error("Error making call:", error);
@@ -780,12 +810,21 @@ export default function AppHeader({
               departmentName={activeDepartmentName}
               connection={activeCall}
               conferenceSid={activeConferenceSid}
-              onHangUp={() => {
-                activeCall?.disconnect();
+              onLeaveCall={async (sid, callSid) => {
+                await leaveCall(sid, callSid);
                 setIsActiveCallOpen(false);
                 setActiveCall(null);
                 setActiveDepartmentName(null);
                 setActiveConferenceSid(null);
+                setConferenceSid(null);
+              }}
+              onEndCallForAll={async (sid) => {
+                await endCallForAll(sid ?? activeConferenceSid);
+                setIsActiveCallOpen(false);
+                setActiveCall(null);
+                setActiveDepartmentName(null);
+                setActiveConferenceSid(null);
+                setConferenceSid(null);
               }}
             />
         </>

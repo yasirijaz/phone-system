@@ -20,7 +20,8 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     conferenceSid,
     acceptCall,
     rejectCall,
-    hangUp,
+    leaveCall,
+    endCallForAll,
     incomingReservation,
     activeReservation,
     showReservationModal,
@@ -71,7 +72,11 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   const callStatus = connection?.status?.();
   const hasLiveConnection =
     !!connection && !['pending', 'ringing', 'closed'].includes(String(callStatus ?? ''));
-  const isIncomingCall = !!connection && (callStatus === 'pending' || callStatus === 'ringing');
+  const isIncomingDeviceCall =
+    !!connection && (callStatus === 'pending' || callStatus === 'ringing');
+  // Only show the device incoming prompt for standalone calls — not Task Router legs.
+  const isIncomingCall =
+    isIncomingDeviceCall && !activeReservation && !incomingReservation && !showReservationModal;
   // Keep the bar visible for reservation-based calls even if the device leg disconnects.
   const isActiveCall = hasLiveConnection || !!activeReservation;
   
@@ -104,7 +109,8 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         contactNumber={callerNumber}
         callerName={callerName}
         departmentName={departmentName}
-        onHangUp={hangUp}
+        onLeaveCall={leaveCall}
+        onEndCallForAll={endCallForAll}
         connection={connection}
         conferenceSid={conferenceSid}
       />

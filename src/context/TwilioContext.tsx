@@ -6,6 +6,7 @@ import type { Device, Call } from '@twilio/voice-sdk';
 import type { Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
 
 import axios from '@/lib/axios';
+import { leaveConference as leaveConferenceApi, endConference as endConferenceApi } from '@/services/twilioService';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { isElectron } from '@/lib/is-electron';
@@ -28,6 +29,8 @@ interface TwilioContextType {
   acceptCall: () => void;
   rejectCall: () => void;
   hangUp: () => void;
+  leaveCall: (conferenceSid: string, callSid: string) => Promise<void>;
+  endCallForAll: (conferenceSid?: string | null) => Promise<void>;
   acceptReservation: (reservation: Reservation) => void;
   rejectReservation: (reservation: Reservation) => void;
   completeReservation: (reservation: Reservation) => void;
@@ -69,6 +72,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const incomingReservationRef = useRef<Reservation | null>(null);
   const activeReservationRef = useRef<Reservation | null>(null);
   const connectionSourceRef = useRef<'device' | 'reservation' | null>(null);
+  const expectingReservationDeviceLegRef = useRef(false);
 
   useEffect(() => {
     activeReservationRef.current = activeReservation;
@@ -78,6 +82,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setConnection(null);
     setActiveReservation(null);
     activeReservationRef.current = null;
+    expectingReservationDeviceLegRef.current = false;
     setConferenceSid(null);
     setFromNumber(null);
     connectionSourceRef.current = null;
@@ -154,23 +159,37 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       const handleIncomingCall = (conn: Call) => {
         console.log('Incoming call received:', conn);
-        
+
         const incomingConferenceSid = conn.customParameters.get('conferenceSid');
         if (incomingConferenceSid) {
           console.log('Found conferenceSid in incoming call parameters:', incomingConferenceSid);
           setConferenceSid(incomingConferenceSid);
         }
+
         connectionSourceRef.current = 'device';
         setConnection(conn);
+
         const autoAccept = conn.customParameters.get('autoAccept');
-        if(autoAccept && autoAccept === '0') {
-          // for later user.
-        } else {
+        const isTransferLeg = conn.customParameters.get('transfer') === '1';
+        const isReservationLeg =
+          expectingReservationDeviceLegRef.current || activeReservationRef.current !== null;
+        const shouldAutoAccept = isReservationLeg || isTransferLeg || autoAccept !== '0';
+
+        if (shouldAutoAccept) {
           conn.accept();
-          toast({ title: "Incoming Call Accepted" });
+          expectingReservationDeviceLegRef.current = false;
+          if (!isReservationLeg) {
+            toast({ title: "Incoming Call Accepted" });
+          }
         }
+
+        conn.on('accept', () => {
+          expectingReservationDeviceLegRef.current = false;
+        });
+
         conn.on('disconnect', () => {
           console.log('Call disconnected.');
+          expectingReservationDeviceLegRef.current = false;
           if (connectionSourceRef.current === 'device') {
             clearDeviceConnectionState();
             if (!activeReservationRef.current) {
@@ -181,6 +200,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
         conn.on('reject', () => {
           console.log('Call rejected.');
+          expectingReservationDeviceLegRef.current = false;
           if (connectionSourceRef.current === 'device') {
             if (activeReservationRef.current) {
               clearDeviceConnectionState();
@@ -401,15 +421,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const hangUp = () => {
+  const completeActiveReservation = () => {
     const reservation = activeReservationRef.current;
-    if (connection) {
-      try {
-        connection.disconnect();
-      } catch (error) {
-        console.warn('Failed to disconnect call leg:', error);
-      }
-    }
     if (reservation) {
       try {
         reservation.complete();
@@ -417,37 +430,64 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.warn('Failed to complete reservation:', error);
       }
     }
+  };
+
+  const leaveCall = async (conferenceSid: string, callSid: string) => {
+    try {
+      await leaveConferenceApi(conferenceSid, callSid);
+    } catch (error) {
+      console.warn('Failed to leave conference via API:', error);
+      if (connection) {
+        try {
+          connection.disconnect();
+        } catch (disconnectError) {
+          console.warn('Failed to disconnect call leg:', disconnectError);
+        }
+      }
+    }
+
+    completeActiveReservation();
     clearActiveCallState();
-    toast({ title: "Call Ended" });
+    toast({ title: 'Left call' });
+  };
+
+  const endCallForAll = async (conferenceSid?: string | null) => {
+    if (conferenceSid) {
+      try {
+        await endConferenceApi(conferenceSid);
+      } catch (error) {
+        console.warn('Failed to end conference via API:', error);
+      }
+    }
+
+    if (connection) {
+      try {
+        connection.disconnect();
+      } catch (error) {
+        console.warn('Failed to disconnect call leg:', error);
+      }
+    }
+
+    completeActiveReservation();
+    clearActiveCallState();
+    toast({ title: 'Call Ended' });
+  };
+
+  const hangUp = () => {
+    void endCallForAll(conferenceSid);
   };
 
   const acceptReservation = (reservation: Reservation) => {
     audio.pause();
     console.log('accepting reservation', reservation);
 
-    // Simulate an active call immediately for UI purposes
-    const fakeCall = {
-        parameters: {
-            CallSid: reservation.sid,
-            From: reservation.task.attributes.from,
-            To: reservation.task.attributes.to,
-            FriendlyName: reservation.task.attributes.callerName || 'Conference Call'
-        },
-        status: () => 'open' as const, // Simulate an open call
-        disconnect: () => rejectReservation(reservation),
-        on: () => {}, // Mock event listeners
-        removeListener: () => {},
-        isMuted: () => false,
-        mute: () => {},
-        sendDigits: () => {},
-    } as unknown as Call;
-
     connectionSourceRef.current = 'reservation';
-    setConnection(fakeCall);
+    expectingReservationDeviceLegRef.current = true;
     setActiveReservation(reservation);
     activeReservationRef.current = reservation;
     setShowReservationModal(false);
     setIncomingReservation(null);
+    incomingReservationRef.current = null;
 
     const attributes = reservation.task?.attributes;
     if (attributes.do_nothing) {
@@ -476,7 +516,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       statusCallback: conferenceCallback,
       statusCallbackMethod: 'POST',
       statusCallbackEvent: 'start,end,join,leave',
-      endConferenceOnExit: true,
+      endConferenceOnExit: false,
       startConferenceOnEnter: true,
       transcribe: false,
       recordingStatusCallback: recordingCallback,
@@ -487,6 +527,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const rejectReservation = (reservation: Reservation) => {
     console.log('rejecting reservation', reservation)
+    expectingReservationDeviceLegRef.current = false;
     reservation.reject();
     clearActiveCallState();
   };
@@ -543,6 +584,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     acceptCall,
     rejectCall,
     hangUp,
+    leaveCall,
+    endCallForAll,
     acceptReservation,
     rejectReservation,
     completeReservation,
