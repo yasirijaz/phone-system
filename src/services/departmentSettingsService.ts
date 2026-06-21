@@ -38,12 +38,16 @@ export const createOrUpdateDepartmentSettings = async (id: number | undefined, s
 };
 
 export const createDepartmentSlackGroup = async (
-  departmentId: number,
-  botToken?: string
+  departmentId: number
 ): Promise<{ settings: DepartmentSettings; slack_settings: DepartmentSettings['slack_settings']; message: string }> => {
-  const response = await axios.post(`/api/settings/department/${departmentId}/slack/create-group`, {
-    bot_token: botToken || undefined,
-  });
+  const response = await axios.post(`/api/settings/department/${departmentId}/slack/create-group`);
+  return response.data;
+};
+
+export const deleteDepartmentSlackGroup = async (
+  departmentId: number
+): Promise<{ settings: DepartmentSettings; slack_settings: DepartmentSettings['slack_settings']; message: string }> => {
+  const response = await axios.delete(`/api/settings/department/${departmentId}/slack/group`);
   return response.data;
 };
 

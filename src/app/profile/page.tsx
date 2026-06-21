@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import AppHeader from "@/components/app-header";
 import { getRoleName } from '@/lib/roles';
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import UserDevices from "@/components/user-devices";
 
@@ -26,6 +26,8 @@ const profileSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6, "Password must be at least 6 characters.").optional().or(z.literal('')),
   password_confirmation: z.string().optional(),
+  slack_user_id: z.string().optional(),
+  slack_access_token: z.string().optional(),
 }).refine((data) => data.password === data.password_confirmation, {
   message: "Passwords don't match",
   path: ["password_confirmation"],
@@ -45,8 +47,22 @@ export default function ProfilePage() {
       email: user?.email || "",
       password: "",
       password_confirmation: "",
+      slack_user_id: user?.slack_user_id || "",
+      slack_access_token: "",
     },
   });
+
+  useEffect(() => {
+    if (!user) return;
+    form.reset({
+      name: user.name || "",
+      email: user.email || "",
+      password: "",
+      password_confirmation: "",
+      slack_user_id: user.slack_user_id || "",
+      slack_access_token: "",
+    });
+  }, [user, form]);
   
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -76,10 +92,22 @@ export default function ProfilePage() {
   const onSubmit = async (values: z.infer<typeof profileSchema>) => {
     if (!user) return;
     try {
-      const updateData: { name: string; email: string; password?: string; password_confirmation?: string } = {
+      const updateData: {
+        name: string;
+        email: string;
+        password?: string;
+        password_confirmation?: string;
+        slack_user_id?: string;
+        slack_access_token?: string;
+      } = {
         name: values.name,
         email: values.email,
+        slack_user_id: values.slack_user_id || undefined,
       };
+
+      if (values.slack_access_token) {
+        updateData.slack_access_token = values.slack_access_token;
+      }
 
       if (values.password) {
         updateData.password = values.password;
@@ -87,6 +115,7 @@ export default function ProfilePage() {
       }
       
       const updatedUser = await updateProfile(user.id, updateData);
+      const nextUser = updatedUser?.user ?? updatedUser?.data?.user ?? updatedUser;
       
       if (values.password) {
         // If password was changed, logout user
@@ -94,8 +123,9 @@ export default function ProfilePage() {
         logout();
       } else {
         // If only name/email was changed, update user in store
-        console.log("🔄 Updating user in store:", updatedUser);
-        dispatch(updateUser(updatedUser));
+        console.log("🔄 Updating user in store:", nextUser);
+        dispatch(updateUser(nextUser));
+        form.setValue("slack_access_token", "");
         toast({ title: "Success", description: "Profile updated successfully." });
       }
 
@@ -149,21 +179,21 @@ export default function ProfilePage() {
               </Card>
             </div>
             <div className="md:col-span-2">
+              <Form {...form}>
+                <form id="profile-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <Card>
                 <CardHeader>
                   <CardTitle>Profile Information</CardTitle>
                   <CardDescription>Update your account's profile information and email address.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <Form {...form}>
-                    <form id="profile-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <CardContent className="space-y-6">
                       <FormField
                         control={form.control}
                         name="name"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Name</FormLabel>
-                            <FormControl><Input {...field} defaultValue={user.name} /></FormControl>
+                            <FormControl><Input {...field} /></FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -174,7 +204,7 @@ export default function ProfilePage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Email</FormLabel>
-                            <FormControl><Input type="email" {...field} defaultValue={user.email} disabled /></FormControl>
+                            <FormControl><Input type="email" {...field} disabled /></FormControl>
                              <FormDescription>Email address cannot be changed.</FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -205,10 +235,57 @@ export default function ProfilePage() {
                           </FormItem>
                         )}
                       />
-                    </form>
-                  </Form>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Slack Status</CardTitle>
+                  <CardDescription>
+                    Connect your Slack account so your status updates to &quot;In a call&quot; during live calls.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="slack_user_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Slack User ID (optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="U0123456789" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Leave blank to auto-match by your account email when a department enables Slack status sync.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="slack_access_token"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Slack User Token</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="password"
+                            placeholder={user.has_slack_access_token ? "Token saved — enter a new value to replace" : "xoxp-..."}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Create a Slack app with the <code>users.profile:write</code> user scope and paste your user OAuth token here.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+                </form>
+              </Form>
 
               <UserDevices />
             </div>

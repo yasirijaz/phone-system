@@ -16,6 +16,12 @@ import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { isElectron } from '@/lib/is-electron';
 import { events } from '@/lib/events';
+import {
+  createIncomingRingAudio,
+  isAgentOnCallState,
+  playIncomingRing,
+  stopIncomingRing,
+} from '@/lib/incoming-call-audio';
 
 interface TwilioContextType {
   device: Device | null;
@@ -73,15 +79,52 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
   const [activityName, setActivityName] = useState<string | null>(null);
-  const audio = new Audio('/sounds/reservation.mp3');
+  const ringAudioRef = useRef<HTMLAudioElement | null>(null);
+  const connectionRef = useRef<Call | null>(null);
+  const userInCallRef = useRef(false);
   const incomingReservationRef = useRef<Reservation | null>(null);
   const activeReservationRef = useRef<Reservation | null>(null);
   const connectionSourceRef = useRef<'device' | 'reservation' | null>(null);
   const expectingReservationDeviceLegRef = useRef(false);
+  const reservationLifecycleAttachedRef = useRef<WeakSet<Reservation>>(new WeakSet());
 
   useEffect(() => {
     activeReservationRef.current = activeReservation;
   }, [activeReservation]);
+
+  useEffect(() => {
+    connectionRef.current = connection;
+  }, [connection]);
+
+  useEffect(() => {
+    userInCallRef.current = Boolean(user?.in_call);
+  }, [user?.in_call]);
+
+  useEffect(() => {
+    ringAudioRef.current = createIncomingRingAudio();
+    return () => {
+      stopIncomingRing(ringAudioRef.current);
+      ringAudioRef.current = null;
+    };
+  }, []);
+
+  const isAgentOnCall = useCallback(() => {
+    return isAgentOnCallState({
+      hasActiveReservation: Boolean(activeReservationRef.current),
+      userInCall: userInCallRef.current,
+      connectionStatus: connectionRef.current?.status?.() ?? null,
+    });
+  }, []);
+
+  const startIncomingRing = useCallback(() => {
+    const audio = ringAudioRef.current;
+    if (!audio) return;
+    void playIncomingRing(audio, isAgentOnCall());
+  }, [isAgentOnCall]);
+
+  const stopIncomingRingSound = useCallback(() => {
+    stopIncomingRing(ringAudioRef.current);
+  }, []);
 
   const clearActiveCallState = useCallback(() => {
     setConnection(null);
@@ -92,6 +135,72 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setFromNumber(null);
     connectionSourceRef.current = null;
   }, []);
+
+  const safeCompleteReservation = useCallback((reservation?: Reservation | null) => {
+    const target = reservation ?? activeReservationRef.current;
+    if (!target) return;
+
+    const status = target.status;
+    if (status === 'completed' || status === 'rejected' || status === 'canceled' || status === 'timeout' || status === 'rescinded') {
+      return;
+    }
+
+    if (status === 'pending') {
+      return;
+    }
+
+    if (status === 'wrapping') {
+      try {
+        target.complete();
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes('Invalid state transition')) {
+          console.warn('Failed to complete reservation:', error);
+        }
+      }
+      return;
+    }
+
+    if (status === 'accepted') {
+      // Wait for TaskRouter to move the worker into wrap-up after the call leg ends.
+      return;
+    }
+  }, []);
+
+  const safeRejectReservation = useCallback((reservation?: Reservation | null) => {
+    const target = reservation ?? activeReservationRef.current;
+    if (!target) return;
+
+    if (target.status !== 'pending') {
+      return;
+    }
+
+    try {
+      target.reject();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('Invalid state transition')) {
+        console.warn('Failed to reject reservation:', error);
+      }
+    }
+  }, []);
+
+  const attachReservationLifecycleHandlers = useCallback((reservation: Reservation) => {
+    if (reservationLifecycleAttachedRef.current.has(reservation)) {
+      return;
+    }
+    reservationLifecycleAttachedRef.current.add(reservation);
+
+    reservation.on('wrapup', () => {
+      safeCompleteReservation(reservation);
+    });
+
+    reservation.on('completed', () => {
+      if (activeReservationRef.current === reservation) {
+        clearActiveCallState();
+      }
+    });
+  }, [clearActiveCallState, safeCompleteReservation]);
 
   const clearDeviceConnectionState = useCallback(() => {
     setConnection(null);
@@ -159,6 +268,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         closeExistingSessions: true,
         codecPreferences: ['opus', 'pcmu'],
         debug: true,
+        sounds: { incoming: '' },
       });
 
       deviceRef.current = newDevice;
@@ -204,7 +314,15 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           if (!isReservationLeg) {
             toast({ title: "Incoming Call Accepted" });
           }
+        } else {
+          startIncomingRing();
         }
+
+        const stopRingOnEnd = () => stopIncomingRingSound();
+        conn.on('accept', stopRingOnEnd);
+        conn.on('cancel', stopRingOnEnd);
+        conn.on('disconnect', stopRingOnEnd);
+        conn.on('reject', stopRingOnEnd);
 
         conn.on('accept', () => {
           expectingReservationDeviceLegRef.current = false;
@@ -272,7 +390,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         if (savedSpeakerId && newDevice.audio) {
           await newDevice.audio.speakerDevices.set([savedSpeakerId]);
           await newDevice.audio.ringtoneDevices.set([savedSpeakerId]);
+          newDevice.audio.incoming(false);
           console.log('Applied saved speaker output routes:', savedSpeakerId);
+        } else if (newDevice.audio) {
+          newDevice.audio.incoming(false);
         }
       } catch (audioErr) {
         console.warn('Could not initialize custom local storage audio routing:', audioErr);
@@ -303,10 +424,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         setIncomingReservation(reservation);
         setShowReservationModal(true);
         incomingReservationRef.current = reservation;
-        // play ringtone or notification sound here
-        // play in loop until accepted or rejected
-        audio.loop = true;
-        audio.play();
+        startIncomingRing();
         // Inform Electron main to show native/mini window notification
         try {
           if (isElectron() && window.electronAPI) {
@@ -340,9 +458,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         }
         reservation.on('accepted', () => {
           console.log('Reservation accepted.');
+          attachReservationLifecycleHandlers(reservation);
           setIncomingReservation(null);
           setShowReservationModal(false);
-          audio.pause();
+          stopIncomingRingSound();
           setTimeout(() => {
             const attributes = reservation.task?.attributes;
             const confSid = attributes?.conference?.sid;
@@ -361,7 +480,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         });
 
         const clearReservation = () => {
-           audio.pause();
+          stopIncomingRingSound();
           setIncomingReservation(null);
           setShowReservationModal(false);
           incomingReservationRef.current = null;
@@ -391,7 +510,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsConnecting(false);
     }
-  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, clearActiveCallState, clearDeviceConnectionState]);
+  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, clearActiveCallState, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound]);
 
   // Listen for accept/reject actions coming back from Electron main
   useEffect(() => {
@@ -430,6 +549,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const acceptCall = () => {
     if (connection) {
       console.log(`Accepting call`);
+      stopIncomingRingSound();
       connection.accept();
       toast({ title: "Call Accepted" });
     }
@@ -438,21 +558,26 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const rejectCall = () => {
     if (connection) {
       console.log(`Rejecting call`);
+      stopIncomingRingSound();
       connection.reject();
       toast({ title: "Call Rejected" });
       clearActiveCallState();
     }
   };
 
-  const completeActiveReservation = () => {
-    const reservation = activeReservationRef.current;
-    if (reservation) {
-      try {
-        reservation.complete();
-      } catch (error) {
-        console.warn('Failed to complete reservation:', error);
+  const scheduleReservationFinalize = useCallback((reservation?: Reservation | null) => {
+    const target = reservation ?? activeReservationRef.current;
+    if (!target) return;
+
+    window.setTimeout(() => {
+      if (activeReservationRef.current === target) {
+        safeCompleteReservation(target);
       }
-    }
+    }, 2000);
+  }, [safeCompleteReservation]);
+
+  const completeActiveReservation = () => {
+    scheduleReservationFinalize();
   };
 
   const leaveCall = async (conferenceSid: string, callSid: string) => {
@@ -501,13 +626,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   };
 
   const acceptReservation = (reservation: Reservation) => {
-    audio.pause();
+    stopIncomingRingSound();
     console.log('accepting reservation', reservation);
 
     connectionSourceRef.current = 'reservation';
     expectingReservationDeviceLegRef.current = true;
     setActiveReservation(reservation);
     activeReservationRef.current = reservation;
+    attachReservationLifecycleHandlers(reservation);
     setShowReservationModal(false);
     setIncomingReservation(null);
     incomingReservationRef.current = null;
@@ -550,14 +676,15 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const rejectReservation = (reservation: Reservation) => {
     console.log('rejecting reservation', reservation)
+    stopIncomingRingSound();
     expectingReservationDeviceLegRef.current = false;
-    reservation.reject();
+    safeRejectReservation(reservation);
     clearActiveCallState();
   };
 
   const completeReservation = (reservation: Reservation) => {
     console.log('completing reservation', reservation)
-    reservation.complete();
+    safeCompleteReservation(reservation);
     clearActiveCallState();
   };
 

@@ -158,6 +158,9 @@ export interface ConferenceParticipant {
     muted?: boolean;
     is_agent?: boolean;
     call_status?: string | null;
+    connection_status?: 'ringing' | 'connecting' | 'connected' | 'on-hold' | 'ended';
+    user_id?: number | null;
+    phone?: string | null;
 }
 
 export const recordConference = async (conferenceSid: string, action: 'start' | 'stop'): Promise<any> => {

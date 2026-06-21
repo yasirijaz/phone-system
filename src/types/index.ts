@@ -85,6 +85,8 @@ export interface User {
   do_not_disturb?: number;
   in_call?: number;
   worker_status?: string;
+  slack_user_id?: string | null;
+  has_slack_access_token?: boolean;
 }
 
 export interface ProfilePayload {
@@ -93,6 +95,8 @@ export interface ProfilePayload {
   password?: string;
   password_confirmation?: string;
   profile_picture?: File;
+  slack_user_id?: string;
+  slack_access_token?: string;
 }
 
 export interface Company {
@@ -187,6 +191,10 @@ export interface CompanySettings {
     default_route: string;
     timeout: number;
   };
+  slack_settings?: {
+    has_bot_token?: boolean;
+    bot_token?: string;
+  };
   integrations?: {
     integration_id: number;
     enabled: boolean;
@@ -232,12 +240,10 @@ export interface DepartmentSettings {
         holidays: Holiday[];
     };
     slack_settings?: {
-        enabled?: boolean;
         notify_missed_calls?: boolean;
-        has_bot_token?: boolean;
+        sync_in_call_status?: boolean;
         channel_id?: string;
         channel_name?: string;
-        bot_token?: string;
     };
 }
 
