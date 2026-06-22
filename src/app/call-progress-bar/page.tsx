@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { Suspense, useEffect, useState, type CSSProperties } from 'react';
 import { Phone, PhoneOff } from 'lucide-react';
 
 type ElectronWindowStyle = CSSProperties & {
@@ -18,6 +18,14 @@ function formatTime(seconds: number) {
 }
 
 export default function CallProgressBarPage() {
+  return (
+    <Suspense fallback={null}>
+      <CallProgressBarContent />
+    </Suspense>
+  );
+}
+
+function CallProgressBarContent() {
   const searchParams = useSearchParams();
   const [callerName, setCallerName] = useState(searchParams.get('callerName') || 'On Call');
   const [startedAt, setStartedAt] = useState(
