@@ -288,50 +288,67 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     );
   }, [persistActiveCallMeta]);
 
-  const safeCompleteReservation = useCallback((reservation?: Reservation | null) => {
+  const isIgnorableReservationError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.includes('Invalid state transition');
+  };
+
+  const safeCompleteReservation = useCallback(async (reservation?: Reservation | null) => {
     const target = reservation ?? activeReservationRef.current;
     if (!target) return;
 
-    const status = target.status;
-    if (status === 'completed' || status === 'rejected' || status === 'canceled' || status === 'timeout' || status === 'rescinded') {
+    let current = target;
+    try {
+      current = await target.fetchLatestVersion();
+    } catch {
+      // Fall back to the cached reservation snapshot.
+    }
+
+    const status = current.status;
+    if (
+      status === 'completed' ||
+      status === 'rejected' ||
+      status === 'canceled' ||
+      status === 'timeout' ||
+      status === 'rescinded' ||
+      status === 'pending' ||
+      status === 'accepted'
+    ) {
       return;
     }
 
-    if (status === 'pending') {
-      return;
-    }
-
-    if (status === 'wrapping') {
-      try {
-        target.complete();
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (!message.includes('Invalid state transition')) {
-          console.warn('Failed to complete reservation:', error);
-        }
-      }
-      return;
-    }
-
-    if (status === 'accepted') {
-      // Wait for TaskRouter to move the worker into wrap-up after the call leg ends.
-      return;
-    }
-  }, []);
-
-  const safeRejectReservation = useCallback((reservation?: Reservation | null) => {
-    const target = reservation ?? activeReservationRef.current;
-    if (!target) return;
-
-    if (target.status !== 'pending') {
+    if (status !== 'wrapping') {
       return;
     }
 
     try {
-      target.reject();
+      await current.complete();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.includes('Invalid state transition')) {
+      if (!isIgnorableReservationError(error)) {
+        console.warn('Failed to complete reservation:', error);
+      }
+    }
+  }, []);
+
+  const safeRejectReservation = useCallback(async (reservation?: Reservation | null) => {
+    const target = reservation ?? activeReservationRef.current;
+    if (!target) return;
+
+    let current = target;
+    try {
+      current = await target.fetchLatestVersion();
+    } catch {
+      // Fall back to the cached reservation snapshot.
+    }
+
+    if (current.status !== 'pending') {
+      return;
+    }
+
+    try {
+      await current.reject();
+    } catch (error: unknown) {
+      if (!isIgnorableReservationError(error)) {
         console.warn('Failed to reject reservation:', error);
       }
     }
@@ -344,7 +361,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     reservationLifecycleAttachedRef.current.add(reservation);
 
     reservation.on('wrapup', () => {
-      safeCompleteReservation(reservation);
+      void safeCompleteReservation(reservation);
     });
 
     reservation.on('completed', () => {
@@ -819,18 +836,16 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     const target = reservation ?? activeReservationRef.current;
     if (!target) return;
 
-    window.setTimeout(() => {
-      if (activeReservationRef.current === target) {
-        safeCompleteReservation(target);
-      }
-    }, 2000);
+    for (const delayMs of [500, 2000, 5000]) {
+      window.setTimeout(() => {
+        void safeCompleteReservation(target);
+      }, delayMs);
+    }
   }, [safeCompleteReservation]);
 
-  const completeActiveReservation = () => {
-    scheduleReservationFinalize();
-  };
-
   const leaveCall = async (conferenceSid: string, callSid: string) => {
+    const reservationToFinalize = activeReservationRef.current;
+
     try {
       await leaveConferenceApi(conferenceSid, callSid);
     } catch (error) {
@@ -844,12 +859,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    completeActiveReservation();
+    scheduleReservationFinalize(reservationToFinalize);
     clearActiveCallState();
     toast({ title: 'Left call' });
   };
 
   const endCallForAll = async (conferenceSid?: string | null) => {
+    const reservationToFinalize = activeReservationRef.current;
+
     if (conferenceSid) {
       try {
         await endConferenceApi(conferenceSid);
@@ -866,7 +883,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    completeActiveReservation();
+    scheduleReservationFinalize(reservationToFinalize);
     clearActiveCallState();
     toast({ title: 'Call Ended' });
   };
@@ -943,6 +960,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       recordingStatusCallback: recordingCallback,
       conferenceRecordingStatusCallback: conferenceEventCallback,
       conferenceRecord: 'record-from-start', //[true, false, 'record-from-start', 'do-not-record']
+    }).catch((error: unknown) => {
+      if (!isIgnorableReservationError(error)) {
+        console.warn('Failed to accept reservation conference:', error);
+      }
     });
   };
 
@@ -950,13 +971,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     console.log('rejecting reservation', reservation)
     stopIncomingRingSound();
     expectingReservationDeviceLegRef.current = false;
-    safeRejectReservation(reservation);
+    void safeRejectReservation(reservation);
     clearActiveCallState();
   };
 
   const completeReservation = (reservation: Reservation) => {
     console.log('completing reservation', reservation)
-    safeCompleteReservation(reservation);
+    void safeCompleteReservation(reservation);
     clearActiveCallState();
   };
 

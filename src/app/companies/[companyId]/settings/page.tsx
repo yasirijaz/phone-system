@@ -356,9 +356,8 @@ export default function CompanySettingsPage() {
         slack_settings: slackSettings,
       };
       const response = await createOrUpdateCompanySettings(settings?.id, payload);
-      const savedSettings = response?.settings ?? response;
-      if (savedSettings?.id) {
-        setSettings(savedSettings);
+      if (response?.id) {
+        setSettings(response);
       }
       form.setValue("slack_settings.bot_token", "");
       toast({ title: "Success", description: "Settings saved successfully." });

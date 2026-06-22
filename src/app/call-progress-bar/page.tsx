@@ -1,8 +1,15 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Phone, PhoneOff } from 'lucide-react';
+
+type ElectronWindowStyle = CSSProperties & {
+  WebkitAppRegion?: 'drag' | 'no-drag';
+};
+
+const dragRegionStyle: ElectronWindowStyle = { WebkitAppRegion: 'drag' };
+const noDragRegionStyle: ElectronWindowStyle = { WebkitAppRegion: 'no-drag' };
 
 function formatTime(seconds: number) {
   const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -61,7 +68,7 @@ export default function CallProgressBarPage() {
       <div
         className="flex w-full max-w-[340px] items-center gap-2 rounded-full border border-white/15 px-3 py-2 shadow-2xl"
         style={{
-          WebkitAppRegion: 'drag',
+          ...dragRegionStyle,
           background: 'rgba(15, 23, 42, 0.78)',
           backdropFilter: 'blur(10px)',
         }}
@@ -74,7 +81,7 @@ export default function CallProgressBarPage() {
           type="button"
           onClick={handleFocusMain}
           className="shrink-0 rounded-full p-0.5 text-green-400 transition-colors hover:text-green-300"
-          style={{ WebkitAppRegion: 'no-drag' }}
+          style={noDragRegionStyle}
           aria-label="Focus main window"
         >
           <Phone className="h-4 w-4" />
@@ -90,7 +97,7 @@ export default function CallProgressBarPage() {
           onClick={handleEndCall}
           disabled={isEnding}
           className="shrink-0 rounded-full p-1 text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300 disabled:opacity-50"
-          style={{ WebkitAppRegion: 'no-drag' }}
+          style={noDragRegionStyle}
           aria-label="End call"
         >
           <PhoneOff className="h-4 w-4" />
