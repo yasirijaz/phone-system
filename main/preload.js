@@ -12,12 +12,14 @@ const electronSendChannels = [
   'show-call-progress',
   'hide-call-progress',
   'focus-main-window',
+  'end-call-from-progress',
 ];
 
 const electronReceiveChannels = [
   'call-accepted',
   'call-rejected',
   'call-progress-update',
+  'end-call-from-progress',
 ];
 
 const apiSendChannels = ['check-for-updates', 'restart-to-update'];

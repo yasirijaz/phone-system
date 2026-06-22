@@ -102,6 +102,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const connectionSourceRef = useRef<'device' | 'reservation' | null>(null);
   const expectingReservationDeviceLegRef = useRef(false);
   const reservationLifecycleAttachedRef = useRef<WeakSet<Reservation>>(new WeakSet());
+  const conferenceSidRef = useRef<string | null>(null);
+  const hangUpFromOverlayRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    conferenceSidRef.current = conferenceSid;
+  }, [conferenceSid]);
 
   useEffect(() => {
     activeReservationRef.current = activeReservation;
@@ -775,9 +781,18 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    const offEndCall = window.electronAPI.on('end-call-from-progress', () => {
+      try {
+        hangUpFromOverlayRef.current();
+      } catch (e) {
+        console.error('Failed to end call from progress overlay:', e);
+      }
+    });
+
     return () => {
       try { offAccepted && offAccepted(); } catch {}
       try { offRejected && offRejected(); } catch {}
+      try { offEndCall && offEndCall(); } catch {}
     };
   }, []);
 
@@ -855,6 +870,16 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     clearActiveCallState();
     toast({ title: 'Call Ended' });
   };
+
+  useEffect(() => {
+    hangUpFromOverlayRef.current = () => {
+      const sid =
+        conferenceSidRef.current ??
+        readActiveCallSession()?.conferenceSid ??
+        null;
+      void endCallForAll(sid);
+    };
+  });
 
   const hangUp = () => {
     void endCallForAll(conferenceSid);

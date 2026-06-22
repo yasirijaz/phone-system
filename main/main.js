@@ -329,9 +329,9 @@ function showCallProgressWindow(callInfo = {}) {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
   callProgressWindow = new BrowserWindow({
-    width: 320,
+    width: 360,
     height: 56,
-    x: screenWidth - 340,
+    x: screenWidth - 380,
     y: screenHeight - 88,
     frame: false,
     transparent: true,
@@ -471,5 +471,11 @@ ipcMain.on('focus-main-window', () => {
     }
     Mainwindow.show();
     Mainwindow.focus();
+  }
+});
+
+ipcMain.on('end-call-from-progress', () => {
+  if (Mainwindow && !Mainwindow.isDestroyed()) {
+    Mainwindow.webContents.send('end-call-from-progress');
   }
 });

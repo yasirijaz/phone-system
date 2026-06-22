@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Phone } from 'lucide-react';
+import { Phone, PhoneOff } from 'lucide-react';
 
 function formatTime(seconds: number) {
   const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -17,6 +17,7 @@ export default function CallProgressBarPage() {
     Number(searchParams.get('startedAt')) || Date.now()
   );
   const [duration, setDuration] = useState(0);
+  const [isEnding, setIsEnding] = useState(false);
 
   useEffect(() => {
     document.documentElement.style.background = 'transparent';
@@ -49,10 +50,16 @@ export default function CallProgressBarPage() {
     window.electronAPI?.send('focus-main-window');
   };
 
+  const handleEndCall = () => {
+    if (isEnding) return;
+    setIsEnding(true);
+    window.electronAPI?.send('end-call-from-progress');
+  };
+
   return (
     <div className="flex h-screen w-screen items-center justify-center p-1">
       <div
-        className="flex w-full max-w-[300px] items-center gap-2.5 rounded-full border border-white/15 px-3.5 py-2 shadow-2xl"
+        className="flex w-full max-w-[340px] items-center gap-2 rounded-full border border-white/15 px-3 py-2 shadow-2xl"
         style={{
           WebkitAppRegion: 'drag',
           background: 'rgba(15, 23, 42, 0.78)',
@@ -78,6 +85,16 @@ export default function CallProgressBarPage() {
         <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-white">
           {formatTime(duration)}
         </span>
+        <button
+          type="button"
+          onClick={handleEndCall}
+          disabled={isEnding}
+          className="shrink-0 rounded-full p-1 text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300 disabled:opacity-50"
+          style={{ WebkitAppRegion: 'no-drag' }}
+          aria-label="End call"
+        >
+          <PhoneOff className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );
