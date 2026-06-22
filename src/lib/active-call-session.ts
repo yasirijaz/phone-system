@@ -40,15 +40,58 @@ export function clearActiveCallSession(): void {
   }
 }
 
+export function isSameCallSession(
+  existing: ActiveCallSession | null | undefined,
+  patch: Partial<ActiveCallSession>
+): boolean {
+  if (!existing) return false;
+
+  if (patch.callSid && existing.callSid) {
+    return patch.callSid === existing.callSid;
+  }
+
+  if (patch.conferenceSid && existing.conferenceSid) {
+    return patch.conferenceSid === existing.conferenceSid;
+  }
+
+  return false;
+}
+
+export function replaceActiveCallSession(session: Partial<ActiveCallSession>): ActiveCallSession {
+  const replaced: ActiveCallSession = {
+    callSid: session.callSid ?? null,
+    conferenceSid: session.conferenceSid ?? null,
+    callerName: session.callerName ?? 'Unknown Caller',
+    callerNumber: session.callerNumber ?? '',
+    departmentName: session.departmentName ?? null,
+    startedAt: session.startedAt ?? Date.now(),
+  };
+  writeActiveCallSession(replaced);
+  return replaced;
+}
+
+/** Patch the current call session — starts a fresh session when the call identity changes. */
 export function mergeActiveCallSession(patch: Partial<ActiveCallSession>): ActiveCallSession {
   const existing = readActiveCallSession();
+
+  if (
+    existing &&
+    ((patch.callSid && existing.callSid && patch.callSid !== existing.callSid) ||
+      (patch.conferenceSid &&
+        existing.conferenceSid &&
+        patch.conferenceSid !== existing.conferenceSid &&
+        patch.callSid !== existing.callSid))
+  ) {
+    return replaceActiveCallSession({ ...patch, startedAt: patch.startedAt ?? Date.now() });
+  }
+
   const merged: ActiveCallSession = {
     callSid: patch.callSid ?? existing?.callSid ?? null,
     conferenceSid: patch.conferenceSid ?? existing?.conferenceSid ?? null,
     callerName: patch.callerName ?? existing?.callerName ?? 'Unknown Caller',
     callerNumber: patch.callerNumber ?? existing?.callerNumber ?? '',
     departmentName: patch.departmentName ?? existing?.departmentName ?? null,
-    startedAt: existing?.startedAt ?? patch.startedAt ?? Date.now(),
+    startedAt: patch.startedAt ?? existing?.startedAt ?? Date.now(),
   };
   writeActiveCallSession(merged);
   return merged;

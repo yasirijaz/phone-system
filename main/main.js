@@ -16,6 +16,8 @@ const require = createRequire(import.meta.url);
 const { autoUpdater } = require('electron-updater');
 let Mainwindow
 let notificationWindow;
+let callProgressWindow = null;
+let callProgressStartedAt = null;
 let pendingCallInfo = null;
 let isdev = false;
 let updateReady = false;
@@ -270,16 +272,90 @@ app.on('before-quit', () => {
     clearInterval(updateCheckTimer);
     updateCheckTimer = null;
   }
+  destroyCallProgressWindow();
 });
-
-
-
 
 function destroyNotificationWindow() {
   if (notificationWindow && !notificationWindow.isDestroyed()) {
     notificationWindow.close();
   }
   notificationWindow = null;
+}
+
+function getAppBaseUrl() {
+  return app.isPackaged
+    ? 'https://phone.windshieldhub.com'
+    : 'http://localhost:3000';
+}
+
+function destroyCallProgressWindow() {
+  if (callProgressWindow && !callProgressWindow.isDestroyed()) {
+    callProgressWindow.close();
+  }
+  callProgressWindow = null;
+  callProgressStartedAt = null;
+}
+
+function showCallProgressWindow(callInfo = {}) {
+  const { callerName = '', callerNumber = '', startedAt } = callInfo;
+  const effectiveStartedAt = startedAt || callProgressStartedAt;
+  if (!effectiveStartedAt) return;
+
+  callProgressStartedAt = effectiveStartedAt;
+
+  if (callProgressWindow && !callProgressWindow.isDestroyed()) {
+    callProgressWindow.webContents.send('call-progress-update', {
+      callerName,
+      callerNumber,
+      startedAt: effectiveStartedAt,
+    });
+    if (!callProgressWindow.isVisible()) {
+      callProgressWindow.show();
+    }
+    return;
+  }
+
+  const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+
+  callProgressWindow = new BrowserWindow({
+    width: 320,
+    height: 56,
+    x: screenWidth - 340,
+    y: screenHeight - 88,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: false,
+    focusable: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+    }
+  });
+
+  const params = new URLSearchParams({
+    callerName,
+    callerNumber,
+    startedAt: String(effectiveStartedAt),
+  });
+
+  callProgressWindow.loadURL(`${getAppBaseUrl()}/call-progress-bar?${params}`);
+  callProgressWindow.once('ready-to-show', () => {
+    if (callProgressWindow && !callProgressWindow.isDestroyed()) {
+      callProgressWindow.show();
+    }
+  });
+  callProgressWindow.on('closed', () => {
+    callProgressWindow = null;
+  });
 }
 
 ipcMain.on('incoming-sms', (event, sms) => {
@@ -367,4 +443,22 @@ ipcMain.on('successfully-rejected-call', () => {
 ipcMain.on('dismiss-incoming-overlay', () => {
   destroyNotificationWindow();
   pendingCallInfo = null;
+});
+
+ipcMain.on('show-call-progress', (_event, callInfo) => {
+  showCallProgressWindow(callInfo || {});
+});
+
+ipcMain.on('hide-call-progress', () => {
+  destroyCallProgressWindow();
+});
+
+ipcMain.on('focus-main-window', () => {
+  if (Mainwindow && !Mainwindow.isDestroyed()) {
+    if (Mainwindow.isMinimized()) {
+      Mainwindow.restore();
+    }
+    Mainwindow.show();
+    Mainwindow.focus();
+  }
 });

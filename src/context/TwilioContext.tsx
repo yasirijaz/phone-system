@@ -24,8 +24,10 @@ import {
 } from '@/lib/incoming-call-audio';
 import {
   clearActiveCallSession,
+  isSameCallSession,
   mergeActiveCallSession,
   readActiveCallSession,
+  replaceActiveCallSession,
   type ActiveCallSession,
 } from '@/lib/active-call-session';
 import { findLiveCallOnDevice, isLiveCallStatus } from '@/lib/twilio-call-utils';
@@ -145,14 +147,19 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     stopIncomingRing(ringAudioRef.current);
   }, []);
 
-  const persistActiveCallMeta = useCallback((patch: Partial<ActiveCallSession>) => {
-    const merged = mergeActiveCallSession(patch);
-    setActiveCallMeta(merged);
-    if (merged.conferenceSid) {
-      setConferenceSid(merged.conferenceSid);
-    }
-    return merged;
-  }, []);
+  const persistActiveCallMeta = useCallback(
+    (patch: Partial<ActiveCallSession>, options?: { replace?: boolean }) => {
+      const merged = options?.replace
+        ? replaceActiveCallSession({ ...patch, startedAt: patch.startedAt ?? Date.now() })
+        : mergeActiveCallSession(patch);
+      setActiveCallMeta(merged);
+      if (merged.conferenceSid) {
+        setConferenceSid(merged.conferenceSid);
+      }
+      return merged;
+    },
+    []
+  );
 
   const clearActiveCallState = useCallback(() => {
     setConnection(null);
@@ -185,22 +192,23 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       if (connectionAfterSync && isLiveCallStatus(connectionAfterSync.status?.())) {
         const callSid = connectionAfterSync.parameters?.CallSid ?? null;
+        const attrs = reservation?.task?.attributes;
         persistActiveCallMeta({
           callSid,
           callerName:
-            reservation?.task?.attributes?.contact_name ||
+            attrs?.contact_name ||
             connectionAfterSync.parameters?.FriendlyName ||
-            readActiveCallSession()?.callerName ||
             'Unknown Caller',
           callerNumber:
-            reservation?.task?.attributes?.from ||
+            attrs?.from ||
             connectionAfterSync.parameters?.From ||
             connectionAfterSync.parameters?.To ||
-            readActiveCallSession()?.callerNumber ||
             '',
-          departmentName:
-            reservation?.task?.attributes?.department_name ||
-            readActiveCallSession()?.departmentName ||
+          departmentName: attrs?.department_name || null,
+          conferenceSid:
+            attrs?.conference?.sid ||
+            connectionAfterSync.customParameters?.get?.('conferenceSid') ||
+            readActiveCallSession()?.conferenceSid ||
             null,
         });
         return;
@@ -209,10 +217,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       if (reservation) {
         const attrs = reservation.task?.attributes;
         persistActiveCallMeta({
-          callerName: attrs?.contact_name || readActiveCallSession()?.callerName || 'Unknown Caller',
-          callerNumber: attrs?.from || readActiveCallSession()?.callerNumber || '',
-          departmentName: attrs?.department_name || readActiveCallSession()?.departmentName || null,
-          conferenceSid: attrs?.conference?.sid || readActiveCallSession()?.conferenceSid || null,
+          callerName: attrs?.contact_name || attrs?.from || 'Unknown Caller',
+          callerNumber: attrs?.from || '',
+          departmentName: attrs?.department_name || null,
+          conferenceSid: attrs?.conference?.sid || null,
         });
         return;
       }
@@ -229,18 +237,21 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       if (userInCallRef.current && user?.id) {
         const activeCallLog = await getActiveCall();
         if (activeCallLog?.call_status === 'in_progress') {
-          const restored = persistActiveCallMeta({
-            callSid: activeCallLog.worker_sid || activeCallLog.call_sid || null,
-            conferenceSid: activeCallLog.conference_sid || null,
-            callerName:
-              activeCallLog.contact_name ||
-              activeCallLog.client_name ||
-              activeCallLog.from ||
-              activeCallLog.to ||
-              'Unknown Caller',
-            callerNumber: activeCallLog.from || activeCallLog.to || '',
-            departmentName: activeCallLog.department?.name || null,
-          });
+          const restored = persistActiveCallMeta(
+            {
+              callSid: activeCallLog.worker_sid || activeCallLog.call_sid || null,
+              conferenceSid: activeCallLog.conference_sid || null,
+              callerName:
+                activeCallLog.contact_name ||
+                activeCallLog.client_name ||
+                activeCallLog.from ||
+                activeCallLog.to ||
+                'Unknown Caller',
+              callerNumber: activeCallLog.from || activeCallLog.to || '',
+              departmentName: activeCallLog.department?.name || null,
+            },
+            { replace: true }
+          );
           setActiveCallMeta(restored);
           return;
         }
@@ -258,14 +269,17 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const registerOutboundConnection = useCallback((conn: Call, meta?: Partial<ActiveCallSession>) => {
     connectionSourceRef.current = 'device';
     setConnection(conn);
-    persistActiveCallMeta({
-      callSid: conn.parameters?.CallSid ?? null,
-      callerName: meta?.callerName ?? meta?.callerNumber ?? 'Unknown Caller',
-      callerNumber: meta?.callerNumber ?? '',
-      departmentName: meta?.departmentName ?? null,
-      conferenceSid: meta?.conferenceSid ?? null,
-      startedAt: Date.now(),
-    });
+    persistActiveCallMeta(
+      {
+        callSid: conn.parameters?.CallSid ?? null,
+        callerName: meta?.callerName ?? meta?.callerNumber ?? 'Unknown Caller',
+        callerNumber: meta?.callerNumber ?? '',
+        departmentName: meta?.departmentName ?? null,
+        conferenceSid: null,
+        startedAt: Date.now(),
+      },
+      { replace: true }
+    );
   }, [persistActiveCallMeta]);
 
   const safeCompleteReservation = useCallback((reservation?: Reservation | null) => {
@@ -434,6 +448,33 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         connectionSourceRef.current = 'device';
         setConnection(conn);
 
+        const reservationAttrs = activeReservationRef.current?.task?.attributes;
+        const incomingCallerName =
+          reservationAttrs?.contact_name ||
+          conn.parameters?.FriendlyName ||
+          conn.parameters?.From ||
+          'Unknown Caller';
+        const incomingCallerNumber =
+          reservationAttrs?.from || conn.parameters?.From || conn.parameters?.To || '';
+
+        persistActiveCallMeta(
+          {
+            callSid: conn.parameters?.CallSid ?? null,
+            conferenceSid: incomingConferenceSid || reservationAttrs?.conference?.sid || null,
+            callerName: incomingCallerName,
+            callerNumber: incomingCallerNumber,
+            departmentName: reservationAttrs?.department_name || null,
+            startedAt: Date.now(),
+          },
+          {
+            replace:
+              Boolean(reservationAttrs) ||
+              !isSameCallSession(readActiveCallSession(), {
+                callSid: conn.parameters?.CallSid ?? null,
+              }),
+          }
+        );
+
         const autoAccept = conn.customParameters.get('autoAccept');
         const isTransferLeg = conn.customParameters.get('transfer') === '1';
         const isReservationLeg =
@@ -496,11 +537,16 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.log('Successfully established call!', conn);
         connectionSourceRef.current = 'device';
         setConnection(conn);
-        persistActiveCallMeta({
-          callSid: conn.parameters?.CallSid ?? null,
-          callerName: conn.parameters?.FriendlyName || conn.parameters?.To || 'Unknown Caller',
-          callerNumber: conn.parameters?.From || conn.parameters?.To || '',
-        });
+        persistActiveCallMeta(
+          {
+            callSid: conn.parameters?.CallSid ?? null,
+            callerName: conn.parameters?.FriendlyName || conn.parameters?.To || 'Unknown Caller',
+            callerNumber: conn.parameters?.From || conn.parameters?.To || '',
+            conferenceSid: null,
+            startedAt: Date.now(),
+          },
+          { replace: true }
+        );
       });
 
       newDevice.on('disconnect', () => {
@@ -570,6 +616,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       newWorker.on('reservationCreated', (reservation: Reservation) => {
         console.log('Reservation created:', reservation);
+        if (!isAgentOnCall()) {
+          clearActiveCallSession();
+          setActiveCallMeta(null);
+          setConferenceSid(null);
+        }
         setIncomingReservation(reservation);
         setShowReservationModal(true);
         incomingReservationRef.current = reservation;
@@ -666,7 +717,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsConnecting(false);
     }
-  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, clearActiveCallState, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound, persistActiveCallMeta]);
+  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, clearActiveCallState, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound, persistActiveCallMeta, isAgentOnCall]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -823,12 +874,18 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     incomingReservationRef.current = null;
 
     const attributes = reservation.task?.attributes;
-    persistActiveCallMeta({
-      callerName: attributes?.contact_name || attributes?.from || 'Unknown Caller',
-      callerNumber: attributes?.from || '',
-      departmentName: attributes?.department_name || null,
-      conferenceSid: attributes?.conference?.sid || null,
-    });
+    setConferenceSid(null);
+    persistActiveCallMeta(
+      {
+        callSid: null,
+        conferenceSid: attributes?.conference?.sid || null,
+        callerName: attributes?.contact_name || attributes?.from || 'Unknown Caller',
+        callerNumber: attributes?.from || '',
+        departmentName: attributes?.department_name || null,
+        startedAt: Date.now(),
+      },
+      { replace: true }
+    );
     if (attributes.do_nothing) {
       console.log('Reservation is set to do nothing.');
       const outgoing = process.env.NEXT_PUBLIC_API_URL + '/api/twilio/outgoing-callback';

@@ -9,11 +9,15 @@ const electronSendChannels = [
   'successfully-accepted-call',
   'successfully-rejected-call',
   'dismiss-incoming-overlay',
+  'show-call-progress',
+  'hide-call-progress',
+  'focus-main-window',
 ];
 
 const electronReceiveChannels = [
   'call-accepted',
   'call-rejected',
+  'call-progress-update',
 ];
 
 const apiSendChannels = ['check-for-updates', 'restart-to-update'];

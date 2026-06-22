@@ -19,14 +19,21 @@ axiosInstance.interceptors.request.use((config) => {
   return config;
 });
 
+const AUTH_ENDPOINTS = ['/api/login', '/api/register', '/api/forgot-password', '/api/reset-password'];
+
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+    if (error.response?.status === 401) {
+      const requestUrl = error.config?.url ?? '';
+      const isAuthRequest = AUTH_ENDPOINTS.some((path) => requestUrl.includes(path));
+
+      if (!isAuthRequest) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);

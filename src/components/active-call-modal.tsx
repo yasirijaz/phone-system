@@ -86,6 +86,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [pendingTransferCallSid, setPendingTransferCallSid] = useState<string | null>(null);
   const effectiveConferenceSid = conferenceSid || verifiedConferenceSid;
   const agentCallSid = connection?.parameters?.CallSid ?? fallbackAgentCallSid ?? null;
+  const callIdentity = effectiveConferenceSid || agentCallSid || contactNumber;
   const externalParticipants = (currentParticipants as ConferenceParticipant[]).filter(
     (participant) => !participant.is_agent && participant.call_sid !== agentCallSid
   );
@@ -115,6 +116,22 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     '7', '8', '9',
     '*', '0', '#'
   ];
+
+  useEffect(() => {
+    setDepartmentSettings(null);
+    setCompanySettings(null);
+    setResolvedDepartmentName(departmentName || null);
+    setCustomerCallSid(null);
+    setConsultCallSid(null);
+    setActiveExternalCallSid(null);
+    setCurrentParticipants([]);
+    setIsOnHold(false);
+    setVerifiedConferenceSid(conferenceSid || null);
+    setPendingOutgoing(null);
+    setPendingTransferCallSid(null);
+    setDuration(0);
+    setIsCollapsed(false);
+  }, [callIdentity, departmentName, conferenceSid]);
 
    useEffect(() => {
     const lookupCallSid = connection?.parameters?.CallSid || fallbackAgentCallSid;
@@ -174,7 +191,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       setPendingOutgoing(null);
       setPendingTransferCallSid(null);
     }
-  }, [isOpen, contactNumber, connection, departmentName, fallbackAgentCallSid]);
+  }, [isOpen, contactNumber, connection, departmentName, fallbackAgentCallSid, setConferenceSid]);
 
   useEffect(() => {
     if (departmentName) {

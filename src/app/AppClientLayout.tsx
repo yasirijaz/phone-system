@@ -6,11 +6,13 @@ import IncomingCallModal from '@/components/incoming-call-modal';
 import ActiveCallBar from '@/components/active-call-modal';
 import { useAuth } from '@/context/AuthContext';
 import ReservationModal from '@/components/reservation-modal';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { toast } from '@/hooks/use-toast';
 import UpdateProgress from '@/components/update-progress';
 import { usePathname } from 'next/navigation';
 import { isInAppRoute } from '@/lib/in-app-routes';
+import { isElectronOverlayRoute } from '@/lib/electron-overlay-routes';
+import { isElectron } from '@/lib/is-electron';
 import { InAppShell } from '@/components/in-app-shell';
 import { isLiveCallStatus } from '@/lib/twilio-call-utils';
 import { readActiveCallSession } from '@/lib/active-call-session';
@@ -34,8 +36,10 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
 
   const { user } = useAuth();
   const pathname = usePathname();
+  const isOverlayRoute = isElectronOverlayRoute(pathname);
   const showInAppShell = isInAppRoute(pathname);
   const [updateMessage, setUpdateMessage] = useState<string>('');
+  const callStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     void syncActiveCallState();
@@ -88,25 +92,70 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     !!connection && (callStatus === 'pending' || callStatus === 'ringing');
   const isIncomingCall =
     isIncomingDeviceCall && !activeReservation && !incomingReservation && !showReservationModal;
-  const isActiveCall = hasLiveConnection || !!activeReservation || hasPersistedActiveCall;
+  const isActiveCall =
+    hasLiveConnection ||
+    !!activeReservation ||
+    (hasPersistedActiveCall && !incomingReservation);
+
+  const liveCallSid = connection?.parameters?.CallSid ?? null;
+  const storedMetaApplies = Boolean(
+    activeCallMeta &&
+      (!liveCallSid || !activeCallMeta.callSid || activeCallMeta.callSid === liveCallSid) &&
+      (!activeReservation ||
+        !activeCallMeta.callerNumber ||
+        activeCallMeta.callerNumber === activeReservation.task?.attributes?.from)
+  );
 
   const callerName =
     activeReservation?.task?.attributes?.contact_name ||
     connection?.parameters?.FriendlyName ||
-    activeCallMeta?.callerName ||
+    (storedMetaApplies ? activeCallMeta?.callerName : null) ||
     'Unknown Caller';
   const callerNumber =
     activeReservation?.task?.attributes?.from ||
     connection?.parameters?.From ||
     connection?.parameters?.To ||
-    activeCallMeta?.callerNumber ||
+    (storedMetaApplies ? activeCallMeta?.callerNumber : null) ||
     '';
   const departmentName =
     activeReservation?.task?.attributes?.department_name ||
     incomingReservation?.task?.attributes?.department_name ||
-    activeCallMeta?.departmentName ||
+    (storedMetaApplies ? activeCallMeta?.departmentName : null) ||
     null;
-  const effectiveConferenceSid = conferenceSid || activeCallMeta?.conferenceSid || null;
+  const effectiveConferenceSid =
+    conferenceSid ||
+    (storedMetaApplies ? activeCallMeta?.conferenceSid : null) ||
+    null;
+  const activeCallKey =
+    effectiveConferenceSid ||
+    connection?.parameters?.CallSid ||
+    activeCallMeta?.callSid ||
+    activeReservation?.task?.sid ||
+    incomingReservation?.task?.sid ||
+    'idle';
+
+  useEffect(() => {
+    if (!isElectron() || !window.electronAPI || isOverlayRoute) return;
+
+    if (isActiveCall) {
+      if (!callStartedAtRef.current) {
+        callStartedAtRef.current = Date.now();
+      }
+      window.electronAPI.send('show-call-progress', {
+        callerName,
+        callerNumber,
+        startedAt: callStartedAtRef.current,
+      });
+      return;
+    }
+
+    callStartedAtRef.current = null;
+    window.electronAPI.send('hide-call-progress');
+  }, [isActiveCall, callerName, callerNumber, isOverlayRoute]);
+
+  if (isOverlayRoute) {
+    return <>{children}</>;
+  }
 
   return (
     <>
@@ -121,6 +170,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         onReject={rejectCall}
       />
        <ActiveCallBar
+        key={activeCallKey}
         isOpen={!!isActiveCall}
         contactNumber={callerNumber}
         callerName={callerName}
@@ -129,7 +179,9 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         onEndCallForAll={endCallForAll}
         connection={connection}
         conferenceSid={effectiveConferenceSid}
-        fallbackAgentCallSid={activeCallMeta?.callSid ?? null}
+        fallbackAgentCallSid={
+          storedMetaApplies ? activeCallMeta?.callSid ?? null : liveCallSid
+        }
       />
       <ReservationModal
         isOpen={!!showReservationModal}
