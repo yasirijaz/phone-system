@@ -29,6 +29,9 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     activeReservation,
     showReservationModal,
     acceptReservation,
+    acceptReservationAndEndCurrent,
+    acceptReservationWithHold,
+    acceptReservationAndMerge,
     rejectReservation,
     activeCallMeta,
     syncActiveCallState,
@@ -96,6 +99,9 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     hasLiveConnection ||
     !!activeReservation ||
     (hasPersistedActiveCall && !incomingReservation);
+
+  const isAgentOnCall =
+    isActiveCall && !isIncomingDeviceCall;
 
   const liveCallSid = connection?.parameters?.CallSid ?? null;
   const storedMetaApplies = Boolean(
@@ -171,7 +177,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
       />
        <ActiveCallBar
         key={activeCallKey}
-        isOpen={!!isActiveCall}
+        isOpen={!!isActiveCall && !showReservationModal}
         contactNumber={callerNumber}
         callerName={callerName}
         departmentName={departmentName}
@@ -187,7 +193,20 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         isOpen={!!showReservationModal}
         onClose={() => rejectReservation(incomingReservation!)}
         reservation={incomingReservation}
+        activeCall={
+          isAgentOnCall && showReservationModal
+            ? {
+                callerName,
+                callerNumber,
+                departmentName,
+                startedAt: callStartedAtRef.current ?? activeCallMeta?.startedAt ?? Date.now(),
+              }
+            : null
+        }
         onAccept={acceptReservation}
+        onAcceptEndCurrent={acceptReservationAndEndCurrent}
+        onAcceptHold={acceptReservationWithHold}
+        onAcceptMerge={acceptReservationAndMerge}
         onReject={rejectReservation}
       />
       <UpdateProgress message={updateMessage} />

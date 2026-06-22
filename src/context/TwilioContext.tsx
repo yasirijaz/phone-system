@@ -6,7 +6,14 @@ import type { Device, Call } from '@twilio/voice-sdk';
 import type { Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
 
 import axios from '@/lib/axios';
-import { leaveConference as leaveConferenceApi, endConference as endConferenceApi } from '@/services/twilioService';
+import {
+  leaveConference as leaveConferenceApi,
+  endConference as endConferenceApi,
+  allParticipant,
+  holdParticipant,
+  consultMerge,
+  type ConferenceParticipant,
+} from '@/services/twilioService';
 import {
   broadcastOperatorPresence,
   broadcastOperatorPresenceKeepalive,
@@ -56,6 +63,9 @@ interface TwilioContextType {
   leaveCall: (conferenceSid: string, callSid: string) => Promise<void>;
   endCallForAll: (conferenceSid?: string | null) => Promise<void>;
   acceptReservation: (reservation: Reservation) => void;
+  acceptReservationAndEndCurrent: (reservation: Reservation) => Promise<void>;
+  acceptReservationWithHold: (reservation: Reservation) => Promise<void>;
+  acceptReservationAndMerge: (reservation: Reservation) => Promise<void>;
   rejectReservation: (reservation: Reservation) => void;
   completeReservation: (reservation: Reservation) => void;
   activityName: string | null;
@@ -104,6 +114,20 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const reservationLifecycleAttachedRef = useRef<WeakSet<Reservation>>(new WeakSet());
   const conferenceSidRef = useRef<string | null>(null);
   const hangUpFromOverlayRef = useRef<() => void>(() => {});
+  const pendingMergeConferenceSidRef = useRef<string | null>(null);
+  const reservationActionHandlersRef = useRef<{
+    acceptReservation: (reservation: Reservation) => void;
+    acceptReservationWithHold: (reservation: Reservation) => Promise<void>;
+    acceptReservationAndEndCurrent: (reservation: Reservation) => Promise<void>;
+    acceptReservationAndMerge: (reservation: Reservation) => Promise<void>;
+    isAgentOnCall: () => boolean;
+  }>({
+    acceptReservation: () => {},
+    acceptReservationWithHold: async () => {},
+    acceptReservationAndEndCurrent: async () => {},
+    acceptReservationAndMerge: async () => {},
+    isAgentOnCall: () => false,
+  });
 
   useEffect(() => {
     conferenceSidRef.current = conferenceSid;
@@ -654,7 +678,19 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
             const attrs: any = reservation.task?.attributes || {};
             const from = attrs.contact_name || attrs.callerName || attrs.from || '';
             const callerName = attrs.callerName || attrs.contact_name || '';
-            window.electronAPI.send('incoming-call', { from, callerName });
+            const session = readActiveCallSession();
+            const onCall = isAgentOnCall();
+            window.electronAPI.send('incoming-call', {
+              from,
+              callerName,
+              activeCall: onCall
+                ? {
+                    callerName: session?.callerName || 'On Call',
+                    callerNumber: session?.callerNumber || '',
+                    startedAt: session?.startedAt || Date.now(),
+                  }
+                : null,
+            });
           }
         } catch (e) {
           console.warn('Failed to send incoming-call IPC:', e);
@@ -714,7 +750,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setIncomingReservation(null);
           setShowReservationModal(false);
           incomingReservationRef.current = null;
-          clearActiveCallState();
+          if (!isAgentOnCall()) {
+            clearActiveCallState();
+          }
           try {
             if (isElectron() && window.electronAPI) {
               window.electronAPI.send('dismiss-incoming-overlay');
@@ -778,10 +816,47 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       const res = incomingReservationRef.current;
       if (res) {
         try {
-          acceptReservation(res);
-          
+          const handlers = reservationActionHandlersRef.current;
+          if (handlers.isAgentOnCall()) {
+            void handlers.acceptReservationWithHold(res);
+          } else {
+            handlers.acceptReservation(res);
+          }
         } catch (e) {
           console.error('Failed to accept reservation from IPC:', e);
+        }
+      }
+    });
+
+    const offAcceptedHold = window.electronAPI.on('accept-call-hold', () => {
+      const res = incomingReservationRef.current;
+      if (res) {
+        try {
+          void reservationActionHandlersRef.current.acceptReservationWithHold(res);
+        } catch (e) {
+          console.error('Failed to hold and accept reservation from IPC:', e);
+        }
+      }
+    });
+
+    const offAcceptedEndCurrent = window.electronAPI.on('accept-call-end-current', () => {
+      const res = incomingReservationRef.current;
+      if (res) {
+        try {
+          void reservationActionHandlersRef.current.acceptReservationAndEndCurrent(res);
+        } catch (e) {
+          console.error('Failed to end current call and accept reservation from IPC:', e);
+        }
+      }
+    });
+
+    const offAcceptedMerge = window.electronAPI.on('accept-call-merge', () => {
+      const res = incomingReservationRef.current;
+      if (res) {
+        try {
+          void reservationActionHandlersRef.current.acceptReservationAndMerge(res);
+        } catch (e) {
+          console.error('Failed to merge and accept reservation from IPC:', e);
         }
       }
     });
@@ -808,6 +883,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     return () => {
       try { offAccepted && offAccepted(); } catch {}
+      try { offAcceptedHold && offAcceptedHold(); } catch {}
+      try { offAcceptedEndCurrent && offAcceptedEndCurrent(); } catch {}
+      try { offAcceptedMerge && offAcceptedMerge(); } catch {}
       try { offRejected && offRejected(); } catch {}
       try { offEndCall && offEndCall(); } catch {}
     };
@@ -902,6 +980,47 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     void endCallForAll(conferenceSid);
   };
 
+  const holdCurrentConferenceParticipants = useCallback(async (): Promise<boolean> => {
+    const sid = conferenceSidRef.current ?? readActiveCallSession()?.conferenceSid ?? null;
+    if (!sid) return false;
+
+    try {
+      const response = await allParticipant(sid);
+      const participants: ConferenceParticipant[] = response?.data ?? response?.participants ?? [];
+      const agentSid = connectionRef.current?.parameters?.CallSid ?? null;
+
+      await Promise.all(
+        participants
+          .filter((participant) => !participant.is_agent && participant.call_sid !== agentSid)
+          .map((participant) => holdParticipant(sid, participant.call_sid, true))
+      );
+      return true;
+    } catch (error) {
+      console.warn('Failed to hold current conference participants:', error);
+      return false;
+    }
+  }, []);
+
+  const scheduleConsultMerge = useCallback((conferenceSidToMerge: string | null) => {
+    if (!conferenceSidToMerge) return;
+
+    pendingMergeConferenceSidRef.current = conferenceSidToMerge;
+    for (const delayMs of [1500, 4000, 8000]) {
+      window.setTimeout(async () => {
+        if (pendingMergeConferenceSidRef.current !== conferenceSidToMerge) return;
+        try {
+          const result = await consultMerge(conferenceSidToMerge);
+          if (result?.status) {
+            pendingMergeConferenceSidRef.current = null;
+            toast({ title: 'Calls merged', description: 'All callers are now connected.' });
+          }
+        } catch (error) {
+          console.warn('Deferred consult merge failed:', error);
+        }
+      }, delayMs);
+    }
+  }, [toast]);
+
   const acceptReservation = (reservation: Reservation) => {
     stopIncomingRingSound();
     console.log('accepting reservation', reservation);
@@ -971,9 +1090,49 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     console.log('rejecting reservation', reservation)
     stopIncomingRingSound();
     expectingReservationDeviceLegRef.current = false;
+    setIncomingReservation(null);
+    setShowReservationModal(false);
+    incomingReservationRef.current = null;
     void safeRejectReservation(reservation);
-    clearActiveCallState();
+    if (!isAgentOnCall()) {
+      clearActiveCallState();
+    }
   };
+
+  const acceptReservationAndEndCurrent = async (reservation: Reservation) => {
+    stopIncomingRingSound();
+    setShowReservationModal(false);
+    setIncomingReservation(null);
+    incomingReservationRef.current = null;
+
+    const sid = conferenceSidRef.current ?? readActiveCallSession()?.conferenceSid ?? null;
+    await endCallForAll(sid);
+    acceptReservation(reservation);
+  };
+
+  const acceptReservationWithHold = async (reservation: Reservation) => {
+    stopIncomingRingSound();
+    await holdCurrentConferenceParticipants();
+    acceptReservation(reservation);
+  };
+
+  const acceptReservationAndMerge = async (reservation: Reservation) => {
+    stopIncomingRingSound();
+    const sid = conferenceSidRef.current ?? readActiveCallSession()?.conferenceSid ?? null;
+    await holdCurrentConferenceParticipants();
+    scheduleConsultMerge(sid);
+    acceptReservation(reservation);
+  };
+
+  useEffect(() => {
+    reservationActionHandlersRef.current = {
+      acceptReservation,
+      acceptReservationWithHold,
+      acceptReservationAndEndCurrent,
+      acceptReservationAndMerge,
+      isAgentOnCall,
+    };
+  });
 
   const completeReservation = (reservation: Reservation) => {
     console.log('completing reservation', reservation)
@@ -1033,6 +1192,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     leaveCall,
     endCallForAll,
     acceptReservation,
+    acceptReservationAndEndCurrent,
+    acceptReservationWithHold,
+    acceptReservationAndMerge,
     rejectReservation,
     completeReservation,
     activityName,

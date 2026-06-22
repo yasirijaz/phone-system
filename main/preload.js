@@ -4,6 +4,9 @@ const electronSendChannels = [
   'incoming-sms',
   'incoming-call',
   'accept-call',
+  'accept-call-hold',
+  'accept-call-end-current',
+  'accept-call-merge',
   'reject-call',
   'check-for-updates',
   'successfully-accepted-call',
@@ -17,8 +20,12 @@ const electronSendChannels = [
 
 const electronReceiveChannels = [
   'call-accepted',
+  'accept-call-hold',
+  'accept-call-end-current',
+  'accept-call-merge',
   'call-rejected',
   'call-progress-update',
+  'incoming-call-update',
   'end-call-from-progress',
 ];
 
