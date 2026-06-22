@@ -22,6 +22,14 @@ import {
   playIncomingRing,
   stopIncomingRing,
 } from '@/lib/incoming-call-audio';
+import {
+  clearActiveCallSession,
+  mergeActiveCallSession,
+  readActiveCallSession,
+  type ActiveCallSession,
+} from '@/lib/active-call-session';
+import { findLiveCallOnDevice, isLiveCallStatus } from '@/lib/twilio-call-utils';
+import { getActiveCall } from '@/services/callLogService';
 
 interface TwilioContextType {
   device: Device | null;
@@ -36,7 +44,10 @@ interface TwilioContextType {
   error: string | null;
   conferenceSid: string | null;
   fromNumber: string | null;
+  activeCallMeta: ActiveCallSession | null;
   connectTwilio: () => void;
+  syncActiveCallState: () => Promise<void>;
+  registerOutboundConnection: (conn: Call, meta?: Partial<ActiveCallSession>) => void;
   acceptCall: () => void;
   rejectCall: () => void;
   hangUp: () => void;
@@ -79,7 +90,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [twilio, setTwilio] = useState<any>(null);
   const [activityName, setActivityName] = useState<string | null>(null);
+  const [activeCallMeta, setActiveCallMeta] = useState<ActiveCallSession | null>(() => readActiveCallSession());
   const ringAudioRef = useRef<HTMLAudioElement | null>(null);
+  const syncInFlightRef = useRef(false);
   const connectionRef = useRef<Call | null>(null);
   const userInCallRef = useRef(false);
   const incomingReservationRef = useRef<Reservation | null>(null);
@@ -95,6 +108,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     connectionRef.current = connection;
   }, [connection]);
+
+  useEffect(() => {
+    if (!conferenceSid) return;
+    const merged = mergeActiveCallSession({ conferenceSid });
+    setActiveCallMeta(merged);
+  }, [conferenceSid]);
 
   useEffect(() => {
     userInCallRef.current = Boolean(user?.in_call);
@@ -126,6 +145,15 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     stopIncomingRing(ringAudioRef.current);
   }, []);
 
+  const persistActiveCallMeta = useCallback((patch: Partial<ActiveCallSession>) => {
+    const merged = mergeActiveCallSession(patch);
+    setActiveCallMeta(merged);
+    if (merged.conferenceSid) {
+      setConferenceSid(merged.conferenceSid);
+    }
+    return merged;
+  }, []);
+
   const clearActiveCallState = useCallback(() => {
     setConnection(null);
     setActiveReservation(null);
@@ -134,7 +162,111 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setConferenceSid(null);
     setFromNumber(null);
     connectionSourceRef.current = null;
+    clearActiveCallSession();
+    setActiveCallMeta(null);
   }, []);
+
+  const syncActiveCallState = useCallback(async () => {
+    if (syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
+
+    try {
+      const liveDeviceCall = findLiveCallOnDevice(deviceRef.current);
+      const currentConnection = connectionRef.current;
+      const currentStatus = currentConnection?.status?.() ?? null;
+
+      if (liveDeviceCall && (!currentConnection || !isLiveCallStatus(currentStatus))) {
+        connectionSourceRef.current = 'device';
+        setConnection(liveDeviceCall);
+      }
+
+      const connectionAfterSync = liveDeviceCall ?? connectionRef.current;
+      const reservation = activeReservationRef.current;
+
+      if (connectionAfterSync && isLiveCallStatus(connectionAfterSync.status?.())) {
+        const callSid = connectionAfterSync.parameters?.CallSid ?? null;
+        persistActiveCallMeta({
+          callSid,
+          callerName:
+            reservation?.task?.attributes?.contact_name ||
+            connectionAfterSync.parameters?.FriendlyName ||
+            readActiveCallSession()?.callerName ||
+            'Unknown Caller',
+          callerNumber:
+            reservation?.task?.attributes?.from ||
+            connectionAfterSync.parameters?.From ||
+            connectionAfterSync.parameters?.To ||
+            readActiveCallSession()?.callerNumber ||
+            '',
+          departmentName:
+            reservation?.task?.attributes?.department_name ||
+            readActiveCallSession()?.departmentName ||
+            null,
+        });
+        return;
+      }
+
+      if (reservation) {
+        const attrs = reservation.task?.attributes;
+        persistActiveCallMeta({
+          callerName: attrs?.contact_name || readActiveCallSession()?.callerName || 'Unknown Caller',
+          callerNumber: attrs?.from || readActiveCallSession()?.callerNumber || '',
+          departmentName: attrs?.department_name || readActiveCallSession()?.departmentName || null,
+          conferenceSid: attrs?.conference?.sid || readActiveCallSession()?.conferenceSid || null,
+        });
+        return;
+      }
+
+      const storedSession = readActiveCallSession();
+      if (storedSession && (storedSession.conferenceSid || storedSession.callSid)) {
+        setActiveCallMeta(storedSession);
+        if (storedSession.conferenceSid) {
+          setConferenceSid(storedSession.conferenceSid);
+        }
+        return;
+      }
+
+      if (userInCallRef.current && user?.id) {
+        const activeCallLog = await getActiveCall();
+        if (activeCallLog?.call_status === 'in_progress') {
+          const restored = persistActiveCallMeta({
+            callSid: activeCallLog.worker_sid || activeCallLog.call_sid || null,
+            conferenceSid: activeCallLog.conference_sid || null,
+            callerName:
+              activeCallLog.contact_name ||
+              activeCallLog.client_name ||
+              activeCallLog.from ||
+              activeCallLog.to ||
+              'Unknown Caller',
+            callerNumber: activeCallLog.from || activeCallLog.to || '',
+            departmentName: activeCallLog.department?.name || null,
+          });
+          setActiveCallMeta(restored);
+          return;
+        }
+      }
+
+      if (!userInCallRef.current && !liveDeviceCall) {
+        clearActiveCallSession();
+        setActiveCallMeta(null);
+      }
+    } finally {
+      syncInFlightRef.current = false;
+    }
+  }, [persistActiveCallMeta, user?.id]);
+
+  const registerOutboundConnection = useCallback((conn: Call, meta?: Partial<ActiveCallSession>) => {
+    connectionSourceRef.current = 'device';
+    setConnection(conn);
+    persistActiveCallMeta({
+      callSid: conn.parameters?.CallSid ?? null,
+      callerName: meta?.callerName ?? meta?.callerNumber ?? 'Unknown Caller',
+      callerNumber: meta?.callerNumber ?? '',
+      departmentName: meta?.departmentName ?? null,
+      conferenceSid: meta?.conferenceSid ?? null,
+      startedAt: Date.now(),
+    });
+  }, [persistActiveCallMeta]);
 
   const safeCompleteReservation = useCallback((reservation?: Reservation | null) => {
     const target = reservation ?? activeReservationRef.current;
@@ -332,9 +464,15 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           console.log('Call disconnected.');
           expectingReservationDeviceLegRef.current = false;
           if (connectionSourceRef.current === 'device') {
-            clearDeviceConnectionState();
-            if (!activeReservationRef.current) {
-              setActiveReservation(null);
+            const liveCall = findLiveCallOnDevice(deviceRef.current);
+            if (liveCall) {
+              setConnection(liveCall);
+              return;
+            }
+            if (activeReservationRef.current) {
+              clearDeviceConnectionState();
+            } else {
+              clearActiveCallState();
             }
           }
         });
@@ -358,14 +496,25 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.log('Successfully established call!', conn);
         connectionSourceRef.current = 'device';
         setConnection(conn);
+        persistActiveCallMeta({
+          callSid: conn.parameters?.CallSid ?? null,
+          callerName: conn.parameters?.FriendlyName || conn.parameters?.To || 'Unknown Caller',
+          callerNumber: conn.parameters?.From || conn.parameters?.To || '',
+        });
       });
 
       newDevice.on('disconnect', () => {
         console.log('Call disconnected (device event).');
+        const liveCall = findLiveCallOnDevice(newDevice);
+        if (liveCall) {
+          setConnection(liveCall);
+          return;
+        }
         if (connectionSourceRef.current === 'device') {
-          clearDeviceConnectionState();
-          if (!activeReservationRef.current) {
-            setActiveReservation(null);
+          if (activeReservationRef.current) {
+            clearDeviceConnectionState();
+          } else {
+            clearActiveCallState();
           }
         }
       });
@@ -472,6 +621,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
             if (confSid) setConferenceSid(confSid);
             if (fromNum) setFromNumber(fromNum);
 
+            persistActiveCallMeta({
+              conferenceSid: confSid || null,
+              callerName: attributes?.contact_name || attributes?.from || 'Unknown Caller',
+              callerNumber: attributes?.from || '',
+              departmentName: attributes?.department_name || null,
+            });
+
             if (typeof window !== 'undefined' && window.electronAPI) {
               window.electronAPI.send('successfully-accepted-call');
             }
@@ -510,7 +666,35 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsConnecting(false);
     }
-  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, clearActiveCallState, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound]);
+  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, clearActiveCallState, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound, persistActiveCallMeta]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const handleInCallStatus = (data: { user_id?: number | string; in_call?: number | string | boolean }) => {
+      if (Number(data.user_id) !== Number(user.id) || data.in_call == null) return;
+
+      userInCallRef.current = Boolean(Number(data.in_call));
+      if (userInCallRef.current) {
+        void syncActiveCallState();
+      } else if (!findLiveCallOnDevice(deviceRef.current) && !activeReservationRef.current) {
+        clearActiveCallState();
+      }
+    };
+
+    events.on('refreshInCallStatus', handleInCallStatus);
+    return () => {
+      events.off('refreshInCallStatus', handleInCallStatus);
+    };
+  }, [user?.id, syncActiveCallState, clearActiveCallState]);
+
+  useEffect(() => {
+    void syncActiveCallState();
+    const interval = window.setInterval(() => {
+      void syncActiveCallState();
+    }, 3000);
+    return () => window.clearInterval(interval);
+  }, [syncActiveCallState]);
 
   // Listen for accept/reject actions coming back from Electron main
   useEffect(() => {
@@ -639,6 +823,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     incomingReservationRef.current = null;
 
     const attributes = reservation.task?.attributes;
+    persistActiveCallMeta({
+      callerName: attributes?.contact_name || attributes?.from || 'Unknown Caller',
+      callerNumber: attributes?.from || '',
+      departmentName: attributes?.department_name || null,
+      conferenceSid: attributes?.conference?.sid || null,
+    });
     if (attributes.do_nothing) {
       console.log('Reservation is set to do nothing.');
       const outgoing = process.env.NEXT_PUBLIC_API_URL + '/api/twilio/outgoing-callback';
@@ -730,7 +920,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     error,
     conferenceSid,
     fromNumber,
+    activeCallMeta,
     connectTwilio,
+    syncActiveCallState,
+    registerOutboundConnection,
     acceptCall,
     rejectCall,
     hangUp,

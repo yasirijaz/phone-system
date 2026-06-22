@@ -157,6 +157,16 @@ export async function enrichThreadsWithLastAttendee(
   );
 }
 
+export const getActiveCall = async (): Promise<Communication | null> => {
+  try {
+    const response = await axios.get('/api/call-logs/active/current');
+    return response.data.call_log || null;
+  } catch (error) {
+    console.error('Error fetching active call:', error);
+    return null;
+  }
+};
+
 export const getCallLogsBySid = async (callSid: string): Promise<Communication | null> => {
   try {
     const response = await axios.get(`/api/call-logs/${callSid}`);

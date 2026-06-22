@@ -9,10 +9,11 @@ import ReservationModal from '@/components/reservation-modal';
 import { useEffect, useState } from 'react';
 import { toast } from '@/hooks/use-toast';
 import UpdateProgress from '@/components/update-progress';
-import ReconnectPrompt from '@/components/reconnect-prompt';
 import { usePathname } from 'next/navigation';
 import { isInAppRoute } from '@/lib/in-app-routes';
 import { InAppShell } from '@/components/in-app-shell';
+import { isLiveCallStatus } from '@/lib/twilio-call-utils';
+import { readActiveCallSession } from '@/lib/active-call-session';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const {
@@ -27,13 +28,18 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     showReservationModal,
     acceptReservation,
     rejectReservation,
+    activeCallMeta,
+    syncActiveCallState,
   } = useTwilio();
 
-  // set update status state
-  const [updateMessage, setUpdateMessage] = useState<string>("");
   const { user } = useAuth();
   const pathname = usePathname();
   const showInAppShell = isInAppRoute(pathname);
+  const [updateMessage, setUpdateMessage] = useState<string>('');
+
+  useEffect(() => {
+    void syncActiveCallState();
+  }, [pathname, syncActiveCallState]);
    useEffect(() => {
     if(window.api)
       window.api.receive('updatelog', handleUpdates);
@@ -43,6 +49,10 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     const handleChunkError = (event: ErrorEvent) => {
       const message = event.message || '';
       if (message.includes('ChunkLoadError') || message.includes('Loading chunk')) {
+        if (readActiveCallSession()) {
+          console.warn('Skipping chunk reload while a call is in progress.');
+          return;
+        }
         const reloadKey = 'chunk-reload';
         if (!sessionStorage.getItem(reloadKey)) {
           sessionStorage.setItem(reloadKey, '1');
@@ -70,27 +80,33 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   }
 
   const callStatus = connection?.status?.();
-  const hasLiveConnection =
-    !!connection && !['pending', 'ringing', 'closed'].includes(String(callStatus ?? ''));
+  const hasLiveConnection = !!connection && isLiveCallStatus(callStatus);
+  const hasPersistedActiveCall = Boolean(
+    activeCallMeta?.conferenceSid || activeCallMeta?.callSid
+  );
   const isIncomingDeviceCall =
     !!connection && (callStatus === 'pending' || callStatus === 'ringing');
-  // Only show the device incoming prompt for standalone calls — not Task Router legs.
   const isIncomingCall =
     isIncomingDeviceCall && !activeReservation && !incomingReservation && !showReservationModal;
-  // Keep the bar visible for reservation-based calls even if the device leg disconnects.
-  const isActiveCall = hasLiveConnection || !!activeReservation;
-  
-  // For reservation-based calls, get customer info from reservation
-  // For regular calls, get customer info from connection parameters
-  const callerName = activeReservation?.task?.attributes?.contact_name || connection?.parameters?.FriendlyName || "Unknown Caller";
-  const callerNumber = activeReservation?.task?.attributes?.from || connection?.parameters?.From || "";
+  const isActiveCall = hasLiveConnection || !!activeReservation || hasPersistedActiveCall;
+
+  const callerName =
+    activeReservation?.task?.attributes?.contact_name ||
+    connection?.parameters?.FriendlyName ||
+    activeCallMeta?.callerName ||
+    'Unknown Caller';
+  const callerNumber =
+    activeReservation?.task?.attributes?.from ||
+    connection?.parameters?.From ||
+    connection?.parameters?.To ||
+    activeCallMeta?.callerNumber ||
+    '';
   const departmentName =
     activeReservation?.task?.attributes?.department_name ||
     incomingReservation?.task?.attributes?.department_name ||
+    activeCallMeta?.departmentName ||
     null;
-  
-  // Use customer number (From) for active call display
-  const activeCallContact = activeReservation?.task?.attributes?.from || connection?.parameters?.From || connection?.parameters?.To || "Unknown";
+  const effectiveConferenceSid = conferenceSid || activeCallMeta?.conferenceSid || null;
 
   return (
     <>
@@ -112,7 +128,8 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         onLeaveCall={leaveCall}
         onEndCallForAll={endCallForAll}
         connection={connection}
-        conferenceSid={conferenceSid}
+        conferenceSid={effectiveConferenceSid}
+        fallbackAgentCallSid={activeCallMeta?.callSid ?? null}
       />
       <ReservationModal
         isOpen={!!showReservationModal}

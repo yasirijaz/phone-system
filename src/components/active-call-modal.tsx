@@ -40,6 +40,7 @@ interface ActiveCallBarProps {
   onEndCallForAll: (conferenceSid?: string | null) => Promise<void>;
   connection: Call | null;
   conferenceSid: string | null;
+  fallbackAgentCallSid?: string | null;
 }
 
 const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { icon: React.ElementType, label: string, onClick?: () => void, isActive?: boolean, className?: string }) => (
@@ -52,7 +53,7 @@ const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { ico
 );
 
 
-export default function ActiveCallBar({ isOpen, contactNumber, callerName, departmentName, onLeaveCall, onEndCallForAll, connection, conferenceSid }: ActiveCallBarProps) {
+export default function ActiveCallBar({ isOpen, contactNumber, callerName, departmentName, onLeaveCall, onEndCallForAll, connection, conferenceSid, fallbackAgentCallSid }: ActiveCallBarProps) {
   const { user: authUser } = useAuth();
   const { fromNumber, setConferenceSid } = useTwilio();
   const [duration, setDuration] = useState(0);
@@ -84,7 +85,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [pendingOutgoing, setPendingOutgoing] = useState<PendingOutgoingParticipant | null>(null);
   const [pendingTransferCallSid, setPendingTransferCallSid] = useState<string | null>(null);
   const effectiveConferenceSid = conferenceSid || verifiedConferenceSid;
-  const agentCallSid = connection?.parameters?.CallSid ?? null;
+  const agentCallSid = connection?.parameters?.CallSid ?? fallbackAgentCallSid ?? null;
   const externalParticipants = (currentParticipants as ConferenceParticipant[]).filter(
     (participant) => !participant.is_agent && participant.call_sid !== agentCallSid
   );
@@ -116,10 +117,11 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   ];
 
    useEffect(() => {
-    if (isOpen && connection?.parameters?.CallSid) {
+    const lookupCallSid = connection?.parameters?.CallSid || fallbackAgentCallSid;
+    if (isOpen && lookupCallSid) {
       const fetchUserName = async () => {
         try {
-          const currentCallSid = connection?.parameters?.CallSid || '';
+          const currentCallSid = lookupCallSid;
           const matchingCall = await getCallLogsBySid(currentCallSid);
           
           
@@ -172,7 +174,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       setPendingOutgoing(null);
       setPendingTransferCallSid(null);
     }
-  }, [isOpen, contactNumber, connection, departmentName]);
+  }, [isOpen, contactNumber, connection, departmentName, fallbackAgentCallSid]);
 
   useEffect(() => {
     if (departmentName) {

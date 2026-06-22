@@ -21,8 +21,6 @@ import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
 import HardwareSettings from "@/components/hardware-settings";
-import ActiveCallBar from "./active-call-modal";
-import type { Call } from '@twilio/voice-sdk';
 import { ScrollArea } from "./ui/scroll-area";
 import { useRouter } from "next/navigation";
 import { events } from "@/lib/events";
@@ -64,7 +62,7 @@ export default function AppHeader({
 }: AppHeaderProps) {
     const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
     const [isVideoOpen, setIsVideoOpen] = useState(false);
-    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid, connection: twilioConnection, conferenceSid: twilioConferenceSid, leaveCall, endCallForAll } = useTwilio();
+    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid, connection: twilioConnection, conferenceSid: twilioConferenceSid, registerOutboundConnection } = useTwilio();
     const { toast } = useToast();
     const router = useRouter();
 
@@ -84,13 +82,6 @@ export default function AppHeader({
     
     const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
     const [selectedFromNumber, setSelectedFromNumber] = useState('');
-
-    //for outgoing calls
-    const [activeCall, setActiveCall] = useState<Call | null>(null);
-    const [isActiveCallOpen, setIsActiveCallOpen] = useState(false);
-    const [activeContactName, setActiveContactName] = useState('');
-    const [activeDepartmentName, setActiveDepartmentName] = useState<string | null>(null);
-    const [activeConferenceSid, setActiveConferenceSid] = useState<string | null>(null);
 
     // Search state
     const [searchOpen, setSearchOpen] = useState(false);
@@ -419,12 +410,12 @@ export default function AppHeader({
             return;
         }
 
-        const liveConnection = activeCall || twilioConnection;
+        const liveConnection = twilioConnection;
         const callStatus = liveConnection?.status?.();
         const isInLiveCall = callStatus === 'open';
         const isCallConnecting =
           !!callStatus && !['closed', 'disconnected'].includes(callStatus) && !isInLiveCall;
-        const conferenceSidForConsult = activeConferenceSid || twilioConferenceSid;
+        const conferenceSidForConsult = twilioConferenceSid;
 
         if (isCallConnecting) {
             toast({
@@ -451,7 +442,6 @@ export default function AppHeader({
                 }
                 if (consultResult?.data?.conference_sid) {
                     setConferenceSid(consultResult.data.conference_sid);
-                    setActiveConferenceSid(consultResult.data.conference_sid);
                 }
                 await consultEnsureAgent(conferenceSidForConsult);
                 setDialerOpen(false);
@@ -471,7 +461,6 @@ export default function AppHeader({
     
         try {
             setConferenceSid(null);
-            setActiveConferenceSid(null);
 
             const params: { To: string, From?: string, conferenceSid?: string, direction?: string } = { To: number };
             if (fromNumber) {
@@ -486,11 +475,12 @@ export default function AppHeader({
             }
             setDialerOpen(false);
 
-            setActiveContactName(number);
             const selectedDepartment = departments.find((dept) => String(dept.id) === selectedDepartmentId);
-            setActiveDepartmentName(selectedDepartment?.name || null);
-            setActiveCall(connection);
-            setIsActiveCallOpen(true);
+            registerOutboundConnection(connection, {
+                callerName: number,
+                callerNumber: number,
+                departmentName: selectedDepartment?.name || null,
+            });
 
            connection.on('accept', async () => {
                 console.log('Call accepted');
@@ -499,37 +489,12 @@ export default function AppHeader({
                     const data = await getconferenceSid(callSid);
                     if (data.conferenceSid) {
                         setConferenceSid(data.conferenceSid);
-                        setActiveConferenceSid(data.conferenceSid);
                     } else {
                         console.warn('No conferenceSid found yet.');
                     }
                 } catch (e) {
                     console.error('Error fetching conferenceSid:', e);
                 }
-            });
-
-            connection.on('disconnect', () => {
-                setIsActiveCallOpen(false);
-                setActiveCall(null);
-                setActiveDepartmentName(null);
-                setActiveConferenceSid(null);
-                setConferenceSid(null);
-            });
-
-            connection.on('cancel', () => {
-                setIsActiveCallOpen(false);
-                setActiveCall(null);
-                setActiveDepartmentName(null);
-                setActiveConferenceSid(null);
-                setConferenceSid(null);
-            });
-
-            connection.on('reject', () => {
-                setIsActiveCallOpen(false);
-                setActiveCall(null);
-                setActiveDepartmentName(null);
-                setActiveConferenceSid(null);
-                setConferenceSid(null);
             });
         } catch (error) {
             console.error("Error making call:", error);
@@ -811,31 +776,6 @@ export default function AppHeader({
                 </DialogHeader>
             </DialogContent>
             </Dialog>
-            
-            <ActiveCallBar
-              isOpen={isActiveCallOpen}
-              contactNumber={activeContactName}
-              callerName={activeContactName}
-              departmentName={activeDepartmentName}
-              connection={activeCall}
-              conferenceSid={activeConferenceSid}
-              onLeaveCall={async (sid, callSid) => {
-                await leaveCall(sid, callSid);
-                setIsActiveCallOpen(false);
-                setActiveCall(null);
-                setActiveDepartmentName(null);
-                setActiveConferenceSid(null);
-                setConferenceSid(null);
-              }}
-              onEndCallForAll={async (sid) => {
-                await endCallForAll(sid ?? activeConferenceSid);
-                setIsActiveCallOpen(false);
-                setActiveCall(null);
-                setActiveDepartmentName(null);
-                setActiveConferenceSid(null);
-                setConferenceSid(null);
-              }}
-            />
         </>
     );
 }
