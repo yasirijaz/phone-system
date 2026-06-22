@@ -98,7 +98,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   const isActiveCall =
     hasLiveConnection ||
     !!activeReservation ||
-    (hasPersistedActiveCall && !incomingReservation);
+    (hasPersistedActiveCall && !incomingReservation && !isIncomingDeviceCall);
 
   const isAgentOnCall =
     isActiveCall && !isIncomingDeviceCall;

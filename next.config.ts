@@ -9,6 +9,13 @@ const nextConfig: NextConfig = {
   distDir: 'build',
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
   outputFileTracingRoot: workspaceRoot,
+  serverExternalPackages: [
+    'genkit',
+    '@genkit-ai/google-genai',
+    '@genkit-ai/next',
+    '@genkit-ai/ai',
+    '@genkit-ai/core',
+  ],
   turbopack: {
     root: projectRoot,
   },

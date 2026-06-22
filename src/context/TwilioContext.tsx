@@ -504,31 +504,34 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         const incomingCallerNumber =
           reservationAttrs?.from || conn.parameters?.From || conn.parameters?.To || '';
 
-        persistActiveCallMeta(
-          {
-            callSid: conn.parameters?.CallSid ?? null,
-            conferenceSid: incomingConferenceSid || reservationAttrs?.conference?.sid || null,
-            callerName: incomingCallerName,
-            callerNumber: incomingCallerNumber,
-            departmentName: reservationAttrs?.department_name || null,
-            startedAt: Date.now(),
-          },
-          {
-            replace:
-              Boolean(reservationAttrs) ||
-              !isSameCallSession(readActiveCallSession(), {
-                callSid: conn.parameters?.CallSid ?? null,
-              }),
-          }
-        );
-
         const autoAccept = conn.customParameters.get('autoAccept');
         const isTransferLeg = conn.customParameters.get('transfer') === '1';
         const isReservationLeg =
           expectingReservationDeviceLegRef.current || activeReservationRef.current !== null;
         const shouldAutoAccept = isReservationLeg || isTransferLeg || autoAccept !== '0';
 
+        const persistIncomingCallMeta = () => {
+          persistActiveCallMeta(
+            {
+              callSid: conn.parameters?.CallSid ?? null,
+              conferenceSid: incomingConferenceSid || reservationAttrs?.conference?.sid || null,
+              callerName: incomingCallerName,
+              callerNumber: incomingCallerNumber,
+              departmentName: reservationAttrs?.department_name || null,
+              startedAt: Date.now(),
+            },
+            {
+              replace:
+                Boolean(reservationAttrs) ||
+                !isSameCallSession(readActiveCallSession(), {
+                  callSid: conn.parameters?.CallSid ?? null,
+                }),
+            }
+          );
+        };
+
         if (shouldAutoAccept) {
+          persistIncomingCallMeta();
           conn.accept();
           expectingReservationDeviceLegRef.current = false;
           if (!isReservationLeg) {
@@ -536,6 +539,16 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           }
         } else {
           startIncomingRing();
+          try {
+            if (isElectron() && window.electronAPI) {
+              window.electronAPI.send('incoming-call', {
+                from: incomingCallerNumber,
+                callerName: incomingCallerName,
+              });
+            }
+          } catch (e) {
+            console.warn('Failed to send incoming-call IPC:', e);
+          }
         }
 
         const stopRingOnEnd = () => stopIncomingRingSound();
@@ -546,6 +559,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
         conn.on('accept', () => {
           expectingReservationDeviceLegRef.current = false;
+          if (!shouldAutoAccept) {
+            persistIncomingCallMeta();
+          }
+          try {
+            if (isElectron() && window.electronAPI) {
+              window.electronAPI.send('successfully-accepted-call');
+            }
+          } catch {}
         });
 
         conn.on('disconnect', () => {
@@ -825,6 +846,21 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         } catch (e) {
           console.error('Failed to accept reservation from IPC:', e);
         }
+        return;
+      }
+
+      const pendingConnection = connectionRef.current;
+      const pendingStatus = pendingConnection?.status?.();
+      if (
+        pendingConnection &&
+        (pendingStatus === 'pending' || pendingStatus === 'ringing')
+      ) {
+        try {
+          stopIncomingRingSound();
+          pendingConnection.accept();
+        } catch (e) {
+          console.error('Failed to accept device call from IPC:', e);
+        }
       }
     });
 
@@ -866,9 +902,24 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       if (res) {
         try {
           rejectReservation(res);
-          
         } catch (e) {
           console.error('Failed to reject reservation from IPC:', e);
+        }
+        return;
+      }
+
+      const pendingConnection = connectionRef.current;
+      const pendingStatus = pendingConnection?.status?.();
+      if (
+        pendingConnection &&
+        (pendingStatus === 'pending' || pendingStatus === 'ringing')
+      ) {
+        try {
+          stopIncomingRingSound();
+          pendingConnection.reject();
+          clearActiveCallState();
+        } catch (e) {
+          console.error('Failed to reject device call from IPC:', e);
         }
       }
     });
