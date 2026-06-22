@@ -1,19 +1,20 @@
 import path from 'node:path';
 import type {NextConfig} from 'next';
 
-const monorepoRoot = path.join(import.meta.dirname, '../..');
+const projectRoot = import.meta.dirname;
+const workspaceRoot = path.join(projectRoot, '..');
 
 const nextConfig: NextConfig = {
   /* config options here */
   distDir: 'build',
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
-  outputFileTracingRoot: monorepoRoot,
+  outputFileTracingRoot: workspaceRoot,
   turbopack: {
-    root: monorepoRoot,
+    root: projectRoot,
   },
   webpack: (config) => {
     config.resolve.modules = [
-      path.join(monorepoRoot, 'node_modules'),
+      path.join(projectRoot, 'node_modules'),
       ...(config.resolve.modules ?? []),
     ];
     return config;

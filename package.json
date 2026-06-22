@@ -32,11 +32,13 @@
     "appId": "com.windshieldhub.voice",
     "productName": "Voice",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "public"
     },
     "files": [
       "main/**/*",
       "build/**/*",
+      "!build/dev/**",
       "package.json"
     ],
     "asar": true,
