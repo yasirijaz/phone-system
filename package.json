@@ -8,7 +8,6 @@
   "license": "MIT",
   "description": "A phone sytem for everyday use",
   "type": "module",
-  
   "scripts": {
     "build:electron": "set ELECTRON_BUILD=true && next build",
     "electron": "electron .",
@@ -51,21 +50,26 @@
       }
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "artifactName": "${productName}-Setup-${version}.${ext}",
       "icon": "public/logo.ico"
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "artifactName": "${productName}-${version}-mac.${ext}"
     },
     "linux": {
-      "target": ["AppImage"],
+      "target": [
+        "AppImage"
+      ],
       "artifactName": "${productName}-${version}.${ext}"
     }
   },
   "dependencies": {
-    "electron-updater": "^6.8.9",
     "@genkit-ai/ai": "^1.37.0",
     "@genkit-ai/core": "^1.37.0",
     "@genkit-ai/google-genai": "^1.37.0",
@@ -103,10 +107,12 @@
     "date-fns": "^4.4.0",
     "dotenv": "^17.4.2",
     "electron-serve": "^3.0.1",
+    "electron-updater": "^6.8.9",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^12.14.0",
     "framer-motion": "^12.40.0",
     "genkit": "^1.37.0",
+    "graphql": "^16.14.2",
     "lucide-react": "^1.18.0",
     "next": "16.2.9",
     "patch-package": "^8.0.1",
@@ -125,19 +131,20 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.1",
     "@types/caseless": "^0.12.5",
     "@types/js-cookie": "^3.0.6",
     "@types/node": "^25",
     "@types/react": "^19",
     "@types/react-beautiful-dnd": "^13.1.8",
     "@types/react-dom": "^19",
+    "app-builder-lib": "^26.15.3",
     "concurrently": "^9.2.1",
     "electron": "^37.4.0",
     "electron-builder": "^26.15.3",
-    "genkit-cli": "^1.37.0",
-    "@tailwindcss/postcss": "^4.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "genkit-cli": "^1.37.0",
     "postcss": "^8",
     "tailwindcss": "^4.3.1",
     "typescript": "^6"

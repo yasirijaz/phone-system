@@ -64,7 +64,7 @@ export default function CallProgressBarContent() {
   };
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center p-1">
+    <div className="flex h-screen w-screen items-start justify-end p-2">
       <div
         className="flex w-full max-w-[340px] items-center gap-2 rounded-full border border-white/15 px-3 py-2 shadow-2xl"
         style={{

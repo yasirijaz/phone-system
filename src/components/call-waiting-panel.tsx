@@ -3,12 +3,25 @@
 import { Button } from '@/components/ui/button';
 import { formatPhoneNumber } from '@/lib/utils';
 import { GitMerge, Pause, Phone, PhoneOff } from 'lucide-react';
+import type { CSSProperties } from 'react';
 
 export type CallWaitingSummary = {
   callerName: string;
   callerNumber: string;
   departmentName?: string | null;
   durationLabel?: string;
+};
+
+type ElectronWindowStyle = CSSProperties & {
+  WebkitAppRegion?: 'drag' | 'no-drag';
+};
+
+const dragRegionStyle: ElectronWindowStyle = { WebkitAppRegion: 'drag' };
+const noDragRegionStyle: ElectronWindowStyle = { WebkitAppRegion: 'no-drag' };
+
+const overlayPanelStyle = {
+  background: 'rgba(15, 23, 42, 0.78)',
+  backdropFilter: 'blur(10px)',
 };
 
 type CallWaitingPanelProps = {
@@ -19,6 +32,7 @@ type CallWaitingPanelProps = {
   onAcceptHold: () => void;
   onAcceptMerge: () => void;
   compact?: boolean;
+  overlayChrome?: boolean;
   isBusy?: boolean;
 };
 
@@ -32,9 +46,11 @@ function formatCallerNumber(callerNumber: string) {
 function ActiveCallStrip({
   activeCall,
   compact,
+  overlayChrome,
 }: {
   activeCall: CallWaitingSummary;
   compact?: boolean;
+  overlayChrome?: boolean;
 }) {
   return (
     <div
@@ -45,7 +61,10 @@ function ActiveCallStrip({
       }
       style={
         compact
-          ? { background: 'rgba(15, 23, 42, 0.78)', backdropFilter: 'blur(10px)' }
+          ? {
+              ...(overlayChrome ? overlayPanelStyle : { background: 'rgba(15, 23, 42, 0.78)', backdropFilter: 'blur(10px)' }),
+              ...(overlayChrome ? dragRegionStyle : {}),
+            }
           : undefined
       }
     >
@@ -85,13 +104,16 @@ export default function CallWaitingPanel({
   onAcceptHold,
   onAcceptMerge,
   compact = false,
+  overlayChrome = false,
   isBusy = false,
 }: CallWaitingPanelProps) {
   const onCall = Boolean(activeCall);
 
   return (
     <div className={compact ? 'flex w-full flex-col gap-2' : 'flex flex-col gap-3'}>
-      {activeCall ? <ActiveCallStrip activeCall={activeCall} compact={compact} /> : null}
+      {activeCall ? (
+        <ActiveCallStrip activeCall={activeCall} compact={compact} overlayChrome={overlayChrome} />
+      ) : null}
 
       <div
         className={
@@ -101,7 +123,9 @@ export default function CallWaitingPanel({
         }
         style={
           compact
-            ? { background: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(10px)' }
+            ? overlayChrome
+              ? overlayPanelStyle
+              : { background: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(10px)' }
             : undefined
         }
       >
@@ -110,7 +134,7 @@ export default function CallWaitingPanel({
         ) : null}
 
         <div className={compact ? 'flex flex-col gap-3' : 'flex flex-col gap-4 p-4'}>
-          <div className="min-w-0">
+          <div className="min-w-0" style={overlayChrome ? dragRegionStyle : undefined}>
             <div className="flex items-center gap-2">
               <span className="relative flex h-2.5 w-2.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
@@ -137,7 +161,10 @@ export default function CallWaitingPanel({
             ) : null}
           </div>
 
-          <div className={`flex flex-wrap gap-2 ${onCall ? '' : 'justify-end'}`}>
+          <div
+            className={`flex flex-wrap gap-2 ${onCall ? '' : 'justify-end'}`}
+            style={overlayChrome ? noDragRegionStyle : undefined}
+          >
             <Button
               variant="destructive"
               size={compact ? 'sm' : 'lg'}

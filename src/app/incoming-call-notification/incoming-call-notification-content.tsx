@@ -1,15 +1,8 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import CallWaitingPanel, { type CallWaitingSummary } from '@/components/call-waiting-panel';
-
-type ElectronWindowStyle = CSSProperties & {
-  WebkitAppRegion?: 'drag' | 'no-drag';
-};
-
-const dragRegionStyle: ElectronWindowStyle = { WebkitAppRegion: 'drag' };
-const noDragRegionStyle: ElectronWindowStyle = { WebkitAppRegion: 'no-drag' };
 
 function formatTime(seconds: number) {
   const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -95,8 +88,8 @@ export default function IncomingCallNotificationContent() {
   const handleAcceptMerge = () => sendAction('accept-call-merge');
 
   return (
-    <div className="flex h-screen w-screen items-end justify-end p-2" style={dragRegionStyle}>
-      <div className="w-full max-w-[420px]" style={noDragRegionStyle}>
+    <div className="flex h-screen w-screen items-start justify-end p-2">
+      <div className="w-full max-w-[420px]">
         <CallWaitingPanel
           activeCall={activeCall}
           incomingCall={{
@@ -108,6 +101,7 @@ export default function IncomingCallNotificationContent() {
           onAcceptHold={handleAcceptHold}
           onAcceptMerge={handleAcceptMerge}
           compact
+          overlayChrome
           isBusy={isBusy}
         />
       </div>

@@ -179,6 +179,21 @@ export default function AppHeader({
             if (api?.remove) api.remove('update-ready');
         };
     }, []);
+
+    useEffect(() => {
+        if (!isElectron() || !window.electronAPI) return;
+
+        const off = window.electronAPI.on('open-sms-conversation', (payload: { from?: string; to?: string }) => {
+            if (!payload?.from || !payload?.to) return;
+            router.push(
+                `/conversations/${encodeURIComponent(payload.from)}/${encodeURIComponent(payload.to)}`
+            );
+        });
+
+        return () => {
+            off?.();
+        };
+    }, [router]);
     
     useEffect(() => {
         if (!user) {
@@ -244,9 +259,9 @@ export default function AppHeader({
                         audioRef.current.play().catch(e =>
                         console.error("Error playing notification sound:", e)
                         );
-                        if (isElectron() && window.electronAPI) {
-                            window.electronAPI.send('incoming-sms',data.data);
-                        }
+                    }
+                    if (isElectron() && window.electronAPI) {
+                        window.electronAPI.send('incoming-sms', data.data);
                     }
                     const { from, to, body } = data.data;
                     // Notify any open conversation detail page to refresh

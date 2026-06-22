@@ -26,6 +26,7 @@ const electronReceiveChannels = [
   'call-rejected',
   'call-progress-update',
   'incoming-call-update',
+  'open-sms-conversation',
   'end-call-from-progress',
 ];
 
