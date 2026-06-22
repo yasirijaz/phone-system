@@ -30,10 +30,10 @@ export const createOrUpdateDepartmentSettings = async (id: number | undefined, s
 
     if (id) {
         const response = await axios.put(`/api/settings/department/${id}`, payload);
-        return response.data;
+        return response.data.settings ?? response.data;
     } else {
         const response = await axios.post('/api/settings/department', payload);
-        return response.data;
+        return response.data.settings ?? response.data;
     }
 };
 

@@ -176,10 +176,8 @@ export default function DepartmentSettingsPage() {
             }
           : undefined,
       };
-      const response = await createOrUpdateDepartmentSettings(settings?.id, payload);
-      if (response?.settings) {
-        setSettings(response.settings);
-      }
+      const updatedSettings = await createOrUpdateDepartmentSettings(settings?.id, payload);
+      setSettings(updatedSettings);
       toast({ title: "Success", description: "Department settings saved successfully." });
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || "An unexpected error occurred.";

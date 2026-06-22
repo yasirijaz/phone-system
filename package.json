@@ -13,7 +13,7 @@
     "build:electron": "set ELECTRON_BUILD=true && next build",
     "electron": "electron .",
     "electron-dev": "NODE_ENV=development electron .",
-    "dist": "node -r dotenv/config node_modules/electron-builder/out/cli/cli.js --publish always",
+    "dist": "node -r dotenv/config ./node_modules/electron-builder/out/cli/cli.js --publish always",
     "dev": "next dev",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
