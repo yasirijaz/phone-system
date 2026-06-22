@@ -162,19 +162,28 @@ const createWindow = () => {
     });
   }
   Mainwindow = win;
-  // If a call is pending, show overlay only while minimized
-  win.on('minimize', () => {
-    console.log('minimuze',pendingCallInfo);
+
+  const refreshBackgroundOverlays = () => {
     if (pendingCallInfo) {
       syncIncomingOverlayWindow(pendingCallInfo);
+      return;
     }
-    if (callProgressStartedAt && !pendingCallInfo) {
+    if (callProgressStartedAt) {
       showCallProgressWindow({
         ...callProgressInfo,
         startedAt: callProgressStartedAt,
       });
     }
+  };
+
+  win.on('minimize', () => {
+    refreshBackgroundOverlays();
   });
+
+  win.on('blur', () => {
+    refreshBackgroundOverlays();
+  });
+
   const hideOverlay = () => {
     hideNotificationWindow();
   };
@@ -265,6 +274,16 @@ app.on('before-quit', () => {
   }
   destroyCallProgressWindow();
 });
+
+function isMainWindowForeground() {
+  if (!Mainwindow || Mainwindow.isDestroyed()) return false;
+  return !Mainwindow.isMinimized() && Mainwindow.isFocused();
+}
+
+function shouldShowIncomingOverlay() {
+  if (!Mainwindow || Mainwindow.isDestroyed()) return false;
+  return !isMainWindowForeground();
+}
 
 function buildIncomingCallUrl(callInfo = {}) {
   const params = new URLSearchParams({
@@ -538,10 +557,10 @@ ipcMain.on('incoming-sms', (_event, sms) => {
   showSmsNotification(sms || {});
 });
 
-ipcMain.on('incoming-call', (event, callInfo) => {
+ipcMain.on('incoming-call', (_event, callInfo) => {
   const payload = callInfo || null;
   pendingCallInfo = payload;
-  if (Mainwindow && Mainwindow.isMinimized()) {
+  if (shouldShowIncomingOverlay()) {
     syncIncomingOverlayWindow(payload);
   } else {
     hideNotificationWindow();
