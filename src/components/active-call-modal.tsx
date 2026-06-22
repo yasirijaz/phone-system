@@ -99,7 +99,6 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     ?? externalParticipants.find((p) => !p.hold)
     ?? externalParticipants[0];
   const hasRingingParticipant = externalParticipants.some((participant) => isParticipantRinging(participant));
-  const showCallLegs = canSwitchBetweenCalls || hasRingingParticipant || Boolean(pendingOutgoing) || Boolean(pendingTransferCallSid);
   const shouldPollParticipantsQuickly = hasRingingParticipant || Boolean(pendingOutgoing) || Boolean(pendingTransferCallSid);
   const participantUserIds = new Set(
     (currentParticipants as ConferenceParticipant[])
@@ -794,76 +793,6 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     return <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{label}</span>;
   };
 
-  const renderCallLeg = (
-    key: string,
-    name: string,
-    status: ReturnType<typeof getParticipantConnectionStatus>,
-    options: {
-      callSid?: string;
-      canCancel?: boolean;
-      canSwitch?: boolean;
-      canHold?: boolean;
-      participant?: ConferenceParticipant;
-    } = {}
-  ) => (
-    <div key={key} className="flex items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{name}</p>
-        <div className="mt-1">{renderParticipantStatusBadge(status)}</div>
-      </div>
-      <div className="flex items-center gap-1 shrink-0">
-        {options.canSwitch && options.participant ? (
-          <Button
-            variant={options.participant.call_sid === activeExternalCallSid && !options.participant.hold ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => handleSwitchToCall(options.participant!.call_sid)}
-            disabled={isConsultActionLoading || (!options.participant.hold && options.participant.call_sid === activeExternalCallSid)}
-          >
-            <PhoneCall className="h-4 w-4 mr-1" />
-            Switch
-          </Button>
-        ) : null}
-        {options.canHold && options.participant ? (
-          <Button variant="ghost" size="icon" onClick={() => handleParticipantHoldToggle(options.participant!)}>
-            {options.participant.hold ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-          </Button>
-        ) : null}
-        {options.canCancel && options.callSid ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-            onClick={() => void handleCancelOutgoingCall(options.callSid!, name)}
-          >
-            <X className="h-4 w-4 mr-1" />
-            Cancel
-          </Button>
-        ) : null}
-      </div>
-    </div>
-  );
-
-  const visibleExternalLegs = externalParticipants.map((participant) => {
-    const status = getParticipantConnectionStatus(participant);
-    const name = resolveParticipantDisplayName(participant, companyUsers, companyContacts);
-    return renderCallLeg(participant.call_sid, name, status, {
-      callSid: participant.call_sid,
-      canCancel: status === 'ringing' || status === 'connecting',
-      canSwitch: canSwitchBetweenCalls && (status === 'connected' || status === 'on-hold'),
-      canHold: canSwitchBetweenCalls && (status === 'connected' || status === 'on-hold'),
-      participant,
-    });
-  });
-
-  const pendingLeg = pendingOutgoing && !externalParticipants.some((participant) => participant.call_sid === pendingOutgoing.callSid)
-    ? renderCallLeg(
-        `pending-${pendingOutgoing.callSid}`,
-        pendingOutgoing.name,
-        'ringing',
-        { callSid: pendingOutgoing.callSid, canCancel: true }
-      )
-    : null;
-
   const handleDigitClick = (digit: string) => {
   setDialerNumber((prev) => prev + digit);
   };
@@ -913,20 +842,6 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     <>
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-[100]">
         <div className="bg-background rounded-2xl shadow-2xl overflow-hidden">
-            {showCallLegs ? (
-              <div className="border-b bg-muted/30 px-4 py-3 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Call legs</p>
-                  {hasRingingParticipant || pendingOutgoing ? (
-                    <span className="text-xs text-amber-700">Outgoing call in progress</span>
-                  ) : null}
-                </div>
-                <div className="space-y-2">
-                  {visibleExternalLegs}
-                  {pendingLeg}
-                </div>
-              </div>
-            ) : null}
             <div className="p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
                  <Avatar className="h-12 w-12">

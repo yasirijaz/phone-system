@@ -18,6 +18,7 @@ let Mainwindow
 let notificationWindow;
 let callProgressWindow = null;
 let callProgressStartedAt = null;
+let callProgressInfo = { callerName: '', callerNumber: '' };
 let pendingCallInfo = null;
 let isdev = false;
 let updateReady = false;
@@ -186,6 +187,12 @@ const createWindow = () => {
         : `http://localhost:3000/incoming-call-notification?from=${encodeURIComponent(pendingCallInfo.from || '')}&callerName=${encodeURIComponent(pendingCallInfo.callerName || '')}`;
       notificationWindow.loadURL(url);
     }
+    if (callProgressStartedAt) {
+      showCallProgressWindow({
+        ...callProgressInfo,
+        startedAt: callProgressStartedAt,
+      });
+    }
   });
   const hideOverlay = () => {
     destroyNotificationWindow();
@@ -288,12 +295,15 @@ function getAppBaseUrl() {
     : 'http://localhost:3000';
 }
 
-function destroyCallProgressWindow() {
+function destroyCallProgressWindow(resetSession = true) {
   if (callProgressWindow && !callProgressWindow.isDestroyed()) {
     callProgressWindow.close();
   }
   callProgressWindow = null;
-  callProgressStartedAt = null;
+  if (resetSession) {
+    callProgressStartedAt = null;
+    callProgressInfo = { callerName: '', callerNumber: '' };
+  }
 }
 
 function showCallProgressWindow(callInfo = {}) {
@@ -302,6 +312,7 @@ function showCallProgressWindow(callInfo = {}) {
   if (!effectiveStartedAt) return;
 
   callProgressStartedAt = effectiveStartedAt;
+  callProgressInfo = { callerName, callerNumber };
 
   if (callProgressWindow && !callProgressWindow.isDestroyed()) {
     callProgressWindow.webContents.send('call-progress-update', {
@@ -450,7 +461,7 @@ ipcMain.on('show-call-progress', (_event, callInfo) => {
 });
 
 ipcMain.on('hide-call-progress', () => {
-  destroyCallProgressWindow();
+  destroyCallProgressWindow(true);
 });
 
 ipcMain.on('focus-main-window', () => {
