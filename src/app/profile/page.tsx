@@ -115,7 +115,6 @@ export default function ProfilePage() {
       }
       
       const updatedUser = await updateProfile(user.id, updateData);
-      const nextUser = updatedUser?.user ?? updatedUser?.data?.user ?? updatedUser;
       
       if (values.password) {
         // If password was changed, logout user
@@ -123,8 +122,8 @@ export default function ProfilePage() {
         logout();
       } else {
         // If only name/email was changed, update user in store
-        console.log("🔄 Updating user in store:", nextUser);
-        dispatch(updateUser(nextUser));
+        console.log("🔄 Updating user in store:", updatedUser);
+        dispatch(updateUser(updatedUser));
         form.setValue("slack_access_token", "");
         toast({ title: "Success", description: "Profile updated successfully." });
       }
