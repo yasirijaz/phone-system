@@ -13,7 +13,7 @@ import type {
 } from '@/services/callLogService';
 import type {
   CallHistoryDirectionFilter,
-  CallHistoryFilters,
+  CallHistoryFilters as CallHistoryFilterValues,
   CallHistoryStatusFilter,
 } from '@/lib/call-history-filters';
 import { getCallHistoryEmptyFilterLabel } from '@/lib/call-history-filters';
@@ -110,7 +110,7 @@ export default function CallHistoryShell({
   onDialerOpenChange,
   dialerInitialValue,
 }: CallHistoryShellProps) {
-  const filters: CallHistoryFilters = { direction: directionFilter, status: statusFilter };
+  const filters: CallHistoryFilterValues = { direction: directionFilter, status: statusFilter };
   const hasAnyRecords = summary.total > 0;
   const hasFilteredResults = calls.length > 0;
   const filterLabel = getCallHistoryEmptyFilterLabel(filters);
