@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Phone } from 'lucide-react';
 import CallHistoryShell from '@/components/call-history-shell';
 import { useAuth } from '@/context/AuthContext';
@@ -12,7 +12,10 @@ import {
   type CallHistoryPagination,
   type CallHistorySummary,
 } from '@/services/callLogService';
-import type { CallHistoryFilter } from '@/lib/call-history-filters';
+import type {
+  CallHistoryDirectionFilter,
+  CallHistoryStatusFilter,
+} from '@/lib/call-history-filters';
 import { findContactByPhone } from '@/services/contactService';
 import type { Contact } from '@/types';
 import { formatPhoneNumber } from '@/lib/utils';
@@ -44,6 +47,7 @@ function decodeRoutePhone(value: string | string[] | undefined): string {
 
 export default function PhoneCallHistoryPage() {
   const params = useParams<{ phone: string }>();
+  const router = useRouter();
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const phoneNumber = decodeRoutePhone(params.phone);
@@ -55,14 +59,22 @@ export default function PhoneCallHistoryPage() {
   const [pagination, setPagination] = useState<CallHistoryPagination>(DEFAULT_PAGINATION);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
-  const [filter, setFilter] = useState<CallHistoryFilter>('all');
+  const [directionFilter, setDirectionFilter] = useState<CallHistoryDirectionFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<CallHistoryStatusFilter>('all');
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [dialerInitialValue, setDialerInitialValue] = useState('');
 
   const fetchCalls = useCallback(async () => {
     if (!phoneNumber) return;
 
     setLoading(true);
     try {
-      const details = await getPhoneCallHistory(phoneNumber, { page, perPage, filter });
+      const details = await getPhoneCallHistory(phoneNumber, {
+        page,
+        perPage,
+        direction: directionFilter,
+        status: statusFilter,
+      });
       setCalls(details.calls);
       setSummary(details.summary);
       setPagination(details.pagination);
@@ -75,7 +87,7 @@ export default function PhoneCallHistoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [phoneNumber, page, perPage, filter, toast]);
+  }, [phoneNumber, page, perPage, directionFilter, statusFilter, toast]);
 
   useEffect(() => {
     if (!phoneNumber || !user?.company_id) return;
@@ -100,7 +112,8 @@ export default function PhoneCallHistoryPage() {
 
   useEffect(() => {
     setPage(1);
-    setFilter('all');
+    setDirectionFilter('all');
+    setStatusFilter('all');
     setContact(null);
   }, [phoneNumber]);
 
@@ -113,9 +126,23 @@ export default function PhoneCallHistoryPage() {
     setPerPage(nextLimit);
   };
 
-  const handleFilterChange = (nextFilter: CallHistoryFilter) => {
+  const handleDirectionChange = (nextDirection: CallHistoryDirectionFilter) => {
     setPage(1);
-    setFilter(nextFilter);
+    setDirectionFilter(nextDirection);
+  };
+
+  const handleStatusChange = (nextStatus: CallHistoryStatusFilter) => {
+    setPage(1);
+    setStatusFilter(nextStatus);
+  };
+
+  const handleCallClick = () => {
+    setDialerInitialValue(phoneNumber.replace(/^\+1/, ''));
+    setDialerOpen(true);
+  };
+
+  const handleMessageClick = () => {
+    router.push(`/messages?to=${encodeURIComponent(phoneNumber)}`);
   };
 
   const title = contact?.name || formatPhoneNumber(phoneNumber);
@@ -140,12 +167,19 @@ export default function PhoneCallHistoryPage() {
       calls={calls}
       summary={summary}
       pagination={pagination}
-      filter={filter}
-      onFilterChange={handleFilterChange}
+      directionFilter={directionFilter}
+      statusFilter={statusFilter}
+      onDirectionChange={handleDirectionChange}
+      onStatusChange={handleStatusChange}
       onPageChange={handlePageChange}
       onLimitChange={handleLimitChange}
       subjectPhone={phoneNumber}
       emptyMessage="No calls found for this number."
+      onCallClick={handleCallClick}
+      onMessageClick={handleMessageClick}
+      dialerOpen={dialerOpen}
+      onDialerOpenChange={setDialerOpen}
+      dialerInitialValue={dialerInitialValue}
     />
   );
 }

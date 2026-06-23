@@ -2,29 +2,40 @@
 
 import { Button } from '@/components/ui/button';
 import {
-  CALL_HISTORY_FILTER_OPTIONS,
-  type CallHistoryFilter,
+  CALL_HISTORY_DIRECTION_OPTIONS,
+  CALL_HISTORY_STATUS_OPTIONS,
+  type CallHistoryDirectionFilter,
+  type CallHistoryStatusFilter,
 } from '@/lib/call-history-filters';
 import { cn } from '@/lib/utils';
 
 type CallHistoryFiltersProps = {
-  value: CallHistoryFilter;
-  onChange: (filter: CallHistoryFilter) => void;
+  direction: CallHistoryDirectionFilter;
+  status: CallHistoryStatusFilter;
+  onDirectionChange: (filter: CallHistoryDirectionFilter) => void;
+  onStatusChange: (filter: CallHistoryStatusFilter) => void;
   disabled?: boolean;
   className?: string;
 };
 
-export default function CallHistoryFilters({
+function FilterRow<T extends string>({
+  label,
+  options,
   value,
   onChange,
   disabled,
-  className,
-}: CallHistoryFiltersProps) {
+}: {
+  label: string;
+  options: Array<{ value: T; label: string }>;
+  value: T;
+  onChange: (value: T) => void;
+  disabled?: boolean;
+}) {
   return (
-    <div className={cn('space-y-2', className)}>
-      <p className="text-sm font-medium text-muted-foreground">Filter calls</p>
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
       <div className="flex flex-wrap gap-2">
-        {CALL_HISTORY_FILTER_OPTIONS.map((option) => {
+        {options.map((option) => {
           const isActive = value === option.value;
 
           return (
@@ -42,6 +53,34 @@ export default function CallHistoryFilters({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+export default function CallHistoryFilters({
+  direction,
+  status,
+  onDirectionChange,
+  onStatusChange,
+  disabled,
+  className,
+}: CallHistoryFiltersProps) {
+  return (
+    <div className={cn('space-y-4', className)}>
+      <FilterRow
+        label="Direction"
+        options={CALL_HISTORY_DIRECTION_OPTIONS}
+        value={direction}
+        onChange={onDirectionChange}
+        disabled={disabled}
+      />
+      <FilterRow
+        label="Status"
+        options={CALL_HISTORY_STATUS_OPTIONS}
+        value={status}
+        onChange={onStatusChange}
+        disabled={disabled}
+      />
     </div>
   );
 }

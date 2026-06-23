@@ -1,7 +1,10 @@
 
 
 import axios from '@/lib/axios';
-import type { CallHistoryFilter } from '@/lib/call-history-filters';
+import type {
+  CallHistoryDirectionFilter,
+  CallHistoryStatusFilter,
+} from '@/lib/call-history-filters';
 import type { Communication, PaginatedCommunicationsResponse, User } from '@/types';
 import {
   getCallAttendeeName,
@@ -304,7 +307,8 @@ type CallHistoryQuery = {
   page?: number;
   perPage?: number;
   departmentId?: number;
-  filter?: CallHistoryFilter;
+  direction?: CallHistoryDirectionFilter;
+  status?: CallHistoryStatusFilter;
 };
 
 function mapCallHistoryPagination(
@@ -361,14 +365,15 @@ function mapCallHistorySummary(data: Record<string, unknown>): CallHistorySummar
 
 export const getPhoneCallHistory = async (
   phoneNumber: string,
-  { page = 1, perPage = 10, departmentId, filter = 'all' }: CallHistoryQuery = {}
+  { page = 1, perPage = 10, departmentId, direction = 'all', status = 'all' }: CallHistoryQuery = {}
 ): Promise<PhoneActivityDetails> => {
   const response = await axios.post('/api/communications/phone-details', {
     phone_number: phoneNumber,
     calls_only: true,
     page,
     per_page: perPage,
-    call_filter: filter,
+    call_direction: direction,
+    call_status: status,
     ...(departmentId ? { department_id: departmentId } : {}),
   });
   const data = response.data;
@@ -391,13 +396,14 @@ export const getPhoneActivityDetails = getPhoneCallHistory;
 
 export const getUserCallHistory = async (
   userId: number,
-  { page = 1, perPage = 10, departmentId, filter = 'all' }: CallHistoryQuery = {}
+  { page = 1, perPage = 10, departmentId, direction = 'all', status = 'all' }: CallHistoryQuery = {}
 ): Promise<UserCallActivityDetails> => {
   const response = await axios.post('/api/communications/user-calls', {
     user_id: userId,
     page,
     per_page: perPage,
-    call_filter: filter,
+    call_direction: direction,
+    call_status: status,
     ...(departmentId ? { department_id: departmentId } : {}),
   });
   const data = response.data;

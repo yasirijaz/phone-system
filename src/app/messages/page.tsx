@@ -9,7 +9,7 @@ import { getDepartments } from "@/services/departmentService";
 import type { PhoneNumber, Contact, Department } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { sendMms } from "@/services/twilioService";
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import AppHeader from "@/components/app-header";
 import MessageComposer from "@/components/message-composer";
@@ -22,6 +22,7 @@ export default function MessagesPage() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -76,11 +77,21 @@ export default function MessagesPage() {
   }, [user, toast]);
   
   useEffect(() => {
-    if (recipient.length > 2) {
+    const to = searchParams.get('to');
+    if (to) {
+      setRecipient(to);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (recipient.length >= 1) {
         const searchTerm = recipient.toLowerCase();
+        const searchDigits = recipient.replace(/\D/g, '');
         const matchingContacts = contacts.filter(contact => 
             contact.name.toLowerCase().includes(searchTerm) ||
-            contact.phone_no.includes(searchTerm)
+            contact.phone_no.includes(searchTerm) ||
+            (searchDigits.length > 0 &&
+              contact.phone_no.replace(/\D/g, '').includes(searchDigits))
         );
         setFilteredContacts(matchingContacts);
     } else {

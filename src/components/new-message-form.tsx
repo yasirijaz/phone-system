@@ -92,11 +92,14 @@ export default function NewMessageForm({
     }, [watchedFromNumber, selectedFromNumber, onSetSelectedFromNumber]);
 
     useEffect(() => {
-        if (watchedRecipient.length > 2) {
+        if (watchedRecipient.length >= 1) {
             const searchTerm = watchedRecipient.toLowerCase();
+            const searchDigits = watchedRecipient.replace(/\D/g, '');
             const matchingContacts = contacts.filter(contact => 
                 contact.name.toLowerCase().includes(searchTerm) ||
-                contact.phone_no.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, ''))
+                contact.phone_no.includes(searchTerm) ||
+                (searchDigits.length > 0 &&
+                  contact.phone_no.replace(/\D/g, '').includes(searchDigits))
             );
             setFilteredContacts(matchingContacts);
         } else {

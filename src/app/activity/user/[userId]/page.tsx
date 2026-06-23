@@ -12,7 +12,10 @@ import {
   type CallHistoryPagination,
   type CallHistorySummary,
 } from '@/services/callLogService';
-import type { CallHistoryFilter } from '@/lib/call-history-filters';
+import type {
+  CallHistoryDirectionFilter,
+  CallHistoryStatusFilter,
+} from '@/lib/call-history-filters';
 
 const EMPTY_SUMMARY: CallHistorySummary = {
   total: 0,
@@ -43,14 +46,20 @@ export default function UserCallHistoryPage() {
   const [pagination, setPagination] = useState<CallHistoryPagination>(DEFAULT_PAGINATION);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
-  const [filter, setFilter] = useState<CallHistoryFilter>('all');
+  const [directionFilter, setDirectionFilter] = useState<CallHistoryDirectionFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<CallHistoryStatusFilter>('all');
 
   const fetchCalls = useCallback(async () => {
     if (!userId || Number.isNaN(userId)) return;
 
     setLoading(true);
     try {
-      const details = await getUserCallHistory(userId, { page, perPage, filter });
+      const details = await getUserCallHistory(userId, {
+        page,
+        perPage,
+        direction: directionFilter,
+        status: statusFilter,
+      });
       setAgentName(details.user.name);
       setAgentEmail(details.user.email);
       setCalls(details.calls);
@@ -65,7 +74,7 @@ export default function UserCallHistoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [userId, page, perPage, filter, toast]);
+  }, [userId, page, perPage, directionFilter, statusFilter, toast]);
 
   useEffect(() => {
     void fetchCalls();
@@ -73,7 +82,8 @@ export default function UserCallHistoryPage() {
 
   useEffect(() => {
     setPage(1);
-    setFilter('all');
+    setDirectionFilter('all');
+    setStatusFilter('all');
     setAgentName('');
     setAgentEmail('');
   }, [userId]);
@@ -87,9 +97,14 @@ export default function UserCallHistoryPage() {
     setPerPage(nextLimit);
   };
 
-  const handleFilterChange = (nextFilter: CallHistoryFilter) => {
+  const handleDirectionChange = (nextDirection: CallHistoryDirectionFilter) => {
     setPage(1);
-    setFilter(nextFilter);
+    setDirectionFilter(nextDirection);
+  };
+
+  const handleStatusChange = (nextStatus: CallHistoryStatusFilter) => {
+    setPage(1);
+    setStatusFilter(nextStatus);
   };
 
   return (
@@ -107,8 +122,10 @@ export default function UserCallHistoryPage() {
       calls={calls}
       summary={summary}
       pagination={pagination}
-      filter={filter}
-      onFilterChange={handleFilterChange}
+      directionFilter={directionFilter}
+      statusFilter={statusFilter}
+      onDirectionChange={handleDirectionChange}
+      onStatusChange={handleStatusChange}
       onPageChange={handlePageChange}
       onLimitChange={handleLimitChange}
       emptyMessage="No calls found for this agent."
