@@ -191,7 +191,7 @@ export default function ContactsPage() {
   
   const handleDelete = async (contactId: number) => {
     try {
-        await deleteContact(contactId);
+        await deleteContact(contactId, user.company_id);
         toast({ title: "Success", description: "Contact deleted successfully." });
         refreshContacts();
     } catch (error) {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { Contact, User } from '@/types';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Hash, Phone, Search, UserRound, Users } from 'lucide-react';
+import { Hash, Loader2, Search, UserRound, Users } from 'lucide-react';
 import {
   buildGlobalSearchResults,
   GLOBAL_SEARCH_GROUP_LABELS,
@@ -13,10 +13,12 @@ import {
   type GlobalSearchResult,
   type GlobalSearchResultType,
 } from '@/lib/global-search';
+import { searchContacts } from '@/services/contactService';
 import { cn } from '@/lib/utils';
 
 type GlobalSearchProps = {
-  contacts: Contact[];
+  companyId?: number;
+  contacts?: Contact[];
   users: User[];
   className?: string;
 };
@@ -27,16 +29,64 @@ const TYPE_ICONS: Record<GlobalSearchResultType, typeof Search> = {
   'phone-query': Hash,
 };
 
-export default function GlobalSearch({ contacts, users, className }: GlobalSearchProps) {
+export default function GlobalSearch({
+  companyId,
+  contacts: fallbackContacts = [],
+  users,
+  className,
+}: GlobalSearchProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [contactResults, setContactResults] = useState<Contact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!companyId || trimmed.length < 1) {
+      setContactResults([]);
+      setContactsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setContactsLoading(true);
+
+    const timer = window.setTimeout(() => {
+      void searchContacts(companyId, trimmed, 25)
+        .then((contacts) => {
+          if (!cancelled) {
+            setContactResults(contacts);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setContactResults([]);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setContactsLoading(false);
+          }
+        });
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [companyId, query]);
+
+  const contactsForSearch =
+    contactResults.length > 0 || query.trim().length >= 1
+      ? contactResults
+      : fallbackContacts;
 
   const results = useMemo(
-    () => buildGlobalSearchResults({ query, contacts, users }),
-    [query, contacts, users]
+    () => buildGlobalSearchResults({ query, contacts: contactsForSearch, users }),
+    [query, contactsForSearch, users]
   );
 
   const groups = useMemo(() => groupGlobalSearchResults(results), [results]);
@@ -112,12 +162,17 @@ export default function GlobalSearch({ contacts, users, className }: GlobalSearc
         onKeyDown={handleKeyDown}
       />
 
-      {open && query.trim().length >= 2 ? (
+      {open && query.trim().length >= 1 ? (
         <div
           id="global-search-results"
           className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg"
         >
-          {results.length === 0 ? (
+          {contactsLoading && results.length === 0 ? (
+            <p className="flex items-center gap-2 px-3 py-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Searching...
+            </p>
+          ) : results.length === 0 ? (
             <p className="px-3 py-4 text-sm text-muted-foreground">No matches found.</p>
           ) : (
             <ScrollArea className="max-h-80">

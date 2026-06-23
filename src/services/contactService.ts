@@ -2,13 +2,20 @@
 import axios from '@/lib/axios';
 import type { Contact, PaginatedResponse } from '@/types';
 import { normalizePhoneDigits, phonesMatch } from '@/lib/utils';
-import { cacheGet, cacheSet } from '@/lib/simpleCache';
+import { cacheDel, cacheGet, cacheSet } from '@/lib/simpleCache';
 
 export interface GetContactsParams {
   page?: number;
   per_page?: number;
   search?: string;
 }
+
+const contactsCacheKey = (companyId: number) => `company:${companyId}:contacts`;
+const headerInitCachePrefix = 'header-init:';
+
+export const invalidateContactsCache = (companyId: number) => {
+  cacheDel(contactsCacheKey(companyId));
+};
 
 export const getContactsPaginated = async (
   companyId: number,
@@ -24,49 +31,68 @@ export const getContactsPaginated = async (
   return response.data.contacts;
 };
 
+export const searchContacts = async (
+  companyId: number,
+  query: string,
+  limit = 25
+): Promise<Contact[]> => {
+  const q = query.trim();
+  if (!q) return [];
+
+  const response = await axios.post(`/api/contacts/${companyId}/search`, { q, limit });
+  return Array.isArray(response.data.contacts) ? response.data.contacts : [];
+};
+
+export const getAllContacts = async (companyId: number): Promise<Contact[]> => {
+  const perPage = 500;
+  let page = 1;
+  let all: Contact[] = [];
+
+  while (true) {
+    const batch = await getContactsPaginated(companyId, { page, per_page: perPage });
+    all = all.concat(batch.data ?? []);
+    if (page >= batch.last_page) break;
+    page += 1;
+  }
+
+  return all;
+};
+
 export const getContacts = async (companyId: number): Promise<Contact[]> => {
-  const cacheKey = `company:${companyId}:contacts`;
+  const cacheKey = contactsCacheKey(companyId);
   const cached = cacheGet<Contact[]>(cacheKey);
   if (cached) return cached;
 
-  const { data } = await getContactsPaginated(companyId, { page: 1, per_page: 500 });
-  cacheSet(cacheKey, data, 2 * 60 * 1000);
-  return data;
+  const contacts = await getAllContacts(companyId);
+  cacheSet(cacheKey, contacts, 2 * 60 * 1000);
+  return contacts;
 };
 
 export const createContact = async (contactData: Omit<Contact, 'id'>): Promise<Contact> => {
   const response = await axios.post('/api/contacts', contactData);
+  invalidateContactsCache(contactData.company_id);
   return response.data.contact;
 };
 
 export const updateContact = async (id: number, contactData: Partial<Omit<Contact, 'id'>>): Promise<Contact> => {
     const response = await axios.put(`/api/contacts/${id}`, contactData);
+    const companyId = contactData.company_id ?? response.data.contact?.company_id;
+    if (companyId) {
+      invalidateContactsCache(companyId);
+    }
     return response.data.contact;
 };
 
-/** Look up a saved contact id by phone number (same list API as contacts page). */
+/** Look up a saved contact by phone number (format-agnostic). */
 export const findContactByPhone = async (
   companyId: number,
   phone: string
 ): Promise<Contact | null> => {
-  const { data } = await getContactsPaginated(companyId, {
-    page: 1,
-    per_page: 500,
-  });
-
-  const directMatch = data.find((c) => phonesMatch(c.phone_no, phone));
-  if (directMatch) return directMatch;
-
   const digits = normalizePhoneDigits(phone);
   if (!digits) return null;
 
-  const { data: searched } = await getContactsPaginated(companyId, {
-    page: 1,
-    per_page: 50,
-    search: digits,
-  });
-
-  return searched.find((c) => phonesMatch(c.phone_no, phone)) ?? null;
+  const matches = await searchContacts(companyId, digits, 50);
+  return matches.find((contact) => phonesMatch(contact.phone_no, phone)) ?? null;
 };
 
 export function formatContactPhoneForApi(phone: string): string {
@@ -78,8 +104,11 @@ export function formatContactPhoneForApi(phone: string): string {
   return `+${digits}`;
 }
 
-export const deleteContact = async (id: number): Promise<void> => {
+export const deleteContact = async (id: number, companyId?: number): Promise<void> => {
     await axios.delete(`/api/contacts/${id}`);
+    if (companyId) {
+      invalidateContactsCache(companyId);
+    }
 };
 
 export const blockContact = async (id: number, block_action: 'voicemail' | 'spam' | 'hard'): Promise<void> => {

@@ -35,7 +35,7 @@ function scoreText(value: string | undefined | null, query: string, queryDigits:
   if (normalized.startsWith(q)) return 85;
   if (normalized.includes(q)) return 70;
 
-  if (queryDigits.length >= 3) {
+  if (queryDigits.length >= 1) {
     const valueDigits = normalizePhoneDigits(value);
     if (valueDigits === queryDigits) return 95;
     if (valueDigits.startsWith(queryDigits)) return 80;
@@ -59,7 +59,7 @@ export function buildGlobalSearchResults({
   users,
 }: SearchInput): GlobalSearchResult[] {
   const trimmed = query.trim();
-  if (trimmed.length < 2) return [];
+  if (trimmed.length < 1) return [];
 
   const queryDigits = normalizePhoneDigits(trimmed);
   const results: GlobalSearchResult[] = [];

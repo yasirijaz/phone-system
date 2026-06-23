@@ -361,6 +361,7 @@ export default function AppHeader({
                 setSelectedFromNumber(cached.phoneNumbers[0].phone_no);
               }
               setLoadingDepartments(false);
+              void getContacts(user.company_id).then(setContacts);
               return;
             }
 
@@ -557,6 +558,7 @@ export default function AppHeader({
                         <h1 className="text-xl font-bold">{pageTitle}</h1>
                      ) : (
                         <GlobalSearch
+                            companyId={user?.company_id}
                             contacts={contacts}
                             users={companyUsers}
                             className={cn('w-full', searchClassName ?? 'md:max-w-md lg:max-w-xl')}

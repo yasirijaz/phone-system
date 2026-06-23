@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getCompanyPhoneNumbers } from "@/services/phoneNumberService";
-import { getContacts } from "@/services/contactService";
+import { searchContacts } from "@/services/contactService";
 import { getDepartments } from "@/services/departmentService";
 import type { PhoneNumber, Contact, Department } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -26,7 +26,6 @@ export default function MessagesPage() {
 
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
   const [loadingNumbers, setLoadingNumbers] = useState(true);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
   
@@ -44,12 +43,10 @@ export default function MessagesPage() {
       setLoadingNumbers(true);
       setLoadingDepartments(true);
       try {
-        const [fetchedContacts, numbers, fetchedDepartments] = await Promise.all([
-            getContacts(user.company_id),
+        const [numbers, fetchedDepartments] = await Promise.all([
             getCompanyPhoneNumbers(user.company_id),
             getDepartments(user.company_id),
         ]);
-        setContacts(Array.isArray(fetchedContacts) ? fetchedContacts : []);
         const depts = Array.isArray(fetchedDepartments) ? fetchedDepartments : [];
         setDepartments(depts);
         const companyNumbers = Array.isArray(numbers) ? numbers : [];
@@ -84,20 +81,31 @@ export default function MessagesPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (recipient.length >= 1) {
-        const searchTerm = recipient.toLowerCase();
-        const searchDigits = recipient.replace(/\D/g, '');
-        const matchingContacts = contacts.filter(contact => 
-            contact.name.toLowerCase().includes(searchTerm) ||
-            contact.phone_no.includes(searchTerm) ||
-            (searchDigits.length > 0 &&
-              contact.phone_no.replace(/\D/g, '').includes(searchDigits))
-        );
-        setFilteredContacts(matchingContacts);
-    } else {
-        setFilteredContacts([]);
+    if (!user?.company_id || recipient.length < 1) {
+      setFilteredContacts([]);
+      return;
     }
-}, [recipient, contacts]);
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void searchContacts(user.company_id, recipient, 25)
+        .then((matches) => {
+          if (!cancelled) {
+            setFilteredContacts(matches);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setFilteredContacts([]);
+          }
+        });
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [recipient, user?.company_id]);
 
   const filteredPhoneNumbers = selectedDepartmentId
     ? phoneNumbers.filter(

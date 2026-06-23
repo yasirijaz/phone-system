@@ -88,11 +88,14 @@ export default function Dialer({
     
     const handleNumberChange = (value: string) => {
         setNumber(formatDialerNumber(value));
-         if (value.length > 2) {
+         if (value.length >= 1) {
             const searchTerm = value.toLowerCase();
+            const searchDigits = value.replace(/\D/g, '');
             const matchingContacts = contacts.filter(contact => 
                 contact.name.toLowerCase().includes(searchTerm) ||
-                contact.phone_no.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, ''))
+                contact.phone_no.includes(searchTerm) ||
+                (searchDigits.length > 0 &&
+                  contact.phone_no.replace(/\D/g, '').includes(searchDigits))
             );
             setFilteredContacts(matchingContacts);
         } else {
