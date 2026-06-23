@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Search, Phone, MessageSquare, Video, Settings, LogOut, MoreVertical, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
+import ThemeToggle from "@/components/theme-toggle";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
@@ -604,6 +605,7 @@ export default function AppHeader({
                 </div>
                 <div className="flex items-center gap-4">
                     <TwilioStatusIndicator />
+                    <ThemeToggle />
                     <Button
                       variant="ghost"
                       size="icon"

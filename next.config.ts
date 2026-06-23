@@ -2,13 +2,12 @@ import path from 'node:path';
 import type {NextConfig} from 'next';
 
 const projectRoot = import.meta.dirname;
-const workspaceRoot = path.join(projectRoot, '..');
 
 const nextConfig: NextConfig = {
   /* config options here */
   distDir: 'build',
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
-  outputFileTracingRoot: workspaceRoot,
+  outputFileTracingRoot: projectRoot,
   serverExternalPackages: [
     'genkit',
     '@genkit-ai/google-genai',
