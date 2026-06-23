@@ -81,14 +81,15 @@ export default function MessagesPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!user?.company_id || recipient.length < 1) {
+    const companyId = user?.company_id;
+    if (!companyId || recipient.length < 1) {
       setFilteredContacts([]);
       return;
     }
 
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      void searchContacts(user.company_id, recipient, 25)
+      void searchContacts(companyId, recipient, 25)
         .then((matches) => {
           if (!cancelled) {
             setFilteredContacts(matches);
