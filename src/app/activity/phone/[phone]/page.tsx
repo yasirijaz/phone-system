@@ -1,16 +1,36 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Phone } from 'lucide-react';
 import CallHistoryShell from '@/components/call-history-shell';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { getPhoneCallHistory } from '@/services/callLogService';
+import {
+  getPhoneCallHistory,
+  type CallActivityEntry,
+  type CallHistoryPagination,
+  type CallHistorySummary,
+} from '@/services/callLogService';
+import type { CallHistoryFilter } from '@/lib/call-history-filters';
 import { findContactByPhone } from '@/services/contactService';
 import type { Contact } from '@/types';
 import { formatPhoneNumber } from '@/lib/utils';
-import type { CallActivityEntry } from '@/services/callLogService';
+
+const EMPTY_SUMMARY: CallHistorySummary = {
+  total: 0,
+  completed: 0,
+  missed: 0,
+  in_progress: 0,
+  rejected: 0,
+};
+
+const DEFAULT_PAGINATION: CallHistoryPagination = {
+  currentPage: 1,
+  totalPages: 1,
+  totalRecords: 0,
+  perPage: 10,
+};
 
 function decodeRoutePhone(value: string | string[] | undefined): string {
   const raw = Array.isArray(value) ? value[0] : value;
@@ -31,41 +51,72 @@ export default function PhoneCallHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [contact, setContact] = useState<Contact | null>(null);
   const [calls, setCalls] = useState<CallActivityEntry[]>([]);
+  const [summary, setSummary] = useState<CallHistorySummary>(EMPTY_SUMMARY);
+  const [pagination, setPagination] = useState<CallHistoryPagination>(DEFAULT_PAGINATION);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [filter, setFilter] = useState<CallHistoryFilter>('all');
 
-  useEffect(() => {
+  const fetchCalls = useCallback(async () => {
     if (!phoneNumber) return;
 
-    let cancelled = false;
     setLoading(true);
+    try {
+      const details = await getPhoneCallHistory(phoneNumber, { page, perPage, filter });
+      setCalls(details.calls);
+      setSummary(details.summary);
+      setPagination(details.pagination);
+    } catch {
+      toast({
+        title: 'Unable to load call history',
+        description: 'Please try again in a moment.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [phoneNumber, page, perPage, filter, toast]);
 
-    const load = async () => {
-      try {
-        const [details, matchedContact] = await Promise.all([
-          getPhoneCallHistory(phoneNumber),
-          user?.company_id ? findContactByPhone(user.company_id, phoneNumber) : Promise.resolve(null),
-        ]);
+  useEffect(() => {
+    if (!phoneNumber || !user?.company_id) return;
+    let cancelled = false;
 
-        if (cancelled) return;
-        setCalls(details.calls);
-        setContact(matchedContact);
-      } catch {
-        if (!cancelled) {
-          toast({
-            title: 'Unable to load call history',
-            description: 'Please try again in a moment.',
-            variant: 'destructive',
-          });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
+    findContactByPhone(user.company_id, phoneNumber)
+      .then((matchedContact) => {
+        if (!cancelled) setContact(matchedContact);
+      })
+      .catch(() => {
+        if (!cancelled) setContact(null);
+      });
 
-    void load();
     return () => {
       cancelled = true;
     };
-  }, [phoneNumber, user?.company_id, toast]);
+  }, [phoneNumber, user?.company_id]);
+
+  useEffect(() => {
+    void fetchCalls();
+  }, [fetchCalls]);
+
+  useEffect(() => {
+    setPage(1);
+    setFilter('all');
+    setContact(null);
+  }, [phoneNumber]);
+
+  const handlePageChange = (nextPage: number) => {
+    setPage(nextPage);
+  };
+
+  const handleLimitChange = (nextLimit: number) => {
+    setPage(1);
+    setPerPage(nextLimit);
+  };
+
+  const handleFilterChange = (nextFilter: CallHistoryFilter) => {
+    setPage(1);
+    setFilter(nextFilter);
+  };
 
   const title = contact?.name || formatPhoneNumber(phoneNumber);
   const subtitle = contact ? (
@@ -87,6 +138,12 @@ export default function PhoneCallHistoryPage() {
       icon={<Phone className="h-5 w-5" />}
       loading={loading}
       calls={calls}
+      summary={summary}
+      pagination={pagination}
+      filter={filter}
+      onFilterChange={handleFilterChange}
+      onPageChange={handlePageChange}
+      onLimitChange={handleLimitChange}
       subjectPhone={phoneNumber}
       emptyMessage="No calls found for this number."
     />
