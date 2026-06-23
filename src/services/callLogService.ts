@@ -252,3 +252,66 @@ export const unstarCall = async (id: string): Promise<void> => {
 export const saveTranscription = async (id: number, transcribe_text: string): Promise<void> => {
     await axios.post(`/api/call-logs/${id}/transcription`, { transcribe_text });
 }
+
+export type CallActivityEntry = {
+  id: number;
+  call_sid?: string;
+  from: string;
+  to: string;
+  direction: 'inbound' | 'outbound';
+  call_status?: string;
+  call_duration?: string;
+  created_at: string;
+  user?: { id: number; name: string; email: string } | null;
+};
+
+/** @deprecated Use CallActivityEntry */
+export type PhoneActivityCall = CallActivityEntry;
+
+export type PhoneActivityDetails = {
+  phone_number: string;
+  calls: CallActivityEntry[];
+  total_calls: number;
+};
+
+export type UserCallActivityDetails = {
+  user: { id: number; name: string; email: string };
+  calls: CallActivityEntry[];
+  total_calls: number;
+};
+
+export const getPhoneCallHistory = async (
+  phoneNumber: string,
+  departmentId?: number
+): Promise<PhoneActivityDetails> => {
+  const response = await axios.post('/api/communications/phone-details', {
+    phone_number: phoneNumber,
+    calls_only: true,
+    ...(departmentId ? { department_id: departmentId } : {}),
+  });
+  const data = response.data;
+  return {
+    phone_number: data.phone_number ?? phoneNumber,
+    calls: Array.isArray(data.calls) ? data.calls : [],
+    total_calls: data.total_calls ?? 0,
+  };
+};
+
+/** @deprecated Use getPhoneCallHistory */
+export const getPhoneActivityDetails = getPhoneCallHistory;
+
+export const getUserCallHistory = async (
+  userId: number,
+  departmentId?: number
+): Promise<UserCallActivityDetails> => {
+  const response = await axios.post('/api/communications/user-calls', {
+    user_id: userId,
+    ...(departmentId ? { department_id: departmentId } : {}),
+  });
+  const data = response.data;
+  return {
+    user: data.user,
+    calls: Array.isArray(data.calls) ? data.calls : [],
+    total_calls: data.total_calls ?? 0,
+  };
+};

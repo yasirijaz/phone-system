@@ -6,23 +6,22 @@ import type { Department, PhoneNumber, Contact, User } from "@/types";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
 import { getDepartments } from "@/services/departmentService";
-import { getUserDepartments, stopImpersonation } from "@/services/userService";
+import { getUserDepartments, stopImpersonation, getUsersByCompany } from "@/services/userService";
 import { getCompanyPhoneNumbers, getconferenceSid } from "@/services/phoneNumberService";
 import { getContacts } from "@/services/contactService";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuShortcut } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, MessageSquare, Video, Settings, LogOut, MoreVertical, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
+import { Phone, MessageSquare, Video, Settings, LogOut, MoreVertical, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
 import ThemeToggle from "@/components/theme-toggle";
+import GlobalSearch from "@/components/global-search";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
 import HardwareSettings from "@/components/hardware-settings";
-import { ScrollArea } from "./ui/scroll-area";
 import { useRouter } from "next/navigation";
 import { events } from "@/lib/events";
 import { ToastAction } from "./ui/toast";
@@ -44,6 +43,7 @@ interface AppHeaderProps {
     user: User | null;
     logout: () => void;
     pageTitle?: string;
+    searchClassName?: string;
     showBackButton?: boolean;
     backButtonHref?: string;
     dialerOpen?: boolean;
@@ -54,7 +54,8 @@ interface AppHeaderProps {
 export default function AppHeader({ 
     user, 
     logout, 
-    pageTitle, 
+    pageTitle,
+    searchClassName,
     showBackButton = false, 
     backButtonHref = "", 
     dialerOpen: controlledDialerOpen, 
@@ -70,6 +71,7 @@ export default function AppHeader({
     const [departments, setDepartments] = useState<Department[]>([]);
     const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
     const [contacts, setContacts] = useState<Contact[]>([]);
+    const [companyUsers, setCompanyUsers] = useState<User[]>([]);
     const [loadingDepartments, setLoadingDepartments] = useState(true);
     const [loadingNumbers, setLoadingNumbers] = useState(false);
     
@@ -84,9 +86,6 @@ export default function AppHeader({
     const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
     const [selectedFromNumber, setSelectedFromNumber] = useState('');
 
-    // Search state
-    const [searchOpen, setSearchOpen] = useState(false);
-    const [searchValue, setSearchValue] = useState("");
     const socketRef = useRef<WebSocket | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -344,12 +343,14 @@ export default function AppHeader({
               departments: Department[];
               contacts: Contact[];
               phoneNumbers: PhoneNumber[];
+              companyUsers: User[];
               firstDeptId?: string;
             }>(cacheKey);
             if (cached) {
               setDepartments(cached.departments);
               setContacts(cached.contacts);
               setPhoneNumbers(cached.phoneNumbers);
+              setCompanyUsers(cached.companyUsers);
               if (cached.firstDeptId) {
                 setSelectedDepartmentId(cached.firstDeptId);
                 const numbersForDept = cached.phoneNumbers.filter(
@@ -367,19 +368,22 @@ export default function AppHeader({
             setLoadingNumbers(true);
             try {
                 const canFetchAllDepts = canListAllCompanyDepartments(user.role_id);
-                const [fetchedDepts, fetchedContacts, fetchedNumbers] = await Promise.all([
+                const [fetchedDepts, fetchedContacts, fetchedNumbers, usersResponse] = await Promise.all([
                     canFetchAllDepts
                         ? getDepartments(user.company_id)
                         : getUserDepartments(user.id),
                     getContacts(user.company_id),
                     getCompanyPhoneNumbers(user.company_id),
+                    getUsersByCompany(user.company_id),
                 ]);
                 const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
                 const contactList = Array.isArray(fetchedContacts) ? fetchedContacts : [];
                 const numbers = Array.isArray(fetchedNumbers) ? fetchedNumbers : [];
+                const users = Array.isArray(usersResponse.data) ? usersResponse.data : [];
                 setDepartments(depts);
                 setContacts(contactList);
                 setPhoneNumbers(numbers);
+                setCompanyUsers(users);
 
                 let firstDeptId: string | undefined;
                 if (depts.length > 0) {
@@ -397,6 +401,7 @@ export default function AppHeader({
                   departments: depts,
                   contacts: contactList,
                   phoneNumbers: numbers,
+                  companyUsers: users,
                   firstDeptId,
                 }, 60_000);
             } catch (error) {
@@ -518,29 +523,6 @@ export default function AppHeader({
         }
     };
     
-    const handleContactSelect = (contact: Contact) => {
-        setSearchValue('');
-        setSearchOpen(false);
-        
-        if (setControlledDialerOpen !== undefined) {
-            setControlledDialerOpen(true);
-        } else {
-            setInternalDialerOpen(true);
-        }
-        
-        // This relies on the dialer being able to receive the initial value.
-        setInternalDialerInitialValue(contact.phone_no.replace(/^\+1/, ''));
-    };
-
-    
-    const filteredContacts = searchValue
-    ? contacts.filter(
-        contact =>
-          contact.name.toLowerCase().includes(searchValue.toLowerCase()) ||
-          contact.phone_no.includes(searchValue)
-      )
-    : [];
-
     const statusClasses = {
         'Available': 'bg-green-500',
         'Unavailable': 'bg-yellow-500',
@@ -568,42 +550,20 @@ export default function AppHeader({
 
     return (
         <>
-            <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
-                <div className="flex items-center gap-4">
-                    <SidebarTrigger className="md:hidden" />
+            <header className="sticky top-0 z-30 flex items-center justify-between gap-4 h-16 px-4 md:px-8 border-b bg-background shadow-sm">
+                <div className={cn('flex min-w-0 items-center gap-4', !pageTitle && 'flex-1')}>
+                    <SidebarTrigger className="md:hidden shrink-0" />
                      {pageTitle ? (
                         <h1 className="text-xl font-bold">{pageTitle}</h1>
                      ) : (
-                        <div className="relative w-full md:w-96">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input 
-                                placeholder="Search contacts..."
-                                className="pl-9"
-                                value={searchValue}
-                                onFocus={() => setSearchOpen(true)}
-                                onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
-                                onChange={(e) => setSearchValue(e.target.value)}
-                            />
-                            {searchOpen && filteredContacts.length > 0 && (
-                                <div className="absolute z-10 top-full mt-1 w-full bg-background border rounded-md shadow-lg">
-                                    <ScrollArea className="max-h-60 overflow-y-auto">
-                                        {filteredContacts.map(contact => (
-                                            <div 
-                                                key={contact.id}
-                                                onMouseDown={() => handleContactSelect(contact)}
-                                                className="p-2 hover:bg-accent cursor-pointer"
-                                            >
-                                                <p className="font-medium">{contact.name}</p>
-                                                <p className="text-xs text-muted-foreground">{formatPhoneNumber(contact.phone_no)}</p>
-                                            </div>
-                                        ))}
-                                    </ScrollArea>
-                                </div>
-                            )}
-                        </div>
+                        <GlobalSearch
+                            contacts={contacts}
+                            users={companyUsers}
+                            className={cn('w-full', searchClassName ?? 'md:max-w-md lg:max-w-xl')}
+                        />
                      )}
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex shrink-0 items-center gap-4">
                     <TwilioStatusIndicator />
                     <ThemeToggle />
                     <Button

@@ -132,6 +132,24 @@ export default function ManageUsersPage() {
     fetchData();
   }, [authUser, companyId, router]);
 
+  useEffect(() => {
+    if (loading || users.length === 0 || typeof window === "undefined") return;
+
+    const hash = window.location.hash;
+    if (!hash.startsWith("#user-")) return;
+
+    const target = document.querySelector(hash);
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("bg-accent/60");
+    const timer = window.setTimeout(() => {
+      target.classList.remove("bg-accent/60");
+    }, 2500);
+
+    return () => window.clearTimeout(timer);
+  }, [loading, users]);
+
   // Handle DND status change notifications
   useEffect(() => {
     const handleDndStatusChange = (data: any) => {
@@ -708,7 +726,7 @@ export default function ManageUsersPage() {
                       </TableHeader>
                       <TableBody>
                         {Array.isArray(users) && users.map((u) => (
-                          <TableRow key={u.id}>
+                          <TableRow key={u.id} id={`user-${u.id}`} className="transition-colors">
                             <TableCell className="font-medium">{u.name}</TableCell>
                             <TableCell>{u.email}</TableCell>
                             <TableCell>
