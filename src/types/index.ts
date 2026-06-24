@@ -87,6 +87,7 @@ export interface User {
   worker_status?: string;
   slack_user_id?: string | null;
   has_slack_access_token?: boolean;
+  slack_connected?: boolean;
 }
 
 export interface ProfilePayload {
@@ -194,6 +195,10 @@ export interface CompanySettings {
   slack_settings?: {
     has_bot_token?: boolean;
     bot_token?: string;
+    client_id?: string;
+    has_client_secret?: boolean;
+    client_secret?: string;
+    oauth_configured?: boolean;
   };
   integrations?: {
     integration_id: number;

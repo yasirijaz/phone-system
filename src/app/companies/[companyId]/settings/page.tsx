@@ -71,6 +71,8 @@ const settingsSchema = z.object({
   }),
   slack_settings: z.object({
     bot_token: z.string().optional(),
+    client_id: z.string().optional(),
+    client_secret: z.string().optional(),
   }).optional(),
   integrations: z.array(integrationSettingSchema).optional(),
 });
@@ -108,7 +110,7 @@ export default function CompanySettingsPage() {
       },
       holiday_schedule: { holidays: [] },
       routing_preferences: { default_route: "voicemail", timeout: 30 },
-      slack_settings: { bot_token: "" },
+      slack_settings: { bot_token: "", client_id: "", client_secret: "" },
       integrations: [],
     },
   });
@@ -186,6 +188,8 @@ export default function CompanySettingsPage() {
           routing_preferences: settings.routing_preferences || { default_route: "voicemail", timeout: 30 },
           slack_settings: {
             bot_token: "",
+            client_id: settings.slack_settings?.client_id || "",
+            client_secret: "",
           },
           integrations: integrationSettings,
         });
@@ -208,6 +212,8 @@ export default function CompanySettingsPage() {
         ...settings,
         slack_settings: {
           bot_token: "",
+          client_id: settings.slack_settings?.client_id || "",
+          client_secret: "",
         },
         integrations: [],
       });
@@ -349,6 +355,9 @@ export default function CompanySettingsPage() {
       if (slackSettings && !slackSettings.bot_token) {
         delete slackSettings.bot_token;
       }
+      if (slackSettings && !slackSettings.client_secret) {
+        delete slackSettings.client_secret;
+      }
 
       const payload = {
         ...values,
@@ -360,6 +369,7 @@ export default function CompanySettingsPage() {
         setSettings(response);
       }
       form.setValue("slack_settings.bot_token", "");
+      form.setValue("slack_settings.client_secret", "");
       toast({ title: "Success", description: "Settings saved successfully." });
     } catch (error: any) {
       const errorMessage =
@@ -713,7 +723,7 @@ export default function CompanySettingsPage() {
                             <CardHeader>
                                 <CardTitle>Slack Integration</CardTitle>
                                 <CardDescription>
-                                    Configure the shared Slack bot token used by all departments for groups, missed-call alerts, and user lookup.
+                                    Configure the shared Slack app used by all departments for groups, missed-call alerts, user lookup, and agent status OAuth.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-6">
@@ -732,12 +742,60 @@ export default function CompanySettingsPage() {
                                         />
                                       </FormControl>
                                       <FormDescription>
-                                        Use a Slack bot token with <code>channels:manage</code>, <code>chat:write</code>, and <code>users:read.email</code> scopes. Department settings control missed-call notifications, in-call status, and per-department Slack groups.
+                                        Bot scopes: <code>channels:manage</code>, <code>chat:write</code>, and <code>users:read.email</code>.
                                       </FormDescription>
                                       <FormMessage />
                                     </FormItem>
                                   )}
                                 />
+
+                                <div className="rounded-lg border p-4 space-y-4">
+                                  <div>
+                                    <p className="font-medium">Agent Status OAuth</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Agents connect Slack from their profile using these app credentials. Add this redirect URL in your Slack app:
+                                    </p>
+                                    <code className="mt-2 block rounded bg-muted px-2 py-1 text-xs break-all">
+                                      {process.env.NEXT_PUBLIC_API_URL}/api/slack/oauth/callback
+                                    </code>
+                                  </div>
+
+                                  <FormField
+                                    control={form.control}
+                                    name="slack_settings.client_id"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Slack Client ID</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="1234567890.1234567890" {...field} value={field.value || ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+
+                                  <FormField
+                                    control={form.control}
+                                    name="slack_settings.client_secret"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Slack Client Secret</FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            type="password"
+                                            placeholder={settings?.slack_settings?.has_client_secret ? "Secret saved — enter a new value to replace" : "Paste client secret"}
+                                            {...field}
+                                            value={field.value || ""}
+                                          />
+                                        </FormControl>
+                                        <FormDescription>
+                                          User OAuth scope required: <code>users.profile:write</code>
+                                        </FormDescription>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
                             </CardContent>
                         </Card>
                     </TabsContent>
