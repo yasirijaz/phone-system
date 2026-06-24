@@ -241,7 +241,7 @@ export default function ProfilePage() {
                 <CardHeader>
                   <CardTitle>Slack Status</CardTitle>
                   <CardDescription>
-                    Connect your Slack account so your status updates to &quot;In a call&quot; during live calls.
+                    Connect your Slack account so your status updates to &quot;In a call on voice&quot; during live calls.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
