@@ -29,6 +29,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import { cn, formatPhoneNumber } from "@/lib/utils";
+import {
+  findLocalContactByPhone,
+  formatSmsNotificationSenderLabel,
+} from "@/lib/contact-display";
 import { dispatchOperatorStatusUpdate } from "@/lib/worker-status";
 import { isElectron } from '@/lib/is-electron';
 import { canListAllCompanyDepartments } from '@/lib/roles';
@@ -71,6 +75,7 @@ export default function AppHeader({
     const [departments, setDepartments] = useState<Department[]>([]);
     const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
     const [contacts, setContacts] = useState<Contact[]>([]);
+    const contactsRef = useRef<Contact[]>([]);
     const [companyUsers, setCompanyUsers] = useState<User[]>([]);
     const [loadingDepartments, setLoadingDepartments] = useState(true);
     const [loadingNumbers, setLoadingNumbers] = useState(false);
@@ -260,10 +265,20 @@ export default function AppHeader({
                         console.error("Error playing notification sound:", e)
                         );
                     }
+                    const { from, to, body, contact_name: apiContactName } = data.data;
+                    const localContact = findLocalContactByPhone(contactsRef.current, from);
+                    const senderLabel = formatSmsNotificationSenderLabel(from, {
+                        contactName: apiContactName,
+                        localContact,
+                    });
+                    const notificationPayload = {
+                        ...data.data,
+                        contact_name: apiContactName || localContact?.name || null,
+                    };
+
                     if (isElectron() && window.electronAPI) {
-                        window.electronAPI.send('incoming-sms', data.data);
+                        window.electronAPI.send('incoming-sms', notificationPayload);
                     }
-                    const { from, to, body } = data.data;
                     // Notify any open conversation detail page to refresh
                     try {
                         events.emit("refreshConversation", { from, to });
@@ -275,8 +290,8 @@ export default function AppHeader({
                     const hasMedia = Boolean(data.data?.meta_data?.num_media || data.data?.meta_data?.media_urls?.length);
                     toast({
                         title: hasMedia
-                          ? `New MMS from ${formatPhoneNumber(from)}`
-                          : `New Message from ${formatPhoneNumber(from)}`,
+                          ? `New MMS from ${senderLabel}`
+                          : `New Message from ${senderLabel}`,
                         description: body || (hasMedia ? 'Media attachment' : ''),
                         action: (
                         <ToastAction altText="View" onClick={navigateToConversation}>
@@ -333,6 +348,10 @@ export default function AppHeader({
             setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
         }
     }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
+
+    useEffect(() => {
+        contactsRef.current = contacts;
+    }, [contacts]);
     
     useEffect(() => {
         const fetchInitialData = async () => {

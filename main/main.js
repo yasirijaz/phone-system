@@ -519,13 +519,24 @@ function formatPhoneForNotification(value) {
   return String(value);
 }
 
+function formatSmsSenderLabel(sms = {}) {
+  const from = sms.from || 'Unknown';
+  const formattedNumber = formatPhoneForNotification(from);
+  const contactName = typeof sms.contact_name === 'string' ? sms.contact_name.trim() : '';
+
+  if (contactName) {
+    return `${contactName} (${formattedNumber})`;
+  }
+
+  return formattedNumber;
+}
+
 function showSmsNotification(sms = {}) {
   if (!Notification.isSupported()) return;
   if (!Mainwindow || Mainwindow.isDestroyed()) return;
 
-  const from = sms.from || 'Unknown';
   const hasMedia = Boolean(sms?.meta_data?.num_media || sms?.meta_data?.media_urls?.length);
-  const senderLabel = formatPhoneForNotification(from);
+  const senderLabel = formatSmsSenderLabel(sms);
   const title = hasMedia ? `New MMS from ${senderLabel}` : `New message from ${senderLabel}`;
   const body = sms.body || (hasMedia ? 'Media attachment' : 'New message received');
 
