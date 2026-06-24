@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from 'next/navigation';
-import { getCommunicationThread, markThreadAsRead } from "@/services/callLogService";
+import { getCommunicationThread, markThreadAsRead, invalidateCommunicationThreadCache } from "@/services/callLogService";
 import type { Communication, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import AppHeader from "@/components/app-header";
 import { events } from "@/lib/events";
 import { cacheGet, cacheSet } from "@/lib/simpleCache";
-import { formatPhoneNumber } from "@/lib/utils";
+import { formatPhoneNumber, isSameConversationThread } from "@/lib/utils";
 import { getOtherPartyDisplay } from "@/lib/contact-display";
 
 export default function ConversationDetailPage() {
@@ -35,17 +35,23 @@ export default function ConversationDetailPage() {
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from = '', to = ''] = slug.map(part => decodeURIComponent(part));
 
-    const refreshThread = useCallback(async (): Promise<Communication[]> => {
+    const refreshThread = useCallback(async (options?: { bypassCache?: boolean }): Promise<Communication[]> => {
         try {
+            if (options?.bypassCache) {
+                invalidateCommunicationThreadCache(from, to);
+                cacheDel(`thread:${from}:${to}`);
+                cacheDel(`thread:${to}:${from}`);
+            }
+
             const cacheKey = `thread:${from}:${to}`;
-            const cached = cacheGet<Communication[]>(cacheKey);
+            const cached = options?.bypassCache ? null : cacheGet<Communication[]>(cacheKey);
             let logs: Communication[];
             if (cached) {
                 logs = cached;
             } else {
                 let inFlight = inFlightRef.current.get(cacheKey);
                 if (!inFlight) {
-                    inFlight = getCommunicationThread(from, to);
+                    inFlight = getCommunicationThread(from, to, { bypassCache: options?.bypassCache });
                     inFlightRef.current.set(cacheKey, inFlight);
                 }
                 logs = await inFlight.finally(() => {
@@ -100,9 +106,8 @@ export default function ConversationDetailPage() {
 
     useEffect(() => {
         const handler = (payload: { from: string; to: string }) => {
-            const matches = (payload.from === from && payload.to === to) || (payload.from === to && payload.to === from);
-            if (matches) {
-                refreshThread();
+            if (isSameConversationThread(from, to, payload.from, payload.to)) {
+                void refreshThread({ bypassCache: true });
             }
         };
         events.on('refreshConversation', handler);

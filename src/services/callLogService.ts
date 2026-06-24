@@ -11,7 +11,7 @@ import {
   getThreadEndpoints,
   isCallThread,
 } from '@/lib/call-attendee';
-import { cacheGet, cacheSet } from '@/lib/simpleCache';
+import { cacheGet, cacheSet, cacheDel } from '@/lib/simpleCache';
 
 const THREAD_ATTENDEE_CACHE_TTL = 5 * 60_000;
 const THREAD_LOGS_CACHE_TTL = 2 * 60_000;
@@ -41,10 +41,26 @@ export const getCommunicationThreads = async (type: string, page: number = 1, li
     return response.data.data;
 };
 
-export const getCommunicationThread = async (from: string, to: string): Promise<Communication[]> => {
+export function invalidateCommunicationThreadCache(from: string, to: string): void {
+  for (const key of [`thread-logs:${from}:${to}`, `thread-logs:${to}:${from}`]) {
+    cacheDel(key);
+    inFlightThreadRequests.delete(key);
+  }
+}
+
+export const getCommunicationThread = async (
+  from: string,
+  to: string,
+  options?: { bypassCache?: boolean }
+): Promise<Communication[]> => {
     const cacheKey = `thread-logs:${from}:${to}`;
-    const cached = cacheGet<Communication[]>(cacheKey);
-    if (cached) return cached;
+
+    if (options?.bypassCache) {
+        invalidateCommunicationThreadCache(from, to);
+    } else {
+        const cached = cacheGet<Communication[]>(cacheKey);
+        if (cached) return cached;
+    }
 
     let inFlight = inFlightThreadRequests.get(cacheKey);
     if (!inFlight) {

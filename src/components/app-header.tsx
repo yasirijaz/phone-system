@@ -279,9 +279,10 @@ export default function AppHeader({
                     if (isElectron() && window.electronAPI) {
                         window.electronAPI.send('incoming-sms', notificationPayload);
                     }
-                    // Notify any open conversation detail page to refresh
+                    // Notify open conversation views and refresh thread listings
                     try {
                         events.emit("refreshConversation", { from, to });
+                        events.emitDebounced("refreshCalls", 500);
                     } catch (_) {}
                     const navigateToConversation = () => {
                         router.push(`/conversations/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
