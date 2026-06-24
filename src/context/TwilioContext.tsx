@@ -105,6 +105,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const [activeCallMeta, setActiveCallMeta] = useState<ActiveCallSession | null>(() => readActiveCallSession());
   const ringAudioRef = useRef<HTMLAudioElement | null>(null);
   const syncInFlightRef = useRef(false);
+  const lastClearedAtRef = useRef<number>(0);
   const connectionRef = useRef<Call | null>(null);
   const userInCallRef = useRef(false);
   const incomingReservationRef = useRef<Reservation | null>(null);
@@ -192,6 +193,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   );
 
   const clearActiveCallState = useCallback(() => {
+    lastClearedAtRef.current = Date.now();
     setConnection(null);
     setActiveReservation(null);
     activeReservationRef.current = null;
@@ -264,9 +266,22 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (userInCallRef.current && user?.id) {
+      // Guard: if the call was explicitly ended recently, don't restore from the API even
+      // if the backend webhook hasn't arrived yet (userInCallRef may still be true for a
+      // few seconds after clearActiveCallState() runs).
+      const recentlyClearedMs = lastClearedAtRef.current > 0
+        ? Date.now() - lastClearedAtRef.current
+        : Infinity;
+      const justCleared = recentlyClearedMs < 15_000;
+
+      if (userInCallRef.current && user?.id && !justCleared) {
         const activeCallLog = await getActiveCall();
-        if (activeCallLog?.call_status === 'in_progress') {
+
+        // Re-check after the async fetch – the call may have ended while we were waiting.
+        const clearedDuringFetch = lastClearedAtRef.current > 0
+          && Date.now() - lastClearedAtRef.current < 15_000;
+
+        if (!clearedDuringFetch && activeCallLog?.call_status === 'in_progress') {
           const restored = persistActiveCallMeta(
             {
               callSid: activeCallLog.worker_sid || activeCallLog.call_sid || null,

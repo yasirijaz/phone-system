@@ -43,6 +43,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   const showInAppShell = isInAppRoute(pathname);
   const [updateMessage, setUpdateMessage] = useState<string>('');
   const callStartedAtRef = useRef<number | null>(null);
+  const prevIsActiveCallRef = useRef(false);
 
   useEffect(() => {
     void syncActiveCallState();
@@ -102,6 +103,20 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
 
   const isAgentOnCall =
     isActiveCall && !isIncomingDeviceCall;
+
+  // When a call ends, check whether a deferred logout was queued while the user was on the call
+  // (set by the axios 401 interceptor to avoid hard-redirecting mid-call).
+  useEffect(() => {
+    const wasOnCall = prevIsActiveCallRef.current;
+    prevIsActiveCallRef.current = isActiveCall;
+
+    if (wasOnCall && !isActiveCall) {
+      if (typeof window !== 'undefined' && sessionStorage.getItem('pending_auth_logout')) {
+        sessionStorage.removeItem('pending_auth_logout');
+        window.location.href = '/login';
+      }
+    }
+  }, [isActiveCall]);
 
   const liveCallSid = connection?.parameters?.CallSid ?? null;
   const storedMetaApplies = Boolean(
