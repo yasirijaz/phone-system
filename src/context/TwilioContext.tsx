@@ -393,6 +393,19 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const broadcastWorkerStatus = useCallback(
+    async (status: string, event: OperatorPresenceEvent = 'status_change') => {
+      if (!user?.id || !status) return;
+      events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: status });
+      try {
+        await broadcastOperatorPresence({ event, worker_status: status });
+      } catch (error) {
+        console.warn('Failed to broadcast operator presence:', error);
+      }
+    },
+    [user?.id]
+  );
+
   const attachReservationLifecycleHandlers = useCallback((reservation: Reservation) => {
     if (reservationLifecycleAttachedRef.current.has(reservation)) {
       return;
@@ -406,9 +419,24 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     reservation.on('completed', () => {
       if (activeReservationRef.current === reservation) {
         clearActiveCallState();
+        // Restore Available after an answered call completes (same fix as clearReservation)
+        const worker = workerRef.current;
+        if (worker && worker.activity?.name !== 'Available') {
+          const availableActivity = Array.from(worker.activities.values()).find(
+            (a: any) => a.name === 'Available'
+          );
+          if (availableActivity) {
+            void (availableActivity as any).setAsCurrent().then(() => {
+              setActivityName('Available');
+              void broadcastWorkerStatus('Available');
+            }).catch((err: unknown) => {
+              console.warn('Failed to restore Available activity after call completed:', err);
+            });
+          }
+        }
       }
     });
-  }, [clearActiveCallState, safeCompleteReservation]);
+  }, [clearActiveCallState, safeCompleteReservation, broadcastWorkerStatus]);
 
   const clearDeviceConnectionState = useCallback(() => {
     setConnection(null);
@@ -418,19 +446,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       connectionSourceRef.current = null;
     }
   }, []);
-
-  const broadcastWorkerStatus = useCallback(
-    async (status: string, event: OperatorPresenceEvent = 'status_change') => {
-      if (!user?.id || !status) return;
-      events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: status });
-      try {
-        await broadcastOperatorPresence({ event, worker_status: status });
-      } catch (error) {
-        console.warn('Failed to broadcast operator presence:', error);
-      }
-    },
-    [user?.id]
-  );
 
   useEffect(() => {
     if (!user?.id || user.role_id === 1) return;
@@ -788,6 +803,24 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           incomingReservationRef.current = null;
           if (!isAgentOnCall()) {
             clearActiveCallState();
+            // Twilio TaskRouter automatically moves the worker to Unavailable when a
+            // reservation is created (reservationActivitySid). Without postWorkActivitySid
+            // configured on the worker, it stays Unavailable after the call ends.
+            // Restore to Available here for all call-end paths.
+            const worker = workerRef.current;
+            if (worker && worker.activity?.name !== 'Available') {
+              const availableActivity = Array.from(worker.activities.values()).find(
+                (a: any) => a.name === 'Available'
+              );
+              if (availableActivity) {
+                void (availableActivity as any).setAsCurrent().then(() => {
+                  setActivityName('Available');
+                  void broadcastWorkerStatus('Available');
+                }).catch((err: unknown) => {
+                  console.warn('Failed to restore Available activity after call end:', err);
+                });
+              }
+            }
           }
           try {
             if (isElectron() && window.electronAPI) {
