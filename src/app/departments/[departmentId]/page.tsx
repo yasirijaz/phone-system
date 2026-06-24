@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import OperatorsTable from "@/components/operators-table";
 import PaginationControls from "@/components/pagination-controls";
 import { events } from '@/lib/events';
-import { getPhoneNumberDisplayName } from "@/lib/utils";
+import { getPhoneNumberOptionLabel } from "@/lib/utils";
 
 type TabName = 'all' | 'unread' | 'calls' | 'messages' | 'operators' | 'missed' | 'voicemails' | 'recordings';
 
@@ -212,7 +212,9 @@ export default function DepartmentDetailPage() {
   };
   
   const assignedNumber = phoneNumbers[0];
-  const departmentPhoneNumber = assignedNumber ? getPhoneNumberDisplayName(assignedNumber) : 'No number assigned';
+  const departmentPhoneNumber = assignedNumber
+    ? getPhoneNumberOptionLabel(assignedNumber)
+    : 'No number assigned';
 
   const renderTabContent = (tabName: TabName) => {
     const currentData = data[tabName];

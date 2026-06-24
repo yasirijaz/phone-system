@@ -6,24 +6,22 @@ import type { Department, PhoneNumber, Contact, User } from "@/types";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
 import { getDepartments } from "@/services/departmentService";
-import { getUserDepartments, stopImpersonation } from "@/services/userService";
+import { getUserDepartments, stopImpersonation, getUsersByCompany } from "@/services/userService";
 import { getCompanyPhoneNumbers, getconferenceSid } from "@/services/phoneNumberService";
 import { getContacts } from "@/services/contactService";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuShortcut } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, MessageSquare, Video, Settings, LogOut, MoreVertical, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
+import { Phone, MessageSquare, Video, Settings, LogOut, MoreVertical, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
+import ThemeToggle from "@/components/theme-toggle";
+import GlobalSearch from "@/components/global-search";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
 import NewMessageForm from "@/components/new-message-form";
 import HardwareSettings from "@/components/hardware-settings";
-import ActiveCallBar from "./active-call-modal";
-import type { Call } from '@twilio/voice-sdk';
-import { ScrollArea } from "./ui/scroll-area";
 import { useRouter } from "next/navigation";
 import { events } from "@/lib/events";
 import { ToastAction } from "./ui/toast";
@@ -31,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import { cn, formatPhoneNumber } from "@/lib/utils";
+import { dispatchOperatorStatusUpdate } from "@/lib/worker-status";
 import { isElectron } from '@/lib/is-electron';
 import { canListAllCompanyDepartments } from '@/lib/roles';
 import { cacheGet, cacheSet } from '@/lib/simpleCache';
@@ -44,6 +43,7 @@ interface AppHeaderProps {
     user: User | null;
     logout: () => void;
     pageTitle?: string;
+    searchClassName?: string;
     showBackButton?: boolean;
     backButtonHref?: string;
     dialerOpen?: boolean;
@@ -54,7 +54,8 @@ interface AppHeaderProps {
 export default function AppHeader({ 
     user, 
     logout, 
-    pageTitle, 
+    pageTitle,
+    searchClassName,
     showBackButton = false, 
     backButtonHref = "", 
     dialerOpen: controlledDialerOpen, 
@@ -63,13 +64,14 @@ export default function AppHeader({
 }: AppHeaderProps) {
     const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
     const [isVideoOpen, setIsVideoOpen] = useState(false);
-    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid, connection: twilioConnection, conferenceSid: twilioConferenceSid, leaveCall, endCallForAll } = useTwilio();
+    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid, connection: twilioConnection, conferenceSid: twilioConferenceSid, registerOutboundConnection } = useTwilio();
     const { toast } = useToast();
     const router = useRouter();
 
     const [departments, setDepartments] = useState<Department[]>([]);
     const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
     const [contacts, setContacts] = useState<Contact[]>([]);
+    const [companyUsers, setCompanyUsers] = useState<User[]>([]);
     const [loadingDepartments, setLoadingDepartments] = useState(true);
     const [loadingNumbers, setLoadingNumbers] = useState(false);
     
@@ -84,16 +86,6 @@ export default function AppHeader({
     const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
     const [selectedFromNumber, setSelectedFromNumber] = useState('');
 
-    //for outgoing calls
-    const [activeCall, setActiveCall] = useState<Call | null>(null);
-    const [isActiveCallOpen, setIsActiveCallOpen] = useState(false);
-    const [activeContactName, setActiveContactName] = useState('');
-    const [activeDepartmentName, setActiveDepartmentName] = useState<string | null>(null);
-    const [activeConferenceSid, setActiveConferenceSid] = useState<string | null>(null);
-
-    // Search state
-    const [searchOpen, setSearchOpen] = useState(false);
-    const [searchValue, setSearchValue] = useState("");
     const socketRef = useRef<WebSocket | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -187,6 +179,21 @@ export default function AppHeader({
             if (api?.remove) api.remove('update-ready');
         };
     }, []);
+
+    useEffect(() => {
+        if (!isElectron() || !window.electronAPI) return;
+
+        const off = window.electronAPI.on('open-sms-conversation', (payload: { from?: string; to?: string }) => {
+            if (!payload?.from || !payload?.to) return;
+            router.push(
+                `/conversations/${encodeURIComponent(payload.from)}/${encodeURIComponent(payload.to)}`
+            );
+        });
+
+        return () => {
+            off?.();
+        };
+    }, [router]);
     
     useEffect(() => {
         if (!user) {
@@ -215,9 +222,17 @@ export default function AppHeader({
                 const data = JSON.parse(evt.data);
                 console.log("📩 WebSocket message received:", data);
 
-                if (data.method_type === "status_change") {
-                    if (data.data) {
-                        events.emit("refreshWorkerStatus", data.data);
+                if (data.method_type === "operator_status_notification" && data.data) {
+                    dispatchOperatorStatusUpdate(data.data);
+                }
+
+                if (data.method_type === "status_change" && data.data) {
+                    if (
+                        data.data.worker_status ||
+                        data.data.activity_name ||
+                        data.data.activity
+                    ) {
+                        dispatchOperatorStatusUpdate(data.data);
                     }
                 }
 
@@ -244,9 +259,9 @@ export default function AppHeader({
                         audioRef.current.play().catch(e =>
                         console.error("Error playing notification sound:", e)
                         );
-                        if (isElectron() && window.electronAPI) {
-                            window.electronAPI.send('incoming-sms',data.data);
-                        }
+                    }
+                    if (isElectron() && window.electronAPI) {
+                        window.electronAPI.send('incoming-sms', data.data);
                     }
                     const { from, to, body } = data.data;
                     // Notify any open conversation detail page to refresh
@@ -328,12 +343,14 @@ export default function AppHeader({
               departments: Department[];
               contacts: Contact[];
               phoneNumbers: PhoneNumber[];
+              companyUsers: User[];
               firstDeptId?: string;
             }>(cacheKey);
             if (cached) {
               setDepartments(cached.departments);
               setContacts(cached.contacts);
               setPhoneNumbers(cached.phoneNumbers);
+              setCompanyUsers(cached.companyUsers);
               if (cached.firstDeptId) {
                 setSelectedDepartmentId(cached.firstDeptId);
                 const numbersForDept = cached.phoneNumbers.filter(
@@ -344,6 +361,7 @@ export default function AppHeader({
                 setSelectedFromNumber(cached.phoneNumbers[0].phone_no);
               }
               setLoadingDepartments(false);
+              void getContacts(user.company_id).then(setContacts);
               return;
             }
 
@@ -351,19 +369,22 @@ export default function AppHeader({
             setLoadingNumbers(true);
             try {
                 const canFetchAllDepts = canListAllCompanyDepartments(user.role_id);
-                const [fetchedDepts, fetchedContacts, fetchedNumbers] = await Promise.all([
+                const [fetchedDepts, fetchedContacts, fetchedNumbers, usersResponse] = await Promise.all([
                     canFetchAllDepts
                         ? getDepartments(user.company_id)
                         : getUserDepartments(user.id),
                     getContacts(user.company_id),
                     getCompanyPhoneNumbers(user.company_id),
+                    getUsersByCompany(user.company_id),
                 ]);
                 const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
                 const contactList = Array.isArray(fetchedContacts) ? fetchedContacts : [];
                 const numbers = Array.isArray(fetchedNumbers) ? fetchedNumbers : [];
+                const users = Array.isArray(usersResponse.data) ? usersResponse.data : [];
                 setDepartments(depts);
                 setContacts(contactList);
                 setPhoneNumbers(numbers);
+                setCompanyUsers(users);
 
                 let firstDeptId: string | undefined;
                 if (depts.length > 0) {
@@ -381,6 +402,7 @@ export default function AppHeader({
                   departments: depts,
                   contacts: contactList,
                   phoneNumbers: numbers,
+                  companyUsers: users,
                   firstDeptId,
                 }, 60_000);
             } catch (error) {
@@ -410,12 +432,12 @@ export default function AppHeader({
             return;
         }
 
-        const liveConnection = activeCall || twilioConnection;
+        const liveConnection = twilioConnection;
         const callStatus = liveConnection?.status?.();
         const isInLiveCall = callStatus === 'open';
         const isCallConnecting =
           !!callStatus && !['closed', 'disconnected'].includes(callStatus) && !isInLiveCall;
-        const conferenceSidForConsult = activeConferenceSid || twilioConferenceSid;
+        const conferenceSidForConsult = twilioConferenceSid;
 
         if (isCallConnecting) {
             toast({
@@ -442,7 +464,6 @@ export default function AppHeader({
                 }
                 if (consultResult?.data?.conference_sid) {
                     setConferenceSid(consultResult.data.conference_sid);
-                    setActiveConferenceSid(consultResult.data.conference_sid);
                 }
                 await consultEnsureAgent(conferenceSidForConsult);
                 setDialerOpen(false);
@@ -462,7 +483,6 @@ export default function AppHeader({
     
         try {
             setConferenceSid(null);
-            setActiveConferenceSid(null);
 
             const params: { To: string, From?: string, conferenceSid?: string, direction?: string } = { To: number };
             if (fromNumber) {
@@ -477,11 +497,12 @@ export default function AppHeader({
             }
             setDialerOpen(false);
 
-            setActiveContactName(number);
             const selectedDepartment = departments.find((dept) => String(dept.id) === selectedDepartmentId);
-            setActiveDepartmentName(selectedDepartment?.name || null);
-            setActiveCall(connection);
-            setIsActiveCallOpen(true);
+            registerOutboundConnection(connection, {
+                callerName: number,
+                callerNumber: number,
+                departmentName: selectedDepartment?.name || null,
+            });
 
            connection.on('accept', async () => {
                 console.log('Call accepted');
@@ -490,7 +511,6 @@ export default function AppHeader({
                     const data = await getconferenceSid(callSid);
                     if (data.conferenceSid) {
                         setConferenceSid(data.conferenceSid);
-                        setActiveConferenceSid(data.conferenceSid);
                     } else {
                         console.warn('No conferenceSid found yet.');
                     }
@@ -498,59 +518,12 @@ export default function AppHeader({
                     console.error('Error fetching conferenceSid:', e);
                 }
             });
-
-            connection.on('disconnect', () => {
-                setIsActiveCallOpen(false);
-                setActiveCall(null);
-                setActiveDepartmentName(null);
-                setActiveConferenceSid(null);
-                setConferenceSid(null);
-            });
-
-            connection.on('cancel', () => {
-                setIsActiveCallOpen(false);
-                setActiveCall(null);
-                setActiveDepartmentName(null);
-                setActiveConferenceSid(null);
-                setConferenceSid(null);
-            });
-
-            connection.on('reject', () => {
-                setIsActiveCallOpen(false);
-                setActiveCall(null);
-                setActiveDepartmentName(null);
-                setActiveConferenceSid(null);
-                setConferenceSid(null);
-            });
         } catch (error) {
             console.error("Error making call:", error);
             toast({ title: "Call Error", description: "Failed to make call. See console for details.", variant: 'destructive'});
         }
     };
     
-    const handleContactSelect = (contact: Contact) => {
-        setSearchValue('');
-        setSearchOpen(false);
-        
-        if (setControlledDialerOpen !== undefined) {
-            setControlledDialerOpen(true);
-        } else {
-            setInternalDialerOpen(true);
-        }
-        
-        // This relies on the dialer being able to receive the initial value.
-        setInternalDialerInitialValue(contact.phone_no.replace(/^\+1/, ''));
-    };
-
-    
-    const filteredContacts = searchValue
-    ? contacts.filter(
-        contact =>
-          contact.name.toLowerCase().includes(searchValue.toLowerCase()) ||
-          contact.phone_no.includes(searchValue)
-      )
-    : [];
-
     const statusClasses = {
         'Available': 'bg-green-500',
         'Unavailable': 'bg-yellow-500',
@@ -578,43 +551,23 @@ export default function AppHeader({
 
     return (
         <>
-            <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-8 border-b bg-background shadow-sm">
-                <div className="flex items-center gap-4">
-                    <SidebarTrigger className="md:hidden" />
+            <header className="sticky top-0 z-30 flex items-center justify-between gap-4 h-16 px-4 md:px-8 border-b bg-background shadow-sm">
+                <div className={cn('flex min-w-0 items-center gap-4', !pageTitle && 'flex-1')}>
+                    <SidebarTrigger className="md:hidden shrink-0" />
                      {pageTitle ? (
                         <h1 className="text-xl font-bold">{pageTitle}</h1>
                      ) : (
-                        <div className="relative w-full md:w-96">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input 
-                                placeholder="Search contacts..."
-                                className="pl-9"
-                                value={searchValue}
-                                onFocus={() => setSearchOpen(true)}
-                                onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
-                                onChange={(e) => setSearchValue(e.target.value)}
-                            />
-                            {searchOpen && filteredContacts.length > 0 && (
-                                <div className="absolute z-10 top-full mt-1 w-full bg-background border rounded-md shadow-lg">
-                                    <ScrollArea className="max-h-60 overflow-y-auto">
-                                        {filteredContacts.map(contact => (
-                                            <div 
-                                                key={contact.id}
-                                                onMouseDown={() => handleContactSelect(contact)}
-                                                className="p-2 hover:bg-accent cursor-pointer"
-                                            >
-                                                <p className="font-medium">{contact.name}</p>
-                                                <p className="text-xs text-muted-foreground">{formatPhoneNumber(contact.phone_no)}</p>
-                                            </div>
-                                        ))}
-                                    </ScrollArea>
-                                </div>
-                            )}
-                        </div>
+                        <GlobalSearch
+                            companyId={user?.company_id}
+                            contacts={contacts}
+                            users={companyUsers}
+                            className={cn('w-full', searchClassName ?? 'md:max-w-md lg:max-w-xl')}
+                        />
                      )}
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex shrink-0 items-center gap-4">
                     <TwilioStatusIndicator />
+                    <ThemeToggle />
                     <Button
                       variant="ghost"
                       size="icon"
@@ -802,31 +755,6 @@ export default function AppHeader({
                 </DialogHeader>
             </DialogContent>
             </Dialog>
-            
-            <ActiveCallBar
-              isOpen={isActiveCallOpen}
-              contactNumber={activeContactName}
-              callerName={activeContactName}
-              departmentName={activeDepartmentName}
-              connection={activeCall}
-              conferenceSid={activeConferenceSid}
-              onLeaveCall={async (sid, callSid) => {
-                await leaveCall(sid, callSid);
-                setIsActiveCallOpen(false);
-                setActiveCall(null);
-                setActiveDepartmentName(null);
-                setActiveConferenceSid(null);
-                setConferenceSid(null);
-              }}
-              onEndCallForAll={async (sid) => {
-                await endCallForAll(sid ?? activeConferenceSid);
-                setIsActiveCallOpen(false);
-                setActiveCall(null);
-                setActiveDepartmentName(null);
-                setActiveConferenceSid(null);
-                setConferenceSid(null);
-              }}
-            />
         </>
     );
 }

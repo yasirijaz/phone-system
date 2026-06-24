@@ -1,19 +1,26 @@
 import path from 'node:path';
 import type {NextConfig} from 'next';
 
-const monorepoRoot = path.join(import.meta.dirname, '../..');
+const projectRoot = import.meta.dirname;
 
 const nextConfig: NextConfig = {
   /* config options here */
   distDir: 'build',
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
-  outputFileTracingRoot: monorepoRoot,
+  outputFileTracingRoot: projectRoot,
+  serverExternalPackages: [
+    'genkit',
+    '@genkit-ai/google-genai',
+    '@genkit-ai/next',
+    '@genkit-ai/ai',
+    '@genkit-ai/core',
+  ],
   turbopack: {
-    root: monorepoRoot,
+    root: projectRoot,
   },
   webpack: (config) => {
     config.resolve.modules = [
-      path.join(monorepoRoot, 'node_modules'),
+      path.join(projectRoot, 'node_modules'),
       ...(config.resolve.modules ?? []),
     ];
     return config;

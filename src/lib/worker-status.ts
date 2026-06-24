@@ -1,4 +1,5 @@
 import type { User } from '@/types';
+import { events } from '@/lib/events';
 
 export type WorkerActivityName = 'Available' | 'Unavailable' | 'Offline' | string;
 
@@ -20,6 +21,30 @@ export function parseWorkerStatusPayload(
     data.worker_status ?? data.activity_name ?? data.activity ?? data.status;
   if (userId == null || typeof status !== 'string' || !status) return null;
   return { user_id: Number(userId), worker_status: status };
+}
+
+export function dispatchOperatorStatusUpdate(
+  data: Record<string, unknown> | null | undefined
+): void {
+  if (!data || data.user_id == null) return;
+
+  const statusPayload = parseWorkerStatusPayload(data);
+  if (statusPayload) {
+    events.emit('refreshWorkerStatus', statusPayload);
+  }
+
+  if (data.in_call != null) {
+    events.emit('refreshInCallStatus', data);
+  }
+
+  const dndValue = data.is_dnd ?? data.do_not_disturb;
+  if (dndValue != null) {
+    events.emit('refreshOperators', {
+      user_id: data.user_id,
+      is_dnd: dndValue,
+      department_id: data.department_id,
+    });
+  }
 }
 
 export function getWorkerStatusBadgeVariant(

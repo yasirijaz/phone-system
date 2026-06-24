@@ -6,13 +6,16 @@ import IncomingCallModal from '@/components/incoming-call-modal';
 import ActiveCallBar from '@/components/active-call-modal';
 import { useAuth } from '@/context/AuthContext';
 import ReservationModal from '@/components/reservation-modal';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { toast } from '@/hooks/use-toast';
 import UpdateProgress from '@/components/update-progress';
-import ReconnectPrompt from '@/components/reconnect-prompt';
 import { usePathname } from 'next/navigation';
 import { isInAppRoute } from '@/lib/in-app-routes';
+import { isElectronOverlayRoute } from '@/lib/electron-overlay-routes';
+import { isElectron } from '@/lib/is-electron';
 import { InAppShell } from '@/components/in-app-shell';
+import { isLiveCallStatus } from '@/lib/twilio-call-utils';
+import { readActiveCallSession } from '@/lib/active-call-session';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const {
@@ -26,14 +29,24 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     activeReservation,
     showReservationModal,
     acceptReservation,
+    acceptReservationAndEndCurrent,
+    acceptReservationWithHold,
+    acceptReservationAndMerge,
     rejectReservation,
+    activeCallMeta,
+    syncActiveCallState,
   } = useTwilio();
 
-  // set update status state
-  const [updateMessage, setUpdateMessage] = useState<string>("");
   const { user } = useAuth();
   const pathname = usePathname();
+  const isOverlayRoute = isElectronOverlayRoute(pathname);
   const showInAppShell = isInAppRoute(pathname);
+  const [updateMessage, setUpdateMessage] = useState<string>('');
+  const callStartedAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    void syncActiveCallState();
+  }, [pathname, syncActiveCallState]);
    useEffect(() => {
     if(window.api)
       window.api.receive('updatelog', handleUpdates);
@@ -43,6 +56,10 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     const handleChunkError = (event: ErrorEvent) => {
       const message = event.message || '';
       if (message.includes('ChunkLoadError') || message.includes('Loading chunk')) {
+        if (readActiveCallSession()) {
+          console.warn('Skipping chunk reload while a call is in progress.');
+          return;
+        }
         const reloadKey = 'chunk-reload';
         if (!sessionStorage.getItem(reloadKey)) {
           sessionStorage.setItem(reloadKey, '1');
@@ -70,27 +87,81 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   }
 
   const callStatus = connection?.status?.();
-  const hasLiveConnection =
-    !!connection && !['pending', 'ringing', 'closed'].includes(String(callStatus ?? ''));
+  const hasLiveConnection = !!connection && isLiveCallStatus(callStatus);
+  const hasPersistedActiveCall = Boolean(
+    activeCallMeta?.conferenceSid || activeCallMeta?.callSid
+  );
   const isIncomingDeviceCall =
     !!connection && (callStatus === 'pending' || callStatus === 'ringing');
-  // Only show the device incoming prompt for standalone calls — not Task Router legs.
   const isIncomingCall =
     isIncomingDeviceCall && !activeReservation && !incomingReservation && !showReservationModal;
-  // Keep the bar visible for reservation-based calls even if the device leg disconnects.
-  const isActiveCall = hasLiveConnection || !!activeReservation;
-  
-  // For reservation-based calls, get customer info from reservation
-  // For regular calls, get customer info from connection parameters
-  const callerName = activeReservation?.task?.attributes?.contact_name || connection?.parameters?.FriendlyName || "Unknown Caller";
-  const callerNumber = activeReservation?.task?.attributes?.from || connection?.parameters?.From || "";
+  const isActiveCall =
+    hasLiveConnection ||
+    !!activeReservation ||
+    (hasPersistedActiveCall && !incomingReservation && !isIncomingDeviceCall);
+
+  const isAgentOnCall =
+    isActiveCall && !isIncomingDeviceCall;
+
+  const liveCallSid = connection?.parameters?.CallSid ?? null;
+  const storedMetaApplies = Boolean(
+    activeCallMeta &&
+      (!liveCallSid || !activeCallMeta.callSid || activeCallMeta.callSid === liveCallSid) &&
+      (!activeReservation ||
+        !activeCallMeta.callerNumber ||
+        activeCallMeta.callerNumber === activeReservation.task?.attributes?.from)
+  );
+
+  const callerName =
+    activeReservation?.task?.attributes?.contact_name ||
+    connection?.parameters?.FriendlyName ||
+    (storedMetaApplies ? activeCallMeta?.callerName : null) ||
+    'Unknown Caller';
+  const callerNumber =
+    activeReservation?.task?.attributes?.from ||
+    connection?.parameters?.From ||
+    connection?.parameters?.To ||
+    (storedMetaApplies ? activeCallMeta?.callerNumber : null) ||
+    '';
   const departmentName =
     activeReservation?.task?.attributes?.department_name ||
     incomingReservation?.task?.attributes?.department_name ||
+    (storedMetaApplies ? activeCallMeta?.departmentName : null) ||
     null;
-  
-  // Use customer number (From) for active call display
-  const activeCallContact = activeReservation?.task?.attributes?.from || connection?.parameters?.From || connection?.parameters?.To || "Unknown";
+  const effectiveConferenceSid =
+    conferenceSid ||
+    (storedMetaApplies ? activeCallMeta?.conferenceSid : null) ||
+    null;
+  const activeCallKey =
+    effectiveConferenceSid ||
+    connection?.parameters?.CallSid ||
+    activeCallMeta?.callSid ||
+    activeReservation?.task?.sid ||
+    incomingReservation?.task?.sid ||
+    'idle';
+
+  useEffect(() => {
+    if (!isElectron() || !window.electronAPI || isOverlayRoute) return;
+
+    if (isActiveCall) {
+      if (!callStartedAtRef.current) {
+        callStartedAtRef.current = Date.now();
+      }
+      window.electronAPI.send('show-call-progress', {
+        callerName,
+        callerNumber,
+        startedAt: callStartedAtRef.current,
+      });
+      return;
+    }
+
+    callStartedAtRef.current = null;
+    window.electronAPI.send('hide-call-progress');
+  }, [isActiveCall, callerName, callerNumber, isOverlayRoute]);
+
+  if (isOverlayRoute) {
+    return <>{children}</>;
+  }
 
   return (
     <>
@@ -105,20 +176,37 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         onReject={rejectCall}
       />
        <ActiveCallBar
-        isOpen={!!isActiveCall}
+        key={activeCallKey}
+        isOpen={!!isActiveCall && !showReservationModal}
         contactNumber={callerNumber}
         callerName={callerName}
         departmentName={departmentName}
         onLeaveCall={leaveCall}
         onEndCallForAll={endCallForAll}
         connection={connection}
-        conferenceSid={conferenceSid}
+        conferenceSid={effectiveConferenceSid}
+        fallbackAgentCallSid={
+          storedMetaApplies ? activeCallMeta?.callSid ?? null : liveCallSid
+        }
       />
       <ReservationModal
         isOpen={!!showReservationModal}
         onClose={() => rejectReservation(incomingReservation!)}
         reservation={incomingReservation}
+        activeCall={
+          isAgentOnCall && showReservationModal
+            ? {
+                callerName,
+                callerNumber,
+                departmentName,
+                startedAt: callStartedAtRef.current ?? activeCallMeta?.startedAt ?? Date.now(),
+              }
+            : null
+        }
         onAccept={acceptReservation}
+        onAcceptEndCurrent={acceptReservationAndEndCurrent}
+        onAcceptHold={acceptReservationWithHold}
+        onAcceptMerge={acceptReservationAndMerge}
         onReject={rejectReservation}
       />
       <UpdateProgress message={updateMessage} />

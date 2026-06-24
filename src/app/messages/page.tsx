@@ -4,12 +4,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getCompanyPhoneNumbers } from "@/services/phoneNumberService";
-import { getContacts } from "@/services/contactService";
+import { searchContacts } from "@/services/contactService";
 import { getDepartments } from "@/services/departmentService";
 import type { PhoneNumber, Contact, Department } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { sendMms } from "@/services/twilioService";
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import AppHeader from "@/components/app-header";
 import MessageComposer from "@/components/message-composer";
@@ -22,10 +22,10 @@ export default function MessagesPage() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
   const [loadingNumbers, setLoadingNumbers] = useState(true);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
   
@@ -43,12 +43,10 @@ export default function MessagesPage() {
       setLoadingNumbers(true);
       setLoadingDepartments(true);
       try {
-        const [fetchedContacts, numbers, fetchedDepartments] = await Promise.all([
-            getContacts(user.company_id),
+        const [numbers, fetchedDepartments] = await Promise.all([
             getCompanyPhoneNumbers(user.company_id),
             getDepartments(user.company_id),
         ]);
-        setContacts(Array.isArray(fetchedContacts) ? fetchedContacts : []);
         const depts = Array.isArray(fetchedDepartments) ? fetchedDepartments : [];
         setDepartments(depts);
         const companyNumbers = Array.isArray(numbers) ? numbers : [];
@@ -76,17 +74,39 @@ export default function MessagesPage() {
   }, [user, toast]);
   
   useEffect(() => {
-    if (recipient.length > 2) {
-        const searchTerm = recipient.toLowerCase();
-        const matchingContacts = contacts.filter(contact => 
-            contact.name.toLowerCase().includes(searchTerm) ||
-            contact.phone_no.includes(searchTerm)
-        );
-        setFilteredContacts(matchingContacts);
-    } else {
-        setFilteredContacts([]);
+    const to = searchParams.get('to');
+    if (to) {
+      setRecipient(to);
     }
-}, [recipient, contacts]);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const companyId = user?.company_id;
+    if (!companyId || recipient.length < 1) {
+      setFilteredContacts([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void searchContacts(companyId, recipient, 25)
+        .then((matches) => {
+          if (!cancelled) {
+            setFilteredContacts(matches);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setFilteredContacts([]);
+          }
+        });
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [recipient, user?.company_id]);
 
   const filteredPhoneNumbers = selectedDepartmentId
     ? phoneNumbers.filter(

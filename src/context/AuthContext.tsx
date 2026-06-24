@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { setInitialState, logoutUser } from '@/store/slices/authSlice';
 import type { User } from '@/types';
+import { isElectronOverlayRoute } from '@/lib/electron-overlay-routes';
 
 interface AuthContextType {
   user: User | null;
@@ -34,7 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
   
   const unprotectedRoutes = ['/login', '/register', '/pricing', '/forgot-password', '/reset-password'];
-  const isProtectedRoute = !unprotectedRoutes.some(route => pathname.startsWith(route));
+  const isOverlayRoute = isElectronOverlayRoute(pathname);
+  const isProtectedRoute = !isOverlayRoute && !unprotectedRoutes.some(route => pathname.startsWith(route));
   const isAuthRoute = ['/login', '/register'].includes(pathname);
 
   useEffect(() => {
@@ -50,6 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, initialLoading, pathname, isProtectedRoute, isAuthRoute, router]);
 
   const isLoading = initialLoading || authLoading;
+
+  if (isOverlayRoute) {
+    return <AuthContext.Provider value={{ user, loading: isLoading, logout }}>{children}</AuthContext.Provider>;
+  }
 
   if (isLoading || (!user && isProtectedRoute)) {
      return (

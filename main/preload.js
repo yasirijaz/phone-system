@@ -4,16 +4,30 @@ const electronSendChannels = [
   'incoming-sms',
   'incoming-call',
   'accept-call',
+  'accept-call-hold',
+  'accept-call-end-current',
+  'accept-call-merge',
   'reject-call',
   'check-for-updates',
   'successfully-accepted-call',
   'successfully-rejected-call',
   'dismiss-incoming-overlay',
+  'show-call-progress',
+  'hide-call-progress',
+  'focus-main-window',
+  'end-call-from-progress',
 ];
 
 const electronReceiveChannels = [
   'call-accepted',
+  'accept-call-hold',
+  'accept-call-end-current',
+  'accept-call-merge',
   'call-rejected',
+  'call-progress-update',
+  'incoming-call-update',
+  'open-sms-conversation',
+  'end-call-from-progress',
 ];
 
 const apiSendChannels = ['check-for-updates', 'restart-to-update'];

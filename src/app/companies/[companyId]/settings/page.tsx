@@ -69,6 +69,9 @@ const settingsSchema = z.object({
     default_route: z.string().default("voicemail"),
     timeout: z.coerce.number().min(5).max(120).default(30),
   }),
+  slack_settings: z.object({
+    bot_token: z.string().optional(),
+  }).optional(),
   integrations: z.array(integrationSettingSchema).optional(),
 });
 
@@ -105,6 +108,7 @@ export default function CompanySettingsPage() {
       },
       holiday_schedule: { holidays: [] },
       routing_preferences: { default_route: "voicemail", timeout: 30 },
+      slack_settings: { bot_token: "" },
       integrations: [],
     },
   });
@@ -180,6 +184,9 @@ export default function CompanySettingsPage() {
           },
           holiday_schedule: settings.holiday_schedule || { holidays: [] },
           routing_preferences: settings.routing_preferences || { default_route: "voicemail", timeout: 30 },
+          slack_settings: {
+            bot_token: "",
+          },
           integrations: integrationSettings,
         });
       } else {
@@ -199,6 +206,9 @@ export default function CompanySettingsPage() {
       console.log('Settings available but no integrations, resetting with empty integrations');
       form.reset({
         ...settings,
+        slack_settings: {
+          bot_token: "",
+        },
         integrations: [],
       });
     }
@@ -335,11 +345,28 @@ export default function CompanySettingsPage() {
 
   const onSubmit = async (values: z.infer<typeof settingsSchema>) => {
     try {
-      const payload = { ...values, company_id: companyId };
-      await createOrUpdateCompanySettings(settings?.id, payload);
+      const slackSettings = values.slack_settings ? { ...values.slack_settings } : undefined;
+      if (slackSettings && !slackSettings.bot_token) {
+        delete slackSettings.bot_token;
+      }
+
+      const payload = {
+        ...values,
+        company_id: companyId,
+        slack_settings: slackSettings,
+      };
+      const response = await createOrUpdateCompanySettings(settings?.id, payload);
+      if (response?.id) {
+        setSettings(response);
+      }
+      form.setValue("slack_settings.bot_token", "");
       toast({ title: "Success", description: "Settings saved successfully." });
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || "An unexpected error occurred.";
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        (typeof error.response?.data === "string" ? error.response.data : null) ||
+        "An unexpected error occurred.";
       toast({
         title: `Error saving settings`,
         description: errorMessage,
@@ -384,12 +411,13 @@ export default function CompanySettingsPage() {
             <Form {...form}>
               <form id="settings-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                  <Tabs defaultValue="call-settings">
-                    <TabsList className="grid w-full grid-cols-6">
+                    <TabsList className="grid w-full grid-cols-7">
                         <TabsTrigger value="call-settings">Call Settings</TabsTrigger>
                         <TabsTrigger value="voicemail">Voicemail</TabsTrigger>
                         <TabsTrigger value="business-hours">Business Hours</TabsTrigger>
                         <TabsTrigger value="holiday-schedule">Holiday Schedule</TabsTrigger>
                         <TabsTrigger value="routing">Routing</TabsTrigger>
+                        <TabsTrigger value="slack">Slack</TabsTrigger>
                         <TabsTrigger value="integrations">Integrations</TabsTrigger>
                     </TabsList>
                     
@@ -675,6 +703,40 @@ export default function CompanySettingsPage() {
                                             <FormMessage />
                                         </FormItem>
                                     )}
+                                />
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="slack">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Slack Integration</CardTitle>
+                                <CardDescription>
+                                    Configure the shared Slack bot token used by all departments for groups, missed-call alerts, and user lookup.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <FormField
+                                  control={form.control}
+                                  name="slack_settings.bot_token"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Slack Bot Token</FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          type="password"
+                                          placeholder={settings?.slack_settings?.has_bot_token ? "Token saved — enter a new value to replace" : "xoxb-..."}
+                                          {...field}
+                                          value={field.value || ""}
+                                        />
+                                      </FormControl>
+                                      <FormDescription>
+                                        Use a Slack bot token with <code>channels:manage</code>, <code>chat:write</code>, and <code>users:read.email</code> scopes. Department settings control missed-call notifications, in-call status, and per-department Slack groups.
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
                                 />
                             </CardContent>
                         </Card>

@@ -24,15 +24,16 @@ export const createOrUpdateCompanySettings = async (id: number | undefined, sett
         business_hours: settings.business_hours,
         holiday_schedule: settings.holiday_schedule,
         routing_preferences: settings.routing_preferences,
+        slack_settings: settings.slack_settings,
         integrations: settings.integrations,
     };
 
     if (id) {
         const response = await axios.put(`/api/settings/company/${id}`, payload);
-        return response.data;
+        return response.data.settings ?? response.data.companySetting ?? response.data;
     } else {
         const response = await axios.post('/api/settings/company', payload);
-        return response.data;
+        return response.data.settings ?? response.data.companySetting ?? response.data;
     }
 };
 

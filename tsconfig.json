@@ -28,18 +28,18 @@
       ]
     },
     "typeRoots": [
-      "../../node_modules/@types"
+      "./node_modules/@types"
     ]
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
     "next-env.d.ts",
     "build/types/**/*.ts",
     "build/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "build/dev"
   ]
 }

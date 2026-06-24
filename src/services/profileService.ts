@@ -20,8 +20,13 @@ export const updateProfile = async (id: number, data: ProfilePayload): Promise<U
     } else {
         response = await axios.put(`/api/users/${id}`, data);
     }
-    
-    return response.data;
+
+    const payload = response.data as {
+        user?: User;
+        data?: { user?: User };
+    };
+
+    return payload.data?.user ?? payload.user ?? (response.data as User);
 };
 
 export const getUserDevices = async (): Promise<any[]> => {

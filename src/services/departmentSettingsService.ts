@@ -25,15 +25,30 @@ export const createOrUpdateDepartmentSettings = async (id: number | undefined, s
       ivr_menu: settings.ivr_menu,
       break_handling: settings.break_handling,
       holiday_schedule: settings.holiday_schedule,
+      slack_settings: settings.slack_settings,
     };
 
     if (id) {
         const response = await axios.put(`/api/settings/department/${id}`, payload);
-        return response.data;
+        return response.data.settings ?? response.data;
     } else {
         const response = await axios.post('/api/settings/department', payload);
-        return response.data;
+        return response.data.settings ?? response.data;
     }
+};
+
+export const createDepartmentSlackGroup = async (
+  departmentId: number
+): Promise<{ settings: DepartmentSettings; slack_settings: DepartmentSettings['slack_settings']; message: string }> => {
+  const response = await axios.post(`/api/settings/department/${departmentId}/slack/create-group`);
+  return response.data;
+};
+
+export const deleteDepartmentSlackGroup = async (
+  departmentId: number
+): Promise<{ settings: DepartmentSettings; slack_settings: DepartmentSettings['slack_settings']; message: string }> => {
+  const response = await axios.delete(`/api/settings/department/${departmentId}/slack/group`);
+  return response.data;
 };
 
 export const deleteDepartmentSettings = async (id: number): Promise<void> => {

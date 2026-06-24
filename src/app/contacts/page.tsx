@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -35,6 +36,8 @@ const contactSchema = z.object({
 
 export default function ContactsPage() {
   const { user, logout } = useAuth();
+  const searchParams = useSearchParams();
+  const highlightContactId = searchParams.get("id");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -54,6 +57,22 @@ export default function ContactsPage() {
     resolver: zodResolver(contactSchema),
     defaultValues: { name: "", email: "", phone_no: "", phone_type: "mobile" },
   });
+
+  useEffect(() => {
+    const query = searchParams.get("q");
+    if (query) {
+      setSearchQuery(query);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!highlightContactId || contacts.length === 0 || typeof window === "undefined") return;
+
+    const target = document.getElementById(`contact-${highlightContactId}`);
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightContactId, contacts]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -171,8 +190,9 @@ export default function ContactsPage() {
   };
   
   const handleDelete = async (contactId: number) => {
+    if (!user?.company_id) return;
     try {
-        await deleteContact(contactId);
+        await deleteContact(contactId, user.company_id);
         toast({ title: "Success", description: "Contact deleted successfully." });
         refreshContacts();
     } catch (error) {
@@ -273,7 +293,11 @@ export default function ContactsPage() {
                         </TableHeader>
                         <TableBody>
                           {contacts.length > 0 ? contacts.map((contact) => (
-                            <TableRow key={contact.id}>
+                            <TableRow
+                              key={contact.id}
+                              id={`contact-${contact.id}`}
+                              className={highlightContactId === String(contact.id) ? "bg-accent/60" : undefined}
+                            >
                               <TableCell className="font-medium">{contact.name}</TableCell>
                               <TableCell>{contact.email || 'N/A'}</TableCell>
                               <TableCell>{formatPhoneNumber(contact.phone_no)}</TableCell>

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, dialog, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog, screen, Notification } from 'electron';
 
 // const serve = 'electron-serve';
 import serve from 'electron-serve';
@@ -16,6 +16,9 @@ const require = createRequire(import.meta.url);
 const { autoUpdater } = require('electron-updater');
 let Mainwindow
 let notificationWindow;
+let callProgressWindow = null;
+let callProgressStartedAt = null;
+let callProgressInfo = { callerName: '', callerNumber: '' };
 let pendingCallInfo = null;
 let isdev = false;
 let updateReady = false;
@@ -159,34 +162,30 @@ const createWindow = () => {
     });
   }
   Mainwindow = win;
-  // If a call is pending, show overlay only while minimized
-  win.on('minimize', () => {
-    console.log('minimuze',pendingCallInfo);
+
+  const refreshBackgroundOverlays = () => {
     if (pendingCallInfo) {
-      // Recreate minimized overlay using the existing route
-      destroyNotificationWindow();
-      notificationWindow = new BrowserWindow({
-        width: 300,
-        height: 300,
-        frame: false,
-        alwaysOnTop: true,
-        webPreferences: {
-          preload: path.join(__dirname, "preload.js"),
-          nodeIntegration: false,
-          contextIsolation: true,
-          sandbox: true,
-          webSecurity: true,
-          allowRunningInsecureContent: false,
-        }
-      });
-      const url = app.isPackaged
-        ? `https://phone.windshieldhub.com/incoming-call-notification?from=${encodeURIComponent(pendingCallInfo.from || '')}&callerName=${encodeURIComponent(pendingCallInfo.callerName || '')}`
-        : `http://localhost:3000/incoming-call-notification?from=${encodeURIComponent(pendingCallInfo.from || '')}&callerName=${encodeURIComponent(pendingCallInfo.callerName || '')}`;
-      notificationWindow.loadURL(url);
+      syncIncomingOverlayWindow(pendingCallInfo);
+      return;
     }
+    if (callProgressStartedAt) {
+      showCallProgressWindow({
+        ...callProgressInfo,
+        startedAt: callProgressStartedAt,
+      });
+    }
+  };
+
+  win.on('minimize', () => {
+    refreshBackgroundOverlays();
   });
+
+  win.on('blur', () => {
+    refreshBackgroundOverlays();
+  });
+
   const hideOverlay = () => {
-    destroyNotificationWindow();
+    hideNotificationWindow();
   };
   win.on('restore', hideOverlay);
   win.on('show', hideOverlay);
@@ -256,6 +255,9 @@ function createAppMenu() {
 }
 
 app.on("ready", () => {
+    if (process.platform === 'win32') {
+      app.setAppUserModelId('com.windshieldhub.voice');
+    }
     createWindow();
     createAppMenu();
     setupAutoUpdater();
@@ -270,58 +272,330 @@ app.on('before-quit', () => {
     clearInterval(updateCheckTimer);
     updateCheckTimer = null;
   }
+  destroyCallProgressWindow();
 });
 
+function isMainWindowForeground() {
+  if (!Mainwindow || Mainwindow.isDestroyed()) return false;
+  return !Mainwindow.isMinimized() && Mainwindow.isFocused();
+}
 
+function shouldShowIncomingOverlay() {
+  if (!Mainwindow || Mainwindow.isDestroyed()) return false;
+  return !isMainWindowForeground();
+}
 
+function buildIncomingCallUrl(callInfo = {}) {
+  const params = new URLSearchParams({
+    from: callInfo.from || '',
+    callerName: callInfo.callerName || '',
+  });
 
-function destroyNotificationWindow() {
+  if (callInfo.activeCall) {
+    params.set('activeCallerName', callInfo.activeCall.callerName || 'On Call');
+    params.set('activeCallerNumber', callInfo.activeCall.callerNumber || '');
+    if (callInfo.activeCall.startedAt) {
+      params.set('activeStartedAt', String(callInfo.activeCall.startedAt));
+    }
+  }
+
+  return `${getAppBaseUrl()}/incoming-call-notification?${params}`;
+}
+
+function getIncomingOverlayBounds(hasActiveCall = false) {
+  const workArea = screen.getPrimaryDisplay().workArea;
+  const windowWidth = 420;
+  const windowHeight = hasActiveCall ? 240 : 190;
+  const margin = 16;
+  return {
+    width: windowWidth,
+    height: windowHeight,
+    x: workArea.x + workArea.width - windowWidth - margin,
+    y: workArea.y + margin,
+  };
+}
+
+function syncIncomingOverlayWindow(callInfo) {
+  pendingCallInfo = callInfo || null;
+  if (!pendingCallInfo) {
+    destroyNotificationWindow(false);
+    return;
+  }
+
+  const hasActiveCall = Boolean(callInfo.activeCall && callProgressStartedAt);
+  const bounds = getIncomingOverlayBounds(hasActiveCall);
+  const url = buildIncomingCallUrl(callInfo);
+
+  if (hasActiveCall && callProgressWindow && !callProgressWindow.isDestroyed()) {
+    callProgressWindow.hide();
+  }
+
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.setBounds(bounds);
+    notificationWindow.webContents.send('incoming-call-update', {
+      from: callInfo.from,
+      callerName: callInfo.callerName,
+      activeCall: callInfo.activeCall || null,
+    });
+    if (!notificationWindow.isVisible()) {
+      notificationWindow.show();
+    }
+    return;
+  }
+
+  notificationWindow = new BrowserWindow({
+    ...bounds,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: false,
+    focusable: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+    }
+  });
+
+  notificationWindow.loadURL(url);
+  notificationWindow.once('ready-to-show', () => {
+    if (notificationWindow && !notificationWindow.isDestroyed()) {
+      notificationWindow.show();
+    }
+  });
+  notificationWindow.on('closed', () => {
+    notificationWindow = null;
+  });
+}
+
+function hideNotificationWindow() {
   if (notificationWindow && !notificationWindow.isDestroyed()) {
     notificationWindow.close();
   }
   notificationWindow = null;
+
+  if (!pendingCallInfo && callProgressStartedAt) {
+    showCallProgressWindow({
+      ...callProgressInfo,
+      startedAt: callProgressStartedAt,
+    });
+  }
 }
 
-ipcMain.on('incoming-sms', (event, sms) => {
-  Mainwindow.show();
-  Mainwindow.focus();
+function destroyNotificationWindow(restoreCallProgress = true, clearPending = true) {
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.close();
+  }
+  notificationWindow = null;
+  if (clearPending) {
+    pendingCallInfo = null;
+  }
+
+  if (restoreCallProgress && callProgressStartedAt) {
+    showCallProgressWindow({
+      ...callProgressInfo,
+      startedAt: callProgressStartedAt,
+    });
+  }
+}
+
+function getAppBaseUrl() {
+  return app.isPackaged
+    ? 'https://phone.windshieldhub.com'
+    : 'http://localhost:3000';
+}
+
+function destroyCallProgressWindow(resetSession = true) {
+  if (callProgressWindow && !callProgressWindow.isDestroyed()) {
+    callProgressWindow.close();
+  }
+  callProgressWindow = null;
+  if (resetSession) {
+    callProgressStartedAt = null;
+    callProgressInfo = { callerName: '', callerNumber: '' };
+  }
+}
+
+function getCallProgressBounds() {
+  const workArea = screen.getPrimaryDisplay().workArea;
+  const windowWidth = 360;
+  const windowHeight = 56;
+  const margin = 16;
+  return {
+    width: windowWidth,
+    height: windowHeight,
+    x: workArea.x + workArea.width - windowWidth - margin,
+    y: workArea.y + margin,
+  };
+}
+
+function showCallProgressWindow(callInfo = {}) {
+  const { callerName = '', callerNumber = '', startedAt } = callInfo;
+  const effectiveStartedAt = startedAt || callProgressStartedAt;
+  if (!effectiveStartedAt) return;
+
+  callProgressStartedAt = effectiveStartedAt;
+  callProgressInfo = { callerName, callerNumber };
+
+  if (pendingCallInfo) {
+    syncIncomingOverlayWindow({
+      ...pendingCallInfo,
+      activeCall: {
+        callerName,
+        callerNumber,
+        startedAt: effectiveStartedAt,
+      },
+    });
+    return;
+  }
+
+  if (callProgressWindow && !callProgressWindow.isDestroyed()) {
+    callProgressWindow.setBounds(getCallProgressBounds());
+    callProgressWindow.webContents.send('call-progress-update', {
+      callerName,
+      callerNumber,
+      startedAt: effectiveStartedAt,
+    });
+    if (!callProgressWindow.isVisible()) {
+      callProgressWindow.show();
+    }
+    return;
+  }
+
+  callProgressWindow = new BrowserWindow({
+    ...getCallProgressBounds(),
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: false,
+    focusable: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+    }
+  });
+
+  const params = new URLSearchParams({
+    callerName,
+    callerNumber,
+    startedAt: String(effectiveStartedAt),
+  });
+
+  callProgressWindow.loadURL(`${getAppBaseUrl()}/call-progress-bar?${params}`);
+  callProgressWindow.once('ready-to-show', () => {
+    if (callProgressWindow && !callProgressWindow.isDestroyed()) {
+      callProgressWindow.show();
+    }
+  });
+  callProgressWindow.on('closed', () => {
+    callProgressWindow = null;
+  });
+}
+
+function formatPhoneForNotification(value) {
+  if (!value) return 'Unknown';
+  const digits = String(value).replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return String(value);
+}
+
+function showSmsNotification(sms = {}) {
+  if (!Notification.isSupported()) return;
+  if (!Mainwindow || Mainwindow.isDestroyed()) return;
+
+  const from = sms.from || 'Unknown';
+  const hasMedia = Boolean(sms?.meta_data?.num_media || sms?.meta_data?.media_urls?.length);
+  const senderLabel = formatPhoneForNotification(from);
+  const title = hasMedia ? `New MMS from ${senderLabel}` : `New message from ${senderLabel}`;
+  const body = sms.body || (hasMedia ? 'Media attachment' : 'New message received');
+
+  const notification = new Notification({
+    title,
+    body: String(body).slice(0, 240),
+    silent: false,
+  });
+
+  notification.on('click', () => {
+    if (!Mainwindow || Mainwindow.isDestroyed()) return;
+    if (Mainwindow.isMinimized()) {
+      Mainwindow.restore();
+    }
+    Mainwindow.show();
+    Mainwindow.focus();
+    if (sms.from && sms.to) {
+      Mainwindow.webContents.send('open-sms-conversation', {
+        from: sms.from,
+        to: sms.to,
+      });
+    }
+  });
+
+  notification.show();
+}
+
+ipcMain.on('incoming-sms', (_event, sms) => {
+  showSmsNotification(sms || {});
 });
 
-ipcMain.on('incoming-call', (event, callInfo) => {
-  pendingCallInfo = callInfo || null;
-  if (Mainwindow && Mainwindow.isMinimized()) {
-    destroyNotificationWindow();
-    notificationWindow = new BrowserWindow({
-      width: 300,
-      height: 300,
-      frame: false,
-      alwaysOnTop: true,
-      webPreferences: {
-        preload: path.join(__dirname, "preload.js"),
-        nodeIntegration: false,
-        contextIsolation: true,
-        sandbox: true,
-        webSecurity: true,
-        allowRunningInsecureContent: false,
-      }
-    });
-
-    const url = app.isPackaged
-      ? `https://phone.windshieldhub.com/incoming-call-notification?from=${encodeURIComponent(callInfo.from)}&callerName=${encodeURIComponent(callInfo.callerName)}`
-      : `http://localhost:3000/incoming-call-notification?from=${encodeURIComponent(callInfo.from)}&callerName=${encodeURIComponent(callInfo.callerName)}`;
-
-    notificationWindow.loadURL(url);
+ipcMain.on('incoming-call', (_event, callInfo) => {
+  const payload = callInfo || null;
+  pendingCallInfo = payload;
+  if (shouldShowIncomingOverlay()) {
+    syncIncomingOverlayWindow(payload);
   } else {
-    // main window is visible/focused; ensure overlay is not shown
-    destroyNotificationWindow();
+    hideNotificationWindow();
   }
 });
 
 ipcMain.on('accept-call', () => {
-  destroyNotificationWindow();
+  destroyNotificationWindow(false);
   pendingCallInfo = null;
   if (Mainwindow) {
     Mainwindow.webContents.send('call-accepted');
+  }
+});
+
+ipcMain.on('accept-call-hold', () => {
+  destroyNotificationWindow(false);
+  pendingCallInfo = null;
+  if (Mainwindow) {
+    Mainwindow.webContents.send('accept-call-hold');
+  }
+});
+
+ipcMain.on('accept-call-end-current', () => {
+  destroyNotificationWindow(false);
+  pendingCallInfo = null;
+  if (Mainwindow) {
+    Mainwindow.webContents.send('accept-call-end-current');
+  }
+});
+
+ipcMain.on('accept-call-merge', () => {
+  destroyNotificationWindow(false);
+  pendingCallInfo = null;
+  if (Mainwindow) {
+    Mainwindow.webContents.send('accept-call-merge');
   }
 });
 
@@ -354,7 +628,7 @@ ipcMain.on('successfully-accepted-call', () => {
   console.log('successfully',pendingCallInfo);
   Mainwindow.show();
   Mainwindow.focus();
-  destroyNotificationWindow();
+  destroyNotificationWindow(false);
   pendingCallInfo = null;
 });
 ipcMain.on('successfully-rejected-call', () => {
@@ -367,4 +641,28 @@ ipcMain.on('successfully-rejected-call', () => {
 ipcMain.on('dismiss-incoming-overlay', () => {
   destroyNotificationWindow();
   pendingCallInfo = null;
+});
+
+ipcMain.on('show-call-progress', (_event, callInfo) => {
+  showCallProgressWindow(callInfo || {});
+});
+
+ipcMain.on('hide-call-progress', () => {
+  destroyCallProgressWindow(true);
+});
+
+ipcMain.on('focus-main-window', () => {
+  if (Mainwindow && !Mainwindow.isDestroyed()) {
+    if (Mainwindow.isMinimized()) {
+      Mainwindow.restore();
+    }
+    Mainwindow.show();
+    Mainwindow.focus();
+  }
+});
+
+ipcMain.on('end-call-from-progress', () => {
+  if (Mainwindow && !Mainwindow.isDestroyed()) {
+    Mainwindow.webContents.send('end-call-from-progress');
+  }
 });

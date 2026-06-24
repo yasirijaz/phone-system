@@ -21,7 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, PlusCircle, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { getDepartmentSettings, createOrUpdateDepartmentSettings } from "@/services/departmentSettingsService";
+import { getDepartmentSettings, createOrUpdateDepartmentSettings, createDepartmentSlackGroup, deleteDepartmentSlackGroup } from "@/services/departmentSettingsService";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { DepartmentSettings } from "@/types";
 import AppHeader from "@/components/app-header";
 
@@ -65,6 +66,10 @@ const settingsSchema = z.object({
   holiday_schedule: z.object({
     holidays: z.array(holidaySchema),
   }),
+  slack_settings: z.object({
+    notify_missed_calls: z.boolean().default(true),
+    sync_in_call_status: z.boolean().default(false),
+  }).optional(),
 });
 
 
@@ -76,6 +81,9 @@ export default function DepartmentSettingsPage() {
 
   const [settings, setSettings] = useState<DepartmentSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [creatingSlackGroup, setCreatingSlackGroup] = useState(false);
+  const [deletingSlackGroup, setDeletingSlackGroup] = useState(false);
+  const [slackDeleteDialogOpen, setSlackDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof settingsSchema>>({
@@ -98,6 +106,7 @@ export default function DepartmentSettingsPage() {
       ivr_menu: { enabled: false, greeting: "", options: [] },
       break_handling: { enabled: false, max_break_duration: 15 },
       holiday_schedule: { holidays: [] },
+      slack_settings: { notify_missed_calls: true, sync_in_call_status: false },
     },
   });
 
@@ -106,6 +115,7 @@ export default function DepartmentSettingsPage() {
   const { fields: holidays, append: appendHoliday, remove: removeHoliday } = useFieldArray({ control: form.control, name: "holiday_schedule.holidays" });
   const is247 = form.watch("business_hours.is_24_7");
   const isIvrEnabled = form.watch("ivr_menu.enabled");
+  const slackChannelName = settings?.slack_settings?.channel_name;
 
   useEffect(() => {
     if (user && departmentId) fetchSettings();
@@ -132,6 +142,10 @@ export default function DepartmentSettingsPage() {
         holiday_schedule: {
             holidays: settings.holiday_schedule?.holidays || []
         },
+        slack_settings: {
+            notify_missed_calls: settings.slack_settings?.notify_missed_calls ?? true,
+            sync_in_call_status: settings.slack_settings?.sync_in_call_status ?? false,
+        },
       });
     }
   }, [settings, form]);
@@ -151,8 +165,19 @@ export default function DepartmentSettingsPage() {
 
   const onSubmit = async (values: z.infer<typeof settingsSchema>) => {
     try {
-      const payload = { ...values, department_id: departmentId };
-      await createOrUpdateDepartmentSettings(settings?.id, payload);
+      const payload = {
+        ...values,
+        department_id: departmentId,
+        slack_settings: values.slack_settings
+          ? {
+              ...values.slack_settings,
+              channel_id: settings?.slack_settings?.channel_id,
+              channel_name: settings?.slack_settings?.channel_name,
+            }
+          : undefined,
+      };
+      const updatedSettings = await createOrUpdateDepartmentSettings(settings?.id, payload);
+      setSettings(updatedSettings);
       toast({ title: "Success", description: "Department settings saved successfully." });
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || "An unexpected error occurred.";
@@ -161,6 +186,61 @@ export default function DepartmentSettingsPage() {
         description: errorMessage,
         variant: "destructive",
       });
+    }
+  };
+
+  const handleCreateSlackGroup = async () => {
+    try {
+      setCreatingSlackGroup(true);
+      const result = await createDepartmentSlackGroup(departmentId);
+      if (result.settings) {
+        setSettings(result.settings);
+      } else {
+        setSettings((prev) => ({
+          ...(prev || { id: 0, department_id: departmentId, timezone: "UTC", call_settings: { greeting_message: "" }, business_hours: { is_24_7: false, days: [] }, ivr_menu: { enabled: false, greeting: "", options: [] }, break_handling: { enabled: false, max_break_duration: 15 }, holiday_schedule: { holidays: [] } }),
+          slack_settings: result.slack_settings,
+        }));
+      }
+      form.setValue("slack_settings.notify_missed_calls", true);
+      toast({
+        title: "Slack group created",
+        description: result.message || "Missed-call notifications will be sent to the new Slack group.",
+      });
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || "Could not create the Slack group.";
+      toast({
+        title: "Slack group creation failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingSlackGroup(false);
+    }
+  };
+
+  const handleDeleteSlackGroup = async () => {
+    try {
+      setDeletingSlackGroup(true);
+      const result = await deleteDepartmentSlackGroup(departmentId);
+      if (result.settings) {
+        setSettings(result.settings);
+      } else {
+        setSettings((prev) => prev ? { ...prev, slack_settings: result.slack_settings } : prev);
+      }
+      toast({
+        title: "Slack group deleted",
+        description: result.message || "The Slack channel has been removed from this department.",
+      });
+      setSlackDeleteDialogOpen(false);
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || "Could not delete the Slack group.";
+      toast({
+        title: "Slack group deletion failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingSlackGroup(false);
     }
   };
 
@@ -186,11 +266,12 @@ export default function DepartmentSettingsPage() {
             <Form {...form}>
               <form id="dept-settings-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                 <Tabs defaultValue="general" className="w-full">
-                  <TabsList className="grid w-full grid-cols-4">
+                  <TabsList className="grid w-full grid-cols-5">
                     <TabsTrigger value="general">General</TabsTrigger>
                     <TabsTrigger value="business-hours">Business Hours</TabsTrigger>
                     <TabsTrigger value="ivr">IVR Menu</TabsTrigger>
                     <TabsTrigger value="schedules">Schedules</TabsTrigger>
+                    <TabsTrigger value="slack">Slack</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="general">
@@ -301,6 +382,99 @@ export default function DepartmentSettingsPage() {
                                 <PlusCircle className="mr-2 h-4 w-4" /> Add Holiday
                            </Button>
                          </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="slack">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Slack Notifications</CardTitle>
+                        <CardDescription>
+                          Create a Slack group for this department and receive missed-call alerts, similar to Dialpad.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        <p className="text-sm text-muted-foreground">
+                          Configure the shared Slack bot token in Company Settings. Each department can choose its own missed-call notifications, in-call status sync, and Slack group.
+                        </p>
+
+                        <FormField control={form.control} name="slack_settings.notify_missed_calls" render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-1">
+                              <FormLabel className="text-base">Notify on Missed Calls</FormLabel>
+                              <p className="text-sm text-muted-foreground">Post a message to the Slack group when a call is missed.</p>
+                            </div>
+                            <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                          </FormItem>
+                        )}/>
+
+                        <FormField control={form.control} name="slack_settings.sync_in_call_status" render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-1">
+                              <FormLabel className="text-base">Sync In-Call Status</FormLabel>
+                              <p className="text-sm text-muted-foreground">Set agents&apos; Slack status to &quot;In a call&quot; while they are on a live call.</p>
+                            </div>
+                            <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                          </FormItem>
+                        )}/>
+
+                        <div className="rounded-lg border p-4 space-y-3">
+                              <div>
+                                <p className="font-medium">Slack Group</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {slackChannelName
+                                    ? `Connected to #${slackChannelName}`
+                                    : "No Slack group has been created for this department yet."}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleCreateSlackGroup}
+                                disabled={creatingSlackGroup || deletingSlackGroup}
+                              >
+                                {creatingSlackGroup ? "Creating..." : slackChannelName ? "Recreate Slack Group" : "Create Slack Group"}
+                              </Button>
+                              {slackChannelName ? (
+                                <AlertDialog open={slackDeleteDialogOpen} onOpenChange={setSlackDeleteDialogOpen}>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="text-destructive hover:text-destructive"
+                                      disabled={creatingSlackGroup || deletingSlackGroup}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      {deletingSlackGroup ? "Deleting..." : "Delete Slack Group"}
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Slack group?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will archive #{slackChannelName} in Slack and disconnect it from this department. Missed-call notifications will no longer be posted there until you create a new group.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel disabled={deletingSlackGroup}>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        disabled={deletingSlackGroup}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        onClick={(event) => {
+                                          event.preventDefault();
+                                          void handleDeleteSlackGroup();
+                                        }}
+                                      >
+                                        Delete group
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              ) : null}
+                              </div>
+                            </div>
                       </CardContent>
                     </Card>
                   </TabsContent>
