@@ -15,7 +15,7 @@ import { useTwilio } from "@/context/TwilioContext";
 import { useToast } from "@/hooks/use-toast";
 import AppHeader from "@/components/app-header";
 import { events } from "@/lib/events";
-import { cacheGet, cacheSet } from "@/lib/simpleCache";
+import { cacheGet, cacheSet, cacheDel } from "@/lib/simpleCache";
 import { formatPhoneNumber, isSameConversationThread } from "@/lib/utils";
 import { getOtherPartyDisplay } from "@/lib/contact-display";
 
