@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/app-header';
 import CallHistoryFilters from '@/components/call-history-filters';
 import CallHistoryTable from '@/components/call-history-table';
@@ -110,10 +111,24 @@ export default function CallHistoryShell({
   onDialerOpenChange,
   dialerInitialValue,
 }: CallHistoryShellProps) {
+  const router = useRouter();
   const filters: CallHistoryFilterValues = { direction: directionFilter, status: statusFilter };
   const hasAnyRecords = summary.total > 0;
   const hasFilteredResults = calls.length > 0;
   const filterLabel = getCallHistoryEmptyFilterLabel(filters);
+
+  const handleHistoryRowClick = (entry: CallActivityEntry) => {
+    const from = entry.direction === 'inbound'
+      ? entry.to || subjectPhone || ''
+      : entry.from || '';
+    const to = entry.direction === 'inbound'
+      ? entry.from || ''
+      : entry.to || subjectPhone || '';
+
+    if (!from || !to) return;
+
+    router.push(`/conversations/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
+  };
 
   return (
     <div className="flex min-h-full flex-col bg-muted/30">
@@ -227,7 +242,6 @@ export default function CallHistoryShell({
                   </div>
                 ) : (
                   <>
-                    <CallHistoryTable calls={calls} subjectPhone={subjectPhone} />
                     <PaginationControls
                       currentPage={pagination.currentPage}
                       totalPages={pagination.totalPages}
@@ -236,6 +250,23 @@ export default function CallHistoryShell({
                       onPageChange={onPageChange}
                       onLimitChange={onLimitChange}
                       isLoading={loading}
+                      showControls={false}
+                      className="mb-4"
+                    />
+                    <CallHistoryTable
+                      calls={calls}
+                      subjectPhone={subjectPhone}
+                      onRowClick={handleHistoryRowClick}
+                    />
+                    <PaginationControls
+                      currentPage={pagination.currentPage}
+                      totalPages={pagination.totalPages}
+                      totalRecords={pagination.totalRecords}
+                      limit={pagination.perPage}
+                      onPageChange={onPageChange}
+                      onLimitChange={onLimitChange}
+                      isLoading={loading}
+                      showSummary={false}
                     />
                   </>
                 )}

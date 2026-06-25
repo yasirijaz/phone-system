@@ -22,9 +22,10 @@ import {
 type CallHistoryTableProps = {
   calls: CallActivityEntry[];
   subjectPhone?: string;
+  onRowClick?: (entry: CallActivityEntry) => void;
 };
 
-export default function CallHistoryTable({ calls, subjectPhone }: CallHistoryTableProps) {
+export default function CallHistoryTable({ calls, subjectPhone, onRowClick }: CallHistoryTableProps) {
   return (
     <div className="overflow-x-auto rounded-lg border bg-card">
       <Table>
@@ -52,8 +53,17 @@ export default function CallHistoryTable({ calls, subjectPhone }: CallHistoryTab
             return (
               <TableRow
                 key={entry.id}
+                role={onRowClick ? 'button' : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+                onClick={() => onRowClick?.(entry)}
+                onKeyDown={(event) => {
+                  if (!onRowClick || (event.key !== 'Enter' && event.key !== ' ')) return;
+                  event.preventDefault();
+                  onRowClick(entry);
+                }}
                 className={cn(
                   'hover:bg-muted/40',
+                  onRowClick && 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                   status.isLive && 'bg-emerald-500/5',
                   isMissed && !status.isLive && 'bg-amber-500/5'
                 )}

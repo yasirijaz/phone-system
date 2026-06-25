@@ -221,14 +221,23 @@ export default function DepartmentDetailPage() {
     const currentPagination = pagination[tabName];
     
     return (
-      <Card>
-        <CallLog calls={currentData || []} contacts={contacts} companyUsers={companyUsers} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
+      <div className="space-y-4">
         <PaginationControls
           {...currentPagination}
           onPageChange={handlePageChange}
           onLimitChange={handleLimitChange}
+          showControls={false}
         />
-      </Card>
+        <Card>
+          <CallLog calls={currentData || []} contacts={contacts} companyUsers={companyUsers} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
+          <PaginationControls
+            {...currentPagination}
+            onPageChange={handlePageChange}
+            onLimitChange={handleLimitChange}
+            showSummary={false}
+          />
+        </Card>
+      </div>
     );
   };
 
