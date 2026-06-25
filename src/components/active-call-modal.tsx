@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type PointerEvent } from 'react';
 import { Button } from "@/components/ui/button";
 import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Users, Trash2, Delete, ChevronDown, ChevronUp, Phone, ArrowLeftRight, GitMerge, PhoneCall, X } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
@@ -78,6 +78,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [consultCallSid, setConsultCallSid] = useState<string | null>(null);
   const [activeExternalCallSid, setActiveExternalCallSid] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [floatingTogglePosition, setFloatingTogglePosition] = useState<{ x: number; y: number } | null>(null);
   const [resolvedDepartmentName, setResolvedDepartmentName] = useState<string | null>(departmentName || null);
   const [verifiedConferenceSid, setVerifiedConferenceSid] = useState<string | null>(null);
   const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
@@ -100,6 +101,15 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     ?? externalParticipants[0];
   const hasRingingParticipant = externalParticipants.some((participant) => isParticipantRinging(participant));
   const shouldPollParticipantsQuickly = hasRingingParticipant || Boolean(pendingOutgoing) || Boolean(pendingTransferCallSid);
+  const floatingToggleDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    dragged: boolean;
+  } | null>(null);
+  const suppressToggleClickRef = useRef(false);
   const participantUserIds = new Set(
     (currentParticipants as ConferenceParticipant[])
       .map((participant) => participant.user_id)
@@ -808,6 +818,49 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       setDialerNumber((prev) => prev.slice(0, -1));
   };
 
+  const handleFloatingTogglePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    floatingToggleDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: rect.left,
+      originY: rect.top,
+      dragged: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleFloatingTogglePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    const drag = floatingToggleDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (!drag.dragged && Math.hypot(deltaX, deltaY) < 4) return;
+
+    drag.dragged = true;
+    const width = event.currentTarget.offsetWidth;
+    const height = event.currentTarget.offsetHeight;
+    const padding = 8;
+    const maxX = Math.max(padding, window.innerWidth - width - padding);
+    const maxY = Math.max(padding, window.innerHeight - height - padding);
+
+    setFloatingTogglePosition({
+      x: Math.min(Math.max(padding, drag.originX + deltaX), maxX),
+      y: Math.min(Math.max(padding, drag.originY + deltaY), maxY),
+    });
+  };
+
+  const handleFloatingTogglePointerUp = (event: PointerEvent<HTMLButtonElement>) => {
+    const drag = floatingToggleDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    suppressToggleClickRef.current = drag.dragged;
+    floatingToggleDragRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
 
   if (!isOpen) {
     return null;
@@ -816,8 +869,26 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const floatingToggle = (
     <button
       type="button"
-      onClick={() => setIsCollapsed((prev) => !prev)}
-      className="fixed bottom-4 right-4 z-[110] flex items-center gap-2.5 rounded-full bg-background px-4 py-2.5 shadow-2xl ring-1 ring-border hover:bg-muted/50 transition-colors"
+      onClick={() => {
+        if (suppressToggleClickRef.current) {
+          suppressToggleClickRef.current = false;
+          return;
+        }
+        setIsCollapsed((prev) => !prev);
+      }}
+      onPointerDown={handleFloatingTogglePointerDown}
+      onPointerMove={handleFloatingTogglePointerMove}
+      onPointerUp={handleFloatingTogglePointerUp}
+      onPointerCancel={handleFloatingTogglePointerUp}
+      className={cn(
+        "fixed z-[110] flex touch-none cursor-move select-none items-center gap-2.5 rounded-full bg-background px-4 py-2.5 shadow-2xl ring-1 ring-border transition-colors hover:bg-muted/50",
+        floatingTogglePosition ? "" : "bottom-4 right-4"
+      )}
+      style={
+        floatingTogglePosition
+          ? { left: floatingTogglePosition.x, top: floatingTogglePosition.y }
+          : undefined
+      }
       aria-label={isCollapsed ? 'Expand active call controls' : 'Collapse active call controls'}
     >
       <span className="relative flex h-2.5 w-2.5">
