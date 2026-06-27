@@ -13,6 +13,7 @@ import MessageComposer from "@/components/message-composer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTwilio } from "@/context/TwilioContext";
 import { useToast } from "@/hooks/use-toast";
+import { useUnusualDepartmentSmsGuard } from "@/hooks/use-unusual-department-sms-guard";
 import AppHeader from "@/components/app-header";
 import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
@@ -24,6 +25,10 @@ import ContactProfile from "@/components/contact-profile";
 import { cn, formatPhoneNumber, phonesMatch, getPhoneNumberOptionLabel, isSameConversationThread } from "@/lib/utils";
 import { buildThreadContactState } from "@/lib/contact-display";
 import { canListAllCompanyDepartments } from "@/lib/roles";
+import {
+    findLastUsedDepartmentId,
+    resolveOutboundContextFromDepartmentId,
+} from "@/lib/department-selection";
 import type { OutboundContext } from "@/lib/outbound-context";
 
 export default function ConversationDetailPage() {
@@ -51,6 +56,8 @@ export default function ConversationDetailPage() {
     const chatScrollRef = useRef<HTMLElement>(null);
     const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
     const [departmentName, setDepartmentName] = useState<string | null>(null);
+    const { confirmIfNeeded: confirmUnusualDepartmentSms, dialog: unusualDepartmentSmsDialog } =
+        useUnusualDepartmentSmsGuard(departments);
     
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from, to] = slug.map(part => decodeURIComponent(part));
@@ -107,10 +114,13 @@ export default function ConversationDetailPage() {
         ? phoneNumbers.filter(
             (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
           )
-        : phoneNumbers;
+        : [];
 
     useEffect(() => {
-        if (!selectedDepartmentId) return;
+        if (!selectedDepartmentId) {
+            setSelectedFromNumber("");
+            return;
+        }
         const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
         if (!hasSelectedNumber) {
             setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
@@ -204,18 +214,20 @@ export default function ConversationDetailPage() {
                 // Determine and set the correct department and from number
                 let resolvedDeptId: string | null = numberToDeptIdMap[ourNumber] ?? null;
 
-                if (!resolvedDeptId && depts.length > 0) {
-                    resolvedDeptId = String(depts[0].id); // fallback
+                if (!resolvedDeptId && sortedLogs.length > 0) {
+                    resolvedDeptId = findLastUsedDepartmentId(sortedLogs);
                 }
 
                 if (resolvedDeptId) {
-                    setSelectedDepartmentId(resolvedDeptId);
-                }
-
-                if (numbers.some((n) => n.phone_no === ourNumber)) {
+                    const context = resolveOutboundContextFromDepartmentId(resolvedDeptId, numbers);
+                    setSelectedDepartmentId(context.departmentId ?? resolvedDeptId);
+                    if (context.fromNumber) {
+                        setSelectedFromNumber(context.fromNumber);
+                    } else if (numbers.some((n) => n.phone_no === ourNumber)) {
+                        setSelectedFromNumber(ourNumber);
+                    }
+                } else if (numbers.some((n) => n.phone_no === ourNumber)) {
                     setSelectedFromNumber(ourNumber);
-                } else if (numbers.length > 0) {
-                    setSelectedFromNumber(numbers[0].phone_no);
                 }
 
 
@@ -285,6 +297,10 @@ export default function ConversationDetailPage() {
 
     const handleSendMessage = async ({ body, mediaFiles }: { body: string; mediaFiles: File[] }) => {
         const recipient = contact?.phone_no;
+        if (!selectedDepartmentId) {
+            toast({ title: "Select a department", description: "Choose which department this message should be sent from.", variant: "destructive" });
+            return;
+        }
         if (!selectedFromNumber) {
             toast({ title: "Error", description: "Please select a 'from' number.", variant: "destructive" });
             return;
@@ -297,6 +313,14 @@ export default function ConversationDetailPage() {
             toast({ title: "Error", description: "Add a message or media attachment to send.", variant: "destructive" });
             return;
         }
+
+        const confirmed = await confirmUnusualDepartmentSms({
+            recipientPhone: recipient,
+            selectedDepartmentId,
+            communications: allComms,
+        });
+        if (!confirmed) return;
+
         setIsSending(true);
         try {
             await sendMms(
@@ -340,6 +364,7 @@ export default function ConversationDetailPage() {
 
     return (
                  <div className="flex h-[100dvh] min-h-0 w-full overflow-hidden bg-background text-foreground">
+                    {unusualDepartmentSmsDialog}
                     <div className="flex-1 flex flex-col">
                         <AppHeader user={user} logout={logout} 
                             dialerOpen={dialerOpen}
@@ -395,7 +420,7 @@ export default function ConversationDetailPage() {
                                         <div className="grid grid-cols-2 gap-2">
                                             <Select onValueChange={handleDepartmentChange} value={selectedDepartmentId} disabled={loadingDepartments}>
                                                 <SelectTrigger>
-                                                    <SelectValue placeholder="Select Department" />
+                                                    <SelectValue placeholder="Select department" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {departments.map((dept) => (
@@ -405,9 +430,9 @@ export default function ConversationDetailPage() {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers}>
+                                            <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
                                                 <SelectTrigger>
-                                                    <SelectValue placeholder="Select Number" />
+                                                    <SelectValue placeholder={selectedDepartmentId ? "Select number" : "Select department first"} />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {filteredPhoneNumbers.map((num) => (

@@ -399,10 +399,13 @@ export default function AppHeader({
         ? phoneNumbers.filter(
             (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
           )
-        : phoneNumbers;
+        : [];
 
     useEffect(() => {
-        if (!selectedDepartmentId) return;
+        if (!selectedDepartmentId) {
+            setSelectedFromNumber("");
+            return;
+        }
         const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
         if (!hasSelectedNumber) {
             setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
@@ -423,22 +426,12 @@ export default function AppHeader({
               contacts: Contact[];
               phoneNumbers: PhoneNumber[];
               companyUsers: User[];
-              firstDeptId?: string;
             }>(cacheKey);
             if (cached) {
               setDepartments(cached.departments);
               setContacts(cached.contacts);
               setPhoneNumbers(cached.phoneNumbers);
               setCompanyUsers(cached.companyUsers);
-              if (cached.firstDeptId) {
-                setSelectedDepartmentId(cached.firstDeptId);
-                const numbersForDept = cached.phoneNumbers.filter(
-                  (num) => num.department_id != null && String(num.department_id) === cached.firstDeptId
-                );
-                setSelectedFromNumber(numbersForDept[0]?.phone_no ?? cached.phoneNumbers[0]?.phone_no ?? "");
-              } else if (cached.phoneNumbers.length > 0) {
-                setSelectedFromNumber(cached.phoneNumbers[0].phone_no);
-              }
               setLoadingDepartments(false);
               void getContacts(user.company_id).then(setContacts);
               return;
@@ -465,24 +458,11 @@ export default function AppHeader({
                 setPhoneNumbers(numbers);
                 setCompanyUsers(users);
 
-                let firstDeptId: string | undefined;
-                if (depts.length > 0) {
-                    firstDeptId = String(depts[0].id);
-                    setSelectedDepartmentId(firstDeptId);
-                    const numbersForDept = numbers.filter(
-                      (num) => num.department_id != null && String(num.department_id) === firstDeptId
-                    );
-                    setSelectedFromNumber(numbersForDept[0]?.phone_no ?? numbers[0]?.phone_no ?? "");
-                } else if (numbers.length > 0) {
-                    setSelectedFromNumber(numbers[0].phone_no);
-                }
-
                 cacheSet(cacheKey, {
                   departments: depts,
                   contacts: contactList,
                   phoneNumbers: numbers,
                   companyUsers: users,
-                  firstDeptId,
                 }, 60_000);
             } catch (error) {
                 toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });

@@ -8,6 +8,7 @@ import { searchContacts } from "@/services/contactService";
 import { getDepartments } from "@/services/departmentService";
 import type { PhoneNumber, Contact, Department } from "@/types";
 import { useToast } from "@/hooks/use-toast";
+import { useUnusualDepartmentSmsGuard } from "@/hooks/use-unusual-department-sms-guard";
 import { sendMms } from "@/services/twilioService";
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -39,6 +40,8 @@ export default function MessagesPage() {
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [messageBody, setMessageBody] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const { confirmIfNeeded: confirmUnusualDepartmentSms, dialog: unusualDepartmentSmsDialog } =
+    useUnusualDepartmentSmsGuard(departments);
 
 
   useEffect(() => {
@@ -153,6 +156,13 @@ export default function MessagesPage() {
         toast({ title: "Error", description: "Add a message or media attachment to send.", variant: "destructive" });
         return;
     }
+
+    const confirmed = await confirmUnusualDepartmentSms({
+        recipientPhone: recipient,
+        selectedDepartmentId,
+    });
+    if (!confirmed) return;
+
     setIsSending(true);
     try {
         await sendMms(
@@ -172,6 +182,7 @@ export default function MessagesPage() {
 
   return (
         <div className="flex h-full min-h-0 w-full bg-background text-foreground">
+          {unusualDepartmentSmsDialog}
           <div className="flex flex-1 flex-col">
             <AppHeader user={user} logout={logout} outboundContext={outboundContext} />
             <main className="flex-1 flex flex-col bg-muted/40">

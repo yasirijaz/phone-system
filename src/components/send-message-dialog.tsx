@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import MessageComposer from '@/components/message-composer';
 import { useToast } from '@/hooks/use-toast';
+import { useUnusualDepartmentSmsGuard } from '@/hooks/use-unusual-department-sms-guard';
 import { sendMms } from '@/services/twilioService';
 import { searchContacts } from '@/services/contactService';
 import { getPhoneNumberOptionLabel } from '@/lib/utils';
@@ -52,6 +53,8 @@ export default function SendMessageDialog({
   const [messageBody, setMessageBody] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
+  const { confirmIfNeeded: confirmUnusualDepartmentSms, dialog: unusualDepartmentSmsDialog } =
+    useUnusualDepartmentSmsGuard(departments);
 
   useEffect(() => {
     if (!open) return;
@@ -154,6 +157,12 @@ export default function SendMessageDialog({
       return;
     }
 
+    const confirmed = await confirmUnusualDepartmentSms({
+      recipientPhone: recipient,
+      selectedDepartmentId,
+    });
+    if (!confirmed) return;
+
     setIsSending(true);
     try {
       await sendMms(
@@ -178,7 +187,9 @@ export default function SendMessageDialog({
   const canCompose = Boolean(selectedDepartmentId && selectedFromNumber);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      {unusualDepartmentSmsDialog}
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>New message</DialogTitle>
@@ -276,5 +287,6 @@ export default function SendMessageDialog({
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

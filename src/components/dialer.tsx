@@ -138,10 +138,13 @@ export default function Dialer({
         ? phoneNumbers.filter(
             (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
           )
-        : phoneNumbers;
+        : [];
 
     useEffect(() => {
-        if (!selectedDepartmentId) return;
+        if (!selectedDepartmentId) {
+            onSetSelectedFromNumber("");
+            return;
+        }
         const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
         if (!hasSelectedNumber) {
             onSetSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
@@ -171,7 +174,7 @@ export default function Dialer({
                     <div className="grid grid-cols-2 gap-2">
                          <Select onValueChange={handleDepartmentSelection} value={selectedDepartmentId} disabled={loadingDepartments}>
                             <SelectTrigger variant="ghost">
-                                <SelectValue placeholder={loadingDepartments ? "Loading..." : "Select Dept."} />
+                                <SelectValue placeholder={loadingDepartments ? "Loading..." : "Select department"} />
                             </SelectTrigger>
                             <SelectContent>
                                 {departments.map(dept => (
@@ -179,9 +182,9 @@ export default function Dialer({
                                 ))}
                             </SelectContent>
                         </Select>
-                         <Select onValueChange={onSetSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers}>
+                         <Select onValueChange={onSetSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
                             <SelectTrigger variant="ghost">
-                                <SelectValue placeholder={loadingNumbers ? "Loading..." : "From Number"} />
+                                <SelectValue placeholder={!selectedDepartmentId ? "Select department first" : loadingNumbers ? "Loading..." : "Select number"} />
                             </SelectTrigger>
                             <SelectContent>
                                 {filteredPhoneNumbers.map(num => (

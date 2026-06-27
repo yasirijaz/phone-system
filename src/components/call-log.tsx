@@ -66,6 +66,7 @@ interface CallLogProps {
   fallbackDepartmentId?: string;
   onMakeCall: (number: string, context?: OutboundContext) => void;
   isClickable?: boolean;
+  onCommunicationSelect?: (comm: Communication) => void;
   source?: string;
   highlightFailedCalls?: boolean;
 }
@@ -77,7 +78,8 @@ function CommunicationCard({
     phoneNumbers,
     fallbackDepartmentId,
     onMakeCall, 
-    isClickable, 
+    isClickable,
+    onCommunicationSelect,
     source,
     highlightFailedCalls,
     isFirstInGroup,
@@ -90,7 +92,8 @@ function CommunicationCard({
     phoneNumbers?: PhoneNumber[],
     fallbackDepartmentId?: string,
     onMakeCall: (number: string, context?: OutboundContext) => void, 
-    isClickable: boolean, 
+    isClickable: boolean,
+    onCommunicationSelect?: (comm: Communication) => void,
     source?: string,
     highlightFailedCalls?: boolean,
     isFirstInGroup: boolean,
@@ -270,6 +273,29 @@ function CommunicationCard({
     );
   };
 
+  const handleCommunicationActivate = () => {
+    onCommunicationSelect?.(comm);
+  };
+
+  const selectableBubbleProps = onCommunicationSelect && !isClickable
+    ? {
+        role: 'button' as const,
+        tabIndex: 0,
+        onClick: handleCommunicationActivate,
+        onKeyDown: (event: React.KeyboardEvent) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          handleCommunicationActivate();
+        },
+        className: 'cursor-pointer transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+      }
+    : {};
+
+  const wrapSelectableBubble = (node: React.ReactNode) => {
+    if (!onCommunicationSelect || isClickable) return node;
+    return <div {...selectableBubbleProps}>{node}</div>;
+  };
+
   const renderMessageBubble = (c: Communication) => {
     const time = c.created_at ? format(parseISO(c.created_at), 'p') : '';
     const mediaUrls = getCommunicationMediaUrls(c);
@@ -333,8 +359,13 @@ function CommunicationCard({
             <Icon className={cn("h-5 w-5 mt-1", (isMissed || isHungUp) ? "text-destructive" : "text-muted-foreground")} />
             <div className="flex-1 flex items-center justify-between text-sm space-y-1">
                 <div className="flex-1">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                         <p className="font-semibold">{title}</p>
+                        {comm.department?.name && (
+                          <Badge variant="secondary" className="shrink-0 text-[10px] font-normal">
+                            {comm.department.name}
+                          </Badge>
+                        )}
                     </div>
                      {isInProgress ? (
                         <p className="flex items-center gap-2 text-xs text-green-600 font-semibold">
@@ -577,13 +608,18 @@ function CommunicationCard({
                 {isFirstInGroup && comm.created_at && (
                     <div className={cn("px-1", isMine ? "text-right" : "text-left")}>
                       <p className="text-xs font-semibold text-muted-foreground">{contactName}</p>
+                      {comm.department?.name && (
+                        <p className="text-[11px] font-medium text-muted-foreground/80">{comm.department.name}</p>
+                      )}
                       {!isMine && otherParty.sublabel && (
                         <p className="text-[11px] text-muted-foreground/80">{otherParty.sublabel}</p>
                       )}
                     </div>
                 )}
                 <div className={cn("flex items-center gap-2", isMine ? 'flex-row-reverse' : 'flex-row')}>
-                    {comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)}
+                    {wrapSelectableBubble(
+                      comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)
+                    )}
                     <Button
                         variant="ghost"
                         size="icon"
@@ -618,6 +654,7 @@ export default function CallLog({
   fallbackDepartmentId,
   onMakeCall,
   isClickable = true,
+  onCommunicationSelect,
   source,
   highlightFailedCalls = false,
 }: CallLogProps) {
@@ -656,6 +693,7 @@ export default function CallLog({
                         key={stableKey}
                         onMakeCall={onMakeCall}
                         isClickable={isClickable}
+                        onCommunicationSelect={onCommunicationSelect}
                         source={source}
                         highlightFailedCalls={highlightFailedCalls}
                         isFirstInGroup={true}
@@ -715,7 +753,8 @@ export default function CallLog({
                             fallbackDepartmentId={fallbackDepartmentId}
                             key={stableKey} 
                             onMakeCall={onMakeCall} 
-                            isClickable={isClickable} 
+                            isClickable={isClickable}
+                            onCommunicationSelect={onCommunicationSelect}
                             source={source}
                             isFirstInGroup={isFirstInGroup}
                             isLastInGroup={isLastInGroup}
