@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { Phone } from 'lucide-react';
 import CallHistoryShell from '@/components/call-history-shell';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { events } from '@/lib/events';
 import {
   getPhoneCallHistory,
   type CallActivityEntry,
@@ -47,7 +48,6 @@ function decodeRoutePhone(value: string | string[] | undefined): string {
 
 export default function PhoneCallHistoryPage() {
   const params = useParams<{ phone: string }>();
-  const router = useRouter();
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const phoneNumber = decodeRoutePhone(params.phone);
@@ -142,7 +142,7 @@ export default function PhoneCallHistoryPage() {
   };
 
   const handleMessageClick = () => {
-    router.push(`/messages?to=${encodeURIComponent(phoneNumber)}`);
+    events.emit('openMessageDialog', { recipient: phoneNumber });
   };
 
   const title = contact?.name || formatPhoneNumber(phoneNumber);

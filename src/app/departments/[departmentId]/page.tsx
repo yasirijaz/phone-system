@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams } from 'next/navigation';
 import type { Communication, Department, PhoneNumber, User, PaginatedCommunicationsResponse, Contact, Operator } from "@/types";
 import { useAuth } from "@/context/AuthContext";
@@ -22,6 +22,12 @@ import OperatorsTable from "@/components/operators-table";
 import PaginationControls from "@/components/pagination-controls";
 import { events } from '@/lib/events';
 import { getPhoneNumberOptionLabel } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { MessageSquare, Phone } from "lucide-react";
+import {
+  resolveOutboundContextForDepartment,
+  type OutboundContext,
+} from "@/lib/outbound-context";
 
 type TabName = 'all' | 'unread' | 'calls' | 'messages' | 'operators' | 'missed' | 'voicemails' | 'recordings';
 
@@ -179,15 +185,34 @@ export default function DepartmentDetailPage() {
     return () => events.off('refreshCalls', handleRefresh);
   }, [handleRefresh]);
 
-  const handleMakeCall = async (number: string) => {
+  const handleMakeCall = async (number: string, context?: OutboundContext) => {
      if (!device) {
         toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});
         return;
     }
 
+    const outboundContext = context ?? resolveOutboundContextForDepartment(departmentId, phoneNumbers);
+    events.emit('setOutboundContext', outboundContext);
     setDialerNumber(number.replace(/^\+1/, ""));
     setDialerOpen(true);
   };
+
+  const handleDepartmentCallClick = () => {
+    if (!device) {
+      toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive' });
+      return;
+    }
+    events.emit('openDialer', resolveOutboundContextForDepartment(departmentId, phoneNumbers));
+  };
+
+  const handleDepartmentMessageClick = () => {
+    events.emit('openMessageDialog', { departmentId: String(departmentId) });
+  };
+
+  const departmentOutboundContext = useMemo(
+    () => resolveOutboundContextForDepartment(departmentId, phoneNumbers),
+    [departmentId, phoneNumbers]
+  );
   
   const handleDndChange = async (checked: boolean) => {
     if (!user) return;
@@ -229,7 +254,15 @@ export default function DepartmentDetailPage() {
           showControls={false}
         />
         <Card>
-          <CallLog calls={currentData || []} contacts={contacts} companyUsers={companyUsers} onMakeCall={handleMakeCall} source={tabName === 'unread' ? 'unread' : undefined} />
+          <CallLog
+            calls={currentData || []}
+            contacts={contacts}
+            companyUsers={companyUsers}
+            phoneNumbers={phoneNumbers}
+            fallbackDepartmentId={String(departmentId)}
+            onMakeCall={handleMakeCall}
+            source={tabName === 'unread' ? 'unread' : undefined}
+          />
           <PaginationControls
             {...currentPagination}
             onPageChange={handlePageChange}
@@ -247,7 +280,10 @@ export default function DepartmentDetailPage() {
                   <AppHeader 
                     user={user} 
                     logout={logout}
-                    dialerOpen={dialerOpen} dialerInitialValue={dialerNumber} onDialerOpenChange={() => setDialerOpen(!dialerOpen)}
+                    dialerOpen={dialerOpen}
+                    dialerInitialValue={dialerNumber}
+                    onDialerOpenChange={() => setDialerOpen(!dialerOpen)}
+                    outboundContext={departmentOutboundContext}
                   />
 
                   <main className="flex-1 p-6 overflow-y-auto">
@@ -256,7 +292,15 @@ export default function DepartmentDetailPage() {
                           <h1 className="text-2xl font-bold">{department?.name || 'Department'}</h1>
                           <p className="text-sm text-muted-foreground">{departmentPhoneNumber}</p>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center gap-2">
+                            <Button type="button" onClick={handleDepartmentCallClick}>
+                              <Phone className="mr-2 h-4 w-4" />
+                              Call
+                            </Button>
+                            <Button type="button" variant="outline" onClick={handleDepartmentMessageClick}>
+                              <MessageSquare className="mr-2 h-4 w-4" />
+                              Message
+                            </Button>
                             <Label htmlFor="dnd-switch">DO NOT DISTURB</Label>
                             <Switch 
                               id="dnd-switch"

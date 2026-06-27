@@ -17,6 +17,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getPhoneNumberOptionLabel } from "@/lib/utils";
+import {
+  resolveOutboundContextForDepartment,
+  type OutboundContext,
+} from "@/lib/outbound-context";
 
 export default function MessagesPage() {
   const { user, logout } = useAuth();
@@ -52,15 +56,15 @@ export default function MessagesPage() {
         const companyNumbers = Array.isArray(numbers) ? numbers : [];
         setPhoneNumbers(companyNumbers);
 
-        if (depts.length > 0) {
-          const firstDeptId = String(depts[0].id);
-          setSelectedDepartmentId(firstDeptId);
-          const numbersForDepartment = companyNumbers.filter(
-            (num) => num.department_id != null && String(num.department_id) === firstDeptId
-          );
-          setSelectedFromNumber(numbersForDepartment[0]?.phone_no ?? "");
-        } else if (companyNumbers.length > 0) {
-          setSelectedFromNumber(companyNumbers[0].phone_no);
+        const requestedDepartmentId = searchParams.get('departmentId');
+        if (requestedDepartmentId && depts.some((dept) => String(dept.id) === requestedDepartmentId)) {
+          const initialContext = resolveOutboundContextForDepartment(requestedDepartmentId, companyNumbers);
+          if (initialContext.departmentId) {
+            setSelectedDepartmentId(initialContext.departmentId);
+          }
+          if (initialContext.fromNumber) {
+            setSelectedFromNumber(initialContext.fromNumber);
+          }
         }
       } catch (error) {
         toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
@@ -71,7 +75,7 @@ export default function MessagesPage() {
     };
 
     fetchInitialData();
-  }, [user, toast]);
+  }, [user, toast, searchParams]);
   
   useEffect(() => {
     const to = searchParams.get('to');
@@ -79,6 +83,11 @@ export default function MessagesPage() {
       setRecipient(to);
     }
   }, [searchParams]);
+
+  const outboundContext: OutboundContext = {
+    departmentId: selectedDepartmentId || undefined,
+    fromNumber: selectedFromNumber || undefined,
+  };
 
   useEffect(() => {
     const companyId = user?.company_id;
@@ -112,7 +121,7 @@ export default function MessagesPage() {
     ? phoneNumbers.filter(
         (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
       )
-    : phoneNumbers;
+    : [];
 
   useEffect(() => {
     if (!selectedDepartmentId) return;
@@ -128,6 +137,10 @@ export default function MessagesPage() {
   };
 
   const handleSendMessage = async ({ body, mediaFiles }: { body: string; mediaFiles: File[] }) => {
+    if (!selectedDepartmentId) {
+        toast({ title: "Select a department", description: "Choose which department this message should be sent from.", variant: "destructive" });
+        return;
+    }
     if (!selectedFromNumber) {
         toast({ title: "Error", description: "Please select a 'from' number.", variant: "destructive" });
         return;
@@ -160,7 +173,7 @@ export default function MessagesPage() {
   return (
         <div className="flex h-full min-h-0 w-full bg-background text-foreground">
           <div className="flex flex-1 flex-col">
-            <AppHeader user={user} logout={logout} />
+            <AppHeader user={user} logout={logout} outboundContext={outboundContext} />
             <main className="flex-1 flex flex-col bg-muted/40">
                 <div className="p-4 border-b space-y-2">
                     <div className="grid grid-cols-2 gap-2">
@@ -180,9 +193,9 @@ export default function MessagesPage() {
                                 ))}
                             </SelectContent>
                         </Select>
-                        <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers}>
+                        <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
                             <SelectTrigger>
-                                <SelectValue placeholder="Select Number" />
+                                <SelectValue placeholder={selectedDepartmentId ? "Select Number" : "Select department first"} />
                             </SelectTrigger>
                             <SelectContent>
                                 {filteredPhoneNumbers.map((num) => (
@@ -220,17 +233,29 @@ export default function MessagesPage() {
                     </div>
                 </div>
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                     <h2 className="text-2xl font-bold mt-8">What's on your mind?</h2>
-                     <p className="text-muted-foreground mt-2">Enter a name or number to start chatting</p>
+                     <h2 className="text-2xl font-bold mt-8">
+                       {selectedDepartmentId ? "What's on your mind?" : 'Choose a department'}
+                     </h2>
+                     <p className="text-muted-foreground mt-2">
+                       {selectedDepartmentId
+                         ? 'Enter a name or number to start chatting'
+                         : 'Select a department and phone number before sending a message.'}
+                     </p>
                 </div>
                 <div className="p-4 border-t bg-background">
-                    <MessageComposer
+                    {selectedDepartmentId && selectedFromNumber ? (
+                      <MessageComposer
                         messageBody={messageBody}
                         onMessageBodyChange={setMessageBody}
                         onSend={handleSendMessage}
                         isSending={isSending}
                         placeholder="New message"
-                    />
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-2">
+                        Select a department and phone number to compose your message.
+                      </p>
+                    )}
                 </div>
             </main>
           </div>

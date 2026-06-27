@@ -20,7 +20,7 @@ import ThemeToggle from "@/components/theme-toggle";
 import GlobalSearch from "@/components/global-search";
 import TwilioStatusIndicator from "@/components/twilio-status-indicator";
 import Dialer from "@/components/dialer";
-import NewMessageForm from "@/components/new-message-form";
+import SendMessageDialog, { type SendMessageDialogPayload } from "@/components/send-message-dialog";
 import HardwareSettings from "@/components/hardware-settings";
 import { useRouter } from "next/navigation";
 import { events } from "@/lib/events";
@@ -40,6 +40,10 @@ import { cacheGet, cacheSet } from '@/lib/simpleCache';
 import { useAppDispatch } from "@/store";
 import { setUser } from "@/store/slices/authSlice";
 import { initiateConsultCall, consultEnsureAgent } from "@/services/twilioService";
+import {
+    applyOutboundContextSelection,
+    type OutboundContext,
+} from "@/lib/outbound-context";
 
 type AppInfo = { version?: string; updateReady?: boolean };
 
@@ -53,6 +57,7 @@ interface AppHeaderProps {
     dialerOpen?: boolean;
     onDialerOpenChange?: (open: boolean) => void;
     dialerInitialValue?: string;
+    outboundContext?: OutboundContext;
 }
 
 export default function AppHeader({ 
@@ -64,7 +69,8 @@ export default function AppHeader({
     backButtonHref = "", 
     dialerOpen: controlledDialerOpen, 
     onDialerOpenChange: setControlledDialerOpen, 
-    dialerInitialValue: controlledDialerInitialValue 
+    dialerInitialValue: controlledDialerInitialValue,
+    outboundContext,
 }: AppHeaderProps) {
     const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
     const [isVideoOpen, setIsVideoOpen] = useState(false);
@@ -90,6 +96,8 @@ export default function AppHeader({
     
     const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
     const [selectedFromNumber, setSelectedFromNumber] = useState('');
+    const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+    const [messageDialogPayload, setMessageDialogPayload] = useState<SendMessageDialogPayload | undefined>();
 
     const socketRef = useRef<WebSocket | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -332,9 +340,60 @@ export default function AppHeader({
     }, [user, toast, router]);
 
 
+    const applyOutboundContext = useCallback((context?: OutboundContext) => {
+        if (!context?.departmentId && !context?.fromNumber) return;
+
+        const resolved = applyOutboundContextSelection(context, phoneNumbers);
+        if (resolved.departmentId) {
+            setSelectedDepartmentId(resolved.departmentId);
+        }
+        if (resolved.fromNumber) {
+            setSelectedFromNumber(resolved.fromNumber);
+        }
+    }, [phoneNumbers]);
+
     const handleDepartmentChange = useCallback((departmentId: string) => {
         setSelectedDepartmentId(departmentId);
     }, []);
+
+    useEffect(() => {
+        applyOutboundContext(outboundContext);
+    }, [outboundContext, applyOutboundContext]);
+
+    useEffect(() => {
+        const handleSetOutboundContext = (context: OutboundContext) => {
+            applyOutboundContext(context);
+        };
+
+        const handleOpenDialer = (payload?: OutboundContext & { initialValue?: string }) => {
+            if (payload) {
+                applyOutboundContext(payload);
+            }
+            if (payload?.initialValue !== undefined) {
+                if (setControlledDialerOpen === undefined) {
+                    setInternalDialerInitialValue(payload.initialValue.replace(/^\+1/, ''));
+                }
+            } else if (setControlledDialerOpen === undefined) {
+                setInternalDialerInitialValue('');
+            }
+            setDialerOpen(true);
+        };
+
+        const handleOpenMessageDialog = (payload?: SendMessageDialogPayload) => {
+            setMessageDialogPayload(payload);
+            setMessageDialogOpen(true);
+        };
+
+        events.on('setOutboundContext', handleSetOutboundContext);
+        events.on('openDialer', handleOpenDialer);
+        events.on('openMessageDialog', handleOpenMessageDialog);
+
+        return () => {
+            events.off('setOutboundContext', handleSetOutboundContext);
+            events.off('openDialer', handleOpenDialer);
+            events.off('openMessageDialog', handleOpenMessageDialog);
+        };
+    }, [applyOutboundContext, setControlledDialerOpen, setDialerOpen]);
 
     const filteredPhoneNumbers = selectedDepartmentId
         ? phoneNumbers.filter(
@@ -625,7 +684,16 @@ export default function AppHeader({
                            <Phone className="h-5 w-5" />
                         </Button>
                      </Dialer>
-                     <Button variant="ghost" size="icon" onClick={() => router.push('/messages')}><MessageSquare className="h-5 w-5" /></Button>
+                     <Button
+                       variant="ghost"
+                       size="icon"
+                       onClick={() => {
+                         setMessageDialogPayload(undefined);
+                         setMessageDialogOpen(true);
+                       }}
+                     >
+                       <MessageSquare className="h-5 w-5" />
+                     </Button>
                      <Button variant="ghost" size="icon" onClick={() => setIsVideoOpen(true)}><Video className="h-5 w-5" /></Button>
                      <HardwareSettings />
 
@@ -765,6 +833,17 @@ export default function AppHeader({
                 </div>
             )}
               
+            <SendMessageDialog
+              open={messageDialogOpen}
+              onOpenChange={setMessageDialogOpen}
+              departments={departments}
+              phoneNumbers={phoneNumbers}
+              contacts={contacts}
+              loadingDepartments={loadingDepartments}
+              loadingNumbers={loadingNumbers}
+              payload={messageDialogPayload}
+            />
+
             <Dialog open={isVideoOpen} onOpenChange={setIsVideoOpen}>
             <DialogContent>
                 <DialogHeader>

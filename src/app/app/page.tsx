@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
-import type { Communication, Contact, Operator, PaginatedCommunicationsResponse, User } from "@/types";
+import type { Communication, Contact, Operator, PaginatedCommunicationsResponse, User, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import { getCommunications, enrichThreadsWithLastAttendee } from "@/services/cal
 import { getOperators, type OperatorsScope } from "@/services/departmentService";
 import { getContacts } from "@/services/contactService";
 import { getUsersByCompany } from "@/services/userService";
+import { getCompanyPhoneNumbers } from "@/services/phoneNumberService";
 import CallLog from "@/components/call-log";
 import AppHeader from "@/components/app-header";
 import OperatorsTable from "@/components/operators-table";
@@ -22,6 +23,7 @@ import PaginationControls from "@/components/pagination-controls";
 import { cacheGet, cacheSet } from "@/lib/simpleCache";
 import { useRef } from "react";
 import { debounce } from "@/lib/utils";
+import type { OutboundContext } from "@/lib/outbound-context";
 
 type TabName = 'all' | 'unread' | 'calls' | 'missed' | 'meetings' | 'voicemails' | 'recordings' | 'messages' | 'operators' | 'starred' | 'spam' | 'unlogged';
 
@@ -55,6 +57,7 @@ export default function AppUIPage() {
   const [operatorsScope, setOperatorsScope] = useState<OperatorsScope>('assigned_departments');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companyUsers, setCompanyUsers] = useState<User[]>([]);
+  const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [pagination, setPagination] = useState<Record<TabName, PaginationState>>({
     all: { ...initialPaginationState }, unread: { ...initialPaginationState }, calls: { ...initialPaginationState },
     missed: { ...initialPaginationState }, meetings: { ...initialPaginationState }, voicemails: { ...initialPaginationState },
@@ -84,6 +87,9 @@ export default function AppUIPage() {
     getContacts(user.company_id).then((list) => setContacts(Array.isArray(list) ? list : []));
     getUsersByCompany(user.company_id).then((result) => {
       setCompanyUsers(Array.isArray(result.data) ? result.data : []);
+    });
+    getCompanyPhoneNumbers(user.company_id).then((numbers) => {
+      setPhoneNumbers(Array.isArray(numbers) ? numbers : []);
     });
   }, [user?.company_id]);
 
@@ -209,10 +215,13 @@ export default function AppUIPage() {
     return () => events.off('refreshCalls', debouncedRefresh);
   }, [handleRefresh]);
 
-  const handleMakeCall = async (number: string) => {
+  const handleMakeCall = async (number: string, context?: OutboundContext) => {
      if (!device) {
         toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});
         return;
+    }
+    if (context) {
+      events.emit('setOutboundContext', context);
     }
     setDialerInitialValue(number.replace(/^\+1/, ""));
     setDialerOpen(true);
@@ -255,6 +264,7 @@ export default function AppUIPage() {
             calls={currentData || []}
             contacts={contacts}
             companyUsers={companyUsers}
+            phoneNumbers={phoneNumbers}
             onMakeCall={handleMakeCall}
             source={tabName === 'unread' ? 'unread' : undefined}
             highlightFailedCalls

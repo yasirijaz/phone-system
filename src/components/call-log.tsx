@@ -1,6 +1,6 @@
 
 
-import type { Communication, Contact, User as AppUser } from '@/types';
+import type { Communication, Contact, User as AppUser, PhoneNumber } from '@/types';
 import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight, ChevronDown, User as UserIcon, Star, FileText } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import Link from 'next/link';
@@ -40,6 +40,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import AudioPlayer from './AudioPlayer';
 import { getTranscriptionForAudio } from '@/app/actions';
 import { saveTranscription } from '@/services/callLogService';
+import {
+  resolveOutboundContextFromCommunication,
+  type OutboundContext,
+} from '@/lib/outbound-context';
 
 function parseRecordingDurationSeconds(
   ...values: (string | undefined | null)[]
@@ -58,7 +62,9 @@ interface CallLogProps {
   calls: Communication[];
   contacts?: Contact[];
   companyUsers?: AppUser[];
-  onMakeCall: (number: string) => void;
+  phoneNumbers?: PhoneNumber[];
+  fallbackDepartmentId?: string;
+  onMakeCall: (number: string, context?: OutboundContext) => void;
   isClickable?: boolean;
   source?: string;
   highlightFailedCalls?: boolean;
@@ -68,6 +74,8 @@ function CommunicationCard({
     comm, 
     contacts,
     companyUsers,
+    phoneNumbers,
+    fallbackDepartmentId,
     onMakeCall, 
     isClickable, 
     source,
@@ -79,7 +87,9 @@ function CommunicationCard({
     comm: Communication, 
     contacts?: Contact[],
     companyUsers?: AppUser[],
-    onMakeCall: (number: string) => void, 
+    phoneNumbers?: PhoneNumber[],
+    fallbackDepartmentId?: string,
+    onMakeCall: (number: string, context?: OutboundContext) => void, 
     isClickable: boolean, 
     source?: string,
     highlightFailedCalls?: boolean,
@@ -536,7 +546,14 @@ function CommunicationCard({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onMakeCall(mainPageContactNumber)}>
+                        <DropdownMenuItem onClick={() => {
+                            const context = phoneNumbers?.length
+                              ? resolveOutboundContextFromCommunication(comm, phoneNumbers, fallbackDepartmentId)
+                              : fallbackDepartmentId
+                                ? { departmentId: fallbackDepartmentId }
+                                : undefined;
+                            onMakeCall(mainPageContactNumber, context);
+                        }}>
                             Call {formatPhoneNumber(mainPageContactNumber)}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -597,6 +614,8 @@ export default function CallLog({
   calls: communications,
   contacts,
   companyUsers,
+  phoneNumbers,
+  fallbackDepartmentId,
   onMakeCall,
   isClickable = true,
   source,
@@ -632,6 +651,8 @@ export default function CallLog({
                         comm={comm}
                         contacts={contacts}
                         companyUsers={companyUsers}
+                        phoneNumbers={phoneNumbers}
+                        fallbackDepartmentId={fallbackDepartmentId}
                         key={stableKey}
                         onMakeCall={onMakeCall}
                         isClickable={isClickable}
@@ -690,6 +711,8 @@ export default function CallLog({
                             comm={comm} 
                             contacts={contacts}
                             companyUsers={companyUsers}
+                            phoneNumbers={phoneNumbers}
+                            fallbackDepartmentId={fallbackDepartmentId}
                             key={stableKey} 
                             onMakeCall={onMakeCall} 
                             isClickable={isClickable} 

@@ -18,6 +18,7 @@ import { events } from "@/lib/events";
 import { cacheGet, cacheSet, cacheDel } from "@/lib/simpleCache";
 import { formatPhoneNumber, isSameConversationThread } from "@/lib/utils";
 import { getOtherPartyDisplay } from "@/lib/contact-display";
+import type { OutboundContext } from "@/lib/outbound-context";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -116,12 +117,18 @@ export default function ConversationDetailPage() {
         };
     }, [from, to, refreshThread]);
 
-    const handleMakeCall = async (number: string) => {
+    const handleMakeCall = async (number: string, context?: OutboundContext) => {
         if (!device || !isDeviceReady) {
             toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});
             return;
         }
-        console.log("Request to call from conversation detail:", number);
+        if (context) {
+            events.emit('setOutboundContext', context);
+        }
+        events.emit('openDialer', {
+            ...context,
+            initialValue: number.replace(/^\+1/, ''),
+        });
     };
 
     return (

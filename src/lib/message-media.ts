@@ -175,6 +175,7 @@ export function getCommunicationMediaContentTypes(comm: Communication): string[]
 
 export function isImageMediaUrl(url: string, contentType?: string): boolean {
   if (contentType?.startsWith('image/')) return true;
+  if (url.includes('/api/twilio/mms/stream')) return false;
   return isDataImageUrl(url) || IMAGE_URL_PATTERN.test(url) || url.includes('/uploads/') || url.includes('/mms/') && IMAGE_URL_PATTERN.test(url);
 }
 

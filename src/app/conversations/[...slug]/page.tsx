@@ -24,6 +24,7 @@ import ContactProfile from "@/components/contact-profile";
 import { cn, formatPhoneNumber, phonesMatch, getPhoneNumberOptionLabel, isSameConversationThread } from "@/lib/utils";
 import { buildThreadContactState } from "@/lib/contact-display";
 import { canListAllCompanyDepartments } from "@/lib/roles";
+import type { OutboundContext } from "@/lib/outbound-context";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -265,12 +266,21 @@ export default function ConversationDetailPage() {
     }, [allComms, loading]);
 
 
-    const handleMakeCall = async (number: string) => {
+    const handleMakeCall = async (number: string, context?: OutboundContext) => {
         if (!device || !isDeviceReady) {
             toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});
             return;
         }
-        console.log("Request to call from conversation detail:", number);
+
+        const outboundContext = context ?? {
+            departmentId: selectedDepartmentId || undefined,
+            fromNumber: selectedFromNumber || undefined,
+        };
+        if (outboundContext.departmentId || outboundContext.fromNumber) {
+            events.emit('setOutboundContext', outboundContext);
+        }
+        setDialerInitialValue(number.replace(/^\+1/, ""));
+        setDialerOpen(true);
     };
 
     const handleSendMessage = async ({ body, mediaFiles }: { body: string; mediaFiles: File[] }) => {
@@ -318,6 +328,12 @@ export default function ConversationDetailPage() {
         return;
         }
 
+        if (selectedDepartmentId || selectedFromNumber) {
+            events.emit('setOutboundContext', {
+                departmentId: selectedDepartmentId || undefined,
+                fromNumber: selectedFromNumber || undefined,
+            });
+        }
         setDialerInitialValue(number.replace(/^\+1/, ""));
         setDialerOpen(true);
     };
@@ -329,6 +345,10 @@ export default function ConversationDetailPage() {
                             dialerOpen={dialerOpen}
                             dialerInitialValue={dialerInitialValue}
                             onDialerOpenChange={() => setDialerOpen(!dialerOpen)}
+                            outboundContext={{
+                              departmentId: selectedDepartmentId || undefined,
+                              fromNumber: selectedFromNumber || undefined,
+                            }}
                         />
                         <div className="flex-1 flex overflow-hidden">
                                 <div className={cn("flex flex-1 min-w-0 flex-col h-full bg-background text-foreground overflow-hidden")}>
@@ -360,7 +380,15 @@ export default function ConversationDetailPage() {
                                         </Button>
                                     </header>
                                     <main ref={chatScrollRef} className="flex-1 overflow-y-auto overscroll-contain">
-                                    {loading ? <p className="p-4">Loading...</p> : <CallLog calls={allComms} contacts={contacts} onMakeCall={handleMakeCall} isClickable={false} />}
+                                    {loading ? <p className="p-4">Loading...</p> : (
+                                      <CallLog
+                                        calls={allComms}
+                                        contacts={contacts}
+                                        phoneNumbers={phoneNumbers}
+                                        onMakeCall={handleMakeCall}
+                                        isClickable={false}
+                                      />
+                                    )}
                                     <div ref={messagesEndRef} />
                                     </main>
                                     <footer className="flex-shrink-0 p-4 border-t bg-background space-y-2">
