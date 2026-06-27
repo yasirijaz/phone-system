@@ -413,7 +413,7 @@ export default function DepartmentSettingsPage() {
                           <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                             <div className="space-y-1">
                               <FormLabel className="text-base">Sync In-Call Status</FormLabel>
-                              <p className="text-sm text-muted-foreground">Set agents&apos; Slack status to &quot;In a call&quot; while they are on a live call.</p>
+                              <p className="text-sm text-muted-foreground">Set agents&apos; Slack status to &quot;In a call on voice&quot; while they are on a live call.</p>
                             </div>
                             <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                           </FormItem>

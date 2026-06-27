@@ -41,6 +41,19 @@ import AudioPlayer from './AudioPlayer';
 import { getTranscriptionForAudio } from '@/app/actions';
 import { saveTranscription } from '@/services/callLogService';
 
+function parseRecordingDurationSeconds(
+  ...values: (string | undefined | null)[]
+): number | undefined {
+  for (const value of values) {
+    if (!value) continue;
+    const parsed = parseInt(String(value).replace(/\D/g, ''), 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
 interface CallLogProps {
   calls: Communication[];
   contacts?: Contact[];
@@ -285,8 +298,9 @@ function CommunicationCard({
   const renderCallBubble = (c: Communication) => {
     let title: React.ReactNode;
 
+    const isVoicemail = Boolean(c.voice_mail);
     const attendeeName = getCallAttendeeName(c, companyUsers);
-    if (attendeeName) {
+    if (attendeeName && !isVoicemail) {
         if (isMine) {
             title = <>{attendeeName} called {otherParty.displayName}</>;
         } else {
@@ -353,7 +367,11 @@ function CommunicationCard({
                 )}
                 {c.recording_url && (
                   <div className="flex items-center gap-2">
-                    <AudioPlayer src={c.recording_url} type="Recording" />
+                    <AudioPlayer
+                      src={c.recording_url}
+                      type="Recording"
+                      durationHint={parseRecordingDurationSeconds(c.call_duration, c.duration)}
+                    />
                     <Button size="icon" variant="ghost" onClick={() => handleTranscribeClick(c.recording_url!)} disabled={isTranscribing} title="Transcribe">
                       {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4" />}
                     </Button>
@@ -361,7 +379,11 @@ function CommunicationCard({
                 )}
                 {c.voice_mail && (
                   <div className="flex items-center gap-2">
-                    <AudioPlayer src={c.voice_mail} type="Voicemail" />
+                    <AudioPlayer
+                      src={c.voice_mail}
+                      type="Voicemail"
+                      durationHint={parseRecordingDurationSeconds(c.call_duration, c.duration)}
+                    />
                     <Button size="icon" variant="ghost" onClick={() => handleTranscribeClick(c.voice_mail!)} disabled={isTranscribing} title="Transcribe">
                      {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4" />}
                     </Button>

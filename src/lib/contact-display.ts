@@ -1,5 +1,5 @@
 import type { Communication, Contact } from '@/types';
-import { formatPhoneNumber } from '@/lib/utils';
+import { formatPhoneNumber, phonesMatch } from '@/lib/utils';
 
 export type OtherPartyDisplay = {
   number: string;
@@ -199,4 +199,33 @@ export function getThreadContactDisplay(
   };
 
   return getOtherPartyDisplay(fallbackComm, localContact);
+}
+
+export function findLocalContactByPhone(
+  contacts: Pick<Contact, 'phone_no' | 'name'>[],
+  phone: string
+): Pick<Contact, 'name'> | null {
+  if (!phone || contacts.length === 0) {
+    return null;
+  }
+
+  return contacts.find((contact) => phonesMatch(contact.phone_no, phone)) ?? null;
+}
+
+/** Label for SMS notifications: "Name (+1 …)" when saved, otherwise formatted number only. */
+export function formatSmsNotificationSenderLabel(
+  from: string,
+  options?: { contactName?: string | null; localContact?: Pick<Contact, 'name'> | null }
+): string {
+  const name =
+    options?.contactName?.trim() ||
+    options?.localContact?.name?.trim() ||
+    null;
+  const formattedNumber = formatPhoneNumber(from);
+
+  if (name) {
+    return `${name} (${formattedNumber})`;
+  }
+
+  return formattedNumber;
 }

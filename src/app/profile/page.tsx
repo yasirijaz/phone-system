@@ -6,6 +6,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/context/AuthContext";
 import { updateProfile } from "@/services/profileService";
+import {
+  disconnectSlack,
+  getSlackConnectUrl,
+  getSlackConnectionStatus,
+  type SlackConnectionStatus,
+} from "@/services/slackService";
 import { useAppDispatch } from "@/store";
 import { updateUser } from "@/store/slices/authSlice";
 import { Button } from "@/components/ui/button";
@@ -17,17 +23,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import AppHeader from "@/components/app-header";
 import { getRoleName } from '@/lib/roles';
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import UserDevices from "@/components/user-devices";
+import { useSearchParams } from "next/navigation";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email(),
   password: z.string().min(6, "Password must be at least 6 characters.").optional().or(z.literal('')),
   password_confirmation: z.string().optional(),
-  slack_user_id: z.string().optional(),
-  slack_access_token: z.string().optional(),
 }).refine((data) => data.password === data.password_confirmation, {
   message: "Passwords don't match",
   path: ["password_confirmation"],
@@ -37,8 +42,12 @@ export default function ProfilePage() {
   const { user, loading, logout } = useAuth();
   const { toast } = useToast();
   const dispatch = useAppDispatch();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [slackStatus, setSlackStatus] = useState<SlackConnectionStatus | null>(null);
+  const [slackLoading, setSlackLoading] = useState(true);
+  const [slackActionLoading, setSlackActionLoading] = useState(false);
 
   const form = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -47,10 +56,20 @@ export default function ProfilePage() {
       email: user?.email || "",
       password: "",
       password_confirmation: "",
-      slack_user_id: user?.slack_user_id || "",
-      slack_access_token: "",
     },
   });
+
+  const loadSlackStatus = useCallback(async () => {
+    try {
+      setSlackLoading(true);
+      const status = await getSlackConnectionStatus();
+      setSlackStatus(status);
+    } catch {
+      setSlackStatus(null);
+    } finally {
+      setSlackLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -59,11 +78,40 @@ export default function ProfilePage() {
       email: user.email || "",
       password: "",
       password_confirmation: "",
-      slack_user_id: user.slack_user_id || "",
-      slack_access_token: "",
     });
   }, [user, form]);
-  
+
+  useEffect(() => {
+    if (!user) return;
+    loadSlackStatus();
+  }, [user, loadSlackStatus]);
+
+  useEffect(() => {
+    const slackResult = searchParams.get("slack");
+    const message = searchParams.get("message");
+
+    if (slackResult === "connected") {
+      toast({
+        title: "Slack connected",
+        description: "Your Slack account is linked. Your status will update during calls.",
+      });
+      loadSlackStatus();
+      if (user) {
+        dispatch(updateUser({
+          ...user,
+          slack_connected: true,
+          has_slack_access_token: true,
+        }));
+      }
+    } else if (slackResult === "error") {
+      toast({
+        title: "Slack connection failed",
+        description: message || "Could not connect your Slack account.",
+        variant: "destructive",
+      });
+    }
+  }, [searchParams, toast, loadSlackStatus, dispatch, user]);
+
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
   };
@@ -74,7 +122,6 @@ export default function ProfilePage() {
       setIsUploading(true);
       try {
         const updatedUser = await updateProfile(user.id, { profile_picture: file });
-        console.log("🔄 Updating user in store:", updatedUser);
         dispatch(updateUser(updatedUser));
         toast({ title: "Success", description: "Profile picture updated successfully." });
       } catch (error: any) {
@@ -89,6 +136,46 @@ export default function ProfilePage() {
     }
   };
 
+  const handleConnectSlack = async () => {
+    try {
+      setSlackActionLoading(true);
+      const authorizeUrl = await getSlackConnectUrl();
+      window.location.href = authorizeUrl;
+    } catch (error: any) {
+      toast({
+        title: "Could not start Slack connection",
+        description: error.response?.data?.message || "Slack OAuth is not configured for your company.",
+        variant: "destructive",
+      });
+      setSlackActionLoading(false);
+    }
+  };
+
+  const handleDisconnectSlack = async () => {
+    try {
+      setSlackActionLoading(true);
+      await disconnectSlack();
+      setSlackStatus((prev) => (prev ? { ...prev, connected: false, slack_user_id: null } : prev));
+      if (user) {
+        dispatch(updateUser({
+          ...user,
+          slack_user_id: null,
+          slack_connected: false,
+          has_slack_access_token: false,
+        }));
+      }
+      toast({ title: "Slack disconnected", description: "Your Slack account has been unlinked." });
+    } catch (error: any) {
+      toast({
+        title: "Disconnect failed",
+        description: error.response?.data?.message || "Could not disconnect Slack.",
+        variant: "destructive",
+      });
+    } finally {
+      setSlackActionLoading(false);
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof profileSchema>) => {
     if (!user) return;
     try {
@@ -97,17 +184,10 @@ export default function ProfilePage() {
         email: string;
         password?: string;
         password_confirmation?: string;
-        slack_user_id?: string;
-        slack_access_token?: string;
       } = {
         name: values.name,
         email: values.email,
-        slack_user_id: values.slack_user_id || undefined,
       };
-
-      if (values.slack_access_token) {
-        updateData.slack_access_token = values.slack_access_token;
-      }
 
       if (values.password) {
         updateData.password = values.password;
@@ -117,14 +197,10 @@ export default function ProfilePage() {
       const updatedUser = await updateProfile(user.id, updateData);
       
       if (values.password) {
-        // If password was changed, logout user
         toast({ title: "Success", description: "Profile updated successfully. Please re-login with your new password." });
         logout();
       } else {
-        // If only name/email was changed, update user in store
-        console.log("🔄 Updating user in store:", updatedUser);
         dispatch(updateUser(updatedUser));
-        form.setValue("slack_access_token", "");
         toast({ title: "Success", description: "Profile updated successfully." });
       }
 
@@ -144,6 +220,7 @@ export default function ProfilePage() {
   
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
   const userRole = getRoleName(user.role_id);
+  const slackConnected = slackStatus?.connected ?? user.slack_connected ?? user.has_slack_access_token;
 
   return (
       <div className="flex flex-col min-h-screen">
@@ -177,13 +254,13 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
             </div>
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 space-y-8">
               <Form {...form}>
                 <form id="profile-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <Card>
                 <CardHeader>
                   <CardTitle>Profile Information</CardTitle>
-                  <CardDescription>Update your account's profile information and email address.</CardDescription>
+                  <CardDescription>Update your account&apos;s profile information and email address.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                       <FormField
@@ -236,55 +313,70 @@ export default function ProfilePage() {
                       />
                 </CardContent>
               </Card>
+                </form>
+              </Form>
 
               <Card>
                 <CardHeader>
                   <CardTitle>Slack Status</CardTitle>
                   <CardDescription>
-                    Connect your Slack account so your status updates to &quot;In a call&quot; during live calls.
+                    Connect your Slack account so your status updates to &quot;In a call on voice&quot; during live calls.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="slack_user_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Slack User ID (optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="U0123456789" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Leave blank to auto-match by your account email when a department enables Slack status sync.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="slack_access_token"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Slack User Token</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder={user.has_slack_access_token ? "Token saved — enter a new value to replace" : "xoxp-..."}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Create a Slack app with the <code>users.profile:write</code> user scope and paste your user OAuth token here.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <CardContent className="space-y-4">
+                  {slackLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Checking Slack connection...
+                    </div>
+                  ) : (
+                    <>
+                      <div className="rounded-lg border p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="font-medium">
+                              {slackConnected ? "Connected to Slack" : "Not connected"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {slackConnected
+                                ? slackStatus?.slack_user_id
+                                  ? `Slack user ID: ${slackStatus.slack_user_id}`
+                                  : "Your Slack account is linked."
+                                : slackStatus?.oauth_configured
+                                  ? "Authorize Slack once to enable automatic in-call status updates."
+                                  : "Ask your admin to configure Slack OAuth in Company Settings before connecting."}
+                            </p>
+                          </div>
+                          <Badge variant={slackConnected ? "default" : "secondary"}>
+                            {slackConnected ? "Connected" : "Disconnected"}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {slackConnected ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleDisconnectSlack}
+                            disabled={slackActionLoading}
+                          >
+                            {slackActionLoading ? "Disconnecting..." : "Disconnect Slack"}
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            onClick={handleConnectSlack}
+                            disabled={slackActionLoading || !slackStatus?.oauth_configured}
+                          >
+                            {slackActionLoading ? "Redirecting..." : "Connect Slack"}
+                          </Button>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
-                </form>
-              </Form>
 
               <UserDevices />
             </div>

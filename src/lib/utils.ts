@@ -64,6 +64,19 @@ export function phonesMatch(
   return left === right;
 }
 
+/** True when two from/to pairs refer to the same SMS/call thread (either direction). */
+export function isSameConversationThread(
+  threadFrom: string,
+  threadTo: string,
+  payloadFrom: string,
+  payloadTo: string
+): boolean {
+  return (
+    (phonesMatch(threadFrom, payloadFrom) && phonesMatch(threadTo, payloadTo)) ||
+    (phonesMatch(threadFrom, payloadTo) && phonesMatch(threadTo, payloadFrom))
+  );
+}
+
 type PhoneNumberLike = {
   phone_no: string;
   label?: string | null;

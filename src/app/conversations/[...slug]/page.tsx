@@ -21,7 +21,7 @@ import { sendMms } from "@/services/twilioService";
 import { getContacts } from "@/services/contactService";
 import { events } from "@/lib/events";
 import ContactProfile from "@/components/contact-profile";
-import { cn, formatPhoneNumber, phonesMatch, getPhoneNumberOptionLabel } from "@/lib/utils";
+import { cn, formatPhoneNumber, phonesMatch, getPhoneNumberOptionLabel, isSameConversationThread } from "@/lib/utils";
 import { buildThreadContactState } from "@/lib/contact-display";
 import { canListAllCompanyDepartments } from "@/lib/roles";
 
@@ -59,11 +59,11 @@ export default function ConversationDetailPage() {
         return contactList.find(c => phonesMatch(c.phone_no, phone)) ?? null;
     };
 
-    const refreshThread = useCallback(async () => {
+    const refreshThread = useCallback(async (options?: { bypassCache?: boolean }) => {
         if (!user) return;
         try {
             const [logs, fetchedContacts] = await Promise.all([
-                getCommunicationThread(from, to),
+                getCommunicationThread(from, to, { bypassCache: options?.bypassCache }),
                 user.company_id ? getContacts(user.company_id) : Promise.resolve([])
             ]);
             
@@ -72,6 +72,14 @@ export default function ConversationDetailPage() {
 
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);
+
+            const unreadLogs = sortedLogs.filter((l) => l.id && l.is_read === 0);
+            if (unreadLogs.length > 0) {
+                await Promise.all(
+                    unreadLogs.map((log) => markRead(String(log.id), log.type))
+                );
+                try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
+            }
 
              if (sortedLogs.length > 0) {
                 const latestComm = sortedLogs[sortedLogs.length - 1];
@@ -227,14 +235,13 @@ export default function ConversationDetailPage() {
 
     useEffect(() => {
         const handler = (payload: { from: string; to: string }) => {
-            const matches = (payload.from === from && payload.to === to) || (payload.from === to && payload.to === from);
-            if (matches) {
-                refreshThread();
+            if (isSameConversationThread(from, to, payload.from, payload.to)) {
+                void refreshThread({ bypassCache: true });
             }
         };
 
         const refreshCallsHandler = () => {
-          refreshThread();
+          void refreshThread({ bypassCache: true });
         };
 
         events.on('refreshConversation', handler);
