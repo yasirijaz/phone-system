@@ -38,7 +38,7 @@ import {
   type ActiveCallSession,
 } from '@/lib/active-call-session';
 import { findLiveCallOnDevice, isLiveCallStatus } from '@/lib/twilio-call-utils';
-import { getActiveCall } from '@/services/callLogService';
+import { getActiveCall, dismissActiveCall } from '@/services/callLogService';
 
 interface TwilioContextType {
   device: Device | null;
@@ -182,6 +182,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   }, [conferenceSid]);
 
   useEffect(() => {
+    const justCleared =
+      lastClearedAtRef.current > 0 && Date.now() - lastClearedAtRef.current < 15_000;
+    if (justCleared) {
+      return;
+    }
     userInCallRef.current = Boolean(user?.in_call);
   }, [user?.in_call]);
 
@@ -240,6 +245,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const clearActiveCallState = useCallback(() => {
     lastClearedAtRef.current = Date.now();
+    userInCallRef.current = false;
     setConnection(null);
     setActiveReservation(null);
     activeReservationRef.current = null;
@@ -303,15 +309,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const storedSession = readActiveCallSession();
-      if (storedSession && (storedSession.conferenceSid || storedSession.callSid)) {
-        setActiveCallMeta(storedSession);
-        if (storedSession.conferenceSid) {
-          setConferenceSid(storedSession.conferenceSid);
-        }
-        return;
-      }
-
       // Guard: if the call was explicitly ended recently, don't restore from the API even
       // if the backend webhook hasn't arrived yet (userInCallRef may still be true for a
       // few seconds after clearActiveCallState() runs).
@@ -320,14 +317,19 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         : Infinity;
       const justCleared = recentlyClearedMs < 15_000;
 
-      if (userInCallRef.current && user?.id && !justCleared) {
+      if (!justCleared && (userInCallRef.current || readActiveCallSession()) && user?.id) {
         const activeCallLog = await getActiveCall();
 
-        // Re-check after the async fetch – the call may have ended while we were waiting.
         const clearedDuringFetch = lastClearedAtRef.current > 0
           && Date.now() - lastClearedAtRef.current < 15_000;
 
-        if (!clearedDuringFetch && activeCallLog?.call_status === 'in_progress') {
+        const hasLiveCallLeg = Boolean(liveDeviceCall) || Boolean(activeReservationRef.current);
+
+        if (
+          !clearedDuringFetch &&
+          activeCallLog?.call_status === 'in_progress' &&
+          hasLiveCallLeg
+        ) {
           const restored = persistActiveCallMeta(
             {
               callSid: activeCallLog.worker_sid || activeCallLog.call_sid || null,
@@ -346,11 +348,16 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setActiveCallMeta(restored);
           return;
         }
+
+        if (!hasLiveCallLeg && activeCallLog?.call_status === 'in_progress') {
+          await dismissActiveCall();
+        }
       }
 
-      if (!userInCallRef.current && !liveDeviceCall) {
+      if (!liveDeviceCall && !activeReservationRef.current) {
         clearActiveCallSession();
         setActiveCallMeta(null);
+        userInCallRef.current = false;
       }
     } finally {
       syncInFlightRef.current = false;
@@ -1076,6 +1083,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     scheduleReservationFinalize(reservationToFinalize);
     clearActiveCallState();
+    void dismissActiveCall().then(() => {
+      if (user?.id) {
+        events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
+      }
+    });
     toast({ title: 'Left call' });
   };
 
@@ -1100,6 +1112,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     scheduleReservationFinalize(reservationToFinalize);
     clearActiveCallState();
+    void dismissActiveCall().then(() => {
+      if (user?.id) {
+        events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
+      }
+    });
     toast({ title: 'Call Ended' });
   };
 

@@ -252,15 +252,6 @@ export default function PhoneCallHistoryPage() {
       fromNumber: selectedFromNumber || undefined,
     };
 
-    if (!outboundContext.departmentId) {
-      toast({
-        title: 'Select a department',
-        description: 'Choose which department this call should be placed from.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     if (outboundContext.departmentId || outboundContext.fromNumber) {
       events.emit('setOutboundContext', outboundContext);
     }

@@ -89,17 +89,13 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
 
   const callStatus = connection?.status?.();
   const hasLiveConnection = !!connection && isLiveCallStatus(callStatus);
-  const hasPersistedActiveCall = Boolean(
-    activeCallMeta?.conferenceSid || activeCallMeta?.callSid
-  );
   const isIncomingDeviceCall =
     !!connection && (callStatus === 'pending' || callStatus === 'ringing');
   const isIncomingCall =
     isIncomingDeviceCall && !activeReservation && !incomingReservation && !showReservationModal;
   const isActiveCall =
     hasLiveConnection ||
-    !!activeReservation ||
-    (hasPersistedActiveCall && !incomingReservation && !isIncomingDeviceCall);
+    !!activeReservation;
 
   const isAgentOnCall =
     isActiveCall && !isIncomingDeviceCall;

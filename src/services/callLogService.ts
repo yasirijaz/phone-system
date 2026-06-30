@@ -187,6 +187,14 @@ export const getActiveCall = async (): Promise<Communication | null> => {
   }
 };
 
+export const dismissActiveCall = async (): Promise<void> => {
+  try {
+    await axios.post('/api/call-logs/active/dismiss');
+  } catch (error) {
+    console.warn('Failed to dismiss active call session:', error);
+  }
+};
+
 export const getCallLogsBySid = async (callSid: string): Promise<Communication | null> => {
   try {
     const response = await axios.get(`/api/call-logs/${callSid}`);

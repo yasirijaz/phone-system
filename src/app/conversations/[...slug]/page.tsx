@@ -342,25 +342,6 @@ export default function ConversationDetailPage() {
     const [dialerOpen, setDialerOpen] = useState(false);
     const [dialerInitialValue, setDialerInitialValue] = useState("");
 
-    const handleMakeCallDialer = (number: string) => {
-        if (!device) {
-        toast({
-            title: "Twilio Error",
-            description: "Twilio Device not ready.",
-            variant: "destructive",
-        });
-        return;
-        }
-
-        if (selectedDepartmentId || selectedFromNumber) {
-            events.emit('setOutboundContext', {
-                departmentId: selectedDepartmentId || undefined,
-                fromNumber: selectedFromNumber || undefined,
-            });
-        }
-        setDialerInitialValue(number.replace(/^\+1/, ""));
-        setDialerOpen(true);
-    };
 
     return (
                  <div className="flex h-[100dvh] min-h-0 w-full overflow-hidden bg-background text-foreground">
@@ -369,7 +350,7 @@ export default function ConversationDetailPage() {
                         <AppHeader user={user} logout={logout} 
                             dialerOpen={dialerOpen}
                             dialerInitialValue={dialerInitialValue}
-                            onDialerOpenChange={() => setDialerOpen(!dialerOpen)}
+                            onDialerOpenChange={setDialerOpen}
                             outboundContext={{
                               departmentId: selectedDepartmentId || undefined,
                               fromNumber: selectedFromNumber || undefined,
@@ -387,7 +368,8 @@ export default function ConversationDetailPage() {
                                                 size="icon"
                                                 title="Call Now"
                                                 className="text-left"
-                                                onClick={() => handleMakeCallDialer(contact.phone_no)}
+                                                disabled={loading || !contact?.phone_no}
+                                                onClick={() => contact?.phone_no && handleMakeCall(contact.phone_no)}
                                             >
                                                 <Phone className="h-4 w-4" />
                                             </Button>
