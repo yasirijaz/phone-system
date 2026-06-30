@@ -60,9 +60,15 @@ export interface OperatorsResponse {
   operators: Operator[];
 }
 
-export const getOperators = async (departmentId?: number): Promise<OperatorsResponse> => {
+export const getOperators = async (
+  departmentId?: number,
+  options?: { companyWide?: boolean }
+): Promise<OperatorsResponse> => {
   const response = await axios.get('/api/operators', {
-    params: departmentId ? { department_id: departmentId } : undefined,
+    params: {
+      ...(departmentId ? { department_id: departmentId } : {}),
+      ...(options?.companyWide ? { company_wide: 1 } : {}),
+    },
   });
   return response.data;
 };
