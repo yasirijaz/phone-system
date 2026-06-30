@@ -121,6 +121,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const conferenceSidRef = useRef<string | null>(null);
   const hangUpFromOverlayRef = useRef<() => void>(() => {});
   const pendingMergeConferenceSidRef = useRef<string | null>(null);
+  const pendingConferenceInviteRef = useRef<{
+    transfer?: boolean;
+    autoAccept: boolean;
+    expires: number;
+  } | null>(null);
   const reservationActionHandlersRef = useRef<{
     acceptReservation: (reservation: Reservation) => void;
     acceptReservationWithHold: (reservation: Reservation) => Promise<void>;
@@ -179,6 +184,19 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     userInCallRef.current = Boolean(user?.in_call);
   }, [user?.in_call]);
+
+  useEffect(() => {
+    const handleConferenceInvite = (data: Record<string, unknown>) => {
+      pendingConferenceInviteRef.current = {
+        transfer: Boolean(data.transfer),
+        autoAccept: data.auto_accept === true,
+        expires: Date.now() + 120_000,
+      };
+    };
+
+    events.on('conferenceInvite', handleConferenceInvite);
+    return () => events.off('conferenceInvite', handleConferenceInvite);
+  }, []);
 
   useEffect(() => {
     ringAudioRef.current = createIncomingRingAudio();
@@ -559,7 +577,19 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         const isTransferLeg = conn.customParameters.get('transfer') === '1';
         const isReservationLeg =
           expectingReservationDeviceLegRef.current || activeReservationRef.current !== null;
-        const shouldAutoAccept = isReservationLeg || isTransferLeg || autoAccept !== '0';
+        const pendingInvite = pendingConferenceInviteRef.current;
+        const hasPendingInvite =
+          Boolean(pendingInvite) && (pendingInvite?.expires ?? 0) > Date.now();
+        const isConferenceInvite =
+          Boolean(incomingConferenceSid) || (hasPendingInvite && pendingInvite?.autoAccept === false);
+        const shouldAutoAccept =
+          isReservationLeg ||
+          expectingReservationDeviceLegRef.current ||
+          (!isConferenceInvite && !isTransferLeg && autoAccept !== '0');
+
+        const clearPendingConferenceInvite = () => {
+          pendingConferenceInviteRef.current = null;
+        };
 
         const persistIncomingCallMeta = () => {
           persistActiveCallMeta(
@@ -582,6 +612,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         };
 
         if (shouldAutoAccept) {
+          clearPendingConferenceInvite();
           persistIncomingCallMeta();
           conn.accept();
           expectingReservationDeviceLegRef.current = false;
@@ -609,6 +640,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         conn.on('reject', stopRingOnEnd);
 
         conn.on('accept', () => {
+          clearPendingConferenceInvite();
           expectingReservationDeviceLegRef.current = false;
           if (!shouldAutoAccept) {
             persistIncomingCallMeta();
@@ -622,6 +654,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
         conn.on('disconnect', () => {
           console.log('Call disconnected.');
+          clearPendingConferenceInvite();
           expectingReservationDeviceLegRef.current = false;
           if (connectionSourceRef.current === 'device') {
             const liveCall = findLiveCallOnDevice(deviceRef.current);
@@ -639,6 +672,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
         conn.on('reject', () => {
           console.log('Call rejected.');
+          clearPendingConferenceInvite();
           expectingReservationDeviceLegRef.current = false;
           if (connectionSourceRef.current === 'device') {
             if (activeReservationRef.current) {

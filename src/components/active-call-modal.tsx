@@ -141,6 +141,48 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [pendingTransferCallSid, setPendingTransferCallSid] = useState<string | null>(null);
   const effectiveConferenceSid = conferenceSid || verifiedConferenceSid;
   const agentCallSid = connection?.parameters?.CallSid ?? fallbackAgentCallSid ?? null;
+
+  const resolveActionAgentCallSid = (): string | null => {
+    if (agentCallSid) {
+      return agentCallSid;
+    }
+
+    if (authUser?.id) {
+      const selfParticipant = (currentParticipants as ConferenceParticipant[]).find(
+        (participant) =>
+          participant.is_agent && Number(participant.user_id) === Number(authUser.id)
+      );
+      if (selfParticipant?.call_sid) {
+        return selfParticipant.call_sid;
+      }
+    }
+
+    return null;
+  };
+
+  const resolveCustomerHoldCallSid = (): string | null => {
+    if (customerCallSid) {
+      return customerCallSid;
+    }
+
+    const external = (currentParticipants as ConferenceParticipant[]).find(
+      (participant) => !participant.is_agent && participant.call_sid !== agentCallSid
+    );
+
+    return external?.call_sid ?? null;
+  };
+
+  const resolveTwilioNumber = (): string | null => {
+    if (connection?.parameters) {
+      if (connection.direction === 'INCOMING') {
+        return connection.parameters.To || null;
+      }
+      return localStorage.getItem('twilioFromNumber') || fromNumber || null;
+    }
+
+    return localStorage.getItem('twilioFromNumber') || fromNumber || null;
+  };
+
   const callIdentity = effectiveConferenceSid || agentCallSid || contactNumber;
   const externalParticipants = (currentParticipants as ConferenceParticipant[]).filter(
     (participant) => !participant.is_agent && participant.call_sid !== agentCallSid
@@ -507,7 +549,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     if (effectiveConferenceSid) {
       return effectiveConferenceSid;
     }
-    const callSid = connection?.parameters?.CallSid;
+    const callSid = resolveActionAgentCallSid();
     if (!callSid) {
       return null;
     }
@@ -691,15 +733,39 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const waitForTransferAnswer = async (conferenceSid: string, targetCallSid: string, maxWaitMs = 45000) => {
+  const waitForTransferAnswer = async (
+    conferenceSid: string,
+    targetCallSid: string,
+    targetUserId: string,
+    maxWaitMs = 45000
+  ) => {
     const started = Date.now();
+    let sawRinging = false;
+
     while (Date.now() - started < maxWaitMs) {
       try {
         const response = await allParticipant(conferenceSid);
         const participants = Array.isArray(response?.data) ? response.data as ConferenceParticipant[] : [];
         const target = participants.find((participant) => participant.call_sid === targetCallSid);
-        if (target && getParticipantConnectionStatus(target) === 'connected') {
-          return true;
+
+        if (target) {
+          const status = getParticipantConnectionStatus(target);
+          if (status === 'ringing' || status === 'connecting') {
+            sawRinging = true;
+          }
+
+          if (status === 'ended') {
+            return false;
+          }
+
+          if (
+            status === 'connected' &&
+            target.is_agent &&
+            Number(target.user_id) === Number(targetUserId) &&
+            (sawRinging || Date.now() - started > 3000)
+          ) {
+            return true;
+          }
         }
       } catch {
         // Keep polling until timeout.
@@ -709,8 +775,12 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     return false;
   };
 
-  const completeWarmTransfer = async (conferenceSid: string, targetCallSid: string) => {
-    const myCallSid = connection?.parameters?.CallSid;
+  const completeWarmTransfer = async (
+    conferenceSid: string,
+    targetCallSid: string,
+    targetUserId: string
+  ) => {
+    const myCallSid = resolveActionAgentCallSid();
     if (!myCallSid) {
       throw new Error('Active call session not found.');
     }
@@ -720,7 +790,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       description: 'Waiting for your colleague to join the call...',
     });
 
-    const answered = await waitForTransferAnswer(conferenceSid, targetCallSid);
+    const answered = await waitForTransferAnswer(conferenceSid, targetCallSid, targetUserId);
 
     if (answered) {
       setPendingTransferCallSid(null);
@@ -742,7 +812,11 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     setPendingTransferCallSid(null);
     setPendingOutgoing(null);
 
-    await holdParticipant(conferenceSid, myCallSid, false);
+    const customerSid = resolveCustomerHoldCallSid();
+    if (customerSid) {
+      await holdParticipant(conferenceSid, customerSid, false);
+    }
+    setIsOnHold(false);
     toast({
       title: 'Transfer failed',
       description: 'Your colleague did not answer. You are still on the call with the customer.',
@@ -765,9 +839,10 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       return;
     }
     
-    if (!connection) {
-        toast({ title: "Error", description: "Cannot add participant. Active call session not found.", variant: 'destructive' });
-        return;
+    const myCallSid = resolveActionAgentCallSid();
+    if (!myCallSid) {
+      toast({ title: "Error", description: "Cannot add participant. Active call session not found.", variant: 'destructive' });
+      return;
     }
 
     const sid = await ensureConferenceSid();
@@ -776,9 +851,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       return;
     }
 
-    const savedFromNumber = localStorage.getItem("twilioFromNumber");
-
-    const twilioNumber = connection.direction === 'INCOMING' ? connection.parameters.To : savedFromNumber;
+    const twilioNumber = resolveTwilioNumber();
 
     if (!twilioNumber) {
       toast({ title: "Error", description: "Could not determine a valid Twilio number for this call.", variant: 'destructive' });
@@ -791,14 +864,19 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
         const userId = selectedParticipant || undefined;
 
         if (isTransferring && userId) {
-          await holdParticipant(sid, connection.parameters.CallSid, true);
+          const customerHoldSid = resolveCustomerHoldCallSid();
+          if (!customerHoldSid) {
+            throw new Error('Could not find the customer on this call to place on hold.');
+          }
+
+          await holdParticipant(sid, customerHoldSid, true);
           setIsOnHold(true);
 
           const response = await addParticipant(sid, twilioNumber, userId, undefined, { transfer: true });
           const targetCallSid = response?.data?.call_sid;
 
           if (!response?.status || !targetCallSid) {
-            await holdParticipant(sid, connection.parameters.CallSid, false);
+            await holdParticipant(sid, customerHoldSid, false);
             setIsOnHold(false);
             throw new Error(response?.msg || 'Failed to reach your colleague.');
           }
@@ -816,7 +894,10 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
           setSelectedParticipant('');
           setIsTransferring(false);
 
-          await completeWarmTransfer(sid, targetCallSid);
+          void completeWarmTransfer(sid, targetCallSid, userId).catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : 'Transfer could not be completed.';
+            toast({ title: 'Transfer failed', description: message, variant: 'destructive' });
+          });
           return;
         }
         

@@ -267,6 +267,14 @@ export default function AppHeader({
                     events.emit("refreshInCallStatus", data.data);
                 }
 
+                if (
+                    data.method_type === "conference_invite_notification" &&
+                    data.task_type === "conference_invite" &&
+                    data.data
+                ) {
+                    events.emit("conferenceInvite", data.data);
+                }
+
                 if (data.method_type === "show_sms_notification" && data.data) {
                     if (audioRef.current) {
                         audioRef.current.play().catch(e =>
