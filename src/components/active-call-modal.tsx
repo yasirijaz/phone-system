@@ -736,11 +736,10 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const waitForTransferAnswer = async (
     conferenceSid: string,
     targetCallSid: string,
-    targetUserId: string,
+    _targetUserId: string,
     maxWaitMs = 45000
   ) => {
     const started = Date.now();
-    let sawRinging = false;
 
     while (Date.now() - started < maxWaitMs) {
       try {
@@ -750,27 +749,19 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
 
         if (target) {
           const status = getParticipantConnectionStatus(target);
-          if (status === 'ringing' || status === 'connecting') {
-            sawRinging = true;
-          }
 
           if (status === 'ended') {
             return false;
           }
 
-          if (
-            status === 'connected' &&
-            target.is_agent &&
-            Number(target.user_id) === Number(targetUserId) &&
-            (sawRinging || Date.now() - started > 3000)
-          ) {
+          if (status === 'connected') {
             return true;
           }
         }
       } catch {
         // Keep polling until timeout.
       }
-      await sleep(2000);
+      await sleep(1000);
     }
     return false;
   };

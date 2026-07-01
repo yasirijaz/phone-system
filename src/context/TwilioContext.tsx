@@ -581,18 +581,20 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           reservationAttrs?.from || conn.parameters?.From || conn.parameters?.To || '';
 
         const autoAccept = conn.customParameters.get('autoAccept');
-        const isTransferLeg = conn.customParameters.get('transfer') === '1';
-        const isReservationLeg =
-          expectingReservationDeviceLegRef.current || activeReservationRef.current !== null;
         const pendingInvite = pendingConferenceInviteRef.current;
         const hasPendingInvite =
           Boolean(pendingInvite) && (pendingInvite?.expires ?? 0) > Date.now();
+        const isTransferLeg =
+          conn.customParameters.get('transfer') === '1' ||
+          (hasPendingInvite && pendingInvite?.transfer === true);
+        const isReservationLeg =
+          expectingReservationDeviceLegRef.current || activeReservationRef.current !== null;
         const isConferenceInvite =
-          Boolean(incomingConferenceSid) || (hasPendingInvite && pendingInvite?.autoAccept === false);
+          Boolean(incomingConferenceSid) || hasPendingInvite || isTransferLeg;
         const shouldAutoAccept =
           isReservationLeg ||
           expectingReservationDeviceLegRef.current ||
-          (!isConferenceInvite && !isTransferLeg && autoAccept !== '0');
+          (!isConferenceInvite && (autoAccept === '1' || autoAccept === 'true'));
 
         const clearPendingConferenceInvite = () => {
           pendingConferenceInviteRef.current = null;
