@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getPhoneNumberOptionLabel } from "@/lib/utils";
+import { resolveDefaultFromNumberForDepartment } from "@/lib/phone-numbers";
 import {
   resolveOutboundContextForDepartment,
   type OutboundContext,
@@ -87,11 +88,6 @@ export default function MessagesPage() {
     }
   }, [searchParams]);
 
-  const outboundContext: OutboundContext = {
-    departmentId: selectedDepartmentId || undefined,
-    fromNumber: selectedFromNumber || undefined,
-  };
-
   useEffect(() => {
     const companyId = user?.company_id;
     if (!companyId || recipient.length < 1) {
@@ -130,7 +126,7 @@ export default function MessagesPage() {
     if (!selectedDepartmentId) return;
     const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
     if (!hasSelectedNumber) {
-      setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
+      setSelectedFromNumber(resolveDefaultFromNumberForDepartment(phoneNumbers, selectedDepartmentId));
     }
   }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
 
@@ -184,7 +180,7 @@ export default function MessagesPage() {
         <div className="flex h-full min-h-0 w-full bg-background text-foreground">
           {unusualDepartmentSmsDialog}
           <div className="flex flex-1 flex-col">
-            <AppHeader user={user} logout={logout} outboundContext={outboundContext} />
+            <AppHeader user={user} logout={logout} />
             <main className="flex-1 flex flex-col bg-muted/40">
                 <div className="p-4 border-b space-y-2">
                     <div className="grid grid-cols-2 gap-2">

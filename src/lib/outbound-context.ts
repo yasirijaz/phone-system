@@ -1,4 +1,5 @@
 import type { Communication, PhoneNumber } from '@/types';
+import { resolveDefaultPhoneNumberForDepartment } from '@/lib/phone-numbers';
 
 export type OutboundContext = {
   departmentId?: string;
@@ -18,13 +19,11 @@ export function resolveOutboundContextForDepartment(
   phoneNumbers: PhoneNumber[]
 ): OutboundContext {
   const deptId = String(departmentId);
-  const numbersForDept = phoneNumbers.filter(
-    (num) => num.department_id != null && String(num.department_id) === deptId
-  );
+  const defaultNumber = resolveDefaultPhoneNumberForDepartment(phoneNumbers, deptId);
 
   return {
     departmentId: deptId,
-    fromNumber: numbersForDept[0]?.phone_no,
+    fromNumber: defaultNumber?.phone_no,
   };
 }
 

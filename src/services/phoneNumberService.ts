@@ -86,6 +86,20 @@ export const deletePhoneNumber = async (
   }
 };
 
+export const setDefaultPhoneNumber = async (
+  id: number,
+  options?: { companyId?: number; departmentId?: number }
+): Promise<PhoneNumber> => {
+  const response = await axios.post(`/api/phone-numbers/${id}/default`);
+  if (options?.companyId) {
+    invalidateCompanyPhoneNumbersCache(options.companyId);
+  }
+  if (options?.departmentId) {
+    invalidateDepartmentPhoneNumbersCache(options.departmentId);
+  }
+  return response.data.phone_number;
+};
+
 export const getconferenceSid = async (callSid: string) => {
   const response = await axios.get(`/api/twilio/conference-sid/${callSid}`);
   return response.data;

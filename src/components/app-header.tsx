@@ -44,6 +44,7 @@ import {
     applyOutboundContextSelection,
     type OutboundContext,
 } from "@/lib/outbound-context";
+import { resolveDefaultFromNumberForDepartment } from '@/lib/phone-numbers';
 
 type AppInfo = { version?: string; updateReady?: boolean };
 
@@ -57,7 +58,6 @@ interface AppHeaderProps {
     dialerOpen?: boolean;
     onDialerOpenChange?: (open: boolean) => void;
     dialerInitialValue?: string;
-    outboundContext?: OutboundContext;
 }
 
 export default function AppHeader({ 
@@ -70,7 +70,6 @@ export default function AppHeader({
     dialerOpen: controlledDialerOpen, 
     onDialerOpenChange: setControlledDialerOpen, 
     dialerInitialValue: controlledDialerInitialValue,
-    outboundContext,
 }: AppHeaderProps) {
     const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
     const [isVideoOpen, setIsVideoOpen] = useState(false);
@@ -96,6 +95,8 @@ export default function AppHeader({
     
     const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
     const [selectedFromNumber, setSelectedFromNumber] = useState('');
+    const dialerSelectionPinnedRef = useRef(false);
+    const isMountedRef = useRef(false);
     const [messageDialogOpen, setMessageDialogOpen] = useState(false);
     const [messageDialogPayload, setMessageDialogPayload] = useState<SendMessageDialogPayload | undefined>();
 
@@ -348,7 +349,8 @@ export default function AppHeader({
     }, [user, toast, router]);
 
 
-    const applyOutboundContext = useCallback((context?: OutboundContext) => {
+    const applyOutboundContext = useCallback((context?: OutboundContext, options?: { force?: boolean }) => {
+        if (!options?.force && dialerSelectionPinnedRef.current) return;
         if (!context?.departmentId && !context?.fromNumber) return;
 
         const resolved = applyOutboundContextSelection(context, phoneNumbers);
@@ -361,35 +363,54 @@ export default function AppHeader({
     }, [phoneNumbers]);
 
     const handleDepartmentChange = useCallback((departmentId: string) => {
+        dialerSelectionPinnedRef.current = true;
         setSelectedDepartmentId(departmentId);
     }, []);
 
-    useEffect(() => {
-        applyOutboundContext(outboundContext);
-    }, [outboundContext, applyOutboundContext]);
+    const handleFromNumberChange = useCallback((fromNumber: string) => {
+        dialerSelectionPinnedRef.current = true;
+        setSelectedFromNumber(fromNumber);
+    }, []);
 
     useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        const runWhenMounted = (fn: () => void) => {
+            queueMicrotask(() => {
+                if (isMountedRef.current) fn();
+            });
+        };
+
         const handleSetOutboundContext = (context: OutboundContext) => {
-            applyOutboundContext(context);
+            runWhenMounted(() => applyOutboundContext(context));
         };
 
         const handleOpenDialer = (payload?: OutboundContext & { initialValue?: string }) => {
-            if (payload) {
-                applyOutboundContext(payload);
-            }
-            if (payload?.initialValue !== undefined) {
-                if (setControlledDialerOpen === undefined) {
-                    setInternalDialerInitialValue(payload.initialValue.replace(/^\+1/, ''));
+            runWhenMounted(() => {
+                if (payload) {
+                    applyOutboundContext(payload, { force: true });
                 }
-            } else if (setControlledDialerOpen === undefined) {
-                setInternalDialerInitialValue('');
-            }
-            setDialerOpen(true);
+                if (payload?.initialValue !== undefined) {
+                    if (setControlledDialerOpen === undefined) {
+                        setInternalDialerInitialValue(payload.initialValue.replace(/^\+1/, ''));
+                    }
+                } else if (setControlledDialerOpen === undefined) {
+                    setInternalDialerInitialValue('');
+                }
+                setDialerOpen(true);
+            });
         };
 
         const handleOpenMessageDialog = (payload?: SendMessageDialogPayload) => {
-            setMessageDialogPayload(payload);
-            setMessageDialogOpen(true);
+            runWhenMounted(() => {
+                setMessageDialogPayload(payload);
+                setMessageDialogOpen(true);
+            });
         };
 
         events.on('setOutboundContext', handleSetOutboundContext);
@@ -410,21 +431,32 @@ export default function AppHeader({
         : [];
 
     useEffect(() => {
+        if (dialerSelectionPinnedRef.current || selectedDepartmentId || !departments.length || !phoneNumbers.length) {
+            return;
+        }
+        const firstDeptId = String(departments[0].id);
+        setSelectedDepartmentId(firstDeptId);
+        setSelectedFromNumber(resolveDefaultFromNumberForDepartment(phoneNumbers, firstDeptId));
+    }, [departments, phoneNumbers, selectedDepartmentId]);
+
+    useEffect(() => {
         if (!selectedDepartmentId) {
-            setSelectedFromNumber("");
+            if (selectedFromNumber) setSelectedFromNumber('');
             return;
         }
         const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
         if (!hasSelectedNumber) {
-            setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
+            setSelectedFromNumber(resolveDefaultFromNumberForDepartment(phoneNumbers, selectedDepartmentId));
         }
-    }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
+    }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber, phoneNumbers]);
 
     useEffect(() => {
         contactsRef.current = contacts;
     }, [contacts]);
     
     useEffect(() => {
+        let cancelled = false;
+
         const fetchInitialData = async () => {
             if (!user?.company_id) return;
 
@@ -436,12 +468,18 @@ export default function AppHeader({
               companyUsers: User[];
             }>(cacheKey);
             if (cached) {
+              if (cancelled) return;
               setDepartments(cached.departments);
               setContacts(cached.contacts);
               setPhoneNumbers(cached.phoneNumbers);
               setCompanyUsers(cached.companyUsers);
               setLoadingDepartments(false);
-              void getContacts(user.company_id).then(setContacts);
+              try {
+                const freshContacts = await getContacts(user.company_id);
+                if (!cancelled) setContacts(freshContacts);
+              } catch {
+                // Keep cached contacts on refresh failure.
+              }
               return;
             }
 
@@ -457,6 +495,7 @@ export default function AppHeader({
                     getCompanyPhoneNumbers(user.company_id),
                     getUsersByCompany(user.company_id),
                 ]);
+                if (cancelled) return;
                 const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
                 const contactList = Array.isArray(fetchedContacts) ? fetchedContacts : [];
                 const numbers = Array.isArray(fetchedNumbers) ? fetchedNumbers : [];
@@ -473,13 +512,21 @@ export default function AppHeader({
                   companyUsers: users,
                 }, 60_000);
             } catch (error) {
-                toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
+                if (!cancelled) {
+                  toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
+                }
             } finally {
-                setLoadingDepartments(false);
-                setLoadingNumbers(false);
+                if (!cancelled) {
+                  setLoadingDepartments(false);
+                  setLoadingNumbers(false);
+                }
             }
         };
-        fetchInitialData();
+        void fetchInitialData();
+
+        return () => {
+            cancelled = true;
+        };
     }, [user?.id, user?.company_id, user?.role_id, toast]);
     
     const handleMakeCall = async (number: string, fromNumber?: string) => {
@@ -660,7 +707,7 @@ export default function AppHeader({
                         onOpenChange={setDialerOpen}
                         selectedDepartmentId={selectedDepartmentId}
                         selectedFromNumber={selectedFromNumber}
-                        onSetSelectedFromNumber={setSelectedFromNumber}
+                        onSetSelectedFromNumber={handleFromNumberChange}
                         contacts={contacts}
                      >
                        <Button variant="ghost" size="icon" onClick={() => { 

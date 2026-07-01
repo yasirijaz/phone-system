@@ -140,17 +140,10 @@ export default function Dialer({
           )
         : [];
 
-    useEffect(() => {
-        if (!selectedDepartmentId) {
-            onSetSelectedFromNumber("");
-            return;
-        }
-        const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
-        if (!hasSelectedNumber) {
-            onSetSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
-        }
-    }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber, onSetSelectedFromNumber]);
-    
+    const fromNumberSelectValue = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber)
+        ? selectedFromNumber
+        : '';
+
     const dialpadKeys = [
         '1', '2', '3',
         '4', '5', '6',
@@ -182,7 +175,7 @@ export default function Dialer({
                                 ))}
                             </SelectContent>
                         </Select>
-                         <Select onValueChange={onSetSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
+                         <Select onValueChange={onSetSelectedFromNumber} value={fromNumberSelectValue} disabled={loadingNumbers || !selectedDepartmentId}>
                             <SelectTrigger variant="ghost">
                                 <SelectValue placeholder={!selectedDepartmentId ? "Select department first" : loadingNumbers ? "Loading..." : "Select number"} />
                             </SelectTrigger>

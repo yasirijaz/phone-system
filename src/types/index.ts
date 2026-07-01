@@ -150,6 +150,7 @@ export interface PhoneNumber {
   phone_no: string;
   type: string;
   label: string;
+  is_default?: boolean;
   department?: Pick<Department, 'id' | 'name' | 'company_id'>;
 }
 

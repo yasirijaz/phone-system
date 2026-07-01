@@ -19,11 +19,12 @@ import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger 
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, PlusCircle, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, PlusCircle, Edit, Trash2, Star } from "lucide-react";
 import type { PhoneNumber } from "@/types";
-import { getDepartmentPhoneNumbers, createPhoneNumber, updatePhoneNumber, deletePhoneNumber } from "@/services/phoneNumberService";
+import { getDepartmentPhoneNumbers, createPhoneNumber, updatePhoneNumber, deletePhoneNumber, setDefaultPhoneNumber } from "@/services/phoneNumberService";
 import AppHeader from "@/components/app-header";
 import { formatPhoneNumber } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import {
   canViewPhoneNumbers,
   canManagePhoneNumbers,
@@ -129,7 +130,19 @@ export default function PhoneNumbersPage() {
     } catch (error) {
        toast({ title: "Error", description: "Failed to delete phone number.", variant: "destructive" });
     }
-  }
+  };
+
+  const handleSetDefault = async (phoneNumber: PhoneNumber) => {
+    if (phoneNumber.is_default) return;
+
+    try {
+      await setDefaultPhoneNumber(phoneNumber.id, { companyId, departmentId });
+      toast({ title: "Default updated", description: `${formatPhoneNumber(phoneNumber.phone_no)} is now the default for this department.` });
+      fetchPhoneNumbers();
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to set default phone number.", variant: "destructive" });
+    }
+  };
 
   const formatInputPhoneNumber = (value: string) => {
     const cleaned = value.replace(/\D/g, '');
@@ -232,7 +245,9 @@ export default function PhoneNumbersPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Department Numbers</CardTitle>
-                <CardDescription>Phone numbers assigned to this department.</CardDescription>
+                <CardDescription>
+                  Phone numbers assigned to this department. The default number is pre-selected when agents call or message from this department.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? <p>Loading...</p> : (
@@ -242,6 +257,7 @@ export default function PhoneNumbersPage() {
                         <TableHead>Number</TableHead>
                         <TableHead>Label</TableHead>
                         <TableHead>Type</TableHead>
+                        <TableHead>Default</TableHead>
                         {canManage && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
@@ -251,6 +267,23 @@ export default function PhoneNumbersPage() {
                           <TableCell className="font-medium">{formatPhoneNumber(num.phone_no)}</TableCell>
                           <TableCell>{num.label}</TableCell>
                           <TableCell>{num.type}</TableCell>
+                          <TableCell>
+                            {num.is_default ? (
+                              <Badge variant="secondary">Default</Badge>
+                            ) : canManage ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-muted-foreground"
+                                onClick={() => void handleSetDefault(num)}
+                              >
+                                <Star className="mr-1.5 h-3.5 w-3.5" />
+                                Set default
+                              </Button>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                           {canManage && (
                           <TableCell className="text-right">
                             <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(num)}><Edit className="h-4 w-4" /></Button>
@@ -268,7 +301,7 @@ export default function PhoneNumbersPage() {
                           )}
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={canManage ? 4 : 3} className="text-center h-24">No phone numbers found.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={canManage ? 5 : 4} className="text-center h-24">No phone numbers found.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>

@@ -25,6 +25,7 @@ import ContactProfile from "@/components/contact-profile";
 import { cn, formatPhoneNumber, phonesMatch, getPhoneNumberOptionLabel, isSameConversationThread } from "@/lib/utils";
 import { buildThreadContactState } from "@/lib/contact-display";
 import { canListAllCompanyDepartments } from "@/lib/roles";
+import { resolveDefaultFromNumberForDepartment } from "@/lib/phone-numbers";
 import {
     findLastUsedDepartmentId,
     resolveOutboundContextFromDepartmentId,
@@ -56,6 +57,8 @@ export default function ConversationDetailPage() {
     const chatScrollRef = useRef<HTMLElement>(null);
     const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
     const [departmentName, setDepartmentName] = useState<string | null>(null);
+    const [dialerOpen, setDialerOpen] = useState(false);
+    const [dialerInitialValue, setDialerInitialValue] = useState("");
     const { confirmIfNeeded: confirmUnusualDepartmentSms, dialog: unusualDepartmentSmsDialog } =
         useUnusualDepartmentSmsGuard(departments);
     
@@ -123,7 +126,7 @@ export default function ConversationDetailPage() {
         }
         const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
         if (!hasSelectedNumber) {
-            setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
+            setSelectedFromNumber(resolveDefaultFromNumberForDepartment(phoneNumbers, selectedDepartmentId));
         }
     }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
 
@@ -339,10 +342,6 @@ export default function ConversationDetailPage() {
     };
 
 
-    const [dialerOpen, setDialerOpen] = useState(false);
-    const [dialerInitialValue, setDialerInitialValue] = useState("");
-
-
     return (
                  <div className="flex h-[100dvh] min-h-0 w-full overflow-hidden bg-background text-foreground">
                     {unusualDepartmentSmsDialog}
@@ -351,10 +350,6 @@ export default function ConversationDetailPage() {
                             dialerOpen={dialerOpen}
                             dialerInitialValue={dialerInitialValue}
                             onDialerOpenChange={setDialerOpen}
-                            outboundContext={{
-                              departmentId: selectedDepartmentId || undefined,
-                              fromNumber: selectedFromNumber || undefined,
-                            }}
                         />
                         <div className="flex-1 flex overflow-hidden">
                                 <div className={cn("flex flex-1 min-w-0 flex-col h-full bg-background text-foreground overflow-hidden")}>

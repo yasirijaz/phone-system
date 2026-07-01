@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from 'next/navigation';
 import type { Communication, Department, PhoneNumber, User, PaginatedCommunicationsResponse, Contact, Operator } from "@/types";
 import { useAuth } from "@/context/AuthContext";
@@ -208,11 +208,6 @@ export default function DepartmentDetailPage() {
   const handleDepartmentMessageClick = () => {
     events.emit('openMessageDialog', { departmentId: String(departmentId) });
   };
-
-  const departmentOutboundContext = useMemo(
-    () => resolveOutboundContextForDepartment(departmentId, phoneNumbers),
-    [departmentId, phoneNumbers]
-  );
   
   const handleDndChange = async (checked: boolean) => {
     if (!user) return;
@@ -282,8 +277,7 @@ export default function DepartmentDetailPage() {
                     logout={logout}
                     dialerOpen={dialerOpen}
                     dialerInitialValue={dialerNumber}
-                    onDialerOpenChange={() => setDialerOpen(!dialerOpen)}
-                    outboundContext={departmentOutboundContext}
+                    onDialerOpenChange={setDialerOpen}
                   />
 
                   <main className="flex-1 p-6 overflow-y-auto">

@@ -30,6 +30,7 @@ import {
 } from '@/lib/department-selection';
 import { canListAllCompanyDepartments } from '@/lib/roles';
 import { formatPhoneNumber, getPhoneNumberOptionLabel } from '@/lib/utils';
+import { resolveDefaultFromNumberForDepartment } from '@/lib/phone-numbers';
 import {
   getPhoneCommunicationHistory,
   type CallHistoryPagination,
@@ -204,7 +205,7 @@ export default function PhoneCallHistoryPage() {
 
     const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
     if (!hasSelectedNumber) {
-      setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? '');
+      setSelectedFromNumber(resolveDefaultFromNumberForDepartment(phoneNumbers, selectedDepartmentId));
     }
   }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
 
@@ -345,10 +346,6 @@ export default function PhoneCallHistoryPage() {
           dialerOpen={dialerOpen}
           dialerInitialValue={dialerInitialValue}
           onDialerOpenChange={setDialerOpen}
-          outboundContext={{
-            departmentId: selectedDepartmentId || undefined,
-            fromNumber: selectedFromNumber || undefined,
-          }}
         />
 
         <header className="z-20 flex shrink-0 border-b bg-background/95 backdrop-blur-sm">

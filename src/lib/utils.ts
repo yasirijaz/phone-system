@@ -80,6 +80,7 @@ export function isSameConversationThread(
 type PhoneNumberLike = {
   phone_no: string;
   label?: string | null;
+  is_default?: boolean;
 };
 
 /** Primary display name for a saved company number (label, else formatted number). */
@@ -93,6 +94,7 @@ export function getPhoneNumberDisplayName(num: PhoneNumberLike): string {
 export function getPhoneNumberOptionLabel(num: PhoneNumberLike): string {
   const formatted = formatPhoneNumber(num.phone_no);
   const label = num.label?.trim();
-  if (label) return `${label} · ${formatted}`;
-  return formatted;
+  const defaultSuffix = num.is_default ? ' (Default)' : '';
+  if (label) return `${label} · ${formatted}${defaultSuffix}`;
+  return `${formatted}${defaultSuffix}`;
 }

@@ -15,6 +15,7 @@ import { sendMms } from '@/services/twilioService';
 import { searchContacts } from '@/services/contactService';
 import { getPhoneNumberOptionLabel } from '@/lib/utils';
 import { resolveOutboundContextForDepartment } from '@/lib/outbound-context';
+import { resolveDefaultFromNumberForDepartment } from '@/lib/phone-numbers';
 import { useAuth } from '@/context/AuthContext';
 
 export type SendMessageDialogPayload = {
@@ -90,7 +91,7 @@ export default function SendMessageDialog({
 
     const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
     if (!hasSelectedNumber) {
-      setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? '');
+      setSelectedFromNumber(resolveDefaultFromNumberForDepartment(phoneNumbers, selectedDepartmentId));
     }
   }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
 
