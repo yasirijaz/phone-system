@@ -334,9 +334,8 @@ function CommunicationCard({
   const renderCallBubble = (c: Communication) => {
     let title: React.ReactNode;
 
-    const isVoicemail = Boolean(c.voice_mail);
     const attendeeName = getCallAttendeeName(c, companyUsers);
-    if (attendeeName && !isVoicemail) {
+    if (attendeeName) {
         if (isMine) {
             title = <>{attendeeName} called {otherParty.displayName}</>;
         } else {

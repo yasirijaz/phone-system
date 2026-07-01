@@ -117,8 +117,7 @@ function resolveAttendeeFromFields(
   return null;
 }
 
-/** Name of the agent who handled or placed the latest call on a thread row. */
-export function getCallAttendeeName(
+function resolveCallAttendeeName(
   comm: Communication,
   companyUsers?: User[]
 ): string | null {
@@ -129,6 +128,35 @@ export function getCallAttendeeName(
   }
 
   return resolveAttendeeFromFields(comm, companyUsers);
+}
+
+export function isVoicemailCall(comm: Communication): boolean {
+  if (Boolean(comm.voice_mail)) return true;
+  const nestedLatest = getLatestCallLogFromRecord(comm);
+  return Boolean(nestedLatest?.voice_mail);
+}
+
+/** Agent names are hidden for missed, hung-up, and voicemail calls. */
+export function shouldShowCallAttendee(comm: Communication): boolean {
+  if (!isCallThread(comm)) return false;
+  if (isVoicemailCall(comm)) return false;
+  if (isFailedCallRow(comm)) return false;
+
+  const nestedLatest = getLatestCallLogFromRecord(comm);
+  if (nestedLatest) {
+    if (isVoicemailCall(nestedLatest) || isFailedCallRow(nestedLatest)) return false;
+  }
+
+  return true;
+}
+
+/** Name of the agent who handled or placed the latest call on a thread row. */
+export function getCallAttendeeName(
+  comm: Communication,
+  companyUsers?: User[]
+): string | null {
+  if (!shouldShowCallAttendee(comm)) return null;
+  return resolveCallAttendeeName(comm, companyUsers);
 }
 
 export function formatCallListingSubtitle(
@@ -164,6 +192,8 @@ export function getCallAttendeeUser(
   comm: Communication,
   companyUsers?: User[]
 ): Pick<User, 'name' | 'profile_picture' | 'id'> | null {
+  if (!shouldShowCallAttendee(comm)) return null;
+
   if (comm.user?.name) {
     return comm.user;
   }

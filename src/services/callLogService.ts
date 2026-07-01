@@ -10,6 +10,7 @@ import {
   getCallAttendeeName,
   getThreadEndpoints,
   isCallThread,
+  shouldShowCallAttendee,
 } from '@/lib/call-attendee';
 import { cacheGet, cacheSet, cacheDel } from '@/lib/simpleCache';
 
@@ -123,7 +124,10 @@ export async function enrichThreadsWithLastAttendee(
   if (!threads.length) return threads;
 
   const needsEnrichment = threads.filter(
-    (thread) => isCallThread(thread) && !getCallAttendeeName(thread, companyUsers)
+    (thread) =>
+      isCallThread(thread) &&
+      shouldShowCallAttendee(thread) &&
+      !getCallAttendeeName(thread, companyUsers)
   );
   if (!needsEnrichment.length) return threads;
 
