@@ -292,8 +292,15 @@ function CommunicationCard({
     : {};
 
   const wrapSelectableBubble = (node: React.ReactNode) => {
-    if (!onCommunicationSelect || isClickable) return node;
-    return <div {...selectableBubbleProps}>{node}</div>;
+    const wrapperClass = 'min-w-0 max-w-full';
+    if (!onCommunicationSelect || isClickable) {
+      return <div className={wrapperClass}>{node}</div>;
+    }
+    return (
+      <div {...selectableBubbleProps} className={cn(selectableBubbleProps.className, wrapperClass)}>
+        {node}
+      </div>
+    );
   };
 
   const renderMessageBubble = (c: Communication) => {
@@ -305,7 +312,7 @@ function CommunicationCard({
 
     return (
         <div className={cn(
-            "p-3 group relative space-y-2",
+            "p-3 group relative space-y-2 min-w-0 w-full max-w-full overflow-hidden box-border",
             isUnreadSms
             ? "bg-red-100 border border-red-200"
             : isMine ? "bg-primary text-primary-foreground" : "bg-muted",
@@ -319,7 +326,11 @@ function CommunicationCard({
                 {mediaUrls.map((url, index) => renderMediaAttachment(url, contentTypes[index]))}
               </div>
             )}
-            {showBody && <p className="text-sm whitespace-pre-wrap break-words">{c.body}</p>}
+            {showBody && (
+              <p className="text-sm whitespace-pre-wrap break-all min-w-0 w-full [overflow-wrap:anywhere]">
+                {c.body}
+              </p>
+            )}
             <div className={cn(
                 "text-xs opacity-0 group-hover:opacity-100 transition-opacity",
                 isMine ? "text-primary-foreground/70" : "text-muted-foreground/70"
@@ -593,7 +604,7 @@ function CommunicationCard({
     }
 
     return (
-        <div ref={cardRef} data-is-read={isRead ? '1' : '0'} className={cn("flex items-start gap-3", isMine ? "justify-end" : "justify-start", !isFirstInGroup && "py-0.5", isFirstInGroup && "pt-2")}>
+        <div ref={cardRef} data-is-read={isRead ? '1' : '0'} className={cn("flex w-full min-w-0 items-start gap-3", isMine ? "justify-end" : "justify-start", !isFirstInGroup && "py-0.5", isFirstInGroup && "pt-2")}>
             {showAvatar && (
                 <Avatar className="h-8 w-8">
                     <AvatarFallback>
@@ -603,7 +614,7 @@ function CommunicationCard({
             )}
             {!showAvatar && !isMine && <div className="w-8" />}
 
-            <div className={cn("flex flex-col gap-1 w-full max-w-[75%]", isMine ? 'items-end' : 'items-start')}>
+            <div className={cn("flex min-w-0 max-w-[75%] flex-col gap-1", isMine ? 'items-end' : 'items-start')}>
                 {isFirstInGroup && comm.created_at && (
                     <div className={cn("px-1", isMine ? "text-right" : "text-left")}>
                       <p className="text-xs font-semibold text-muted-foreground">{contactName}</p>
@@ -615,7 +626,7 @@ function CommunicationCard({
                       )}
                     </div>
                 )}
-                <div className={cn("flex items-center gap-2", isMine ? 'flex-row-reverse' : 'flex-row')}>
+                <div className={cn("flex min-w-0 max-w-full items-start gap-2", isMine ? 'flex-row-reverse' : 'flex-row')}>
                     {wrapSelectableBubble(
                       comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)
                     )}
@@ -623,7 +634,7 @@ function CommunicationCard({
                         variant="ghost"
                         size="icon"
                         type="button"
-                        className="h-7 w-7"
+                        className="h-7 w-7 shrink-0"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleToggleStar(); }}
                         disabled={isTogglingStar}
                         aria-label={comm.is_starred ? 'Unstar' : 'Star'}
@@ -717,7 +728,7 @@ export default function CallLog({
     }, {} as Record<string, Communication[]>);
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="min-w-0 overflow-x-hidden p-4 space-y-4">
       {Object.entries(groupedByDay).map(([date, commsForDay]) => (
         <div key={date}>
             <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm flex items-center justify-center my-2">

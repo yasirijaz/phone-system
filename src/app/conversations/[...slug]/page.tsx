@@ -381,7 +381,7 @@ export default function ConversationDetailPage() {
                                             {isProfileSidebarOpen ? <PanelRightClose /> : <User />}
                                         </Button>
                                     </header>
-                                    <main ref={chatScrollRef} className="flex-1 overflow-y-auto overscroll-contain">
+                                    <main ref={chatScrollRef} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
                                     {loading ? <p className="p-4">Loading...</p> : (
                                       <CallLog
                                         calls={allComms}
@@ -393,7 +393,7 @@ export default function ConversationDetailPage() {
                                     )}
                                     <div ref={messagesEndRef} />
                                     </main>
-                                    <footer className="flex-shrink-0 p-4 border-t bg-background space-y-2">
+                                    <footer className="flex-shrink-0 min-w-0 border-t bg-background p-4 space-y-2">
                                         <div className="grid grid-cols-2 gap-2">
                                             <Select onValueChange={handleDepartmentChange} value={selectedDepartmentId} disabled={loadingDepartments}>
                                                 <SelectTrigger>
