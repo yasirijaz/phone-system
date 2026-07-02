@@ -14,6 +14,7 @@ import { Textarea } from './ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from './ui/scroll-area';
 import { getPhoneNumberOptionLabel } from '@/lib/utils';
+import { resolveDefaultFromNumberForDepartment } from '@/lib/phone-numbers';
 
 
 interface NewMessageFormProps {
@@ -73,10 +74,7 @@ export default function NewMessageForm({
     useEffect(() => {
         if (watchedDepartmentId && watchedDepartmentId !== selectedDepartmentId) {
             onDepartmentChange(watchedDepartmentId);
-            const numbersForDepartment = phoneNumbers.filter(
-                (num) => num.department_id != null && String(num.department_id) === watchedDepartmentId
-            );
-            const nextNumber = numbersForDepartment[0]?.phone_no ?? "";
+            const nextNumber = resolveDefaultFromNumberForDepartment(phoneNumbers, watchedDepartmentId);
             form.setValue("fromNumber", nextNumber);
             onSetSelectedFromNumber(nextNumber);
         }

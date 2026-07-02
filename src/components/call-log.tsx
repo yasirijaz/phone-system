@@ -1,6 +1,6 @@
 
 
-import type { Communication, Contact, User as AppUser } from '@/types';
+import type { Communication, Contact, User as AppUser, PhoneNumber } from '@/types';
 import { PhoneIncoming, PhoneOutgoing, Phone as PhoneIcon, Ear, Mic, Info, Loader2, MessageSquare, Video, Share2, ExternalLink, MoreHorizontal, ArrowUpRight, ChevronDown, User as UserIcon, Star, FileText } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import Link from 'next/link';
@@ -40,6 +40,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import AudioPlayer from './AudioPlayer';
 import { getTranscriptionForAudio } from '@/app/actions';
 import { saveTranscription } from '@/services/callLogService';
+import {
+  resolveOutboundContextFromCommunication,
+  type OutboundContext,
+} from '@/lib/outbound-context';
 
 function parseRecordingDurationSeconds(
   ...values: (string | undefined | null)[]
@@ -58,8 +62,11 @@ interface CallLogProps {
   calls: Communication[];
   contacts?: Contact[];
   companyUsers?: AppUser[];
-  onMakeCall: (number: string) => void;
+  phoneNumbers?: PhoneNumber[];
+  fallbackDepartmentId?: string;
+  onMakeCall: (number: string, context?: OutboundContext) => void;
   isClickable?: boolean;
+  onCommunicationSelect?: (comm: Communication) => void;
   source?: string;
   highlightFailedCalls?: boolean;
 }
@@ -68,8 +75,11 @@ function CommunicationCard({
     comm, 
     contacts,
     companyUsers,
+    phoneNumbers,
+    fallbackDepartmentId,
     onMakeCall, 
-    isClickable, 
+    isClickable,
+    onCommunicationSelect,
     source,
     highlightFailedCalls,
     isFirstInGroup,
@@ -79,8 +89,11 @@ function CommunicationCard({
     comm: Communication, 
     contacts?: Contact[],
     companyUsers?: AppUser[],
-    onMakeCall: (number: string) => void, 
-    isClickable: boolean, 
+    phoneNumbers?: PhoneNumber[],
+    fallbackDepartmentId?: string,
+    onMakeCall: (number: string, context?: OutboundContext) => void, 
+    isClickable: boolean,
+    onCommunicationSelect?: (comm: Communication) => void,
     source?: string,
     highlightFailedCalls?: boolean,
     isFirstInGroup: boolean,
@@ -260,6 +273,36 @@ function CommunicationCard({
     );
   };
 
+  const handleCommunicationActivate = () => {
+    onCommunicationSelect?.(comm);
+  };
+
+  const selectableBubbleProps = onCommunicationSelect && !isClickable
+    ? {
+        role: 'button' as const,
+        tabIndex: 0,
+        onClick: handleCommunicationActivate,
+        onKeyDown: (event: React.KeyboardEvent) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          handleCommunicationActivate();
+        },
+        className: 'cursor-pointer transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+      }
+    : {};
+
+  const wrapSelectableBubble = (node: React.ReactNode) => {
+    const wrapperClass = 'min-w-0 max-w-full';
+    if (!onCommunicationSelect || isClickable) {
+      return <div className={wrapperClass}>{node}</div>;
+    }
+    return (
+      <div {...selectableBubbleProps} className={cn(selectableBubbleProps.className, wrapperClass)}>
+        {node}
+      </div>
+    );
+  };
+
   const renderMessageBubble = (c: Communication) => {
     const time = c.created_at ? format(parseISO(c.created_at), 'p') : '';
     const mediaUrls = getCommunicationMediaUrls(c);
@@ -269,7 +312,7 @@ function CommunicationCard({
 
     return (
         <div className={cn(
-            "p-3 group relative space-y-2",
+            "p-3 group relative space-y-2 min-w-0 w-full max-w-full overflow-hidden box-border",
             isUnreadSms
             ? "bg-red-100 border border-red-200"
             : isMine ? "bg-primary text-primary-foreground" : "bg-muted",
@@ -283,7 +326,11 @@ function CommunicationCard({
                 {mediaUrls.map((url, index) => renderMediaAttachment(url, contentTypes[index]))}
               </div>
             )}
-            {showBody && <p className="text-sm whitespace-pre-wrap break-words">{c.body}</p>}
+            {showBody && (
+              <p className="text-sm whitespace-pre-wrap break-all min-w-0 w-full [overflow-wrap:anywhere]">
+                {c.body}
+              </p>
+            )}
             <div className={cn(
                 "text-xs opacity-0 group-hover:opacity-100 transition-opacity",
                 isMine ? "text-primary-foreground/70" : "text-muted-foreground/70"
@@ -298,9 +345,8 @@ function CommunicationCard({
   const renderCallBubble = (c: Communication) => {
     let title: React.ReactNode;
 
-    const isVoicemail = Boolean(c.voice_mail);
     const attendeeName = getCallAttendeeName(c, companyUsers);
-    if (attendeeName && !isVoicemail) {
+    if (attendeeName) {
         if (isMine) {
             title = <>{attendeeName} called {otherParty.displayName}</>;
         } else {
@@ -323,8 +369,13 @@ function CommunicationCard({
             <Icon className={cn("h-5 w-5 mt-1", (isMissed || isHungUp) ? "text-destructive" : "text-muted-foreground")} />
             <div className="flex-1 flex items-center justify-between text-sm space-y-1">
                 <div className="flex-1">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                         <p className="font-semibold">{title}</p>
+                        {comm.department?.name && (
+                          <Badge variant="secondary" className="shrink-0 text-[10px] font-normal">
+                            {comm.department.name}
+                          </Badge>
+                        )}
                     </div>
                      {isInProgress ? (
                         <p className="flex items-center gap-2 text-xs text-green-600 font-semibold">
@@ -536,7 +587,14 @@ function CommunicationCard({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onMakeCall(mainPageContactNumber)}>
+                        <DropdownMenuItem onClick={() => {
+                            const context = phoneNumbers?.length
+                              ? resolveOutboundContextFromCommunication(comm, phoneNumbers, fallbackDepartmentId)
+                              : fallbackDepartmentId
+                                ? { departmentId: fallbackDepartmentId }
+                                : undefined;
+                            onMakeCall(mainPageContactNumber, context);
+                        }}>
                             Call {formatPhoneNumber(mainPageContactNumber)}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -546,7 +604,7 @@ function CommunicationCard({
     }
 
     return (
-        <div ref={cardRef} data-is-read={isRead ? '1' : '0'} className={cn("flex items-start gap-3", isMine ? "justify-end" : "justify-start", !isFirstInGroup && "py-0.5", isFirstInGroup && "pt-2")}>
+        <div ref={cardRef} data-is-read={isRead ? '1' : '0'} className={cn("flex w-full min-w-0 items-start gap-3", isMine ? "justify-end" : "justify-start", !isFirstInGroup && "py-0.5", isFirstInGroup && "pt-2")}>
             {showAvatar && (
                 <Avatar className="h-8 w-8">
                     <AvatarFallback>
@@ -556,22 +614,27 @@ function CommunicationCard({
             )}
             {!showAvatar && !isMine && <div className="w-8" />}
 
-            <div className={cn("flex flex-col gap-1 w-full max-w-[75%]", isMine ? 'items-end' : 'items-start')}>
+            <div className={cn("flex min-w-0 max-w-[75%] flex-col gap-1", isMine ? 'items-end' : 'items-start')}>
                 {isFirstInGroup && comm.created_at && (
                     <div className={cn("px-1", isMine ? "text-right" : "text-left")}>
                       <p className="text-xs font-semibold text-muted-foreground">{contactName}</p>
+                      {comm.department?.name && (
+                        <p className="text-[11px] font-medium text-muted-foreground/80">{comm.department.name}</p>
+                      )}
                       {!isMine && otherParty.sublabel && (
                         <p className="text-[11px] text-muted-foreground/80">{otherParty.sublabel}</p>
                       )}
                     </div>
                 )}
-                <div className={cn("flex items-center gap-2", isMine ? 'flex-row-reverse' : 'flex-row')}>
-                    {comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)}
+                <div className={cn("flex min-w-0 max-w-full items-start gap-2", isMine ? 'flex-row-reverse' : 'flex-row')}>
+                    {wrapSelectableBubble(
+                      comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)
+                    )}
                     <Button
                         variant="ghost"
                         size="icon"
                         type="button"
-                        className="h-7 w-7"
+                        className="h-7 w-7 shrink-0"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleToggleStar(); }}
                         disabled={isTogglingStar}
                         aria-label={comm.is_starred ? 'Unstar' : 'Star'}
@@ -597,8 +660,11 @@ export default function CallLog({
   calls: communications,
   contacts,
   companyUsers,
+  phoneNumbers,
+  fallbackDepartmentId,
   onMakeCall,
   isClickable = true,
+  onCommunicationSelect,
   source,
   highlightFailedCalls = false,
 }: CallLogProps) {
@@ -632,9 +698,12 @@ export default function CallLog({
                         comm={comm}
                         contacts={contacts}
                         companyUsers={companyUsers}
+                        phoneNumbers={phoneNumbers}
+                        fallbackDepartmentId={fallbackDepartmentId}
                         key={stableKey}
                         onMakeCall={onMakeCall}
                         isClickable={isClickable}
+                        onCommunicationSelect={onCommunicationSelect}
                         source={source}
                         highlightFailedCalls={highlightFailedCalls}
                         isFirstInGroup={true}
@@ -659,7 +728,7 @@ export default function CallLog({
     }, {} as Record<string, Communication[]>);
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="min-w-0 overflow-x-hidden p-4 space-y-4">
       {Object.entries(groupedByDay).map(([date, commsForDay]) => (
         <div key={date}>
             <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm flex items-center justify-center my-2">
@@ -690,9 +759,12 @@ export default function CallLog({
                             comm={comm} 
                             contacts={contacts}
                             companyUsers={companyUsers}
+                            phoneNumbers={phoneNumbers}
+                            fallbackDepartmentId={fallbackDepartmentId}
                             key={stableKey} 
                             onMakeCall={onMakeCall} 
-                            isClickable={isClickable} 
+                            isClickable={isClickable}
+                            onCommunicationSelect={onCommunicationSelect}
                             source={source}
                             isFirstInGroup={isFirstInGroup}
                             isLastInGroup={isLastInGroup}

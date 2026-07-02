@@ -10,6 +10,7 @@ import {
   getCallAttendeeName,
   getThreadEndpoints,
   isCallThread,
+  shouldShowCallAttendee,
 } from '@/lib/call-attendee';
 import { cacheGet, cacheSet, cacheDel } from '@/lib/simpleCache';
 
@@ -123,7 +124,10 @@ export async function enrichThreadsWithLastAttendee(
   if (!threads.length) return threads;
 
   const needsEnrichment = threads.filter(
-    (thread) => isCallThread(thread) && !getCallAttendeeName(thread, companyUsers)
+    (thread) =>
+      isCallThread(thread) &&
+      shouldShowCallAttendee(thread) &&
+      !getCallAttendeeName(thread, companyUsers)
   );
   if (!needsEnrichment.length) return threads;
 
@@ -184,6 +188,14 @@ export const getActiveCall = async (): Promise<Communication | null> => {
   } catch (error) {
     console.error('Error fetching active call:', error);
     return null;
+  }
+};
+
+export const dismissActiveCall = async (): Promise<void> => {
+  try {
+    await axios.post('/api/call-logs/active/dismiss');
+  } catch (error) {
+    console.warn('Failed to dismiss active call session:', error);
   }
 };
 
@@ -319,12 +331,49 @@ export type UserCallActivityDetails = {
   summary: CallHistorySummary;
 };
 
+export type PhoneCommunicationEntry = {
+  id: number;
+  type: 'call' | 'sms';
+  from: string;
+  to: string;
+  direction: 'inbound' | 'outbound';
+  body?: string | null;
+  call_status?: string | null;
+  call_duration?: string | null;
+  status?: string | null;
+  created_at: string;
+  user?: { id: number; name: string; email: string } | null;
+  department?: { id: number; name: string } | null;
+  call_sid?: string | null;
+  recording_url?: string | null;
+  voice_mail?: string | null;
+  meta_data?: Record<string, unknown> | null;
+  is_read?: boolean | number | null;
+  is_starred?: boolean | number | null;
+};
+
+export type PhoneCommunicationDetails = {
+  phone_number: string;
+  communications: PhoneCommunicationEntry[];
+  total_communications: number;
+  total_calls: number;
+  total_sms: number;
+  pagination: CallHistoryPagination;
+  summary: CallHistorySummary;
+};
+
+export type CommunicationTypeFilter = 'all' | 'call' | 'sms';
+
 type CallHistoryQuery = {
   page?: number;
   perPage?: number;
   departmentId?: number;
   direction?: CallHistoryDirectionFilter;
   status?: CallHistoryStatusFilter;
+};
+
+type PhoneCommunicationQuery = CallHistoryQuery & {
+  communicationType?: CommunicationTypeFilter;
 };
 
 function mapCallHistoryPagination(
@@ -409,6 +458,53 @@ export const getPhoneCallHistory = async (
 
 /** @deprecated Use getPhoneCallHistory */
 export const getPhoneActivityDetails = getPhoneCallHistory;
+
+export const getPhoneCommunicationHistory = async (
+  phoneNumber: string,
+  {
+    page = 1,
+    perPage = 10,
+    departmentId,
+    direction = 'all',
+    status = 'all',
+    communicationType = 'all',
+  }: PhoneCommunicationQuery = {}
+): Promise<PhoneCommunicationDetails> => {
+  const response = await axios.post('/api/communications/phone-details', {
+    phone_number: phoneNumber,
+    calls_only: false,
+    communication_type: communicationType,
+    page,
+    per_page: perPage,
+    call_direction: direction,
+    call_status: status,
+    ...(departmentId ? { department_id: departmentId } : {}),
+  });
+  const data = response.data;
+  const communications = Array.isArray(data.communications) ? data.communications : [];
+  const perPageValue = Number(data.per_page ?? perPage);
+  const currentPage = Number(data.current_page ?? page);
+  const totalRecords = Number(data.total_communications ?? communications.length);
+  let totalPages = Number(data.total_pages);
+  if (!Number.isFinite(totalPages) || totalPages < 1) {
+    totalPages = Math.max(1, Math.ceil(totalRecords / perPageValue));
+  }
+
+  return {
+    phone_number: data.phone_number ?? phoneNumber,
+    communications,
+    total_communications: totalRecords,
+    total_calls: Number(data.total_calls ?? 0),
+    total_sms: Number(data.total_sms ?? 0),
+    pagination: {
+      currentPage,
+      totalPages,
+      totalRecords,
+      perPage: perPageValue,
+    },
+    summary: mapCallHistorySummary(data),
+  };
+};
 
 export const getUserCallHistory = async (
   userId: number,

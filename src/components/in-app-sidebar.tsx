@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react';
 import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup, SidebarGroupLabel } from '@/components/ui/sidebar';
-import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, BellOff } from 'lucide-react';
+import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, BellOff, Phone } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -20,6 +20,7 @@ import { getContacts } from '@/services/contactService';
 import { debounce } from '@/lib/utils';
 import { getOtherPartyDisplay } from '@/lib/contact-display';
 import { cacheGet, cacheSet } from '@/lib/simpleCache';
+import { Button } from './ui/button';
 
 interface DepartmentWithUnread extends Department {
     unread_count: number;
@@ -49,6 +50,18 @@ export function InAppSidebar() {
   const initialLoadRef = useRef<Promise<void> | null>(null);
   const unreadRefreshRef = useRef<Promise<void> | null>(null);
   const departmentsRef = useRef<DepartmentWithUnread[]>([]);
+
+  const handleDepartmentCallClick = (departmentId: number, event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    events.emit('openDialer', { departmentId: String(departmentId) });
+  };
+
+  const handleDepartmentMessageClick = (departmentId: number, event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    events.emit('openMessageDialog', { departmentId: String(departmentId) });
+  };
 
   useEffect(() => {
     departmentsRef.current = departments;
@@ -346,17 +359,39 @@ export function InAppSidebar() {
                     </SidebarMenuItem>
                 ) : departments.length > 0 ? (
                     departments.map((dept) => (
-                        <SidebarMenuItem key={dept.id}>
+                        <SidebarMenuItem key={dept.id} className="group/dept">
                             <SidebarMenuButton asChild isActive={pathname === `/departments/${dept.id}`}>
-                                <Link href={`/departments/${dept.id}`} className="flex justify-between items-center w-full">
-                                    <div className="flex items-center gap-2">
-                                        <Building className="h-4 w-4" />
+                                <Link href={`/departments/${dept.id}`} className="flex justify-between items-center w-full gap-2">
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <Building className="h-4 w-4 shrink-0" />
                                         <span className="truncate flex-1">{dept.name}</span>
-                                        {dept.is_dnd ? <BellOff className="h-3 w-3 text-amber-600" /> : ''}
+                                        {dept.is_dnd ? <BellOff className="h-3 w-3 text-amber-600 shrink-0" /> : ''}
                                     </div>
-                                    {dept.unread_count > 0 && (
-                                        <Badge className="h-5">{dept.unread_count}</Badge>
-                                    )}
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {dept.unread_count > 0 && (
+                                          <Badge className="h-5">{dept.unread_count}</Badge>
+                                      )}
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 opacity-0 group-hover/dept:opacity-100 focus-visible:opacity-100"
+                                        aria-label={`Call from ${dept.name}`}
+                                        onClick={(event) => handleDepartmentCallClick(dept.id, event)}
+                                      >
+                                        <Phone className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 opacity-0 group-hover/dept:opacity-100 focus-visible:opacity-100"
+                                        aria-label={`Message from ${dept.name}`}
+                                        onClick={(event) => handleDepartmentMessageClick(dept.id, event)}
+                                      >
+                                        <MessageSquare className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
                                 </Link>
                             </SidebarMenuButton>
                         </SidebarMenuItem>

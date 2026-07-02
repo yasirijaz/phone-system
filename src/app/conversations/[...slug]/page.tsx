@@ -13,6 +13,7 @@ import MessageComposer from "@/components/message-composer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTwilio } from "@/context/TwilioContext";
 import { useToast } from "@/hooks/use-toast";
+import { useUnusualDepartmentSmsGuard } from "@/hooks/use-unusual-department-sms-guard";
 import AppHeader from "@/components/app-header";
 import { getDepartments } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
@@ -24,6 +25,12 @@ import ContactProfile from "@/components/contact-profile";
 import { cn, formatPhoneNumber, phonesMatch, getPhoneNumberOptionLabel, isSameConversationThread } from "@/lib/utils";
 import { buildThreadContactState } from "@/lib/contact-display";
 import { canListAllCompanyDepartments } from "@/lib/roles";
+import { resolveDefaultFromNumberForDepartment } from "@/lib/phone-numbers";
+import {
+    findLastUsedDepartmentId,
+    resolveOutboundContextFromDepartmentId,
+} from "@/lib/department-selection";
+import type { OutboundContext } from "@/lib/outbound-context";
 
 export default function ConversationDetailPage() {
     const params = useParams();
@@ -50,6 +57,10 @@ export default function ConversationDetailPage() {
     const chatScrollRef = useRef<HTMLElement>(null);
     const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
     const [departmentName, setDepartmentName] = useState<string | null>(null);
+    const [dialerOpen, setDialerOpen] = useState(false);
+    const [dialerInitialValue, setDialerInitialValue] = useState("");
+    const { confirmIfNeeded: confirmUnusualDepartmentSms, dialog: unusualDepartmentSmsDialog } =
+        useUnusualDepartmentSmsGuard(departments);
     
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from, to] = slug.map(part => decodeURIComponent(part));
@@ -106,13 +117,16 @@ export default function ConversationDetailPage() {
         ? phoneNumbers.filter(
             (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId
           )
-        : phoneNumbers;
+        : [];
 
     useEffect(() => {
-        if (!selectedDepartmentId) return;
+        if (!selectedDepartmentId) {
+            setSelectedFromNumber("");
+            return;
+        }
         const hasSelectedNumber = filteredPhoneNumbers.some((num) => num.phone_no === selectedFromNumber);
         if (!hasSelectedNumber) {
-            setSelectedFromNumber(filteredPhoneNumbers[0]?.phone_no ?? "");
+            setSelectedFromNumber(resolveDefaultFromNumberForDepartment(phoneNumbers, selectedDepartmentId));
         }
     }, [selectedDepartmentId, filteredPhoneNumbers, selectedFromNumber]);
 
@@ -203,18 +217,20 @@ export default function ConversationDetailPage() {
                 // Determine and set the correct department and from number
                 let resolvedDeptId: string | null = numberToDeptIdMap[ourNumber] ?? null;
 
-                if (!resolvedDeptId && depts.length > 0) {
-                    resolvedDeptId = String(depts[0].id); // fallback
+                if (!resolvedDeptId && sortedLogs.length > 0) {
+                    resolvedDeptId = findLastUsedDepartmentId(sortedLogs);
                 }
 
                 if (resolvedDeptId) {
-                    setSelectedDepartmentId(resolvedDeptId);
-                }
-
-                if (numbers.some((n) => n.phone_no === ourNumber)) {
+                    const context = resolveOutboundContextFromDepartmentId(resolvedDeptId, numbers);
+                    setSelectedDepartmentId(context.departmentId ?? resolvedDeptId);
+                    if (context.fromNumber) {
+                        setSelectedFromNumber(context.fromNumber);
+                    } else if (numbers.some((n) => n.phone_no === ourNumber)) {
+                        setSelectedFromNumber(ourNumber);
+                    }
+                } else if (numbers.some((n) => n.phone_no === ourNumber)) {
                     setSelectedFromNumber(ourNumber);
-                } else if (numbers.length > 0) {
-                    setSelectedFromNumber(numbers[0].phone_no);
                 }
 
 
@@ -265,16 +281,29 @@ export default function ConversationDetailPage() {
     }, [allComms, loading]);
 
 
-    const handleMakeCall = async (number: string) => {
+    const handleMakeCall = async (number: string, context?: OutboundContext) => {
         if (!device || !isDeviceReady) {
             toast({ title: "Twilio Error", description: "Twilio Device not ready.", variant: 'destructive'});
             return;
         }
-        console.log("Request to call from conversation detail:", number);
+
+        const outboundContext = context ?? {
+            departmentId: selectedDepartmentId || undefined,
+            fromNumber: selectedFromNumber || undefined,
+        };
+        if (outboundContext.departmentId || outboundContext.fromNumber) {
+            events.emit('setOutboundContext', outboundContext);
+        }
+        setDialerInitialValue(number.replace(/^\+1/, ""));
+        setDialerOpen(true);
     };
 
     const handleSendMessage = async ({ body, mediaFiles }: { body: string; mediaFiles: File[] }) => {
         const recipient = contact?.phone_no;
+        if (!selectedDepartmentId) {
+            toast({ title: "Select a department", description: "Choose which department this message should be sent from.", variant: "destructive" });
+            return;
+        }
         if (!selectedFromNumber) {
             toast({ title: "Error", description: "Please select a 'from' number.", variant: "destructive" });
             return;
@@ -287,6 +316,14 @@ export default function ConversationDetailPage() {
             toast({ title: "Error", description: "Add a message or media attachment to send.", variant: "destructive" });
             return;
         }
+
+        const confirmed = await confirmUnusualDepartmentSms({
+            recipientPhone: recipient,
+            selectedDepartmentId,
+            communications: allComms,
+        });
+        if (!confirmed) return;
+
         setIsSending(true);
         try {
             await sendMms(
@@ -305,30 +342,14 @@ export default function ConversationDetailPage() {
     };
 
 
-    const [dialerOpen, setDialerOpen] = useState(false);
-    const [dialerInitialValue, setDialerInitialValue] = useState("");
-
-    const handleMakeCallDialer = (number: string) => {
-        if (!device) {
-        toast({
-            title: "Twilio Error",
-            description: "Twilio Device not ready.",
-            variant: "destructive",
-        });
-        return;
-        }
-
-        setDialerInitialValue(number.replace(/^\+1/, ""));
-        setDialerOpen(true);
-    };
-
     return (
                  <div className="flex h-[100dvh] min-h-0 w-full overflow-hidden bg-background text-foreground">
+                    {unusualDepartmentSmsDialog}
                     <div className="flex-1 flex flex-col">
                         <AppHeader user={user} logout={logout} 
                             dialerOpen={dialerOpen}
                             dialerInitialValue={dialerInitialValue}
-                            onDialerOpenChange={() => setDialerOpen(!dialerOpen)}
+                            onDialerOpenChange={setDialerOpen}
                         />
                         <div className="flex-1 flex overflow-hidden">
                                 <div className={cn("flex flex-1 min-w-0 flex-col h-full bg-background text-foreground overflow-hidden")}>
@@ -342,7 +363,8 @@ export default function ConversationDetailPage() {
                                                 size="icon"
                                                 title="Call Now"
                                                 className="text-left"
-                                                onClick={() => handleMakeCallDialer(contact.phone_no)}
+                                                disabled={loading || !contact?.phone_no}
+                                                onClick={() => contact?.phone_no && handleMakeCall(contact.phone_no)}
                                             >
                                                 <Phone className="h-4 w-4" />
                                             </Button>
@@ -359,15 +381,23 @@ export default function ConversationDetailPage() {
                                             {isProfileSidebarOpen ? <PanelRightClose /> : <User />}
                                         </Button>
                                     </header>
-                                    <main ref={chatScrollRef} className="flex-1 overflow-y-auto overscroll-contain">
-                                    {loading ? <p className="p-4">Loading...</p> : <CallLog calls={allComms} contacts={contacts} onMakeCall={handleMakeCall} isClickable={false} />}
+                                    <main ref={chatScrollRef} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+                                    {loading ? <p className="p-4">Loading...</p> : (
+                                      <CallLog
+                                        calls={allComms}
+                                        contacts={contacts}
+                                        phoneNumbers={phoneNumbers}
+                                        onMakeCall={handleMakeCall}
+                                        isClickable={false}
+                                      />
+                                    )}
                                     <div ref={messagesEndRef} />
                                     </main>
-                                    <footer className="flex-shrink-0 p-4 border-t bg-background space-y-2">
+                                    <footer className="flex-shrink-0 min-w-0 border-t bg-background p-4 space-y-2">
                                         <div className="grid grid-cols-2 gap-2">
                                             <Select onValueChange={handleDepartmentChange} value={selectedDepartmentId} disabled={loadingDepartments}>
                                                 <SelectTrigger>
-                                                    <SelectValue placeholder="Select Department" />
+                                                    <SelectValue placeholder="Select department" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {departments.map((dept) => (
@@ -377,9 +407,9 @@ export default function ConversationDetailPage() {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers}>
+                                            <Select onValueChange={setSelectedFromNumber} value={selectedFromNumber} disabled={loadingNumbers || !selectedDepartmentId}>
                                                 <SelectTrigger>
-                                                    <SelectValue placeholder="Select Number" />
+                                                    <SelectValue placeholder={selectedDepartmentId ? "Select number" : "Select department first"} />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {filteredPhoneNumbers.map((num) => (

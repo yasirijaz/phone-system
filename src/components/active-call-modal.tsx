@@ -1,14 +1,15 @@
 
 'use client';
 
-import { useState, useEffect, useRef, type PointerEvent } from 'react';
+import { useState, useEffect, useRef, useMemo, type PointerEvent } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, PhoneForwarded, Users, Trash2, Delete, ChevronDown, ChevronUp, Phone, ArrowLeftRight, GitMerge, PhoneCall, X } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, Users, Trash2, Delete, ChevronDown, ChevronUp, Phone, ArrowLeftRight, GitMerge, PhoneCall, X, Search } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
-import type { User, Contact, DepartmentSettings, CompanySettings } from '@/types';
+import type { User, Contact, DepartmentSettings, CompanySettings, Operator } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { getUsersByCompany } from '@/services/userService';
 import { getContacts } from '@/services/contactService';
+import { getOperators } from '@/services/departmentService';
+import { getUsersByCompany } from '@/services/userService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useTwilio } from '@/context/TwilioContext';
@@ -22,7 +23,11 @@ import { getCompanySettings } from '@/services/companySettingsService';
 import { getCallLogsBySid } from '@/services/callLogService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { ScrollArea } from './ui/scroll-area';
 import { getconferenceSid } from '@/services/phoneNumberService';
+import { events } from '@/lib/events';
+import { getWorkerStatusBadgeVariant, parseWorkerStatusPayload } from '@/lib/worker-status';
 import {
   getParticipantConnectionStatus,
   getParticipantStatusLabel,
@@ -52,14 +57,63 @@ const ActionButton = ({ icon: Icon, label, onClick, isActive, className }: { ico
     </div>
 );
 
+function mergeCompanyUsersWithOperators(
+  users: User[],
+  operators: Operator[],
+  currentUserId?: number,
+  activityName?: string | null
+): Operator[] {
+  const operatorById = new Map(operators.map((operator) => [operator.id, operator]));
+
+  return users.map((user) => {
+    const operator = operatorById.get(user.id);
+    const workerStatus =
+      Number(user.id) === Number(currentUserId)
+        ? activityName ?? operator?.worker_status ?? user.worker_status
+        : operator?.worker_status ?? user.worker_status;
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role_id: user.role_id ?? operator?.role_id,
+      do_not_disturb: operator?.do_not_disturb ?? Number(user.do_not_disturb ?? 0),
+      in_call: operator?.in_call ?? Number(user.in_call ?? 0),
+      worker_status: workerStatus,
+      departments: operator?.departments ?? [],
+    };
+  });
+}
+
+function renderColleagueStatusBadges(colleague: Operator) {
+  const isInCall = Number(colleague.in_call) === 1;
+
+  if (isInCall) {
+    return <Badge variant="default">In call</Badge>;
+  }
+
+  const workerStatus = colleague.worker_status?.trim();
+  if (workerStatus) {
+    return (
+      <Badge variant={getWorkerStatusBadgeVariant(workerStatus)}>
+        {workerStatus}
+      </Badge>
+    );
+  }
+
+  return <Badge variant="outline">Unknown</Badge>;
+}
+
 
 export default function ActiveCallBar({ isOpen, contactNumber, callerName, departmentName, onLeaveCall, onEndCallForAll, connection, conferenceSid, fallbackAgentCallSid }: ActiveCallBarProps) {
   const { user: authUser } = useAuth();
-  const { fromNumber, setConferenceSid } = useTwilio();
+  const { fromNumber, setConferenceSid, activityName } = useTwilio();
   const [duration, setDuration] = useState(0);
   const [selectedParticipant, setSelectedParticipant] = useState('');
+  const [colleagueSearch, setColleagueSearch] = useState('');
   const [isAdding, setIsAdding] = useState(false);
-  const [companyUsers, setCompanyUsers] = useState<User[]>([]);
+  const [colleagues, setColleagues] = useState<Operator[]>([]);
+  const [callDepartmentId, setCallDepartmentId] = useState<number | null>(null);
   const [companyContacts, setCompanyContacts] = useState<Contact[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const { toast } = useToast();
@@ -72,7 +126,6 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [dialerNumber, setDialerNumber] = useState('');
   const [departmentSettings, setDepartmentSettings] = useState<DepartmentSettings | null>(null);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
-  const [isTransferring, setIsTransferring] = useState(false);
   const [isConsultActionLoading, setIsConsultActionLoading] = useState(false);
   const [customerCallSid, setCustomerCallSid] = useState<string | null>(null);
   const [consultCallSid, setConsultCallSid] = useState<string | null>(null);
@@ -84,9 +137,38 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
   const [isEndingCall, setIsEndingCall] = useState(false);
   const [pendingOutgoing, setPendingOutgoing] = useState<PendingOutgoingParticipant | null>(null);
-  const [pendingTransferCallSid, setPendingTransferCallSid] = useState<string | null>(null);
   const effectiveConferenceSid = conferenceSid || verifiedConferenceSid;
   const agentCallSid = connection?.parameters?.CallSid ?? fallbackAgentCallSid ?? null;
+
+  const resolveActionAgentCallSid = (): string | null => {
+    if (agentCallSid) {
+      return agentCallSid;
+    }
+
+    if (authUser?.id) {
+      const selfParticipant = (currentParticipants as ConferenceParticipant[]).find(
+        (participant) =>
+          participant.is_agent && Number(participant.user_id) === Number(authUser.id)
+      );
+      if (selfParticipant?.call_sid) {
+        return selfParticipant.call_sid;
+      }
+    }
+
+    return null;
+  };
+
+  const resolveTwilioNumber = (): string | null => {
+    if (connection?.parameters) {
+      if (connection.direction === 'INCOMING') {
+        return connection.parameters.To || null;
+      }
+      return localStorage.getItem('twilioFromNumber') || fromNumber || null;
+    }
+
+    return localStorage.getItem('twilioFromNumber') || fromNumber || null;
+  };
+
   const callIdentity = effectiveConferenceSid || agentCallSid || contactNumber;
   const externalParticipants = (currentParticipants as ConferenceParticipant[]).filter(
     (participant) => !participant.is_agent && participant.call_sid !== agentCallSid
@@ -100,7 +182,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     ?? externalParticipants.find((p) => !p.hold)
     ?? externalParticipants[0];
   const hasRingingParticipant = externalParticipants.some((participant) => isParticipantRinging(participant));
-  const shouldPollParticipantsQuickly = hasRingingParticipant || Boolean(pendingOutgoing) || Boolean(pendingTransferCallSid);
+  const shouldPollParticipantsQuickly = hasRingingParticipant || Boolean(pendingOutgoing);
   const floatingToggleDragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -110,13 +192,54 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     dragged: boolean;
   } | null>(null);
   const suppressToggleClickRef = useRef(false);
-  const participantUserIds = new Set(
-    (currentParticipants as ConferenceParticipant[])
-      .map((participant) => participant.user_id)
-      .filter((id): id is number => Boolean(id))
+  const participantUserIds = useMemo(
+    () =>
+      new Set(
+        (currentParticipants as ConferenceParticipant[])
+          .filter((participant) => participant.is_agent)
+          .map((participant) => Number(participant.user_id))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      ),
+    [currentParticipants]
   );
-  const availableUsersToAdd = companyUsers.filter(
-    (user) => authUser && user.id !== authUser.id && !participantUserIds.has(user.id)
+
+  const availableColleaguesToAdd = useMemo(
+    () =>
+      colleagues.filter(
+        (colleague) =>
+          authUser &&
+          Number(colleague.id) !== Number(authUser.id) &&
+          !participantUserIds.has(Number(colleague.id))
+      ),
+    [colleagues, authUser, participantUserIds]
+  );
+
+  const filteredColleaguesToAdd = useMemo(() => {
+    const query = colleagueSearch.trim().toLowerCase();
+    const sorted = [...availableColleaguesToAdd].sort((a, b) => a.name.localeCompare(b.name));
+
+    if (!query) {
+      return sorted;
+    }
+
+    return sorted.filter(
+      (colleague) =>
+        colleague.name.toLowerCase().includes(query) ||
+        colleague.email.toLowerCase().includes(query)
+    );
+  }, [availableColleaguesToAdd, colleagueSearch]);
+
+  const colleaguesAsUsers = useMemo<User[]>(
+    () =>
+      colleagues.map((colleague) => ({
+        id: colleague.id,
+        name: colleague.name,
+        email: colleague.email,
+        role_id: colleague.role_id,
+        in_call: colleague.in_call,
+        worker_status: colleague.worker_status,
+      })),
+    [colleagues]
   );
   
   const dialpadKeys = [
@@ -137,7 +260,6 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     setIsOnHold(false);
     setVerifiedConferenceSid(conferenceSid || null);
     setPendingOutgoing(null);
-    setPendingTransferCallSid(null);
     setDuration(0);
     setIsCollapsed(false);
   }, [callIdentity, departmentName, conferenceSid]);
@@ -163,6 +285,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
             }
 
             if (matchingCall?.department_id) {
+              setCallDepartmentId(matchingCall.department_id);
               const deptSettings = await getDepartmentSettings(matchingCall.department_id);
               setDepartmentSettings(deptSettings);
             }
@@ -198,7 +321,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       setIsOnHold(false);
       setVerifiedConferenceSid(null);
       setPendingOutgoing(null);
-      setPendingTransferCallSid(null);
+      setCallDepartmentId(null);
     }
   }, [isOpen, contactNumber, connection, departmentName, fallbackAgentCallSid, setConferenceSid]);
 
@@ -209,46 +332,112 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   }, [departmentName]);
   
   useEffect(() => {
+    if (!isOpen || !authUser?.company_id) {
+      if (!isOpen) {
+        setColleagues([]);
+        setCompanyContacts([]);
+        setSelectedParticipant('');
+        setColleagueSearch('');
+      }
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingUsers(true);
+
+    const loadColleaguesAndContacts = async () => {
+      try {
+        const [operatorsResponse, usersResponse, contactsResponse] = await Promise.all([
+          getOperators(undefined, { companyWide: true }),
+          getUsersByCompany(authUser.company_id!, { all: true }),
+          getContacts(authUser.company_id!),
+        ]);
+        if (cancelled) return;
+
+        const nextColleagues = mergeCompanyUsersWithOperators(
+          usersResponse.data ?? [],
+          operatorsResponse.operators ?? [],
+          authUser.id,
+          activityName
+        );
+        setColleagues(nextColleagues);
+        setCompanyContacts(contactsResponse || []);
+      } catch {
+        if (!cancelled) {
+          toast({
+            title: 'Error',
+            description: 'Failed to load colleagues or contacts.',
+            variant: 'destructive',
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingUsers(false);
+        }
+      }
+    };
+
+    void loadColleaguesAndContacts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, authUser?.company_id, authUser?.id, activityName, toast]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleInCallStatusChange = (data: Record<string, unknown>) => {
+      if (!data || data.user_id == null || data.in_call == null) return;
+      const userId = Number(data.user_id);
+      const inCall = Number(data.in_call) ? 1 : 0;
+
+      setColleagues((prev) =>
+        prev.map((colleague) =>
+          Number(colleague.id) === userId ? { ...colleague, in_call: inCall } : colleague
+        )
+      );
+    };
+
+    const handleWorkerStatusChange = (data: Record<string, unknown>) => {
+      const parsed = parseWorkerStatusPayload(data);
+      if (!parsed) return;
+
+      setColleagues((prev) =>
+        prev.map((colleague) =>
+          Number(colleague.id) === parsed.user_id
+            ? { ...colleague, worker_status: parsed.worker_status }
+            : colleague
+        )
+      );
+    };
+
+    events.on('refreshInCallStatus', handleInCallStatusChange);
+    events.on('refreshWorkerStatus', handleWorkerStatusChange);
+
+    return () => {
+      events.off('refreshInCallStatus', handleInCallStatusChange);
+      events.off('refreshWorkerStatus', handleWorkerStatusChange);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
 
     const handleMute = (muted: boolean) => setIsMuted(muted);
-    
+
     if (isOpen && connection) {
-      setDuration(0); 
-      timer = setInterval(() => setDuration(prev => prev + 1), 1000);
+      setDuration(0);
+      timer = setInterval(() => setDuration((prev) => prev + 1), 1000);
       setIsMuted(connection.isMuted());
       connection.on('mute', handleMute);
-
-      const fetchRelatedData = async () => {
-        if (authUser?.company_id) {
-          setLoadingUsers(true);
-          try {
-            const [usersResponse, contactsResponse] = await Promise.all([
-              getUsersByCompany(authUser.company_id),
-              getContacts(authUser.company_id)
-            ]);
-            setCompanyUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
-            setCompanyContacts(contactsResponse || []);
-          } catch (err) {
-            toast({ title: "Error", description: "Failed to load company users or contacts.", variant: 'destructive' });
-          } finally {
-            setLoadingUsers(false);
-          }
-        }
-      }
-      fetchRelatedData();
-
-    } else {
-       setCompanyUsers([]);
-       setCompanyContacts([]);
-       setSelectedParticipant('');
     }
-    
+
     return () => {
       clearInterval(timer);
       connection?.removeListener('mute', handleMute);
     };
-  }, [isOpen, connection, authUser, toast]);
+  }, [isOpen, connection]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -269,16 +458,6 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
         const pendingStatus = getParticipantConnectionStatus(pendingParticipant);
         if (pendingStatus === 'connected' || pendingStatus === 'ended') {
           setPendingOutgoing(null);
-        }
-      }
-    }
-
-    if (pendingTransferCallSid) {
-      const transferParticipant = participantList.find((participant) => participant.call_sid === pendingTransferCallSid);
-      if (transferParticipant) {
-        const transferStatus = getParticipantConnectionStatus(transferParticipant);
-        if (transferStatus === 'connected' || transferStatus === 'ended') {
-          setPendingTransferCallSid(null);
         }
       }
     }
@@ -344,7 +523,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     if (effectiveConferenceSid) {
       return effectiveConferenceSid;
     }
-    const callSid = connection?.parameters?.CallSid;
+    const callSid = resolveActionAgentCallSid();
     if (!callSid) {
       return null;
     }
@@ -480,7 +659,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
 
   const resolveOutgoingTargetName = (userId?: string, phoneNumber?: string) => {
     if (userId) {
-      const user = companyUsers.find((entry) => String(entry.id) === userId);
+      const user = colleagues.find((entry) => String(entry.id) === userId);
       return user?.name || 'Colleague';
     }
 
@@ -507,9 +686,6 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       if (pendingOutgoing?.callSid === callSid) {
         setPendingOutgoing(null);
       }
-      if (pendingTransferCallSid === callSid) {
-        setPendingTransferCallSid(null);
-      }
       await fetchParticipants({ silent: true });
       toast({
         title: 'Call canceled',
@@ -526,85 +702,16 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     }
   };
 
-  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  const waitForTransferAnswer = async (conferenceSid: string, targetCallSid: string, maxWaitMs = 45000) => {
-    const started = Date.now();
-    while (Date.now() - started < maxWaitMs) {
-      try {
-        const response = await allParticipant(conferenceSid);
-        const participants = Array.isArray(response?.data) ? response.data as ConferenceParticipant[] : [];
-        const target = participants.find((participant) => participant.call_sid === targetCallSid);
-        if (target && getParticipantConnectionStatus(target) === 'connected') {
-          return true;
-        }
-      } catch {
-        // Keep polling until timeout.
-      }
-      await sleep(2000);
-    }
-    return false;
-  };
-
-  const completeWarmTransfer = async (conferenceSid: string, targetCallSid: string) => {
-    const myCallSid = connection?.parameters?.CallSid;
-    if (!myCallSid) {
-      throw new Error('Active call session not found.');
-    }
-
-    toast({
-      title: 'Transferring',
-      description: 'Waiting for your colleague to join the call...',
-    });
-
-    const answered = await waitForTransferAnswer(conferenceSid, targetCallSid);
-
-    if (answered) {
-      setPendingTransferCallSid(null);
-      setPendingOutgoing(null);
-      toast({
-        title: 'Transfer complete',
-        description: 'Your colleague is now connected with the customer.',
-      });
-      await onLeaveCall(conferenceSid, myCallSid);
-      return;
-    }
-
-    try {
-      await removeParticipant(conferenceSid, targetCallSid);
-    } catch {
-      // Target leg may have already ended.
-    }
-
-    setPendingTransferCallSid(null);
-    setPendingOutgoing(null);
-
-    await holdParticipant(conferenceSid, myCallSid, false);
-    toast({
-      title: 'Transfer failed',
-      description: 'Your colleague did not answer. You are still on the call with the customer.',
-      variant: 'destructive',
-    });
-  };
-
   const handleAddParticipant = async () => {
     if (!selectedParticipant && !dialerNumber) {
       toast({ title: "Error", description: "Please select a user or enter a number.", variant: 'destructive' });
       return;
     }
-
-    if (isTransferring && !selectedParticipant) {
-      toast({
-        title: "Transfer unavailable",
-        description: "Please select an internal colleague to transfer this call.",
-        variant: 'destructive',
-      });
-      return;
-    }
     
-    if (!connection) {
-        toast({ title: "Error", description: "Cannot add participant. Active call session not found.", variant: 'destructive' });
-        return;
+    const myCallSid = resolveActionAgentCallSid();
+    if (!myCallSid) {
+      toast({ title: "Error", description: "Cannot add participant. Active call session not found.", variant: 'destructive' });
+      return;
     }
 
     const sid = await ensureConferenceSid();
@@ -613,9 +720,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       return;
     }
 
-    const savedFromNumber = localStorage.getItem("twilioFromNumber");
-
-    const twilioNumber = connection.direction === 'INCOMING' ? connection.parameters.To : savedFromNumber;
+    const twilioNumber = resolveTwilioNumber();
 
     if (!twilioNumber) {
       toast({ title: "Error", description: "Could not determine a valid Twilio number for this call.", variant: 'destructive' });
@@ -626,36 +731,6 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     try {
         const phoneNumber = dialerNumber ? `+1${dialerNumber.replace(/\D/g, '')}` : undefined;
         const userId = selectedParticipant || undefined;
-
-        if (isTransferring && userId) {
-          await holdParticipant(sid, connection.parameters.CallSid, true);
-          setIsOnHold(true);
-
-          const response = await addParticipant(sid, twilioNumber, userId, undefined, { transfer: true });
-          const targetCallSid = response?.data?.call_sid;
-
-          if (!response?.status || !targetCallSid) {
-            await holdParticipant(sid, connection.parameters.CallSid, false);
-            setIsOnHold(false);
-            throw new Error(response?.msg || 'Failed to reach your colleague.');
-          }
-
-          const transferTargetName = resolveOutgoingTargetName(userId);
-          setPendingTransferCallSid(targetCallSid);
-          setPendingOutgoing({
-            callSid: targetCallSid,
-            name: transferTargetName,
-            startedAt: Date.now(),
-          });
-
-          setIsAddParticipantModalOpen(false);
-          setDialerNumber('');
-          setSelectedParticipant('');
-          setIsTransferring(false);
-
-          await completeWarmTransfer(sid, targetCallSid);
-          return;
-        }
         
         const response = phoneNumber
           ? await initiateConsultCall(sid, twilioNumber, phoneNumber)
@@ -695,27 +770,25 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
           await fetchParticipants({ silent: true });
           toast({
             title: "Second call started",
-            description: `${outgoingName} is ringing. The first caller is on hold.`,
+            description: `${outgoingName} is ringing. Stay on the call until they answer. The first caller is on hold.`,
           });
         } else if (userId) {
           await fetchParticipants({ silent: true });
           toast({
             title: "Calling colleague",
-            description: `${outgoingName} is ringing. You can cancel from the call legs panel.`,
+            description: `${outgoingName} is ringing. Stay on the call until they answer.`,
           });
         }
 
         setIsAddParticipantModalOpen(false);
         setDialerNumber('');
         setSelectedParticipant('');
-        setIsTransferring(false);
     } catch (err: any) {
        toast({
-         title: isTransferring ? "Transfer failed" : "Error",
+         title: "Error",
          description: err?.response?.data?.msg || err?.message || "Failed to add participant.",
          variant: 'destructive',
        });
-       setIsTransferring(false);
     } finally {
         setIsAdding(false);
     }
@@ -732,12 +805,6 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       toast({ title: "Error", description: "Failed to remove participant.", variant: 'destructive' });
     }
   };
-
-  const handleTransferClick = () => {
-    setIsTransferring(true);
-    setIsAddParticipantModalOpen(true);
-  };
-
 
   const handleEndClick = () => {
     if (otherAgents.length > 0 && effectiveConferenceSid && agentCallSid) {
@@ -896,6 +963,11 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
         <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
       </span>
       <Phone className="h-4 w-4 text-green-600" />
+      {pendingOutgoing ? (
+        <span className="max-w-[140px] truncate text-xs font-medium text-amber-700 dark:text-amber-300">
+          Waiting for {pendingOutgoing.name}
+        </span>
+      ) : null}
       <span className="font-mono text-sm font-semibold tabular-nums">{formatTime(duration)}</span>
       {isCollapsed ? (
         <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -913,6 +985,12 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     <>
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-[100]">
         <div className="bg-background rounded-2xl shadow-2xl overflow-hidden">
+            {pendingOutgoing ? (
+              <div className="border-b bg-amber-50 px-4 py-2.5 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-50">
+                Waiting for <span className="font-medium">{pendingOutgoing.name}</span> to join.
+                Stay on the call until they answer.
+              </div>
+            ) : null}
             <div className="p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
                  <Avatar className="h-12 w-12">
@@ -956,7 +1034,6 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                     />
                   </>
                 ) : null}
-                <ActionButton icon={PhoneForwarded} label="Transfer" onClick={handleTransferClick} />
                 <Dialog open={isKeypadModalOpen} onOpenChange={setIsKeypadModalOpen}>
                     <DialogTrigger asChild>
                          <ActionButton icon={Grip} label="Keypad" />
@@ -978,9 +1055,9 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                 <Dialog open={isAddParticipantModalOpen} onOpenChange={(open) => {
                   setIsAddParticipantModalOpen(open);
                   if (!open) {
-                    setIsTransferring(false);
                     setSelectedParticipant('');
                     setDialerNumber('');
+                    setColleagueSearch('');
                   }
                 }}>
                     <DialogTrigger asChild>
@@ -988,41 +1065,68 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>{isTransferring ? 'Transfer Call' : 'Add Participant'}</DialogTitle>
-                            {isTransferring ? (
-                              <DialogDescription>
-                                Select a colleague. The customer will be placed on hold until they answer.
-                              </DialogDescription>
-                            ) : null}
+                            <DialogTitle>Add Participant</DialogTitle>
+                            <DialogDescription>
+                              The other person must answer before you leave the call.
+                            </DialogDescription>
                         </DialogHeader>
                         <Tabs defaultValue="internal">
-                            <TabsList className={`grid w-full ${isTransferring ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                            <TabsList className="grid w-full grid-cols-2">
                                 <TabsTrigger value="internal">Internal User</TabsTrigger>
-                                {!isTransferring ? (
-                                  <TabsTrigger value="external">Dial Number</TabsTrigger>
-                                ) : null}
+                                <TabsTrigger value="external">Dial Number</TabsTrigger>
                             </TabsList>
-                            <TabsContent value="internal" className="py-4">
-                               {availableUsersToAdd.length === 0 ? (
+                            <TabsContent value="internal" className="py-4 space-y-3">
+                               {loadingUsers ? (
+                                 <p className="text-sm text-muted-foreground">Loading colleagues...</p>
+                               ) : availableColleaguesToAdd.length === 0 ? (
                                  <p className="text-sm text-muted-foreground">
-                                   No colleagues available to add. Everyone else is already on this call.
+                                   {colleagues.length === 0
+                                     ? 'No company users found.'
+                                     : 'No colleagues available to add. Everyone else is already on this call.'}
                                  </p>
                                ) : (
-                                 <Select value={selectedParticipant} onValueChange={setSelectedParticipant} disabled={loadingUsers}>
-                                      <SelectTrigger>
-                                          <SelectValue placeholder={loadingUsers ? 'Loading...' : 'Select a user'} />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                          {availableUsersToAdd.map(user => (
-                                              <SelectItem key={user.id} value={String(user.id)}>
-                                                  {user.name}
-                                              </SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                  </Select>
+                                 <>
+                                   <div className="relative">
+                                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                     <Input
+                                       placeholder="Search by name or email..."
+                                       value={colleagueSearch}
+                                       onChange={(event) => setColleagueSearch(event.target.value)}
+                                       className="pl-9"
+                                     />
+                                   </div>
+                                   <ScrollArea className="h-56 rounded-md border">
+                                     <div className="divide-y">
+                                       {filteredColleaguesToAdd.length === 0 ? (
+                                         <p className="p-4 text-sm text-muted-foreground text-center">
+                                           No colleagues match your search.
+                                         </p>
+                                       ) : (
+                                         filteredColleaguesToAdd.map((colleague) => (
+                                           <button
+                                             key={colleague.id}
+                                             type="button"
+                                             onClick={() => setSelectedParticipant(String(colleague.id))}
+                                             className={cn(
+                                               'w-full flex items-center justify-between gap-3 p-3 text-left hover:bg-muted/50 transition-colors',
+                                               selectedParticipant === String(colleague.id) && 'bg-muted'
+                                             )}
+                                           >
+                                             <div className="min-w-0">
+                                               <p className="font-medium truncate">{colleague.name}</p>
+                                               <p className="text-xs text-muted-foreground truncate">{colleague.email}</p>
+                                             </div>
+                                             <div className="shrink-0">
+                                               {renderColleagueStatusBadges(colleague)}
+                                             </div>
+                                           </button>
+                                         ))
+                                       )}
+                                     </div>
+                                   </ScrollArea>
+                                 </>
                                )}
                             </TabsContent>
-                            {!isTransferring ? (
                             <TabsContent value="external" className="py-4 space-y-4">
                                <Select onValueChange={setDialerNumber} disabled={loadingUsers}>
                                     <SelectTrigger>
@@ -1057,11 +1161,10 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                                     ))}
                                 </div>
                             </TabsContent>
-                            ) : null}
                         </Tabs>
                          <Button onClick={handleAddParticipant} disabled={isAdding || (!selectedParticipant && !dialerNumber)}>
                             <UserPlus className="mr-2 h-4 w-4" />
-                            {isTransferring ? 'Transfer Call' : 'Add Participant'}
+                            Add Participant
                         </Button>
                     </DialogContent>
                 </Dialog>
@@ -1079,7 +1182,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                         <div className="py-4 space-y-2">
                             {currentParticipants.map((p: ConferenceParticipant) => {
                               const status = getParticipantConnectionStatus(p);
-                              const name = resolveParticipantDisplayName(p, companyUsers, companyContacts);
+                              const name = resolveParticipantDisplayName(p, colleaguesAsUsers, companyContacts);
                               return (
                                 <div key={p.call_sid} className="flex items-center justify-between p-2 rounded-md border">
                                     <div className="flex flex-col min-w-0">

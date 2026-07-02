@@ -23,6 +23,8 @@ import { PlusCircle, Edit, Trash2, Search, Phone } from "lucide-react";
 import AppHeader from "@/components/app-header";
 import { formatPhoneNumber } from "@/lib/utils";
 import { useTwilio } from "@/context/TwilioContext";
+import { events } from "@/lib/events";
+import type { OutboundContext } from "@/lib/outbound-context";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name is required."),
@@ -90,7 +92,7 @@ export default function ContactsPage() {
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerInitialValue, setDialerInitialValue] = useState("");
 
-  const handleMakeCall = (number: string) => {
+  const handleMakeCall = (number: string, context?: OutboundContext) => {
     if (!device) {
       toast({
         title: "Twilio Error",
@@ -100,6 +102,9 @@ export default function ContactsPage() {
       return;
     }
 
+    if (context) {
+      events.emit('setOutboundContext', context);
+    }
     setDialerInitialValue(number.replace(/^\+1/, ""));
     setDialerOpen(true);
   };

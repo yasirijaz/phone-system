@@ -38,7 +38,7 @@ import {
   type ActiveCallSession,
 } from '@/lib/active-call-session';
 import { findLiveCallOnDevice, isLiveCallStatus } from '@/lib/twilio-call-utils';
-import { getActiveCall } from '@/services/callLogService';
+import { getActiveCall, dismissActiveCall } from '@/services/callLogService';
 
 interface TwilioContextType {
   device: Device | null;
@@ -121,6 +121,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const conferenceSidRef = useRef<string | null>(null);
   const hangUpFromOverlayRef = useRef<() => void>(() => {});
   const pendingMergeConferenceSidRef = useRef<string | null>(null);
+  const pendingConferenceInviteRef = useRef<{
+    transfer?: boolean;
+    autoAccept: boolean;
+    expires: number;
+  } | null>(null);
   const reservationActionHandlersRef = useRef<{
     acceptReservation: (reservation: Reservation) => void;
     acceptReservationWithHold: (reservation: Reservation) => Promise<void>;
@@ -177,8 +182,26 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   }, [conferenceSid]);
 
   useEffect(() => {
+    const justCleared =
+      lastClearedAtRef.current > 0 && Date.now() - lastClearedAtRef.current < 15_000;
+    if (justCleared) {
+      return;
+    }
     userInCallRef.current = Boolean(user?.in_call);
   }, [user?.in_call]);
+
+  useEffect(() => {
+    const handleConferenceInvite = (data: Record<string, unknown>) => {
+      pendingConferenceInviteRef.current = {
+        transfer: Boolean(data.transfer),
+        autoAccept: data.auto_accept === true,
+        expires: Date.now() + 120_000,
+      };
+    };
+
+    events.on('conferenceInvite', handleConferenceInvite);
+    return () => events.off('conferenceInvite', handleConferenceInvite);
+  }, []);
 
   useEffect(() => {
     ringAudioRef.current = createIncomingRingAudio();
@@ -222,6 +245,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const clearActiveCallState = useCallback(() => {
     lastClearedAtRef.current = Date.now();
+    userInCallRef.current = false;
     setConnection(null);
     setActiveReservation(null);
     activeReservationRef.current = null;
@@ -285,15 +309,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const storedSession = readActiveCallSession();
-      if (storedSession && (storedSession.conferenceSid || storedSession.callSid)) {
-        setActiveCallMeta(storedSession);
-        if (storedSession.conferenceSid) {
-          setConferenceSid(storedSession.conferenceSid);
-        }
-        return;
-      }
-
       // Guard: if the call was explicitly ended recently, don't restore from the API even
       // if the backend webhook hasn't arrived yet (userInCallRef may still be true for a
       // few seconds after clearActiveCallState() runs).
@@ -302,14 +317,19 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         : Infinity;
       const justCleared = recentlyClearedMs < 15_000;
 
-      if (userInCallRef.current && user?.id && !justCleared) {
+      if (!justCleared && (userInCallRef.current || readActiveCallSession()) && user?.id) {
         const activeCallLog = await getActiveCall();
 
-        // Re-check after the async fetch – the call may have ended while we were waiting.
         const clearedDuringFetch = lastClearedAtRef.current > 0
           && Date.now() - lastClearedAtRef.current < 15_000;
 
-        if (!clearedDuringFetch && activeCallLog?.call_status === 'in_progress') {
+        const hasLiveCallLeg = Boolean(liveDeviceCall) || Boolean(activeReservationRef.current);
+
+        if (
+          !clearedDuringFetch &&
+          activeCallLog?.call_status === 'in_progress' &&
+          hasLiveCallLeg
+        ) {
           const restored = persistActiveCallMeta(
             {
               callSid: activeCallLog.worker_sid || activeCallLog.call_sid || null,
@@ -328,11 +348,16 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setActiveCallMeta(restored);
           return;
         }
+
+        if (!hasLiveCallLeg && activeCallLog?.call_status === 'in_progress') {
+          await dismissActiveCall();
+        }
       }
 
-      if (!userInCallRef.current && !liveDeviceCall) {
+      if (!liveDeviceCall && !activeReservationRef.current) {
         clearActiveCallSession();
         setActiveCallMeta(null);
+        userInCallRef.current = false;
       }
     } finally {
       syncInFlightRef.current = false;
@@ -556,10 +581,24 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           reservationAttrs?.from || conn.parameters?.From || conn.parameters?.To || '';
 
         const autoAccept = conn.customParameters.get('autoAccept');
-        const isTransferLeg = conn.customParameters.get('transfer') === '1';
+        const pendingInvite = pendingConferenceInviteRef.current;
+        const hasPendingInvite =
+          Boolean(pendingInvite) && (pendingInvite?.expires ?? 0) > Date.now();
+        const isTransferLeg =
+          conn.customParameters.get('transfer') === '1' ||
+          (hasPendingInvite && pendingInvite?.transfer === true);
         const isReservationLeg =
           expectingReservationDeviceLegRef.current || activeReservationRef.current !== null;
-        const shouldAutoAccept = isReservationLeg || isTransferLeg || autoAccept !== '0';
+        const isConferenceInvite =
+          Boolean(incomingConferenceSid) || hasPendingInvite || isTransferLeg;
+        const shouldAutoAccept =
+          isReservationLeg ||
+          expectingReservationDeviceLegRef.current ||
+          (!isConferenceInvite && (autoAccept === '1' || autoAccept === 'true'));
+
+        const clearPendingConferenceInvite = () => {
+          pendingConferenceInviteRef.current = null;
+        };
 
         const persistIncomingCallMeta = () => {
           persistActiveCallMeta(
@@ -582,6 +621,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         };
 
         if (shouldAutoAccept) {
+          clearPendingConferenceInvite();
           persistIncomingCallMeta();
           conn.accept();
           expectingReservationDeviceLegRef.current = false;
@@ -609,6 +649,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         conn.on('reject', stopRingOnEnd);
 
         conn.on('accept', () => {
+          clearPendingConferenceInvite();
           expectingReservationDeviceLegRef.current = false;
           if (!shouldAutoAccept) {
             persistIncomingCallMeta();
@@ -622,6 +663,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
         conn.on('disconnect', () => {
           console.log('Call disconnected.');
+          clearPendingConferenceInvite();
           expectingReservationDeviceLegRef.current = false;
           if (connectionSourceRef.current === 'device') {
             const liveCall = findLiveCallOnDevice(deviceRef.current);
@@ -639,6 +681,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
         conn.on('reject', () => {
           console.log('Call rejected.');
+          clearPendingConferenceInvite();
           expectingReservationDeviceLegRef.current = false;
           if (connectionSourceRef.current === 'device') {
             if (activeReservationRef.current) {
@@ -1042,6 +1085,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     scheduleReservationFinalize(reservationToFinalize);
     clearActiveCallState();
+    void dismissActiveCall().then(() => {
+      if (user?.id) {
+        events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
+      }
+    });
     toast({ title: 'Left call' });
   };
 
@@ -1066,6 +1114,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     scheduleReservationFinalize(reservationToFinalize);
     clearActiveCallState();
+    void dismissActiveCall().then(() => {
+      if (user?.id) {
+        events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
+      }
+    });
     toast({ title: 'Call Ended' });
   };
 

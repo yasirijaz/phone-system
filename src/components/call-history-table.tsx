@@ -90,7 +90,9 @@ export default function CallHistoryTable({ calls, subjectPhone, onRowClick }: Ca
                   {formatPhoneNumber(entry.to || subjectPhone || '')}
                 </TableCell>
                 <TableCell className="whitespace-nowrap py-3 text-muted-foreground">
-                  {entry.user?.name || '—'}
+                  {!isMissed && status.kind !== 'hung_up' && status.kind !== 'rejected'
+                    ? entry.user?.name || '—'
+                    : '—'}
                 </TableCell>
                 <TableCell className="whitespace-nowrap py-3 font-medium tabular-nums">
                   {formatCallDuration(entry)}

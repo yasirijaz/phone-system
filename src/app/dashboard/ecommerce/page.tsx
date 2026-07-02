@@ -20,6 +20,8 @@ import PaginationControls from '@/components/pagination-controls';
 import { events } from '@/lib/events';
 import { isElectron } from '@/lib/is-electron';
 import { getContacts } from '@/services/contactService';
+import { getCompanyPhoneNumbers } from '@/services/phoneNumberService';
+import type { OutboundContext } from '@/lib/outbound-context';
 
 const StatCard = ({ title, value, icon: Icon, trend, trendType }: { title: string, value: string, icon: React.ElementType, trend: string, trendType: 'up' | 'down' }) => (
     <Card>
@@ -137,6 +139,7 @@ export default function EcommerceDashboard() {
   const [communications, setCommunications] = useState<Communication[]>([]);
   const [allCommunications, setAllCommunications] = useState<Communication[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const { toast } = useToast();
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerNumber, setDialerNumber] = useState('');
@@ -155,13 +158,15 @@ export default function EcommerceDashboard() {
     setPagination(prev => ({ ...prev, loading: true }));
     
     try {
-        const [response, contactsResponse] = await Promise.all([
+        const [response, contactsResponse, numbersResponse] = await Promise.all([
           getCommunications({ page, limit }),
-          user.company_id ? getContacts(user.company_id) : Promise.resolve([])
+          user.company_id ? getContacts(user.company_id) : Promise.resolve([]),
+          user.company_id ? getCompanyPhoneNumbers(user.company_id) : Promise.resolve([]),
         ]);
 
         setCommunications(response.results);
         setContacts(contactsResponse || []);
+        setPhoneNumbers(Array.isArray(numbersResponse) ? numbersResponse : []);
         setPagination(prev => ({
             ...prev,
             currentPage: response.page_no,
@@ -293,10 +298,18 @@ export default function EcommerceDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <CallLog calls={communications} contacts={contacts} onMakeCall={(number) => {
-                  setDialerNumber(number.replace(/^\+1/, ""));
-                  setDialerOpen(true);
-                }} />
+                <CallLog
+                  calls={communications}
+                  contacts={contacts}
+                  phoneNumbers={phoneNumbers}
+                  onMakeCall={(number, context?: OutboundContext) => {
+                    if (context) {
+                      events.emit('setOutboundContext', context);
+                    }
+                    setDialerNumber(number.replace(/^\+1/, ""));
+                    setDialerOpen(true);
+                  }}
+                />
               </CardContent>
               <PaginationControls
                 {...pagination}
