@@ -90,7 +90,7 @@ export default function ConversationDetailPage() {
                 const hasUnread = logs.some((l: any) => l?.is_read === 0 || l?.is_read === false);
                 if (hasUnread) {
                     await markThreadAsRead(from, to);
-                    try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
+                    try { events.emitDebounced('refreshDepartmentsUnread', 2500); } catch (_) {}
                 }
 
             } catch (error) {

@@ -127,7 +127,7 @@ function CommunicationCard({
                   setIsRead(true);
                   markRead(String(comm.id), comm.type)
                     .then(() => {
-                      try { events.emit('refreshDepartmentsUnread'); } catch(_) {}
+                      try { events.emitDebounced('refreshDepartmentsUnread', 2500); } catch(_) {}
                     })
                     .catch(() => setIsRead(false)); // revert on failure
                 }

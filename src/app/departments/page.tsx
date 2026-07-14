@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import type { Department } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { getDepartments, createDepartment, updateDepartment, deleteDepartment } from "@/services/departmentService";
+import { getDepartments, createDepartment, updateDepartment, deleteDepartment, leaveDepartment, invalidateDepartmentsSummaryCache } from "@/services/departmentService";
 import { getUserDepartments } from "@/services/userService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Edit, Trash2, Settings, Users, Phone } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Settings, Users, Phone, MoreVertical, LogOut } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { useRouter } from "next/navigation";
@@ -32,6 +32,13 @@ import {
   canUpdateDepartments,
   canViewPhoneNumbers,
 } from '@/lib/roles';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cacheDel, cacheInvalidatePrefix } from "@/lib/simpleCache";
 
 const departmentSchema = z.object({
   name: z.string().min(2, "Department name must be at least 2 characters."),
@@ -44,6 +51,8 @@ export default function DepartmentsPage() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
+  const [leaveTarget, setLeaveTarget] = useState<Department | null>(null);
+  const [leavingDepartment, setLeavingDepartment] = useState(false);
   const { toast } = useToast();
 
   const isAdmin = isPlatformAdmin(user?.role_id) || isCompanyAdmin(user?.role_id);
@@ -156,6 +165,33 @@ export default function DepartmentsPage() {
     router.push(`/departments/${departmentId}/phone-numbers`);
   };
 
+  const handleConfirmLeaveDepartment = async () => {
+    if (!leaveTarget || !user?.id) return;
+
+    setLeavingDepartment(true);
+    try {
+      await leaveDepartment(leaveTarget.id);
+      setDepartments((prev) => prev.filter((dept) => dept.id !== leaveTarget.id));
+      cacheDel(`sidebar:${user.id}`);
+      cacheDel(`sidebar-dept:${user.id}:${leaveTarget.id}`);
+      invalidateDepartmentsSummaryCache();
+      cacheInvalidatePrefix('unread-logs:');
+      toast({
+        title: "Left department",
+        description: `You left ${leaveTarget.name}. An admin must re-add you if you need access again.`,
+      });
+      setLeaveTarget(null);
+    } catch (error: any) {
+      toast({
+        title: "Could not leave department",
+        description: error?.response?.data?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLeavingDepartment(false);
+    }
+  };
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -221,15 +257,16 @@ export default function DepartmentsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        {canUpdate && <TableHead className="text-right">Actions</TableHead>}
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {Array.isArray(departments) && departments.map((dept) => (
                         <TableRow key={dept.id}>
                           <TableCell className="font-medium">{dept.name}</TableCell>
-                          {canUpdate && (
-                            <TableCell className="text-right">
+                          <TableCell className="text-right">
+                                {canUpdate && (
+                                  <>
                                 <Button variant="ghost" size="icon" onClick={() => handleManageUsers(dept.id)}>
                                     <Users className="h-4 w-4" />
                                 </Button>
@@ -268,13 +305,30 @@ export default function DepartmentsPage() {
                                     </AlertDialogContent>
                                 </AlertDialog>
                                 )}
-                            </TableCell>
-                          )}
+                                  </>
+                                )}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" aria-label={`More options for ${dept.name}`}>
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive"
+                                      onSelect={() => setLeaveTarget(dept)}
+                                    >
+                                      <LogOut className="mr-2 h-4 w-4" />
+                                      Leave department
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                          </TableCell>
                         </TableRow>
                       ))}
                        {(!Array.isArray(departments) || departments.length === 0) && (
                           <TableRow>
-                            <TableCell colSpan={canUpdate ? 2 : 1} className="text-center h-24">
+                            <TableCell colSpan={2} className="text-center h-24">
                               No departments found.
                             </TableCell>
                           </TableRow>
@@ -285,6 +339,36 @@ export default function DepartmentsPage() {
               </CardContent>
             </Card>
           </main>
+
+          <AlertDialog
+            open={Boolean(leaveTarget)}
+            onOpenChange={(open) => {
+              if (!open && !leavingDepartment) setLeaveTarget(null);
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Leave {leaveTarget?.name}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This cannot be undone by you. After you leave, you will lose access to this
+                  department and will need an admin to add you back.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={leavingDepartment}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={leavingDepartment}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void handleConfirmLeaveDepartment();
+                  }}
+                >
+                  {leavingDepartment ? "Leaving..." : "Leave department"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </SidebarInset>
     </SidebarProvider>
