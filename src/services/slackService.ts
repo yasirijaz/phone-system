@@ -12,8 +12,10 @@ export const getSlackConnectionStatus = async (): Promise<SlackConnectionStatus>
   return response.data;
 };
 
-export const getSlackConnectUrl = async (): Promise<string> => {
-  const response = await axios.get('/api/slack/connect');
+export const getSlackConnectUrl = async (useExternalBrowser = false): Promise<string> => {
+  const response = await axios.get('/api/slack/connect', {
+    params: useExternalBrowser ? { client: 'electron' } : undefined,
+  });
   return response.data.authorize_url;
 };
 

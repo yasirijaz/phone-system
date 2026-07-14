@@ -1,7 +1,7 @@
 {
   "name": "voice",
   "productName": "Voice",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "private": true,
   "main": "main/main.js",
   "author": "Yasir",
@@ -68,7 +68,15 @@
         "AppImage"
       ],
       "artifactName": "${productName}-${version}.${ext}"
-    }
+    },
+    "protocols": [
+      {
+        "name": "WindshieldHub Voice",
+        "schemes": [
+          "windshieldhub-voice"
+        ]
+      }
+    ]
   },
   "dependencies": {
     "@genkit-ai/ai": "^1.37.0",

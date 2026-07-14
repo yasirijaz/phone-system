@@ -27,6 +27,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import UserDevices from "@/components/user-devices";
 import { useSearchParams } from "next/navigation";
+import { isElectron } from "@/lib/is-electron";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -87,6 +88,45 @@ export default function ProfilePage() {
   }, [user, loadSlackStatus]);
 
   useEffect(() => {
+    if (!isElectron() || !window.electronAPI) return;
+
+    const off = window.electronAPI.on(
+      'slack-oauth-result',
+      (result: { slack?: string; message?: string }) => {
+        setSlackActionLoading(false);
+
+        if (result.slack === 'connected') {
+          toast({
+            title: "Slack connected",
+            description: "Your Slack account is linked. Your status will update during calls.",
+          });
+          loadSlackStatus();
+          if (user) {
+            dispatch(updateUser({
+              ...user,
+              slack_connected: true,
+              has_slack_access_token: true,
+            }));
+          }
+          return;
+        }
+
+        if (result.slack === 'error') {
+          toast({
+            title: "Slack connection failed",
+            description: result.message || "Could not connect your Slack account.",
+            variant: "destructive",
+          });
+        }
+      }
+    );
+
+    return off;
+  }, [toast, loadSlackStatus, dispatch, user]);
+
+  useEffect(() => {
+    if (isElectron()) return;
+
     const slackResult = searchParams.get("slack");
     const message = searchParams.get("message");
 
@@ -139,7 +179,19 @@ export default function ProfilePage() {
   const handleConnectSlack = async () => {
     try {
       setSlackActionLoading(true);
-      const authorizeUrl = await getSlackConnectUrl();
+      const useExternalBrowser = isElectron();
+      const authorizeUrl = await getSlackConnectUrl(useExternalBrowser);
+
+      if (useExternalBrowser && window.electronAPI) {
+        window.electronAPI.send('open-external-url', { url: authorizeUrl });
+        toast({
+          title: "Continue in your browser",
+          description: "Complete Slack sign-in in your default browser. You'll return to Voice when finished.",
+        });
+        setSlackActionLoading(false);
+        return;
+      }
+
       window.location.href = authorizeUrl;
     } catch (error: any) {
       toast({

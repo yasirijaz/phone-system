@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, dialog, screen, Notification } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog, screen, Notification, shell } from 'electron';
 
 // const serve = 'electron-serve';
 import serve from 'electron-serve';
@@ -25,6 +25,89 @@ let updateReady = false;
 let updateCheckTimer = null;
 let isCheckingUpdates = false;
 let lastCheckSource = null; // 'manual' | 'periodic' | 'startup' | null
+
+const CUSTOM_PROTOCOL = 'windshieldhub-voice';
+
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(CUSTOM_PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient(CUSTOM_PROTOCOL);
+}
+
+function extractDeepLinkFromArgv(argv = process.argv) {
+  return argv.find((arg) => typeof arg === 'string' && arg.startsWith(`${CUSTOM_PROTOCOL}://`));
+}
+
+let pendingDeepLink = extractDeepLinkFromArgv();
+
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const deepLink = extractDeepLinkFromArgv(argv);
+    if (deepLink) {
+      handleSlackOAuthDeepLink(deepLink);
+    }
+    if (Mainwindow && !Mainwindow.isDestroyed()) {
+      if (Mainwindow.isMinimized()) {
+        Mainwindow.restore();
+      }
+      Mainwindow.show();
+      Mainwindow.focus();
+    }
+  });
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  if (url.startsWith(`${CUSTOM_PROTOCOL}://`)) {
+    if (app.isReady()) {
+      handleSlackOAuthDeepLink(url);
+    } else {
+      pendingDeepLink = url;
+    }
+  }
+});
+
+function handleSlackOAuthDeepLink(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== 'slack' || parsed.pathname !== '/oauth') {
+      return;
+    }
+
+    const slack = parsed.searchParams.get('slack') || 'error';
+    const message = parsed.searchParams.get('message') || undefined;
+    const query = new URLSearchParams({ slack });
+    if (message) {
+      query.set('message', message);
+    }
+
+    if (!Mainwindow || Mainwindow.isDestroyed()) {
+      return;
+    }
+
+    if (Mainwindow.isMinimized()) {
+      Mainwindow.restore();
+    }
+    Mainwindow.show();
+    Mainwindow.focus();
+
+    const currentUrl = Mainwindow.webContents.getURL();
+    const onProfile = currentUrl.includes('/profile');
+    Mainwindow.webContents.send('slack-oauth-result', { slack, message });
+
+    if (!onProfile) {
+      Mainwindow.loadURL(`${getAppBaseUrl()}/profile?${query.toString()}`);
+    }
+  } catch (error) {
+    sendToRenderer('updatelog', `Failed to handle Slack OAuth deep link: ${error}`);
+  }
+}
+
 // Load environment variables early (supports dev via root .env)
 // Try project root .env relative to this file; fall back to default resolution
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
@@ -261,6 +344,18 @@ app.on("ready", () => {
     createWindow();
     createAppMenu();
     setupAutoUpdater();
+    if (pendingDeepLink) {
+      const deepLink = pendingDeepLink;
+      pendingDeepLink = null;
+      const focusSlackOAuth = () => handleSlackOAuthDeepLink(deepLink);
+      if (Mainwindow && !Mainwindow.isDestroyed()) {
+        if (Mainwindow.webContents.isLoading()) {
+          Mainwindow.webContents.once('did-finish-load', focusSlackOAuth);
+        } else {
+          focusSlackOAuth();
+        }
+      }
+    }
     // optional: after a short delay, broadcast initial app info
     setTimeout(() => {
       sendToRenderer('app-info', { version: app.getVersion(), updateReady });
@@ -675,5 +770,14 @@ ipcMain.on('focus-main-window', () => {
 ipcMain.on('end-call-from-progress', () => {
   if (Mainwindow && !Mainwindow.isDestroyed()) {
     Mainwindow.webContents.send('end-call-from-progress');
+  }
+});
+
+ipcMain.on('open-external-url', (_event, payload) => {
+  const url = payload?.url;
+  if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+    shell.openExternal(url).catch((error) => {
+      sendToRenderer('updatelog', `Failed to open external URL: ${error}`);
+    });
   }
 });

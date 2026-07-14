@@ -12,7 +12,7 @@ import {
   isCallThread,
   shouldShowCallAttendee,
 } from '@/lib/call-attendee';
-import { cacheGet, cacheSet, cacheDel } from '@/lib/simpleCache';
+import { cacheGet, cacheSet, cacheDel, cacheInvalidatePrefix } from '@/lib/simpleCache';
 
 const THREAD_ATTENDEE_CACHE_TTL = 5 * 60_000;
 const THREAD_LOGS_CACHE_TTL = 2 * 60_000;
@@ -251,10 +251,14 @@ export const markRead = async (id: string, type: 'call' | 'sms'): Promise<void> 
     }
     const endpoint = type === 'call' ? 'call-logs' : 'sms-logs';
     await axios.post(`/api/${endpoint}/${id}/mark-read`);
+    cacheInvalidatePrefix('unread-logs:');
+    cacheInvalidatePrefix('dept-summary:');
 };
 
 export const markThreadAsRead = async (from: string, to: string): Promise<void> => {
   await axios.post(`/api/communications/thread/mark-read`, { from, to });
+  cacheInvalidatePrefix('unread-logs:');
+  cacheInvalidatePrefix('dept-summary:');
 };
 
 type MarkField = 'is_starred' | 'is_spam';

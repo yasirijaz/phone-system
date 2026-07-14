@@ -3,24 +3,44 @@
 
 import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react';
 import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup, SidebarGroupLabel } from '@/components/ui/sidebar';
-import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, BellOff, Phone } from 'lucide-react';
+import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, BellOff, Phone, MoreVertical, LogOut } from 'lucide-react';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { getUserDepartments } from '@/services/userService';
-import { getCommunications, getUnreadCallLogs } from '@/services/callLogService';
-import { getDndStatus } from '@/services/departmentService';
+import { getCommunications } from '@/services/callLogService';
 import type { Department, Communication, Contact } from '@/types';
 import { Badge } from './ui/badge';
 import { isElectron } from '@/lib/is-electron';
 import { events } from '@/lib/events';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import { getContacts } from '@/services/contactService';
-import { debounce } from '@/lib/utils';
 import { getOtherPartyDisplay } from '@/lib/contact-display';
-import { cacheGet, cacheSet } from '@/lib/simpleCache';
+import { cacheGet, cacheSet, cacheInvalidatePrefix, cacheDel } from '@/lib/simpleCache';
 import { Button } from './ui/button';
+import {
+  getDepartmentsSummary,
+  invalidateDepartmentsSummaryCache,
+  leaveDepartment,
+  type DepartmentSummaryItem,
+} from '@/services/departmentService';
+import { getContacts } from '@/services/contactService';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface DepartmentWithUnread extends Department {
     unread_count: number;
@@ -36,16 +56,38 @@ interface RecentItem {
 }
 
 const SIDEBAR_CACHE_TTL = 2 * 60_000;
-const UNREAD_REFRESH_DEBOUNCE_MS = 1_500;
+const SIDEBAR_CACHE_VERSION = 'v3';
+
+function sidebarCacheKey(userId: number): string {
+  return `sidebar:${SIDEBAR_CACHE_VERSION}:${userId}`;
+}
+
+function mapSummaryToDepartment(
+  row: DepartmentSummaryItem,
+  companyId: number
+): DepartmentWithUnread {
+  return {
+    id: row.id,
+    name: row.name,
+    company_id: companyId,
+    workflow_sid: row.workflow_sid ?? undefined,
+    unread_count: row.unread.total,
+    is_dnd: Boolean(row.is_dnd),
+  };
+}
 
 export function InAppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [departments, setDepartments] = useState<DepartmentWithUnread[]>([]);
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(true);
   const [recentsLoading, setRecentsLoading] = useState(true);
   const [inboxUnread, setInboxUnread] = useState(0);
+  const [leaveTarget, setLeaveTarget] = useState<DepartmentWithUnread | null>(null);
+  const [leavingDepartment, setLeavingDepartment] = useState(false);
   const inElectron = isElectron();
   const initialLoadRef = useRef<Promise<void> | null>(null);
   const unreadRefreshRef = useRef<Promise<void> | null>(null);
@@ -63,9 +105,75 @@ export function InAppSidebar() {
     events.emit('openMessageDialog', { departmentId: String(departmentId) });
   };
 
+  const handleConfirmLeaveDepartment = async () => {
+    if (!leaveTarget || !user?.id) return;
+
+    setLeavingDepartment(true);
+    try {
+      await leaveDepartment(leaveTarget.id);
+      setDepartments((prev) => prev.filter((dept) => dept.id !== leaveTarget.id));
+      cacheDel(sidebarCacheKey(user.id));
+      cacheDel(`sidebar-dept:${user.id}:${leaveTarget.id}`);
+      invalidateDepartmentsSummaryCache();
+      cacheInvalidatePrefix('unread-logs:');
+
+      toast({
+        title: 'Left department',
+        description: `You left ${leaveTarget.name}. An admin must re-add you if you need access again.`,
+      });
+
+      if (pathname === `/departments/${leaveTarget.id}` || pathname.startsWith(`/departments/${leaveTarget.id}/`)) {
+        router.push('/app');
+      }
+      setLeaveTarget(null);
+    } catch (error: any) {
+      toast({
+        title: 'Could not leave department',
+        description: error?.response?.data?.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLeavingDepartment(false);
+    }
+  };
+
   useEffect(() => {
     departmentsRef.current = departments;
   }, [departments]);
+
+  const applySummaryUpdates = useCallback((summaryRows: DepartmentSummaryItem[]) => {
+    if (!user?.company_id) return;
+
+    setDepartments((prev) =>
+      prev.map((dept) => {
+        const row = summaryRows.find((item) => item.id === dept.id);
+        if (!row) return dept;
+
+        const updated = mapSummaryToDepartment(row, user.company_id!);
+        cacheSet(`sidebar-dept:${user.id}:${dept.id}`, updated, SIDEBAR_CACHE_TTL);
+        return updated;
+      })
+    );
+
+    const cached = cacheGet<{
+      departments: DepartmentWithUnread[];
+      recentItems: RecentItem[];
+      inboxUnread: number;
+    }>(`sidebar:${SIDEBAR_CACHE_VERSION}:${user.id}`);
+    if (cached) {
+      cacheSet(
+        sidebarCacheKey(user.id),
+        {
+          ...cached,
+          departments: cached.departments.map((dept) => {
+            const row = summaryRows.find((item) => item.id === dept.id);
+            return row ? mapSummaryToDepartment(row, user.company_id!) : dept;
+          }),
+        },
+        SIDEBAR_CACHE_TTL
+      );
+    }
+  }, [user?.id, user?.company_id]);
 
   const refreshDepartmentUnreadBadges = useCallback(async (targetDepartmentId?: number) => {
     if (!user?.id) return;
@@ -78,54 +186,18 @@ export function InAppSidebar() {
       return;
     }
 
-    const departmentsToUpdate = targetDepartmentId
-      ? currentDepartments.filter((dept) => dept.id === targetDepartmentId)
-      : currentDepartments;
-
-    if (departmentsToUpdate.length === 0) return;
+    const departmentIds = targetDepartmentId
+      ? [targetDepartmentId]
+      : currentDepartments.map((dept) => dept.id);
 
     const request = (async () => {
       try {
-        const updates = await Promise.all(
-          departmentsToUpdate.map(async (dept) => {
-            try {
-              const unreadLogs = await getUnreadCallLogs(dept.id);
-              const unreadCount = Array.isArray(unreadLogs) ? unreadLogs.length : 0;
-              const updated = { ...dept, unread_count: unreadCount };
-              cacheSet(`sidebar-dept:${user.id}:${dept.id}`, updated, SIDEBAR_CACHE_TTL);
-              return { id: dept.id, unread_count: unreadCount };
-            } catch (e) {
-              console.error(`Failed to refresh unread count for department ${dept.id}`, e);
-              return { id: dept.id, unread_count: dept.unread_count };
-            }
-          })
-        );
-
-        setDepartments((prev) =>
-          prev.map((dept) => {
-            const update = updates.find((item) => item.id === dept.id);
-            return update ? { ...dept, unread_count: update.unread_count } : dept;
-          })
-        );
-
-        const cached = cacheGet<{
-          departments: DepartmentWithUnread[];
-          recentItems: RecentItem[];
-          inboxUnread: number;
-        }>(`sidebar:${user.id}`);
-        if (cached) {
-          cacheSet(
-            `sidebar:${user.id}`,
-            {
-              ...cached,
-              departments: cached.departments.map((dept) => {
-                const update = updates.find((item) => item.id === dept.id);
-                return update ? { ...dept, unread_count: update.unread_count } : dept;
-              }),
-            },
-            SIDEBAR_CACHE_TTL
-          );
-        }
+        invalidateDepartmentsSummaryCache();
+        cacheInvalidatePrefix('unread-logs:');
+        const summary = await getDepartmentsSummary(departmentIds, { assignedOnly: true });
+        applySummaryUpdates(summary.departments);
+      } catch (e) {
+        console.error('Failed to refresh department unread badges', e);
       } finally {
         unreadRefreshRef.current = null;
       }
@@ -133,14 +205,14 @@ export function InAppSidebar() {
 
     unreadRefreshRef.current = request;
     await request;
-  }, [user?.id]);
+  }, [user?.id, applySummaryUpdates]);
 
   const fetchInitialSidebarData = useCallback(async () => {
     if (!user?.id || !user?.company_id) return;
     const userId = user.id;
     const companyId = user.company_id;
 
-    const cacheKey = `sidebar:${userId}`;
+    const cacheKey = sidebarCacheKey(userId);
     const cached = cacheGet<{
       departments: DepartmentWithUnread[];
       recentItems: RecentItem[];
@@ -165,35 +237,17 @@ export function InAppSidebar() {
         setDepartmentsLoading(true);
         setRecentsLoading(true);
 
-        const [userDepts, recentCommsResponse, contacts] = await Promise.all([
-          getUserDepartments(userId),
+        const [summary, recentCommsResponse, contacts] = await Promise.all([
+          getDepartmentsSummary(undefined, { assignedOnly: true }),
           getCommunications({ limit: 50 }),
           getContacts(companyId),
         ]);
 
-        const deptsArray = Array.isArray(userDepts) ? userDepts : [];
-
-        const deptsWithCounts = await Promise.all(
-          deptsArray.map(async (dept) => {
-            try {
-              const deptCacheKey = `sidebar-dept:${userId}:${dept.id}`;
-              const cachedDept = cacheGet<DepartmentWithUnread>(deptCacheKey);
-              if (cachedDept) return cachedDept;
-
-              const [unreadLogs, dnd] = await Promise.all([
-                getUnreadCallLogs(dept.id),
-                getDndStatus(dept.id, userId),
-              ]);
-              const unreadCount = Array.isArray(unreadLogs) ? unreadLogs.length : 0;
-              const result = { ...dept, unread_count: unreadCount, is_dnd: dnd.is_dnd };
-              cacheSet(deptCacheKey, result, SIDEBAR_CACHE_TTL);
-              return result;
-            } catch (e) {
-              console.error(`Failed to get data for department ${dept.id}`, e);
-              return { ...dept, unread_count: 0, is_dnd: false };
-            }
-          })
-        );
+        const deptsWithCounts = summary.departments.map((row) => {
+          const mapped = mapSummaryToDepartment(row, companyId);
+          cacheSet(`sidebar-dept:${userId}:${row.id}`, mapped, SIDEBAR_CACHE_TTL);
+          return mapped;
+        });
 
         setDepartments(deptsWithCounts);
 
@@ -256,9 +310,9 @@ export function InAppSidebar() {
 
     fetchInitialSidebarData();
 
-    const debouncedUnreadRefresh = debounce(() => {
-      refreshDepartmentUnreadBadges();
-    }, UNREAD_REFRESH_DEBOUNCE_MS);
+    const handleUnreadRefresh = () => {
+      void refreshDepartmentUnreadBadges();
+    };
 
     const handleDndStatusChange = (data: { department_id?: number; is_dnd?: boolean }) => {
       if (data?.department_id == null || data?.is_dnd === undefined) return;
@@ -272,12 +326,11 @@ export function InAppSidebar() {
       );
     };
 
-    // Only refresh unread badges when the user reads something — not on every socket call event.
-    events.on('refreshDepartmentsUnread', debouncedUnreadRefresh);
+    events.on('refreshDepartmentsUnread', handleUnreadRefresh);
     events.on('refreshOperators', handleDndStatusChange);
 
     return () => {
-      events.off('refreshDepartmentsUnread', debouncedUnreadRefresh);
+      events.off('refreshDepartmentsUnread', handleUnreadRefresh);
       events.off('refreshOperators', handleDndStatusChange);
     };
   }, [user, fetchInitialSidebarData, refreshDepartmentUnreadBadges]);
@@ -359,41 +412,75 @@ export function InAppSidebar() {
                     </SidebarMenuItem>
                 ) : departments.length > 0 ? (
                     departments.map((dept) => (
-                        <SidebarMenuItem key={dept.id} className="group/dept">
-                            <SidebarMenuButton asChild isActive={pathname === `/departments/${dept.id}`}>
-                                <Link href={`/departments/${dept.id}`} className="flex justify-between items-center w-full gap-2">
-                                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                                        <Building className="h-4 w-4 shrink-0" />
-                                        <span className="truncate flex-1">{dept.name}</span>
-                                        {dept.is_dnd ? <BellOff className="h-3 w-3 text-amber-600 shrink-0" /> : ''}
-                                    </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      {dept.unread_count > 0 && (
-                                          <Badge className="h-5">{dept.unread_count}</Badge>
-                                      )}
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 opacity-0 group-hover/dept:opacity-100 focus-visible:opacity-100"
-                                        aria-label={`Call from ${dept.name}`}
-                                        onClick={(event) => handleDepartmentCallClick(dept.id, event)}
-                                      >
-                                        <Phone className="h-3.5 w-3.5" />
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 opacity-0 group-hover/dept:opacity-100 focus-visible:opacity-100"
-                                        aria-label={`Message from ${dept.name}`}
-                                        onClick={(event) => handleDepartmentMessageClick(dept.id, event)}
-                                      >
-                                        <MessageSquare className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
-                                </Link>
-                            </SidebarMenuButton>
+                        <SidebarMenuItem key={dept.id} className="group/dept relative">
+                              <SidebarMenuButton
+                                asChild
+                                isActive={pathname === `/departments/${dept.id}`}
+                                className="!pr-2 group-hover/dept:!pr-[5.5rem] group-focus-within/dept:!pr-[5.5rem]"
+                              >
+                                  <Link href={`/departments/${dept.id}`} className="flex min-w-0 items-center gap-2 overflow-hidden">
+                                      <Building className="h-4 w-4 shrink-0" />
+                                      <span className="min-w-0 flex-1 truncate" title={dept.name}>
+                                        {dept.name}
+                                      </span>
+                                      {dept.is_dnd ? (
+                                        <BellOff className="h-3 w-3 shrink-0 text-amber-600" />
+                                      ) : null}
+                                      {dept.unread_count > 0 ? (
+                                          <Badge className="h-5 max-w-[3rem] shrink-0 truncate tabular-nums group-hover/dept:invisible group-focus-within/dept:invisible">
+                                            {dept.unread_count}
+                                          </Badge>
+                                      ) : null}
+                                  </Link>
+                              </SidebarMenuButton>
+                              <div className="absolute inset-y-0 right-1 z-20 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/dept:opacity-100 group-focus-within/dept:opacity-100">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 bg-sidebar hover:bg-accent"
+                                  aria-label={`Call from ${dept.name}`}
+                                  onClick={(event) => handleDepartmentCallClick(dept.id, event)}
+                                >
+                                  <Phone className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 bg-sidebar hover:bg-accent"
+                                  aria-label={`Message from ${dept.name}`}
+                                  onClick={(event) => handleDepartmentMessageClick(dept.id, event)}
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5" />
+                                </Button>
+                                <DropdownMenu modal={false}>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 bg-sidebar hover:bg-accent data-[state=open]:bg-accent"
+                                      aria-label={`More options for ${dept.name}`}
+                                      onClick={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                      }}
+                                    >
+                                      <MoreVertical className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48" sideOffset={4}>
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive"
+                                      onSelect={() => setLeaveTarget(dept)}
+                                    >
+                                      <LogOut className="mr-2 h-4 w-4" />
+                                      Leave department
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                         </SidebarMenuItem>
                     ))
                 ) : (
@@ -436,6 +523,36 @@ export function InAppSidebar() {
             </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
+
+      <AlertDialog
+        open={Boolean(leaveTarget)}
+        onOpenChange={(open) => {
+          if (!open && !leavingDepartment) setLeaveTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave {leaveTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This cannot be undone by you. After you leave, you will lose access to this
+              department and will need an admin to add you back.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={leavingDepartment}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={leavingDepartment}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                void handleConfirmLeaveDepartment();
+              }}
+            >
+              {leavingDepartment ? 'Leaving...' : 'Leave department'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

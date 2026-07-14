@@ -16,6 +16,7 @@ const electronSendChannels = [
   'hide-call-progress',
   'focus-main-window',
   'end-call-from-progress',
+  'open-external-url',
 ];
 
 const electronReceiveChannels = [
@@ -28,6 +29,7 @@ const electronReceiveChannels = [
   'incoming-call-update',
   'open-sms-conversation',
   'end-call-from-progress',
+  'slack-oauth-result',
 ];
 
 const apiSendChannels = ['check-for-updates', 'restart-to-update'];

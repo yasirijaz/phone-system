@@ -89,7 +89,7 @@ export default function ConversationDetailPage() {
                 await Promise.all(
                     unreadLogs.map((log) => markRead(String(log.id), log.type))
                 );
-                try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
+                try { events.emitDebounced('refreshDepartmentsUnread', 2500); } catch (_) {}
             }
 
              if (sortedLogs.length > 0) {
@@ -164,7 +164,7 @@ export default function ConversationDetailPage() {
                     await Promise.all(
                         unreadLogs.map(log => markRead(String(log.id), log.type))
                     );
-                    try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
+                    try { events.emitDebounced('refreshDepartmentsUnread', 2500); } catch (_) {}
                 }
                 
                 const allCompanyNumbers = new Set<string>();
