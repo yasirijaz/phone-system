@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, dialog, screen, Notification, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog, screen, Notification, shell, nativeImage, Tray } from 'electron';
 
 // const serve = 'electron-serve';
 import serve from 'electron-serve';
@@ -16,6 +16,8 @@ const require = createRequire(import.meta.url);
 const { autoUpdater } = require('electron-updater');
 let Mainwindow
 let notificationWindow;
+let tray = null;
+let currentBadgeCount = 0;
 let callProgressWindow = null;
 let callProgressStartedAt = null;
 let callProgressInfo = { callerName: '', callerNumber: '' };
@@ -127,6 +129,40 @@ function sendToRenderer(name,args) {
       console.log('hereee')
     }
 }
+
+function updateBadgeCount(count, badgeDataUrl) {
+  currentBadgeCount = count;
+
+  if (Mainwindow && !Mainwindow.isDestroyed()) {
+    if (count > 0 && badgeDataUrl) {
+      try {
+        const overlay = nativeImage.createFromDataURL(badgeDataUrl);
+        if (!overlay.isEmpty()) {
+          Mainwindow.setOverlayIcon(overlay, `${count} unread notification${count !== 1 ? 's' : ''}`);
+        }
+      } catch (_) {
+        // Overlay rendering failed; clear stale overlay
+        Mainwindow.setOverlayIcon(null, '');
+      }
+    } else {
+      Mainwindow.setOverlayIcon(null, '');
+    }
+  }
+
+  if (tray && !tray.isDestroyed()) {
+    tray.setToolTip(
+      count > 0
+        ? `Voice by WHUB — ${count} unread`
+        : 'Voice by WHUB'
+    );
+  }
+}
+
+ipcMain.on('update-badge-count', (_event, payload) => {
+  const count = typeof payload === 'number' ? payload : (payload?.count ?? 0);
+  const dataUrl = typeof payload === 'object' ? payload?.dataUrl : undefined;
+  updateBadgeCount(Math.max(0, count), dataUrl || null);
+});
 
 ipcMain.on('check-for-updates', (event) => {
   lastCheckSource = 'manual';
@@ -337,11 +373,56 @@ function createAppMenu() {
   Menu.setApplicationMenu(menu);
 }
 
+function createTray() {
+  const trayIconPath = path.join(__dirname, '..', 'public', 'mini-log.ico');
+  const fallbackPath = path.join(__dirname, '..', 'public', 'logo.ico');
+  let icon;
+  try {
+    icon = nativeImage.createFromPath(trayIconPath);
+    if (icon.isEmpty()) icon = nativeImage.createFromPath(fallbackPath);
+  } catch (_) {
+    try { icon = nativeImage.createFromPath(fallbackPath); } catch (__) { return; }
+  }
+  if (!icon || icon.isEmpty()) return;
+
+  tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  tray.setToolTip('Voice by WHUB');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Open Voice by WHUB',
+      click: () => {
+        if (Mainwindow && !Mainwindow.isDestroyed()) {
+          if (Mainwindow.isMinimized()) Mainwindow.restore();
+          Mainwindow.show();
+          Mainwindow.focus();
+        }
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => app.quit(),
+    },
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  tray.on('click', () => {
+    if (Mainwindow && !Mainwindow.isDestroyed()) {
+      if (Mainwindow.isMinimized()) Mainwindow.restore();
+      Mainwindow.show();
+      Mainwindow.focus();
+    }
+  });
+}
+
 app.on("ready", () => {
     if (process.platform === 'win32') {
       app.setAppUserModelId('com.windshieldhub.voice');
     }
     createWindow();
+    createTray();
     createAppMenu();
     setupAutoUpdater();
     if (pendingDeepLink) {
@@ -368,6 +449,10 @@ app.on('before-quit', () => {
     updateCheckTimer = null;
   }
   destroyCallProgressWindow();
+  if (tray && !tray.isDestroyed()) {
+    tray.destroy();
+    tray = null;
+  }
 });
 
 function isMainWindowForeground() {

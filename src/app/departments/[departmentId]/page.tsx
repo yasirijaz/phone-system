@@ -13,7 +13,7 @@ import CallLog from "@/components/call-log";
 import AppHeader from "@/components/app-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { getOperators, getDepartments, updateDndStatus, getDndStatus } from "@/services/departmentService";
+import { getOperators, getDepartments, updateDndStatus, getDndStatus, markDepartmentAsRead } from "@/services/departmentService";
 import { getContacts } from "@/services/contactService";
 import { getUsersByCompany } from "@/services/userService";
 import { Switch } from "@/components/ui/switch";
@@ -161,6 +161,12 @@ export default function DepartmentDetailPage() {
             
             setPhoneNumbers(numbers);
             setDndStatus(dnd.is_dnd);
+
+            markDepartmentAsRead(departmentId)
+              .then(() => {
+                try { events.emitDebounced('refreshDepartmentsUnread', 1000); } catch (_) {}
+              })
+              .catch(() => {});
         } catch (error) {
              toast({ title: "Error", description: "Failed to load initial department data.", variant: "destructive" });
         }

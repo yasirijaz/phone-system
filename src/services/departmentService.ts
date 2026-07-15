@@ -1,6 +1,6 @@
 
 import axios from '@/lib/axios';
-import { cacheGet, cacheInvalidatePrefix, cacheSet } from '@/lib/simpleCache';
+import { cacheGet, cacheInvalidatePrefix, cacheSet, cacheDel } from '@/lib/simpleCache';
 import type { Department, Operator, User } from '@/types';
 
 const DEPARTMENT_SUMMARY_CACHE_TTL = 5_000;
@@ -72,6 +72,13 @@ export const leaveDepartment = async (departmentId: number): Promise<{ message?:
   const response = await axios.post(`/api/departments/${departmentId}/leave`);
   invalidateDepartmentsSummaryCache();
   return response.data;
+};
+
+export const markDepartmentAsRead = async (departmentId: number): Promise<void> => {
+  await axios.post(`/api/departments/${departmentId}/mark-read`);
+  invalidateDepartmentsSummaryCache();
+  cacheInvalidatePrefix('unread-logs:');
+  cacheInvalidatePrefix('sidebar:');
 };
 
 export interface DepartmentUserAssignment {
