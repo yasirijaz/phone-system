@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode, useRef } from 'react';
 import type { Device, Call } from '@twilio/voice-sdk';
-import type { Activity, ConferenceOptions, Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
+import type { ConferenceOptions, Worker as TwilioWorker, Reservation } from 'twilio-taskrouter';
 
 import axios from '@/lib/axios';
 import {
@@ -85,11 +85,6 @@ declare global {
 
 const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
 
-type ConferenceOptionsWithPostWork = ConferenceOptions & {
-  postWorkActivitySid?: string;
-  dequeuePostWorkActivitySid?: string;
-};
-
 export function TwilioProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -139,15 +134,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     acceptReservationAndMerge: async () => {},
     isAgentOnCall: () => false,
   });
-
-  const getAvailableActivitySid = useCallback(() => {
-    const worker = workerRef.current;
-    const availableActivity = worker
-      ? Array.from(worker.activities.values()).find((activity: Activity) => activity.name === 'Available')
-      : null;
-
-    return availableActivity?.sid ?? null;
-  }, []);
 
   const logReservationState = useCallback((message: string, reservation?: Reservation | null, extra: Record<string, unknown> = {}) => {
     const worker = workerRef.current;
@@ -1221,14 +1207,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     const conferenceCallback = process.env.NEXT_PUBLIC_API_URL + '/api/twilio/conference-callback';
     const recordingCallback = process.env.NEXT_PUBLIC_API_URL + '/api/twilio/recording-callback';
     const conferenceEventCallback = process.env.NEXT_PUBLIC_API_URL + '/api/twilio/conference-eventCallback';
-    const availableActivitySid = getAvailableActivitySid();
 
-    logReservationState('Accepting reservation into conference', reservation, {
-      postWorkActivitySid: availableActivitySid,
-      dequeuePostWorkActivitySid: availableActivitySid,
-    });
+    logReservationState('Accepting reservation into conference', reservation);
 
-    const conferenceOptions: ConferenceOptionsWithPostWork = {
+    const conferenceOptions: ConferenceOptions = {
       conferenceStatusCallback: conferenceCallback,
       conferenceStatusCallbackMethod: 'POST',
       conferenceStatusCallbackEvent: 'start,end,join,leave',
@@ -1241,12 +1223,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       recordingStatusCallback: recordingCallback,
       conferenceRecordingStatusCallback: conferenceEventCallback,
       conferenceRecord: 'record-from-start', //[true, false, 'record-from-start', 'do-not-record']
-      ...(availableActivitySid
-        ? {
-            postWorkActivitySid: availableActivitySid,
-            dequeuePostWorkActivitySid: availableActivitySid,
-          }
-        : {}),
     };
 
     reservation.conference(conferenceOptions).catch((error: unknown) => {
