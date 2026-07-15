@@ -17,6 +17,7 @@ const electronSendChannels = [
   'focus-main-window',
   'end-call-from-progress',
   'open-external-url',
+  'update-badge-count',
 ];
 
 const electronReceiveChannels = [

@@ -24,6 +24,7 @@ import {
   type DepartmentSummaryItem,
 } from '@/services/departmentService';
 import { getContacts } from '@/services/contactService';
+import { debounce } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +58,36 @@ interface RecentItem {
 
 const SIDEBAR_CACHE_TTL = 2 * 60_000;
 const SIDEBAR_CACHE_VERSION = 'v3';
+
+let badgeCanvas: HTMLCanvasElement | null = null;
+
+function renderBadgeDataUrl(count: number): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  if (!badgeCanvas) {
+    badgeCanvas = document.createElement('canvas');
+    badgeCanvas.width = 16;
+    badgeCanvas.height = 16;
+  }
+  const ctx = badgeCanvas.getContext('2d');
+  if (!ctx) return undefined;
+
+  const size = 16;
+  const label = count > 99 ? '99+' : String(count);
+  const fontSize = label.length > 2 ? 7 : label.length > 1 ? 9 : 11;
+
+  ctx.clearRect(0, 0, size, size);
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+  ctx.fillStyle = '#ef4444';
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, size / 2, size / 2 + 1);
+
+  return badgeCanvas.toDataURL('image/png');
+}
 
 function sidebarCacheKey(userId: number): string {
   return `sidebar:${SIDEBAR_CACHE_VERSION}:${userId}`;
@@ -175,6 +206,83 @@ export function InAppSidebar() {
     }
   }, [user?.id, user?.company_id]);
 
+  const sendBadgeCount = useCallback((deptUnread: number, inbox: number) => {
+    if (!isElectron() || !window.electronAPI) return;
+    try {
+      const total = deptUnread + inbox;
+      if (total <= 0) {
+        window.electronAPI.send('update-badge-count', { count: 0 });
+        return;
+      }
+      const dataUrl = renderBadgeDataUrl(total);
+      window.electronAPI.send('update-badge-count', { count: total, dataUrl });
+    } catch (_) {}
+  }, []);
+
+  const refreshInboxAndRecents = useCallback(async () => {
+    if (!user?.id || !user?.company_id) return;
+
+    try {
+      const [recentCommsResponse, contacts] = await Promise.all([
+        getCommunications({ limit: 50, scope: 'assigned' }),
+        getContacts(user.company_id),
+      ]);
+
+      const recentComms = Array.isArray(recentCommsResponse.results) ? recentCommsResponse.results : [];
+      const newInboxUnread = recentComms.filter((c) => !c.is_read).length;
+      setInboxUnread(newInboxUnread);
+
+      const uniqueRecents: { [key: string]: RecentItem } = {};
+      recentComms.forEach((comm: Communication) => {
+        const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
+        const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
+
+        if (!uniqueRecents[otherPartyNumber]) {
+          const contact = contacts
+            ? contacts.find((c: Contact) => c.phone_no === otherPartyNumber)
+            : null;
+          const display = getOtherPartyDisplay(comm, contact);
+          uniqueRecents[otherPartyNumber] = {
+            id: otherPartyNumber,
+            name: display.displayName,
+            href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}`,
+            initials: display.initial,
+            unread_count: 0,
+          };
+        }
+      });
+
+      Object.keys(uniqueRecents).forEach((number) => {
+        const unreadCount = recentComms.filter(
+          (c) => (c.direction === 'inbound' ? c.from : c.to) === number && !c.is_read
+        ).length;
+        uniqueRecents[number].unread_count = unreadCount;
+      });
+
+      const recents = Object.values(uniqueRecents).slice(0, 10);
+      setRecentItems(recents);
+
+      // Update sidebar cache with fresh inbox/recents data
+      const cacheKey = sidebarCacheKey(user.id);
+      const cached = cacheGet<{
+        departments: DepartmentWithUnread[];
+        recentItems: RecentItem[];
+        inboxUnread: number;
+      }>(cacheKey);
+      cacheSet(cacheKey, {
+        departments: cached?.departments ?? departmentsRef.current,
+        recentItems: recents,
+        inboxUnread: newInboxUnread,
+      }, SIDEBAR_CACHE_TTL);
+
+      // Update Electron badge
+      const deptTotal = departmentsRef.current.reduce((sum, d) => sum + d.unread_count, 0);
+      sendBadgeCount(deptTotal, newInboxUnread);
+    } catch (e) {
+      console.error('Failed to refresh inbox/recents unread counts', e);
+    }
+  }, [user?.id, user?.company_id, sendBadgeCount]);
+
   const refreshDepartmentUnreadBadges = useCallback(async (targetDepartmentId?: number) => {
     if (!user?.id) return;
 
@@ -196,6 +304,10 @@ export function InAppSidebar() {
         cacheInvalidatePrefix('unread-logs:');
         const summary = await getDepartmentsSummary(departmentIds, { assignedOnly: true });
         applySummaryUpdates(summary.departments);
+
+        // Also update Electron badge after department refresh
+        const deptTotal = summary.departments.reduce((sum, d) => sum + (d.unread?.total ?? 0), 0);
+        sendBadgeCount(deptTotal, inboxUnread);
       } catch (e) {
         console.error('Failed to refresh department unread badges', e);
       } finally {
@@ -205,7 +317,7 @@ export function InAppSidebar() {
 
     unreadRefreshRef.current = request;
     await request;
-  }, [user?.id, applySummaryUpdates]);
+  }, [user?.id, applySummaryUpdates, inboxUnread, sendBadgeCount]);
 
   const fetchInitialSidebarData = useCallback(async () => {
     if (!user?.id || !user?.company_id) return;
@@ -239,7 +351,7 @@ export function InAppSidebar() {
 
         const [summary, recentCommsResponse, contacts] = await Promise.all([
           getDepartmentsSummary(undefined, { assignedOnly: true }),
-          getCommunications({ limit: 50 }),
+          getCommunications({ limit: 50, scope: 'assigned' }),
           getContacts(companyId),
         ]);
 
@@ -290,6 +402,9 @@ export function InAppSidebar() {
           recentItems: recents,
           inboxUnread: inboxUnreadCount,
         }, SIDEBAR_CACHE_TTL);
+
+        const deptTotal = deptsWithCounts.reduce((sum, d) => sum + d.unread_count, 0);
+        sendBadgeCount(deptTotal, inboxUnreadCount);
       } catch (error) {
         console.error('Failed to fetch sidebar data', error);
         setDepartments([]);
@@ -303,7 +418,7 @@ export function InAppSidebar() {
 
     initialLoadRef.current = request;
     await request;
-  }, [user]);
+  }, [user, sendBadgeCount]);
 
   useEffect(() => {
     if (!user) return;
@@ -312,7 +427,13 @@ export function InAppSidebar() {
 
     const handleUnreadRefresh = () => {
       void refreshDepartmentUnreadBadges();
+      void refreshInboxAndRecents();
     };
+
+    const debouncedInboxRefresh = debounce(() => {
+      cacheDel(sidebarCacheKey(user.id));
+      void refreshInboxAndRecents();
+    }, 1500);
 
     const handleDndStatusChange = (data: { department_id?: number; is_dnd?: boolean }) => {
       if (data?.department_id == null || data?.is_dnd === undefined) return;
@@ -327,13 +448,15 @@ export function InAppSidebar() {
     };
 
     events.on('refreshDepartmentsUnread', handleUnreadRefresh);
+    events.on('refreshCalls', debouncedInboxRefresh);
     events.on('refreshOperators', handleDndStatusChange);
 
     return () => {
       events.off('refreshDepartmentsUnread', handleUnreadRefresh);
+      events.off('refreshCalls', debouncedInboxRefresh);
       events.off('refreshOperators', handleDndStatusChange);
     };
-  }, [user, fetchInitialSidebarData, refreshDepartmentUnreadBadges]);
+  }, [user, fetchInitialSidebarData, refreshDepartmentUnreadBadges, refreshInboxAndRecents]);
 
   return (
     <>

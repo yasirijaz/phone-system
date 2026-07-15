@@ -253,12 +253,14 @@ export const markRead = async (id: string, type: 'call' | 'sms'): Promise<void> 
     await axios.post(`/api/${endpoint}/${id}/mark-read`);
     cacheInvalidatePrefix('unread-logs:');
     cacheInvalidatePrefix('dept-summary:');
+    cacheInvalidatePrefix('sidebar:');
 };
 
 export const markThreadAsRead = async (from: string, to: string): Promise<void> => {
   await axios.post(`/api/communications/thread/mark-read`, { from, to });
   cacheInvalidatePrefix('unread-logs:');
   cacheInvalidatePrefix('dept-summary:');
+  cacheInvalidatePrefix('sidebar:');
 };
 
 type MarkField = 'is_starred' | 'is_spam';
