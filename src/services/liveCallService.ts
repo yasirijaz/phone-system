@@ -127,3 +127,25 @@ export async function getLiveCall(id: number): Promise<LiveCall> {
   const response = await axios.get(`/api/live-calls/${id}`);
   return response.data.live_call;
 }
+
+/** Tell the backend this admin/supervisor has the Live Calls dashboard open. */
+export async function pingLiveDashboardWatching(): Promise<void> {
+  await axios.post('/api/live-calls/watching');
+}
+
+/** Clear watching flag when leaving the Live Calls dashboard. */
+export function leaveLiveDashboardWatching(): void {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
+  fetch(`${baseUrl}/api/live-calls/leave`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: '{}',
+    keepalive: true,
+  }).catch(() => {});
+}

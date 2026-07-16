@@ -43,6 +43,8 @@ import { formatPhoneNumber, cn } from "@/lib/utils";
 import { addParticipant } from "@/services/twilioService";
 import {
   getLiveCalls,
+  leaveLiveDashboardWatching,
+  pingLiveDashboardWatching,
   type LiveCall,
   type LiveCallAnalysis,
   type LiveCallsSummary,
@@ -337,6 +339,33 @@ export default function LiveCallsPage() {
   useEffect(() => {
     if (canAccess) loadCalls();
   }, [canAccess, loadCalls]);
+
+  // Heartbeat: live AI analysis only runs while this dashboard is open.
+  useEffect(() => {
+    if (!canAccess) return;
+
+    let cancelled = false;
+    const ping = () => {
+      if (!cancelled) {
+        void pingLiveDashboardWatching().catch(() => {});
+      }
+    };
+
+    ping();
+    const interval = window.setInterval(ping, 20_000);
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') ping();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+      leaveLiveDashboardWatching();
+    };
+  }, [canAccess]);
 
   useEffect(() => {
     const onState = (payload: LiveCall) => {
