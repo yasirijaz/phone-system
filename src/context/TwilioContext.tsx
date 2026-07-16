@@ -862,11 +862,6 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         if (availableSid) {
           availableActivitySidRef.current = availableSid;
         }
-        if (status === 'Available') {
-          suppressAutoAvailableRef.current = false;
-        } else if (isUnavailableLikeActivity(status)) {
-          suppressAutoAvailableRef.current = true;
-        }
         if (status) void broadcastWorkerStatus(status, 'online');
       });
 
@@ -887,9 +882,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
             Boolean(findLiveCallOnDevice(deviceRef.current));
 
           if (onCall) {
-            if (user?.id) {
-              events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: status });
-            }
+            // Keep peers in sync while on-call (busy/unavailable state).
+            void broadcastWorkerStatus(status, 'status_change');
             return;
           }
 
@@ -1331,6 +1325,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setShowReservationModal(false);
     setIncomingReservation(null);
     incomingReservationRef.current = null;
+    setActivityName('Unavailable');
+    void broadcastWorkerStatus('Unavailable', 'status_change');
 
     const attributes = reservation.task?.attributes;
     setConferenceSid(null);

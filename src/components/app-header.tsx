@@ -144,7 +144,7 @@ export default function AppHeader({
                 description: "You are now back in your admin account.",
             });
 
-            router.push("/dashboard/ecommerce");
+            router.push("/dashboard");
         } catch (error: any) {
             toast({
                 title: "Error",

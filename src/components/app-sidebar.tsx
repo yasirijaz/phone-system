@@ -9,18 +9,14 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
-import { LogOut, Phone, Building, Users, Settings, LayoutGrid, ChevronDown, UserCog, Package, CreditCard, AppWindow, UploadCloud, Plug } from 'lucide-react';
+import { LogOut, Phone, Building, Users, Settings, LayoutGrid, UserCog, Package, CreditCard, AppWindow, UploadCloud, Plug } from 'lucide-react';
 import { Button } from './ui/button';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { useState } from 'react';
 import { isElectron } from '@/lib/is-electron';
 import {
   isPlatformAdmin,
@@ -38,7 +34,6 @@ export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const [isDashboardOpen, setIsDashboardOpen] = useState(pathname.startsWith('/dashboard'));
   const inElectron = isElectron();
 
   const handleLogout = () => {
@@ -87,35 +82,15 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {!inElectron && (
-                <Collapsible open={isDashboardOpen} onOpenChange={setIsDashboardOpen}>
-                  <SidebarMenuItem>
-                      <CollapsibleTrigger asChild>
-                           <SidebarMenuButton tooltip="Dashboard" className="justify-between">
-                              <div className="flex items-center gap-2">
-                                  <LayoutGrid />
-                                  <span>Dashboard</span>
-                              </div>
-                              <ChevronDown className={`h-4 w-4 transition-transform group-data-[collapsible=icon]:hidden ${isDashboardOpen ? 'rotate-180' : ''}`} />
-                          </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                  </SidebarMenuItem>
-                   <CollapsibleContent>
-                      <SidebarMenuSub>
-                         <SidebarMenuItem>
-                              <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/ecommerce'}>
-                                 <Link href="/dashboard/ecommerce">eCommerce</Link>
-                              </SidebarMenuSubButton>
-                          </SidebarMenuItem>
-                           <SidebarMenuItem>
-                              <SidebarMenuSubButton asChild isActive={pathname === '/dashboard/calls'}>
-                                 <Link href="/dashboard/calls">Calls</Link>
-                              </SidebarMenuSubButton>
-                          </SidebarMenuItem>
-                      </SidebarMenuSub>
-                   </CollapsibleContent>
-                </Collapsible>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard')} tooltip="Dashboard">
+                    <Link href="/dashboard">
+                      <LayoutGrid />
+                      <span>Dashboard</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               )}
-               
             </>
           )}
            {canAccessDepartments(user?.role_id) && (

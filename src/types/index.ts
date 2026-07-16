@@ -319,3 +319,123 @@ export interface MediaFile {
     created_at: string;
     updated_at: string;
 }
+
+export type DashboardTimeRange = '24h' | '7d' | '30d' | '12m';
+
+export interface DashboardSeriesPoint {
+  bucket: string;
+  label: string;
+  calls: number;
+  duration_seconds: number;
+}
+
+export interface DashboardNamedCount {
+  name: string;
+  value: number;
+  key: string;
+}
+
+export interface DashboardTopContact {
+  phone: string | null;
+  name: string | null;
+  label: string;
+  calls: number;
+  duration_seconds: number;
+}
+
+export interface DashboardTopAgent {
+  user_id: number;
+  name: string;
+  email?: string | null;
+  calls: number;
+  duration_seconds: number;
+}
+
+export interface DashboardTopDepartment {
+  department_id: number;
+  name: string;
+  calls: number;
+  duration_seconds: number;
+}
+
+export interface DashboardRecentCall {
+  id: number;
+  from: string | null;
+  to: string | null;
+  contact_phone: string | null;
+  direction: 'inbound' | 'outbound';
+  call_status: string | null;
+  duration_seconds: number;
+  department: { id: number; name: string } | null;
+  user: { id: number; name: string } | null;
+  has_recording: boolean;
+  has_voicemail: boolean;
+  created_at: string | null;
+}
+
+export interface DashboardSummary {
+  total_calls: number;
+  completed: number;
+  missed: number;
+  rejected: number;
+  in_progress: number;
+  total_duration_seconds: number;
+  avg_duration_seconds: number;
+  answer_rate: number;
+  inbound: number;
+  outbound: number;
+  sms_count: number;
+  voicemail_count: number;
+  recording_count: number;
+  active_agents: number;
+}
+
+export interface DashboardPreviousSummary {
+  total_calls: number;
+  completed: number;
+  missed: number;
+  rejected: number;
+  in_progress: number;
+  total_duration_seconds: number;
+  avg_duration_seconds: number;
+  answer_rate: number;
+  inbound: number;
+  outbound: number;
+  sms_count: number;
+}
+
+export interface DashboardTrends {
+  total_calls: number | null;
+  total_duration: number | null;
+  avg_duration: number | null;
+  answer_rate: number | null;
+  missed: number | null;
+  sms_count: number | null;
+}
+
+export interface DashboardStats {
+  range: DashboardTimeRange;
+  period: {
+    start: string;
+    end: string;
+    previous_start: string;
+    previous_end: string;
+  };
+  summary: DashboardSummary;
+  previous_summary: DashboardPreviousSummary;
+  trends: DashboardTrends;
+  series: DashboardSeriesPoint[];
+  status_breakdown: DashboardNamedCount[];
+  direction_breakdown: DashboardNamedCount[];
+  top_contacts: DashboardTopContact[];
+  top_agents: DashboardTopAgent[];
+  top_departments: DashboardTopDepartment[];
+  active_agents: Array<{
+    id: number;
+    name: string;
+    email?: string | null;
+    profile_picture?: string | null;
+    in_call?: number;
+  }>;
+  recent_calls: DashboardRecentCall[];
+}
