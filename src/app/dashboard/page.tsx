@@ -337,7 +337,7 @@ export default function DashboardPage() {
                     <Tooltip
                       cursor={{ fill: 'hsla(var(--accent), 0.5)' }}
                       contentStyle={chartTooltipStyle}
-                      formatter={(value: ValueType, name: NameType) => {
+                      formatter={(value: ValueType | undefined, name: NameType | undefined) => {
                         const numericValue =
                           typeof value === 'number'
                             ? value
