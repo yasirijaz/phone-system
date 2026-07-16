@@ -981,7 +981,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
               outgoing,
               {
                 accept: true,
-                statusCallbackUrl: process.env.NEXT_PUBLIC_API_URL + '/api/twilio/call-status',
+                statusCallbackUrl: process.env.NEXT_PUBLIC_API_URL + '/api/twilio/statusEventCallback',
                 to: attributes.to,
               }
             )
@@ -1377,7 +1377,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         outgoing,
         {
           accept: true,
-          statusCallbackUrl: process.env.NEXT_PUBLIC_API_URL + '/api/twilio/call-status',
+          statusCallbackUrl: process.env.NEXT_PUBLIC_API_URL + '/api/twilio/statusEventCallback',
           to: attributes.to,
         }
       )
