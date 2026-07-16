@@ -3,13 +3,36 @@ import { events } from '@/lib/events';
 
 export type WorkerActivityName = 'Available' | 'Unavailable' | 'Offline' | string;
 
+/** Normalize TaskRouter / presence activity labels to canonical UI names. */
+export function normalizeWorkerActivityName(
+  status: string | null | undefined
+): WorkerActivityName | null {
+  if (!status || typeof status !== 'string') return null;
+  switch (status.trim().toLowerCase()) {
+    case 'available':
+      return 'Available';
+    case 'unavailable':
+      return 'Unavailable';
+    case 'offline':
+      return 'Offline';
+    default:
+      return status;
+  }
+}
+
+export function isUnavailableLikeActivity(status: string | null | undefined): boolean {
+  const normalized = normalizeWorkerActivityName(status);
+  return normalized === 'Unavailable' || normalized === 'Offline';
+}
+
 export function getWorkerStatusFromUser(
   user: User | Record<string, unknown> | null | undefined
 ): WorkerActivityName | undefined {
   if (!user) return undefined;
   const u = user as Record<string, unknown>;
   const status = u.worker_status ?? u.activity_name ?? u.activity ?? u.worker_activity;
-  return typeof status === 'string' && status.length > 0 ? status : undefined;
+  if (typeof status !== 'string' || !status.length) return undefined;
+  return normalizeWorkerActivityName(status) ?? status;
 }
 
 export function parseWorkerStatusPayload(
@@ -20,7 +43,10 @@ export function parseWorkerStatusPayload(
   const status =
     data.worker_status ?? data.activity_name ?? data.activity ?? data.status;
   if (userId == null || typeof status !== 'string' || !status) return null;
-  return { user_id: Number(userId), worker_status: status };
+  return {
+    user_id: Number(userId),
+    worker_status: normalizeWorkerActivityName(status) ?? status,
+  };
 }
 
 export function dispatchOperatorStatusUpdate(
