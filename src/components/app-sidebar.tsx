@@ -11,7 +11,7 @@ import {
   SidebarGroupLabel,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
-import { LogOut, Phone, Building, Users, Settings, LayoutGrid, UserCog, Package, CreditCard, AppWindow, UploadCloud, Plug } from 'lucide-react';
+import { LogOut, Phone, Building, Users, Settings, LayoutGrid, UserCog, Package, CreditCard, AppWindow, UploadCloud, Plug, Radio } from 'lucide-react';
 import { Button } from './ui/button';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -27,6 +27,7 @@ import {
   canAccessDepartments,
   canAccessBilling,
   canAccessCompanySettings,
+  hasSupervisorAccess,
 } from '@/lib/roles';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
@@ -46,6 +47,7 @@ export function AppSidebar() {
   const isMgr = isManager(user?.role_id);
   const isUser = isRegularUser(user?.role_id);
   const isScopedAdmin = isCompanyScopedAdmin(user?.role_id);
+  const isSupervisor = hasSupervisorAccess(user?.role_id);
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
   const usersLink = user?.company_id ? `/companies/${user.company_id}/members` : '/companies';
@@ -87,6 +89,16 @@ export function AppSidebar() {
                     <Link href="/dashboard">
                       <LayoutGrid />
                       <span>Dashboard</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {isSupervisor && !inElectron && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith('/live-calls')} tooltip="Live Calls">
+                    <Link href="/live-calls">
+                      <Radio />
+                      <span>Live Intel</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

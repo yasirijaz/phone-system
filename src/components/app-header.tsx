@@ -268,6 +268,16 @@ export default function AppHeader({
                     events.emit("refreshInCallStatus", data.data);
                 }
 
+                if (data.method_type === "live_call_notification" && data.data) {
+                    if (data.task_type === "live_call_state") {
+                        events.emit("liveCallState", data.data);
+                    } else if (data.task_type === "live_transcript") {
+                        events.emit("liveTranscript", data.data);
+                    } else if (data.task_type === "live_analysis") {
+                        events.emit("liveAnalysis", data.data);
+                    }
+                }
+
                 if (
                     data.method_type === "conference_invite_notification" &&
                     data.task_type === "conference_invite" &&
