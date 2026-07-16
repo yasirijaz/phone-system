@@ -113,6 +113,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const connectionSourceRef = useRef<'device' | 'reservation' | null>(null);
   const expectingReservationDeviceLegRef = useRef(false);
   const reservationLifecycleAttachedRef = useRef<WeakSet<Reservation>>(new WeakSet());
+  const availableActivitySidRef = useRef<string | null>(null);
   const conferenceSidRef = useRef<string | null>(null);
   const hangUpFromOverlayRef = useRef<() => void>(() => {});
   const pendingMergeConferenceSidRef = useRef<string | null>(null);
@@ -368,7 +369,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const isIgnorableReservationError = (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
-    return message.includes('Invalid state transition');
+    return (
+      message.includes('Invalid state transition') ||
+      message.includes('ReservationDescriptor') ||
+      message.includes('does not contain all properties of a Reservation')
+    );
   };
 
   const safeCompleteReservation = useCallback(async (reservation?: Reservation | null) => {
@@ -451,6 +456,80 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     [user?.id]
   );
 
+  const resolveAvailableActivitySid = useCallback(() => {
+    if (availableActivitySidRef.current) {
+      return availableActivitySidRef.current;
+    }
+
+    const worker = workerRef.current;
+    const fromWorker = worker
+      ? Array.from(worker.activities.values()).find((activity) => activity.name === 'Available')?.sid
+      : null;
+
+    if (fromWorker) {
+      availableActivitySidRef.current = fromWorker;
+    }
+
+    return fromWorker ?? null;
+  }, []);
+
+  /**
+   * Task queues move workers to Offline/Unavailable on assignment. Conference legs do not
+   * always restore Available (especially when the JS SDK fails ReservationDescriptor updates),
+   * so force Available after wrap-up/completion.
+   */
+  const restoreWorkerToAvailable = useCallback(
+    async (reason: string) => {
+      const worker = workerRef.current;
+      if (!worker) return;
+
+      const available = Array.from(worker.activities.values()).find(
+        (activity) => activity.name === 'Available'
+      );
+
+      if (!available) {
+        console.warn('Available activity not found on worker', { reason });
+        try {
+          await broadcastOperatorPresence({ event: 'status_change', worker_status: 'Available' });
+          setActivityName('Available');
+          if (user?.id) {
+            events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: 'Available' });
+          }
+        } catch (error) {
+          console.warn('Failed to restore Available via presence broadcast:', error);
+        }
+        return;
+      }
+
+      if (available.isCurrent) {
+        setActivityName('Available');
+        return;
+      }
+
+      try {
+        logReservationState('Restoring worker to Available', activeReservationRef.current, {
+          reason,
+          activitySid: available.sid,
+        });
+        await available.setAsCurrent();
+        setActivityName(available.name);
+        void broadcastWorkerStatus(available.name);
+      } catch (error) {
+        console.warn('Failed to set Available via TaskRouter SDK, falling back to API:', error);
+        try {
+          await broadcastOperatorPresence({ event: 'status_change', worker_status: 'Available' });
+          setActivityName('Available');
+          if (user?.id) {
+            events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: 'Available' });
+          }
+        } catch (broadcastError) {
+          console.warn('Failed to restore Available via presence broadcast:', broadcastError);
+        }
+      }
+    },
+    [broadcastWorkerStatus, logReservationState, user?.id]
+  );
+
   const attachReservationLifecycleHandlers = useCallback((reservation: Reservation) => {
     if (reservationLifecycleAttachedRef.current.has(reservation)) {
       return;
@@ -459,7 +538,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     reservation.on('wrapup', () => {
       logReservationState('Reservation entered wrapup', reservation);
-      void safeCompleteReservation(reservation);
+      void (async () => {
+        await safeCompleteReservation(reservation);
+        await restoreWorkerToAvailable('reservation.wrapup');
+      })();
     });
 
     reservation.on('completed', () => {
@@ -467,8 +549,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       if (activeReservationRef.current === reservation) {
         clearActiveCallState();
       }
+      void restoreWorkerToAvailable('reservation.completed');
     });
-  }, [clearActiveCallState, safeCompleteReservation, logReservationState]);
+  }, [clearActiveCallState, restoreWorkerToAvailable, safeCompleteReservation, logReservationState]);
 
   const clearDeviceConnectionState = useCallback(() => {
     setConnection(null);
@@ -516,6 +599,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     try {
       const tokenRes = await axios.post('/api/twilio/token');
       const token = tokenRes.data.data.token;
+      availableActivitySidRef.current =
+        typeof tokenRes.data?.data?.available_activity_sid === 'string'
+          ? tokenRes.data.data.available_activity_sid
+          : null;
 
       if (typeof token !== 'string') throw new Error('Invalid token format received from server.');
 
@@ -753,6 +840,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         setIsWorkerReady(true);
         const status = worker.activity?.name || null;
         setActivityName(status);
+        const availableSid = Array.from(worker.activities.values()).find(
+          (activity) => activity.name === 'Available'
+        )?.sid;
+        if (availableSid) {
+          availableActivitySidRef.current = availableSid;
+        }
         if (status) void broadcastWorkerStatus(status, 'online');
       });
 
@@ -1044,14 +1137,20 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const scheduleReservationFinalize = useCallback((reservation?: Reservation | null) => {
     const target = reservation ?? activeReservationRef.current;
-    if (!target) return;
+    if (!target) {
+      void restoreWorkerToAvailable('no-reservation-finalize');
+      return;
+    }
 
     for (const delayMs of [500, 2000, 5000]) {
       window.setTimeout(() => {
-        void safeCompleteReservation(target);
+        void (async () => {
+          await safeCompleteReservation(target);
+          await restoreWorkerToAvailable(`finalize-${delayMs}ms`);
+        })();
       }, delayMs);
     }
-  }, [safeCompleteReservation]);
+  }, [restoreWorkerToAvailable, safeCompleteReservation]);
 
   const leaveCall = async (conferenceSid: string, callSid: string) => {
     const reservationToFinalize = activeReservationRef.current;
@@ -1210,7 +1309,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     logReservationState('Accepting reservation into conference', reservation);
 
-    const conferenceOptions: ConferenceOptions = {
+    const postWorkActivitySid = resolveAvailableActivitySid();
+    const conferenceOptions: ConferenceOptions & { postWorkActivitySid?: string } = {
       conferenceStatusCallback: conferenceCallback,
       conferenceStatusCallbackMethod: 'POST',
       conferenceStatusCallbackEvent: 'start,end,join,leave',
@@ -1223,6 +1323,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       recordingStatusCallback: recordingCallback,
       conferenceRecordingStatusCallback: conferenceEventCallback,
       conferenceRecord: 'record-from-start', //[true, false, 'record-from-start', 'do-not-record']
+      ...(postWorkActivitySid ? { postWorkActivitySid } : {}),
     };
 
     reservation.conference(conferenceOptions).catch((error: unknown) => {
@@ -1282,7 +1383,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const completeReservation = (reservation: Reservation) => {
     console.log('completing reservation', reservation)
-    void safeCompleteReservation(reservation);
+    void (async () => {
+      await safeCompleteReservation(reservation);
+      await restoreWorkerToAvailable('completeReservation');
+    })();
     clearActiveCallState();
   };
 
