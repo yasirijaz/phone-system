@@ -120,6 +120,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const availableActivitySidRef = useRef<string | null>(null);
   /** User explicitly chose Unavailable/Offline — do not auto-restore Available after calls. */
   const suppressAutoAvailableRef = useRef(false);
+  const lastPresenceBroadcastRef = useRef<{ status: string; at: number } | null>(null);
+  const restoreInFlightRef = useRef(false);
   const conferenceSidRef = useRef<string | null>(null);
   const hangUpFromOverlayRef = useRef<() => void>(() => {});
   const pendingMergeConferenceSidRef = useRef<string | null>(null);
@@ -450,16 +452,40 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   }, [logReservationState]);
 
   const broadcastWorkerStatus = useCallback(
-    async (status: string, event: OperatorPresenceEvent = 'status_change') => {
+    async (
+      status: string,
+      event: OperatorPresenceEvent = 'status_change',
+      options?: { force?: boolean; localOnly?: boolean; syncTwilio?: boolean }
+    ) => {
       if (!user?.id || !status) return;
-      events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: status });
+
+      const normalized = normalizeWorkerActivityName(status) || status;
+      setActivityName(normalized);
+      events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: normalized });
+
+      if (options?.localOnly) return;
+
+      // TaskRouter activity can oscillate while reserved/on-call; only explicit transitions
+      // (accept, hangup restore, manual toggle, worker ready) should hit the presence API.
+      if (!options?.force && isAgentOnCall()) return;
+
+      const last = lastPresenceBroadcastRef.current;
+      if (!options?.force && last?.status === normalized && Date.now() - last.at < 5_000) {
+        return;
+      }
+
+      lastPresenceBroadcastRef.current = { status: normalized, at: Date.now() };
       try {
-        await broadcastOperatorPresence({ event, worker_status: status });
+        await broadcastOperatorPresence({
+          event,
+          worker_status: normalized,
+          sync_twilio: options?.syncTwilio ?? false,
+        });
       } catch (error) {
         console.warn('Failed to broadcast operator presence:', error);
       }
     },
-    [user?.id]
+    [user?.id, isAgentOnCall]
   );
 
   const resolveAvailableActivitySid = useCallback(() => {
@@ -488,10 +514,19 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
    */
   const restoreWorkerToAvailable = useCallback(
     async (reason: string) => {
+      if (isAgentOnCall()) {
+        return;
+      }
+
       if (suppressAutoAvailableRef.current) {
         logReservationState('Skipping Available restore (user chose Unavailable/Offline)', null, {
           reason,
         });
+        return;
+      }
+
+      const now = Date.now();
+      if (restoreInFlightRef.current || now - (lastPresenceBroadcastRef.current?.at ?? 0) < 1_500) {
         return;
       }
 
@@ -504,46 +539,40 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       if (!available) {
         console.warn('Available activity not found on worker', { reason });
+        restoreInFlightRef.current = true;
         try {
-          await broadcastOperatorPresence({ event: 'status_change', worker_status: 'Available' });
-          setActivityName('Available');
-          if (user?.id) {
-            events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: 'Available' });
-          }
-        } catch (error) {
-          console.warn('Failed to restore Available via presence broadcast:', error);
+          await broadcastWorkerStatus('Available', 'status_change', { force: true, syncTwilio: true });
+        } finally {
+          restoreInFlightRef.current = false;
         }
         return;
       }
 
       if (available.isCurrent) {
-        setActivityName('Available');
-        void broadcastWorkerStatus('Available');
+        void broadcastWorkerStatus('Available', 'status_change', { localOnly: true });
         return;
       }
 
+      restoreInFlightRef.current = true;
       try {
         logReservationState('Restoring worker to Available', activeReservationRef.current, {
           reason,
           activitySid: available.sid,
         });
         await available.setAsCurrent();
-        setActivityName('Available');
-        void broadcastWorkerStatus('Available');
+        await broadcastWorkerStatus('Available', 'status_change', { force: true });
       } catch (error) {
         console.warn('Failed to set Available via TaskRouter SDK, falling back to API:', error);
         try {
-          await broadcastOperatorPresence({ event: 'status_change', worker_status: 'Available' });
-          setActivityName('Available');
-          if (user?.id) {
-            events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: 'Available' });
-          }
+          await broadcastWorkerStatus('Available', 'status_change', { force: true, syncTwilio: true });
         } catch (broadcastError) {
           console.warn('Failed to restore Available via presence broadcast:', broadcastError);
         }
+      } finally {
+        restoreInFlightRef.current = false;
       }
     },
-    [broadcastWorkerStatus, logReservationState, user?.id]
+    [broadcastWorkerStatus, isAgentOnCall, logReservationState]
   );
 
   const attachReservationLifecycleHandlers = useCallback((reservation: Reservation) => {
@@ -862,48 +891,47 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         if (availableSid) {
           availableActivitySidRef.current = availableSid;
         }
-        if (status) void broadcastWorkerStatus(status, 'online');
+        if (status) void broadcastWorkerStatus(status, 'online', { force: true });
       });
 
       newWorker.on('activityUpdated', (worker: TwilioWorker) => {
         const rawStatus = worker.activity?.name || null;
         const status = normalizeWorkerActivityName(rawStatus) || rawStatus;
-        setActivityName(status);
-
         if (!status) return;
 
-        // Task queues force Offline/Unavailable while reserved/assigned. Echoing that through
-        // /operators/presence after hangup was marking everyone offline and undoing Available.
+        const onCall =
+          Boolean(activeReservationRef.current) ||
+          expectingReservationDeviceLegRef.current ||
+          userInCallRef.current ||
+          Boolean(findLiveCallOnDevice(deviceRef.current));
+
+        // While on a call, TaskRouter may bounce between Offline/Unavailable/Available.
+        // Update local UI only — do not hit /operators/presence on every bounce.
+        if (onCall) {
+          if (status === 'Available') {
+            void broadcastWorkerStatus('Unavailable', 'status_change', { localOnly: true });
+            return;
+          }
+          if (isUnavailableLikeActivity(status)) {
+            void broadcastWorkerStatus(status, 'status_change', { localOnly: true });
+          }
+          return;
+        }
+
         if (isUnavailableLikeActivity(status)) {
-          const onCall =
-            Boolean(activeReservationRef.current) ||
-            expectingReservationDeviceLegRef.current ||
-            userInCallRef.current ||
-            Boolean(findLiveCallOnDevice(deviceRef.current));
-
-          if (onCall) {
-            // Keep peers in sync while on-call (busy/unavailable state).
-            void broadcastWorkerStatus(status, 'status_change');
-            return;
-          }
-
           if (suppressAutoAvailableRef.current) {
-            void broadcastWorkerStatus(status, 'status_change');
+            void broadcastWorkerStatus(status, 'status_change', { localOnly: true });
             return;
           }
 
-          console.log('TaskRouter left worker Offline/Unavailable after call; restoring Available', {
-            rawStatus,
-            status,
-          });
           void restoreWorkerToAvailable(`activityUpdated-${status}`);
           return;
         }
 
         if (status === 'Available') {
           suppressAutoAvailableRef.current = false;
+          void broadcastWorkerStatus(status, 'status_change', { force: true });
         }
-        void broadcastWorkerStatus(status, 'status_change');
       });
 
       newWorker.on('reservationCreated', (reservation: Reservation) => {
@@ -1193,11 +1221,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    for (const delayMs of [500, 2000, 5000]) {
+    for (const delayMs of [1500]) {
       window.setTimeout(() => {
         void (async () => {
           await safeCompleteReservation(target);
-          await restoreWorkerToAvailable(`finalize-${delayMs}ms`);
+          await restoreWorkerToAvailable('finalize');
         })();
       }, delayMs);
     }
@@ -1325,8 +1353,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setShowReservationModal(false);
     setIncomingReservation(null);
     incomingReservationRef.current = null;
-    setActivityName('Unavailable');
-    void broadcastWorkerStatus('Unavailable', 'status_change');
+    void broadcastWorkerStatus('Unavailable', 'status_change', { force: true });
 
     const attributes = reservation.task?.attributes;
     setConferenceSid(null);
@@ -1462,8 +1489,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         activitySid: newActivity.sid ?? null,
       });
       await newActivity.setAsCurrent();
-      setActivityName(normalizedName);
-      broadcastWorkerStatus(normalizedName);
+      void broadcastWorkerStatus(normalizedName, 'status_change', { force: true });
     } else {
       console.error(`Activity '${newActivityName}' not found in worker.activities`);
     }

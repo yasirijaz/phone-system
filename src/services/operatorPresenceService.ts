@@ -5,6 +5,8 @@ export type OperatorPresenceEvent = 'online' | 'offline' | 'status_change';
 export interface BroadcastOperatorPresencePayload {
   event: OperatorPresenceEvent;
   worker_status?: string;
+  /** When true, backend also writes activity to Twilio REST (default false — SDK owns activity). */
+  sync_twilio?: boolean;
 }
 
 export const broadcastOperatorPresence = async (
