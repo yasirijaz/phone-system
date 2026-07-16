@@ -20,7 +20,7 @@ export default function Home() {
     if (inElectron) {
       router.replace('/app');
     } else {
-      router.replace('/dashboard/ecommerce');
+      router.replace('/dashboard');
     }
   }, [user, router, inElectron]);
 

@@ -38,6 +38,10 @@ import {
   type ActiveCallSession,
 } from '@/lib/active-call-session';
 import { findLiveCallOnDevice, isLiveCallStatus } from '@/lib/twilio-call-utils';
+import {
+  isUnavailableLikeActivity,
+  normalizeWorkerActivityName,
+} from '@/lib/worker-status';
 import { getActiveCall, dismissActiveCall } from '@/services/callLogService';
 
 interface TwilioContextType {
@@ -113,6 +117,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const connectionSourceRef = useRef<'device' | 'reservation' | null>(null);
   const expectingReservationDeviceLegRef = useRef(false);
   const reservationLifecycleAttachedRef = useRef<WeakSet<Reservation>>(new WeakSet());
+  const availableActivitySidRef = useRef<string | null>(null);
+  /** User explicitly chose Unavailable/Offline — do not auto-restore Available after calls. */
+  const suppressAutoAvailableRef = useRef(false);
+  const lastPresenceBroadcastRef = useRef<{ status: string; at: number } | null>(null);
+  const restoreInFlightRef = useRef(false);
   const conferenceSidRef = useRef<string | null>(null);
   const hangUpFromOverlayRef = useRef<() => void>(() => {});
   const pendingMergeConferenceSidRef = useRef<string | null>(null);
@@ -368,7 +377,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const isIgnorableReservationError = (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
-    return message.includes('Invalid state transition');
+    return (
+      message.includes('Invalid state transition') ||
+      message.includes('ReservationDescriptor') ||
+      message.includes('does not contain all properties of a Reservation')
+    );
   };
 
   const safeCompleteReservation = useCallback(async (reservation?: Reservation | null) => {
@@ -439,16 +452,127 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   }, [logReservationState]);
 
   const broadcastWorkerStatus = useCallback(
-    async (status: string, event: OperatorPresenceEvent = 'status_change') => {
+    async (
+      status: string,
+      event: OperatorPresenceEvent = 'status_change',
+      options?: { force?: boolean; localOnly?: boolean; syncTwilio?: boolean }
+    ) => {
       if (!user?.id || !status) return;
-      events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: status });
+
+      const normalized = normalizeWorkerActivityName(status) || status;
+      setActivityName(normalized);
+      events.emit('refreshWorkerStatus', { user_id: user.id, worker_status: normalized });
+
+      if (options?.localOnly) return;
+
+      // TaskRouter activity can oscillate while reserved/on-call; only explicit transitions
+      // (accept, hangup restore, manual toggle, worker ready) should hit the presence API.
+      if (!options?.force && isAgentOnCall()) return;
+
+      const last = lastPresenceBroadcastRef.current;
+      if (!options?.force && last?.status === normalized && Date.now() - last.at < 5_000) {
+        return;
+      }
+
+      lastPresenceBroadcastRef.current = { status: normalized, at: Date.now() };
       try {
-        await broadcastOperatorPresence({ event, worker_status: status });
+        await broadcastOperatorPresence({
+          event,
+          worker_status: normalized,
+          sync_twilio: options?.syncTwilio ?? false,
+        });
       } catch (error) {
         console.warn('Failed to broadcast operator presence:', error);
       }
     },
-    [user?.id]
+    [user?.id, isAgentOnCall]
+  );
+
+  const resolveAvailableActivitySid = useCallback(() => {
+    if (availableActivitySidRef.current) {
+      return availableActivitySidRef.current;
+    }
+
+    const worker = workerRef.current;
+    const fromWorker = worker
+      ? Array.from(worker.activities.values()).find(
+          (activity) => normalizeWorkerActivityName(activity.name) === 'Available'
+        )?.sid
+      : null;
+
+    if (fromWorker) {
+      availableActivitySidRef.current = fromWorker;
+    }
+
+    return fromWorker ?? null;
+  }, []);
+
+  /**
+   * Task queues move workers to Offline/Unavailable on assignment. Conference legs do not
+   * always restore Available (especially when the JS SDK fails ReservationDescriptor updates),
+   * so force Available after wrap-up/completion.
+   */
+  const restoreWorkerToAvailable = useCallback(
+    async (reason: string) => {
+      if (isAgentOnCall()) {
+        return;
+      }
+
+      if (suppressAutoAvailableRef.current) {
+        logReservationState('Skipping Available restore (user chose Unavailable/Offline)', null, {
+          reason,
+        });
+        return;
+      }
+
+      const now = Date.now();
+      if (restoreInFlightRef.current || now - (lastPresenceBroadcastRef.current?.at ?? 0) < 1_500) {
+        return;
+      }
+
+      const worker = workerRef.current;
+      if (!worker) return;
+
+      const available = Array.from(worker.activities.values()).find(
+        (activity) => normalizeWorkerActivityName(activity.name) === 'Available'
+      );
+
+      if (!available) {
+        console.warn('Available activity not found on worker', { reason });
+        restoreInFlightRef.current = true;
+        try {
+          await broadcastWorkerStatus('Available', 'status_change', { force: true, syncTwilio: true });
+        } finally {
+          restoreInFlightRef.current = false;
+        }
+        return;
+      }
+
+      if (available.isCurrent) {
+        void broadcastWorkerStatus('Available', 'status_change', { localOnly: true });
+        return;
+      }
+
+      restoreInFlightRef.current = true;
+      try {
+        logReservationState('Restoring worker to Available', activeReservationRef.current, {
+          reason,
+          activitySid: available.sid,
+        });
+        await available.setAsCurrent();
+        await broadcastWorkerStatus('Available', 'status_change', { force: true });
+      } catch (error) {
+        console.warn('Failed to set Available via TaskRouter SDK, falling back to API:', error);
+        try {
+          await broadcastWorkerStatus('Available', 'status_change', { force: true, syncTwilio: true });
+        } catch (broadcastError) {
+          console.warn('Failed to restore Available via presence broadcast:', broadcastError);
+        }
+      } finally {
+        restoreInFlightRef.current = false;
+      }
+    },
+    [broadcastWorkerStatus, isAgentOnCall, logReservationState]
   );
 
   const attachReservationLifecycleHandlers = useCallback((reservation: Reservation) => {
@@ -459,7 +583,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     reservation.on('wrapup', () => {
       logReservationState('Reservation entered wrapup', reservation);
-      void safeCompleteReservation(reservation);
+      void (async () => {
+        await safeCompleteReservation(reservation);
+        await restoreWorkerToAvailable('reservation.wrapup');
+      })();
     });
 
     reservation.on('completed', () => {
@@ -467,8 +594,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       if (activeReservationRef.current === reservation) {
         clearActiveCallState();
       }
+      void restoreWorkerToAvailable('reservation.completed');
     });
-  }, [clearActiveCallState, safeCompleteReservation, logReservationState]);
+  }, [clearActiveCallState, restoreWorkerToAvailable, safeCompleteReservation, logReservationState]);
 
   const clearDeviceConnectionState = useCallback(() => {
     setConnection(null);
@@ -516,6 +644,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     try {
       const tokenRes = await axios.post('/api/twilio/token');
       const token = tokenRes.data.data.token;
+      availableActivitySidRef.current =
+        typeof tokenRes.data?.data?.available_activity_sid === 'string'
+          ? tokenRes.data.data.available_activity_sid
+          : null;
 
       if (typeof token !== 'string') throw new Error('Invalid token format received from server.');
 
@@ -751,15 +883,55 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       newWorker.on('ready', (worker: TwilioWorker) => {
         console.log(`Worker ${worker.sid} is ready`);
         setIsWorkerReady(true);
-        const status = worker.activity?.name || null;
+        const status = normalizeWorkerActivityName(worker.activity?.name) || worker.activity?.name || null;
         setActivityName(status);
-        if (status) void broadcastWorkerStatus(status, 'online');
+        const availableSid = Array.from(worker.activities.values()).find(
+          (activity) => normalizeWorkerActivityName(activity.name) === 'Available'
+        )?.sid;
+        if (availableSid) {
+          availableActivitySidRef.current = availableSid;
+        }
+        if (status) void broadcastWorkerStatus(status, 'online', { force: true });
       });
 
       newWorker.on('activityUpdated', (worker: TwilioWorker) => {
-        const status = worker.activity?.name || null;
-        setActivityName(status);
-        if (status) void broadcastWorkerStatus(status, 'status_change');
+        const rawStatus = worker.activity?.name || null;
+        const status = normalizeWorkerActivityName(rawStatus) || rawStatus;
+        if (!status) return;
+
+        const onCall =
+          Boolean(activeReservationRef.current) ||
+          expectingReservationDeviceLegRef.current ||
+          userInCallRef.current ||
+          Boolean(findLiveCallOnDevice(deviceRef.current));
+
+        // While on a call, TaskRouter may bounce between Offline/Unavailable/Available.
+        // Update local UI only — do not hit /operators/presence on every bounce.
+        if (onCall) {
+          if (status === 'Available') {
+            void broadcastWorkerStatus('Unavailable', 'status_change', { localOnly: true });
+            return;
+          }
+          if (isUnavailableLikeActivity(status)) {
+            void broadcastWorkerStatus(status, 'status_change', { localOnly: true });
+          }
+          return;
+        }
+
+        if (isUnavailableLikeActivity(status)) {
+          if (suppressAutoAvailableRef.current) {
+            void broadcastWorkerStatus(status, 'status_change', { localOnly: true });
+            return;
+          }
+
+          void restoreWorkerToAvailable(`activityUpdated-${status}`);
+          return;
+        }
+
+        if (status === 'Available') {
+          suppressAutoAvailableRef.current = false;
+          void broadcastWorkerStatus(status, 'status_change', { force: true });
+        }
       });
 
       newWorker.on('reservationCreated', (reservation: Reservation) => {
@@ -880,7 +1052,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsConnecting(false);
     }
-  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, clearActiveCallState, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound, persistActiveCallMeta, isAgentOnCall, logReservationState]);
+  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, restoreWorkerToAvailable, clearActiveCallState, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound, persistActiveCallMeta, isAgentOnCall, logReservationState]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1044,14 +1216,20 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const scheduleReservationFinalize = useCallback((reservation?: Reservation | null) => {
     const target = reservation ?? activeReservationRef.current;
-    if (!target) return;
+    if (!target) {
+      void restoreWorkerToAvailable('no-reservation-finalize');
+      return;
+    }
 
-    for (const delayMs of [500, 2000, 5000]) {
+    for (const delayMs of [1500]) {
       window.setTimeout(() => {
-        void safeCompleteReservation(target);
+        void (async () => {
+          await safeCompleteReservation(target);
+          await restoreWorkerToAvailable('finalize');
+        })();
       }, delayMs);
     }
-  }, [safeCompleteReservation]);
+  }, [restoreWorkerToAvailable, safeCompleteReservation]);
 
   const leaveCall = async (conferenceSid: string, callSid: string) => {
     const reservationToFinalize = activeReservationRef.current;
@@ -1175,6 +1353,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setShowReservationModal(false);
     setIncomingReservation(null);
     incomingReservationRef.current = null;
+    void broadcastWorkerStatus('Unavailable', 'status_change', { force: true });
 
     const attributes = reservation.task?.attributes;
     setConferenceSid(null);
@@ -1210,7 +1389,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     logReservationState('Accepting reservation into conference', reservation);
 
-    const conferenceOptions: ConferenceOptions = {
+    const postWorkActivitySid = resolveAvailableActivitySid();
+    const conferenceOptions: ConferenceOptions & { postWorkActivitySid?: string } = {
       conferenceStatusCallback: conferenceCallback,
       conferenceStatusCallbackMethod: 'POST',
       conferenceStatusCallbackEvent: 'start,end,join,leave',
@@ -1223,6 +1403,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       recordingStatusCallback: recordingCallback,
       conferenceRecordingStatusCallback: conferenceEventCallback,
       conferenceRecord: 'record-from-start', //[true, false, 'record-from-start', 'do-not-record']
+      ...(postWorkActivitySid ? { postWorkActivitySid } : {}),
     };
 
     reservation.conference(conferenceOptions).catch((error: unknown) => {
@@ -1282,28 +1463,33 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const completeReservation = (reservation: Reservation) => {
     console.log('completing reservation', reservation)
-    void safeCompleteReservation(reservation);
+    void (async () => {
+      await safeCompleteReservation(reservation);
+      await restoreWorkerToAvailable('completeReservation');
+    })();
     clearActiveCallState();
   };
 
   const toggleActivity = async (selectedActivityName?: string) => {
     if (!workerRef.current) return;
 
-    const currentActivity = workerRef.current.activity?.name;
+    const currentActivity = normalizeWorkerActivityName(workerRef.current.activity?.name) ||
+      workerRef.current.activity?.name;
     const newActivityName = selectedActivityName || (currentActivity === 'Available' ? 'Unavailable' : 'Available');
 
     const newActivity = Array.from(workerRef.current.activities.values()).find(
-      (activity) => activity.name === newActivityName
+      (activity) => normalizeWorkerActivityName(activity.name) === newActivityName || activity.name === newActivityName
     );
 
     if (newActivity) {
+      const normalizedName = normalizeWorkerActivityName(newActivity.name) || newActivity.name;
+      suppressAutoAvailableRef.current = isUnavailableLikeActivity(normalizedName);
       logReservationState('Manually updating worker activity', activeReservationRef.current, {
-        activity: newActivity.name,
+        activity: normalizedName,
         activitySid: newActivity.sid ?? null,
       });
       await newActivity.setAsCurrent();
-      setActivityName(newActivity.name);
-      broadcastWorkerStatus(newActivity.name);
+      void broadcastWorkerStatus(normalizedName, 'status_change', { force: true });
     } else {
       console.error(`Activity '${newActivityName}' not found in worker.activities`);
     }

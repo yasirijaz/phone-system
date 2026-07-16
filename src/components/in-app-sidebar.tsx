@@ -480,7 +480,7 @@ export function InAppSidebar() {
                 {!inElectron && (
                   <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard')}>
-                          <Link href="/dashboard/ecommerce">
+                          <Link href="/dashboard">
                               <LayoutGrid />
                               <span>Dashboard</span>
                           </Link>
