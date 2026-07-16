@@ -21,6 +21,7 @@ import {
   Cell,
   Legend,
 } from 'recharts';
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import {
   Users,
   Phone,
@@ -336,11 +337,16 @@ export default function DashboardPage() {
                     <Tooltip
                       cursor={{ fill: 'hsla(var(--accent), 0.5)' }}
                       contentStyle={chartTooltipStyle}
-                      formatter={(value: number, name: string) =>
-                        name === 'duration_seconds'
-                          ? [formatDuration(value), 'Talk time']
-                          : [value, 'Calls']
-                      }
+                      formatter={(value: ValueType, name: NameType) => {
+                        const numericValue =
+                          typeof value === 'number'
+                            ? value
+                            : Number(Array.isArray(value) ? value[0] : value ?? 0);
+                        const seriesName = String(name ?? '');
+                        return seriesName === 'duration_seconds'
+                          ? [formatDuration(numericValue), 'Talk time']
+                          : [numericValue, 'Calls'];
+                      }}
                     />
                     <Bar
                       dataKey="calls"
