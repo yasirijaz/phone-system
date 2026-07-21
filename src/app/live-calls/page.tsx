@@ -605,15 +605,15 @@ export default function LiveCallsPage() {
               </div>
             ) : (
               <>
-                {/* Main 4-column board */}
-                <div className="grid gap-4 xl:grid-cols-[240px_minmax(0,1.4fr)_260px_260px]">
+                {/* Main 4-column board — fixed-height call/transcript columns */}
+                <div className="grid items-start gap-4 xl:grid-cols-[240px_minmax(0,1.4fr)_260px_260px]">
                   {/* Live calls list */}
-                  <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-                    <div className="border-b border-slate-100 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <div className="flex h-[min(70vh,640px)] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                    <div className="shrink-0 border-b border-slate-100 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Live Calls
                     </div>
                     {filteredCalls.length === 0 ? (
-                      <div className="flex flex-col items-center gap-2 px-3 py-10 text-center">
+                      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-3 py-10 text-center">
                         <Phone className="h-8 w-8 text-slate-300" />
                         <p className="text-sm text-slate-500">No live calls</p>
                         <Button variant="outline" size="sm" onClick={loadCalls}>
@@ -621,7 +621,7 @@ export default function LiveCallsPage() {
                         </Button>
                       </div>
                     ) : (
-                      <ul className="max-h-[520px] divide-y divide-slate-100 overflow-y-auto">
+                      <ul className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
                         {filteredCalls.map((call) => {
                           const isSelected = call.id === selectedId;
                           const agenda = agendaLabel(call.live_analysis);
@@ -682,11 +682,11 @@ export default function LiveCallsPage() {
                     )}
                   </div>
 
-                  {/* Transcript */}
-                  <div className="flex min-h-[520px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                  {/* Transcript — fixed height; messages scroll inside */}
+                  <div className="flex h-[min(70vh,640px)] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
                     {selected ? (
                       <>
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
@@ -731,7 +731,7 @@ export default function LiveCallsPage() {
 
                         <div
                           ref={transcriptScrollRef}
-                          className="flex-1 space-y-3 overflow-y-auto px-4 py-4"
+                          className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4"
                         >
                           {(selected.transcript || []).length === 0 ? (
                             <div className="flex h-full min-h-[200px] items-center justify-center text-sm text-slate-400">
@@ -748,6 +748,8 @@ export default function LiveCallsPage() {
 
                               const seg = item.segment;
                               const isAgent = (seg.role || "").toLowerCase() === "agent";
+                              const externalLabel =
+                                selected.direction === "inbound" ? "Caller" : "Customer";
                               return (
                                 <div
                                   key={`seg-${item.index}-${seg.at ?? ""}`}
@@ -769,7 +771,7 @@ export default function LiveCallsPage() {
                                   >
                                     <div className="mb-0.5 flex items-center justify-between gap-3">
                                       <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                        {isAgent ? "Agent" : "Customer"}
+                                        {isAgent ? "Agent" : externalLabel}
                                       </span>
                                       <span className="text-[10px] text-slate-400">
                                         {formatSegmentTime(seg.at)}
@@ -791,7 +793,7 @@ export default function LiveCallsPage() {
                           )}
                         </div>
 
-                        <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-2.5">
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 px-4 py-2.5">
                           <Waveform />
                           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
                             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />

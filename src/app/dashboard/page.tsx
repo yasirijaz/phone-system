@@ -1,6 +1,6 @@
 "use client";
 
-import type { DashboardRecentCall, DashboardStats, DashboardTimeRange } from '@/types';
+import type { DashboardStats, DashboardTimeRange } from '@/types';
 import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -43,7 +43,6 @@ import { getDashboardStats } from '@/services/dashboardService';
 import { useToast } from '@/hooks/use-toast';
 import { isElectron } from '@/lib/is-electron';
 import { useRouter } from 'next/navigation';
-import { formatPhoneNumber } from '@/lib/utils';
 import {
   formatCompactDuration,
   formatDuration,
@@ -109,65 +108,6 @@ const StatCard = ({
     </Card>
   );
 };
-
-function statusVariant(status: string | null): 'default' | 'secondary' | 'destructive' | 'outline' {
-  const normalized = (status || '').toLowerCase();
-  if (normalized === 'completed') return 'default';
-  if (['missed', 'no-answer', 'no_answer', 'busy', 'canceled', 'cancelled', 'failed'].includes(normalized)) {
-    return 'destructive';
-  }
-  if (normalized === 'in_progress') return 'secondary';
-  return 'outline';
-}
-
-const RecentCallsTable = ({ calls }: { calls: DashboardRecentCall[] }) => (
-  <Card className="col-span-12">
-    <CardHeader>
-      <CardTitle>Recent Calls</CardTitle>
-      <CardDescription>Latest calls across your company</CardDescription>
-    </CardHeader>
-    <CardContent>
-      {calls.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">No recent calls</p>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Contact</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Direction</TableHead>
-              <TableHead>Agent</TableHead>
-              <TableHead>Department</TableHead>
-              <TableHead>Duration</TableHead>
-              <TableHead className="text-right">Date</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {calls.map((call) => (
-              <TableRow key={call.id}>
-                <TableCell className="font-medium">
-                  {formatPhoneNumber(call.contact_phone || '') || 'Unknown'}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={statusVariant(call.call_status)}>
-                    {call.call_status || 'unknown'}
-                  </Badge>
-                </TableCell>
-                <TableCell className="capitalize">{call.direction}</TableCell>
-                <TableCell>{call.user?.name || '—'}</TableCell>
-                <TableCell>{call.department?.name || '—'}</TableCell>
-                <TableCell>{formatCompactDuration(call.duration_seconds)}</TableCell>
-                <TableCell className="text-right">
-                  {call.created_at ? new Date(call.created_at).toLocaleString() : '—'}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </CardContent>
-  </Card>
-);
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -597,8 +537,6 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </div>
-
-            <RecentCallsTable calls={stats?.recent_calls ?? []} />
           </main>
         </div>
       </SidebarInset>

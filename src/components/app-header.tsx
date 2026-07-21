@@ -45,6 +45,7 @@ import {
     type OutboundContext,
 } from "@/lib/outbound-context";
 import { resolveDefaultFromNumberForDepartment } from '@/lib/phone-numbers';
+import AvailabilityStatusBanner from "@/components/availability-status-banner";
 
 type AppInfo = { version?: string; updateReady?: boolean };
 
@@ -877,6 +878,8 @@ export default function AppHeader({
                     </div>
                 </div>
             )}
+
+            <AvailabilityStatusBanner />
               
             <SendMessageDialog
               open={messageDialogOpen}

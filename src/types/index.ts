@@ -358,21 +358,6 @@ export interface DashboardTopDepartment {
   duration_seconds: number;
 }
 
-export interface DashboardRecentCall {
-  id: number;
-  from: string | null;
-  to: string | null;
-  contact_phone: string | null;
-  direction: 'inbound' | 'outbound';
-  call_status: string | null;
-  duration_seconds: number;
-  department: { id: number; name: string } | null;
-  user: { id: number; name: string } | null;
-  has_recording: boolean;
-  has_voicemail: boolean;
-  created_at: string | null;
-}
-
 export interface DashboardSummary {
   total_calls: number;
   completed: number;
@@ -437,5 +422,4 @@ export interface DashboardStats {
     profile_picture?: string | null;
     in_call?: number;
   }>;
-  recent_calls: DashboardRecentCall[];
 }
