@@ -1,5 +1,5 @@
-
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -21,6 +21,8 @@ export const metadata: Metadata = {
   description: 'Manage your calls with ease and AI-powered insights.',
 };
 
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -28,14 +30,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full`} suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();`,
-          }}
-        />
-      </head>
       <body className="font-body antialiased h-full bg-muted/40" suppressHydrationWarning>
+        {/* next/script avoids React 19's "script tag while rendering" warning for FOUC theme init */}
+        <Script id="theme-init" strategy="beforeInteractive">
+          {THEME_INIT_SCRIPT}
+        </Script>
         <ThemeProvider>
           <StoreProvider>
             <AuthProvider>

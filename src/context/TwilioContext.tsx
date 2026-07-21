@@ -42,6 +42,7 @@ import {
   isUnavailableLikeActivity,
   normalizeWorkerActivityName,
 } from '@/lib/worker-status';
+import { startTabPresence, type TabPresenceHandle } from '@/lib/tab-presence';
 import { getActiveCall, dismissActiveCall } from '@/services/callLogService';
 
 interface TwilioContextType {
@@ -120,6 +121,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const availableActivitySidRef = useRef<string | null>(null);
   /** User explicitly chose Unavailable/Offline — do not auto-restore Available after calls. */
   const suppressAutoAvailableRef = useRef(false);
+  const tabPresenceRef = useRef<TabPresenceHandle | null>(null);
+  const restoreRetryTimerRef = useRef<number | null>(null);
   const lastPresenceBroadcastRef = useRef<{ status: string; at: number } | null>(null);
   const restoreInFlightRef = useRef(false);
   const conferenceSidRef = useRef<string | null>(null);
@@ -527,6 +530,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       const now = Date.now();
       if (restoreInFlightRef.current || now - (lastPresenceBroadcastRef.current?.at ?? 0) < 1_500) {
+        // Debounced/in-flight — retry once so a raced Offline from another tab cannot stick.
+        if (restoreRetryTimerRef.current == null && !reason.endsWith(':retry')) {
+          restoreRetryTimerRef.current = window.setTimeout(() => {
+            restoreRetryTimerRef.current = null;
+            void restoreWorkerToAvailable(`${reason}:retry`);
+          }, 1_600);
+        }
         return;
       }
 
@@ -610,13 +620,31 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user?.id || user.role_id === 1) return;
 
+    const presence = startTabPresence(user.id);
+    tabPresenceRef.current = presence;
+
     const handlePageHide = () => {
+      const { otherTabsRemain } = presence.markClosed();
+      tabPresenceRef.current = null;
+
+      // Closing/refreshing one of several tabs must not force the shared worker Offline.
+      if (otherTabsRemain) {
+        console.info('Skipping offline presence broadcast — other tabs still active');
+        return;
+      }
+
       broadcastOperatorPresenceKeepalive({ event: 'offline', worker_status: 'Offline' });
     };
 
     window.addEventListener('pagehide', handlePageHide);
     return () => {
       window.removeEventListener('pagehide', handlePageHide);
+      // Soft unmount (Strict Mode / HMR): remove this tab from the ledger only.
+      // Do not broadcast Offline — pagehide handles real tab closes.
+      if (tabPresenceRef.current === presence) {
+        presence.markClosed();
+        tabPresenceRef.current = null;
+      }
     };
   }, [user?.id, user?.role_id]);
 
@@ -891,6 +919,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         if (availableSid) {
           availableActivitySidRef.current = availableSid;
         }
+
+        // Multi-tab / reconnect often leaves the shared worker Offline/Unavailable.
+        // Restore Available unless the user explicitly chose an unavailable-like status.
+        if (isUnavailableLikeActivity(status) && !suppressAutoAvailableRef.current) {
+          void restoreWorkerToAvailable('worker.ready');
+          return;
+        }
+
         if (status) void broadcastWorkerStatus(status, 'online', { force: true });
       });
 
@@ -1499,6 +1535,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     const currentDevice = deviceRef.current;
     const currentWorker = workerRef.current;
     return () => {
+      if (restoreRetryTimerRef.current != null) {
+        window.clearTimeout(restoreRetryTimerRef.current);
+        restoreRetryTimerRef.current = null;
+      }
       currentDevice?.disconnectAll();
       currentDevice?.destroy();
       currentWorker?.disconnect();
