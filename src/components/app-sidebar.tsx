@@ -11,7 +11,7 @@ import {
   SidebarGroupLabel,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
-import { LogOut, Phone, Building, Users, Settings, LayoutGrid, UserCog, Package, CreditCard, AppWindow, UploadCloud, Plug, Radio } from 'lucide-react';
+import { LogOut, Phone, Building, Users, Settings, LayoutGrid, UserCog, Package, CreditCard, AppWindow, UploadCloud, Plug, Radio, FileSearch } from 'lucide-react';
 import { Button } from './ui/button';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -94,14 +94,24 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               )}
               {isSupervisor && !inElectron && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname.startsWith('/live-calls')} tooltip="Live Calls">
-                    <Link href="/live-calls">
-                      <Radio />
-                      <span>Live Intel</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith('/live-calls')} tooltip="Live Calls">
+                      <Link href="/live-calls">
+                        <Radio />
+                        <span>Live Intel</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith('/call-analysis')} tooltip="Call Analysis">
+                      <Link href="/call-analysis">
+                        <FileSearch />
+                        <span>Analysis</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
               )}
             </>
           )}
