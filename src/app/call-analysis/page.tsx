@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -30,6 +30,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  DateRangePicker,
+  createDefaultDateRange,
+  toDateInputValue,
+  type DateRangeValue,
+} from "@/components/date-range-picker";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { hasSupervisorAccess } from "@/lib/roles";
@@ -43,13 +49,6 @@ import {
   type CallAnalysisListItem,
 } from "@/services/callAnalysisService";
 import type { LiveCallAnalysis, LiveTranscriptSegment } from "@/services/liveCallService";
-
-function toInputDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 function initials(name?: string | null): string {
   if (!name) return "?";
@@ -194,9 +193,7 @@ export default function CallAnalysisPage() {
   const { toast } = useToast();
   const canAccess = hasSupervisorAccess(user?.role_id);
 
-  const today = useMemo(() => toInputDate(new Date()), []);
-  const [fromDate, setFromDate] = useState(today);
-  const [toDate, setToDate] = useState(today);
+  const [dateRange, setDateRange] = useState<DateRangeValue>(() => createDefaultDateRange("today"));
   const [filter, setFilter] = useState<CallAnalysisFilter>("all");
   const [search, setSearch] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
@@ -209,6 +206,9 @@ export default function CallAnalysisPage() {
   const [detail, setDetail] = useState<CallAnalysisDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+
+  const fromDate = toDateInputValue(dateRange.from);
+  const toDate = toDateInputValue(dateRange.to);
 
   useEffect(() => {
     if (user && !canAccess) router.replace("/app");
@@ -386,36 +386,20 @@ export default function CallAnalysisPage() {
         <div className="flex min-h-screen flex-col bg-[#F7F8FC]">
           <AppHeader user={user} logout={logout} pageTitle="Call Analysis" />
           <main className="flex-1 space-y-4 p-4 md:p-6">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-slate-900">Call Analysis</h1>
                 <p className="mt-1 text-sm text-slate-500">
                   Review transcripts and AI insights for calls you missed on Live Intel.
                 </p>
               </div>
-              <div className="flex flex-wrap items-end gap-2">
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                    From
-                  </label>
-                  <Input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="h-9 w-[150px] rounded-full border-slate-200 bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                    To
-                  </label>
-                  <Input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="h-9 w-[150px] rounded-full border-slate-200 bg-white"
-                  />
-                </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <DateRangePicker
+                  value={dateRange}
+                  onChange={setDateRange}
+                  className="min-w-[240px]"
+                  disabled={loading}
+                />
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <Input
