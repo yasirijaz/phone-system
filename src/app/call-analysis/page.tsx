@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  ArrowDownLeft,
+  ArrowUpRight,
   Check,
   Flame,
   Loader2,
@@ -74,6 +76,21 @@ function formatSegmentTime(at?: string): string {
     second: "2-digit",
     hour12: false,
   });
+}
+
+function DirectionBadge({ direction }: { direction?: string | null }) {
+  const isOutbound = (direction || "").toLowerCase().startsWith("outbound");
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+        isOutbound ? "bg-sky-50 text-sky-700" : "bg-emerald-50 text-emerald-700"
+      )}
+    >
+      {isOutbound ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownLeft className="h-3 w-3" />}
+      {isOutbound ? "Outbound" : "Inbound"}
+    </span>
+  );
 }
 
 function StarRating({ value }: { value: number }) {
@@ -502,6 +519,7 @@ export default function CallAnalysisPage() {
                                   : formatPhoneNumber(call.from || "")}
                               </p>
                               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                <DirectionBadge direction={call.direction} />
                                 <span className="truncate text-[11px] font-medium text-violet-700">
                                   {preview?.agenda || (call.has_analysis ? "Analyzed" : "Needs analysis")}
                                 </span>
@@ -537,12 +555,15 @@ export default function CallAnalysisPage() {
                   <>
                     <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">
-                          {detail.user?.name || "Agent"} ·{" "}
-                          {detail.direction === "outbound"
-                            ? formatPhoneNumber(detail.to || "")
-                            : formatPhoneNumber(detail.from || "")}
-                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {detail.user?.name || "Agent"} ·{" "}
+                            {detail.direction === "outbound"
+                              ? formatPhoneNumber(detail.to || "")
+                              : formatPhoneNumber(detail.from || "")}
+                          </p>
+                          <DirectionBadge direction={detail.direction} />
+                        </div>
                         <p className="mt-0.5 text-xs text-slate-500">
                           {detail.created_at
                             ? new Date(detail.created_at).toLocaleString()

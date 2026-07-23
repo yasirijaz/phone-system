@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  ArrowDownLeft,
+  ArrowUpRight,
   CalendarDays,
   Check,
   ChevronDown,
@@ -91,6 +93,21 @@ function DeltaBadge({ value, suffix = "" }: { value: number; suffix?: string }) 
     <span className={cn("text-xs font-medium", up ? "text-emerald-600" : "text-red-500")}>
       {up ? "↑" : "↓"} {Math.abs(value)}
       {suffix} vs yesterday
+    </span>
+  );
+}
+
+function DirectionBadge({ direction }: { direction?: string | null }) {
+  const isOutbound = (direction || "").toLowerCase().startsWith("outbound");
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+        isOutbound ? "bg-sky-50 text-sky-700" : "bg-emerald-50 text-emerald-700"
+      )}
+    >
+      {isOutbound ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownLeft className="h-3 w-3" />}
+      {isOutbound ? "Outbound" : "Inbound"}
     </span>
   );
 }
@@ -654,6 +671,9 @@ export default function LiveCallsPage() {
                                   <p className="truncate text-[11px] font-medium text-slate-500">
                                     {agenda}
                                   </p>
+                                  <div className="mt-1.5 flex items-center gap-1.5">
+                                    <DirectionBadge direction={call.direction} />
+                                  </div>
                                   <div className="mt-1.5 flex items-center justify-between gap-2">
                                     <IntentTag analysis={call.live_analysis} />
                                     <div className="flex h-3 items-end gap-[2px]">
@@ -693,6 +713,7 @@ export default function LiveCallsPage() {
                               <p className="text-sm font-semibold text-slate-900">
                                 Live Call · {selected.user?.name || "Agent"}
                               </p>
+                              <DirectionBadge direction={selected.direction} />
                             </div>
                             <p className="mt-0.5 text-xs text-slate-500">
                               {selected.direction === "outbound"
