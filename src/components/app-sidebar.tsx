@@ -27,7 +27,9 @@ import {
   canAccessDepartments,
   canAccessBilling,
   canAccessCompanySettings,
-  hasSupervisorAccess,
+  canAccessCallAnalysis,
+  canAccessLiveIntel,
+  canAccessDashboard,
 } from '@/lib/roles';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
@@ -47,7 +49,9 @@ export function AppSidebar() {
   const isMgr = isManager(user?.role_id);
   const isUser = isRegularUser(user?.role_id);
   const isScopedAdmin = isCompanyScopedAdmin(user?.role_id);
-  const isSupervisor = hasSupervisorAccess(user?.role_id);
+  const showDashboard = canAccessDashboard(user?.role_id);
+  const showLiveIntel = canAccessLiveIntel(user?.role_id);
+  const showCallAnalysis = canAccessCallAnalysis(user?.role_id);
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
   const usersLink = user?.company_id ? `/companies/${user.company_id}/members` : '/companies';
@@ -83,7 +87,7 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {!inElectron && (
+              {!inElectron && showDashboard && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={pathname.startsWith('/dashboard')} tooltip="Dashboard">
                     <Link href="/dashboard">
@@ -93,25 +97,25 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
-              {isSupervisor && !inElectron && (
-                <>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith('/live-calls')} tooltip="Live Calls">
-                      <Link href="/live-calls">
-                        <Radio />
-                        <span>Live Intel</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith('/call-analysis')} tooltip="Call Analysis">
-                      <Link href="/call-analysis">
-                        <FileSearch />
-                        <span>Analysis</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </>
+              {showLiveIntel && !inElectron && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith('/live-calls')} tooltip="Live Calls">
+                    <Link href="/live-calls">
+                      <Radio />
+                      <span>Live Intel</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {showCallAnalysis && !inElectron && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith('/call-analysis')} tooltip="Call Analysis">
+                    <Link href="/call-analysis">
+                      <FileSearch />
+                      <span>Analysis</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               )}
             </>
           )}

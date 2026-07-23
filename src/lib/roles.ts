@@ -87,6 +87,21 @@ export function hasSupervisorAccess(roleId?: number | null): boolean {
   return isPlatformAdmin(roleId) || isCompanyAdmin(roleId) || isManager(roleId);
 }
 
+/** Call Analysis page — Company Admin only (temporary rollout restriction). */
+export function canAccessCallAnalysis(roleId?: number | null): boolean {
+  return isCompanyAdmin(roleId);
+}
+
+/** Live Intelligence Center — Managers only (temporary rollout restriction). */
+export function canAccessLiveIntel(roleId?: number | null): boolean {
+  return isManager(roleId);
+}
+
+/** Analytics Dashboard — Managers only (temporary rollout restriction). */
+export function canAccessDashboard(roleId?: number | null): boolean {
+  return isManager(roleId);
+}
+
 export function getRoleName(roleId?: number | null): string {
   switch (roleId) {
     case ROLES.PLATFORM_ADMIN:

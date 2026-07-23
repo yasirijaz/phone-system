@@ -43,6 +43,7 @@ import { getDashboardStats } from '@/services/dashboardService';
 import { useToast } from '@/hooks/use-toast';
 import { isElectron } from '@/lib/is-electron';
 import { useRouter } from 'next/navigation';
+import { canAccessDashboard } from '@/lib/roles';
 import {
   formatCompactDuration,
   formatDuration,
@@ -114,6 +115,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const inElectron = isElectron();
   const { toast } = useToast();
+  const canAccess = canAccessDashboard(user?.role_id);
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -122,8 +124,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user?.role_id === 1) {
       router.replace('/companies');
+      return;
     }
-  }, [user, router]);
+    if (user && !canAccess) {
+      router.replace('/app');
+    }
+  }, [user, canAccess, router]);
 
   useEffect(() => {
     if (inElectron) {
@@ -148,12 +154,12 @@ export default function DashboardPage() {
   }, [toast]);
 
   useEffect(() => {
-    if (!inElectron && user) {
+    if (!inElectron && user && canAccess) {
       fetchStats(timeRange);
     }
-  }, [inElectron, user, timeRange, fetchStats]);
+  }, [inElectron, user, canAccess, timeRange, fetchStats]);
 
-  if (user?.role_id === 1 || inElectron) return null;
+  if (user?.role_id === 1 || inElectron || !canAccess) return null;
 
   if (loading && !stats) {
     return (

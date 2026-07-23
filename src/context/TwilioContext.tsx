@@ -1033,12 +1033,21 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           setTimeout(() => {
             const attributes = reservation.task?.attributes;
             const confSid = attributes?.conference?.sid;
-            const fromNum = attributes.contact_name || attributes?.from;
+            // Company DID (task.to) is the Twilio From for later consult/add dials.
+            // Never store contact_name or customer from as caller ID.
+            const companyDid = attributes?.to || null;
             console.log('Extracted conference SID:', confSid);
-            console.log('Extracted from number:', fromNum);
+            console.log('Extracted company DID (caller ID):', companyDid);
 
             if (confSid) setConferenceSid(confSid);
-            if (fromNum) setFromNumber(fromNum);
+            if (companyDid) {
+              setFromNumber(companyDid);
+              try {
+                localStorage.setItem('twilioFromNumber', companyDid);
+              } catch {
+                // ignore storage errors
+              }
+            }
 
             persistActiveCallMeta({
               conferenceSid: confSid || null,

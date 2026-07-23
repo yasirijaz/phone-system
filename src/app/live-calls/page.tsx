@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/collapsible";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { hasSupervisorAccess } from "@/lib/roles";
+import { canAccessLiveIntel } from "@/lib/roles";
 import { events } from "@/lib/events";
 import { formatPhoneNumber, cn } from "@/lib/utils";
 import { addParticipant } from "@/services/twilioService";
@@ -317,7 +317,7 @@ export default function LiveCallsPage() {
   const [keyPointsOpen, setKeyPointsOpen] = useState(true);
   const transcriptScrollRef = useRef<HTMLDivElement | null>(null);
 
-  const canAccess = hasSupervisorAccess(user?.role_id);
+  const canAccess = canAccessLiveIntel(user?.role_id);
   const todayLabel = useMemo(
     () =>
       new Date().toLocaleDateString("en-US", {

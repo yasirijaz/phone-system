@@ -40,7 +40,7 @@ import {
 } from "@/components/date-range-picker";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { hasSupervisorAccess } from "@/lib/roles";
+import { canAccessCallAnalysis } from "@/lib/roles";
 import { formatPhoneNumber, cn } from "@/lib/utils";
 import {
   getCallAnalysisDetail,
@@ -208,7 +208,7 @@ export default function CallAnalysisPage() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const canAccess = hasSupervisorAccess(user?.role_id);
+  const canAccess = canAccessCallAnalysis(user?.role_id);
 
   const [dateRange, setDateRange] = useState<DateRangeValue>(() => createDefaultDateRange("today"));
   const [filter, setFilter] = useState<CallAnalysisFilter>("all");

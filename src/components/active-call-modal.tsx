@@ -158,15 +158,32 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     return null;
   };
 
+  const isUsableTwilioCallerId = (value?: string | null): boolean => {
+    if (!value) return false;
+    const trimmed = value.trim();
+    const lower = trimmed.toLowerCase();
+    if (lower.startsWith('client:') || lower.startsWith('sip:')) return false;
+    if (/[A-Za-z]/.test(trimmed)) return false;
+    const digits = trimmed.replace(/\D/g, '');
+    return digits.length >= 10 && digits.length <= 15;
+  };
+
   const resolveTwilioNumber = (): string | null => {
-    if (connection?.parameters) {
-      if (connection.direction === 'INCOMING') {
-        return connection.parameters.To || null;
+    // Incoming softphone To is usually client:… — never use that as From.
+    const candidates = [
+      typeof window !== 'undefined' ? localStorage.getItem('twilioFromNumber') : null,
+      fromNumber,
+      connection?.direction === 'OUTGOING' ? connection?.parameters?.From : null,
+    ];
+
+    for (const candidate of candidates) {
+      if (isUsableTwilioCallerId(candidate)) {
+        const digits = candidate!.replace(/\D/g, '');
+        return candidate!.startsWith('+') ? candidate! : `+${digits.length === 10 ? `1${digits}` : digits}`;
       }
-      return localStorage.getItem('twilioFromNumber') || fromNumber || null;
     }
 
-    return localStorage.getItem('twilioFromNumber') || fromNumber || null;
+    return null;
   };
 
   const callIdentity = effectiveConferenceSid || agentCallSid || contactNumber;
@@ -736,6 +753,15 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
           ? await initiateConsultCall(sid, twilioNumber, phoneNumber)
           : await addParticipant(sid, twilioNumber, userId, phoneNumber);
 
+        if (response?.status === false) {
+          toast({
+            title: "Error",
+            description: response?.msg || "Failed to add participant.",
+            variant: 'destructive',
+          });
+          return;
+        }
+
         const outgoingCallSid = response?.data?.call_sid;
         const outgoingName = resolveOutgoingTargetName(userId, phoneNumber || dialerNumber);
 
@@ -778,6 +804,13 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
             title: "Calling colleague",
             description: `${outgoingName} is ringing. Stay on the call until they answer.`,
           });
+        } else if (phoneNumber) {
+          toast({
+            title: "Error",
+            description: response?.msg || "Failed to start the second call.",
+            variant: 'destructive',
+          });
+          return;
         }
 
         setIsAddParticipantModalOpen(false);
