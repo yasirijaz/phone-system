@@ -146,6 +146,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     acceptReservationAndMerge: async () => {},
     isAgentOnCall: () => false,
   });
+  /** Completes a held reservation + restores Available after media disconnect (customer hangup). */
+  const finalizeAfterDisconnectRef = useRef<(reservation: Reservation | null) => void>(() => {});
 
   const logReservationState = useCallback((message: string, reservation?: Reservation | null, extra: Record<string, unknown> = {}) => {
     const worker = workerRef.current;
@@ -511,14 +513,37 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * True only when media is live or we are mid-accept. Do NOT use stale `user.in_call` /
+   * a leftover reservation alone — those are the main reasons agents get stuck Unavailable.
+   */
+  const hasLiveCallMedia = useCallback(() => {
+    if (expectingReservationDeviceLegRef.current) {
+      return true;
+    }
+    if (findLiveCallOnDevice(deviceRef.current)) {
+      return true;
+    }
+    const status = String(connectionRef.current?.status?.() ?? '').toLowerCase();
+    return Boolean(status) && !['pending', 'ringing', 'closed', ''].includes(status);
+  }, []);
+
+  /**
    * Task queues move workers to Offline/Unavailable on assignment. Conference legs do not
    * always restore Available (especially when the JS SDK fails ReservationDescriptor updates),
    * so force Available after wrap-up/completion.
    */
   const restoreWorkerToAvailable = useCallback(
     async (reason: string) => {
-      if (isAgentOnCall()) {
+      if (hasLiveCallMedia()) {
+        logReservationState('Skipping Available restore (live media)', activeReservationRef.current, {
+          reason,
+        });
         return;
+      }
+
+      // Stale DB/WS in_call often survives customer hangup and used to block restore forever.
+      if (userInCallRef.current && !activeReservationRef.current) {
+        userInCallRef.current = false;
       }
 
       if (suppressAutoAvailableRef.current) {
@@ -582,7 +607,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         restoreInFlightRef.current = false;
       }
     },
-    [broadcastWorkerStatus, isAgentOnCall, logReservationState]
+    [broadcastWorkerStatus, hasLiveCallMedia, logReservationState]
   );
 
   const attachReservationLifecycleHandlers = useCallback((reservation: Reservation) => {
@@ -817,10 +842,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
               setConnection(liveCall);
               return;
             }
-            if (activeReservationRef.current) {
-              clearDeviceConnectionState();
+            const reservation = activeReservationRef.current;
+            if (reservation) {
+              // Customer hangup often leaves the reservation held + worker Unavailable.
+              // Finalize like leaveCall/endCall so Available is restored.
+              finalizeAfterDisconnectRef.current(reservation);
             } else {
               clearActiveCallState();
+              void restoreWorkerToAvailable('conn.disconnect');
             }
           }
         });
@@ -830,10 +859,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           clearPendingConferenceInvite();
           expectingReservationDeviceLegRef.current = false;
           if (connectionSourceRef.current === 'device') {
-            if (activeReservationRef.current) {
-              clearDeviceConnectionState();
+            const reservation = activeReservationRef.current;
+            if (reservation) {
+              finalizeAfterDisconnectRef.current(reservation);
             } else {
               clearActiveCallState();
+              void restoreWorkerToAvailable('conn.reject');
             }
           }
         });
@@ -865,10 +896,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           return;
         }
         if (connectionSourceRef.current === 'device') {
-          if (activeReservationRef.current) {
-            clearDeviceConnectionState();
+          const reservation = activeReservationRef.current;
+          if (reservation) {
+            finalizeAfterDisconnectRef.current(reservation);
           } else {
             clearActiveCallState();
+            void restoreWorkerToAvailable('device.disconnect');
           }
         }
       });
@@ -935,11 +968,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         const status = normalizeWorkerActivityName(rawStatus) || rawStatus;
         if (!status) return;
 
-        const onCall =
-          Boolean(activeReservationRef.current) ||
-          expectingReservationDeviceLegRef.current ||
-          userInCallRef.current ||
-          Boolean(findLiveCallOnDevice(deviceRef.current));
+        const onCall = hasLiveCallMedia() || Boolean(activeReservationRef.current);
 
         // While on a call, TaskRouter may bounce between Offline/Unavailable/Available.
         // Update local UI only — do not hit /operators/presence on every bounce.
@@ -1097,7 +1126,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsConnecting(false);
     }
-  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, restoreWorkerToAvailable, clearActiveCallState, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound, persistActiveCallMeta, isAgentOnCall, logReservationState]);
+  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, restoreWorkerToAvailable, clearActiveCallState, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound, persistActiveCallMeta, isAgentOnCall, hasLiveCallMedia, logReservationState]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1110,6 +1139,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         void syncActiveCallState();
       } else if (!findLiveCallOnDevice(deviceRef.current) && !activeReservationRef.current) {
         clearActiveCallState();
+        // Backend cleared in_call after hangup — ensure TaskRouter is Available again.
+        void restoreWorkerToAvailable('in_call_cleared');
       }
     };
 
@@ -1117,7 +1148,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     return () => {
       events.off('refreshInCallStatus', handleInCallStatus);
     };
-  }, [user?.id, syncActiveCallState, clearActiveCallState]);
+  }, [user?.id, syncActiveCallState, clearActiveCallState, restoreWorkerToAvailable]);
 
   useEffect(() => {
     void syncActiveCallState();
@@ -1275,6 +1306,18 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       }, delayMs);
     }
   }, [restoreWorkerToAvailable, safeCompleteReservation]);
+
+  useEffect(() => {
+    finalizeAfterDisconnectRef.current = (reservation) => {
+      scheduleReservationFinalize(reservation);
+      clearActiveCallState();
+      void dismissActiveCall().then(() => {
+        if (user?.id) {
+          events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
+        }
+      });
+    };
+  }, [scheduleReservationFinalize, clearActiveCallState, user?.id]);
 
   const leaveCall = async (conferenceSid: string, callSid: string) => {
     const reservationToFinalize = activeReservationRef.current;

@@ -323,11 +323,24 @@ export default function AppHeader({
                           : `New Message from ${senderLabel}`,
                         description: body || (hasMedia ? 'Media attachment' : ''),
                         action: (
-                        <ToastAction altText="View" onClick={navigateToConversation}>
+                        <ToastAction
+                          altText="View"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigateToConversation();
+                          }}
+                        >
                             View
                         </ToastAction>
                         ),
-                        onClick: navigateToConversation,
+                        onClick: (event) => {
+                          // Ignore clicks on close / action controls — only body opens chat.
+                          const target = event.target as HTMLElement | null;
+                          if (target?.closest('[toast-close], [data-radix-toast-close], button')) {
+                            return;
+                          }
+                          navigateToConversation();
+                        },
                         className: "cursor-pointer"
                     });
                 }
