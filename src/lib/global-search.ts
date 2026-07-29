@@ -77,7 +77,7 @@ export function buildGlobalSearchResults({
       id: `contact-${contact.id}`,
       type: 'contact',
       title: contact.name,
-      subtitle: `View communication history · ${formatPhoneNumber(contact.phone_no)}`,
+      subtitle: `Open conversation · ${formatPhoneNumber(contact.phone_no)}`,
       href: buildPhoneCallsHref(contact.phone_no),
       score,
     });
@@ -108,7 +108,7 @@ export function buildGlobalSearchResults({
         id: `phone-query-${queryDigits}`,
         type: 'phone-query',
         title: formatPhoneNumber(trimmed) || trimmed,
-        subtitle: 'View communication history for this number',
+        subtitle: 'Open conversation for this number',
         href: buildPhoneCallsHref(trimmed),
         score: 75,
       });

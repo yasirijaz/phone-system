@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, MessageSquare, Phone } from 'lucide-react';
+import { ArrowLeft, Loader2, PanelRightClose, Phone, User } from 'lucide-react';
 import AppHeader from '@/components/app-header';
 import CallLog from '@/components/call-log';
+import ContactProfile from '@/components/contact-profile';
 import MessageComposer from '@/components/message-composer';
 import PaginationControls from '@/components/pagination-controls';
 import { Button } from '@/components/ui/button';
@@ -24,19 +25,20 @@ import {
   phoneEntryToCommunication,
   sortCommunicationsChronologically,
 } from '@/lib/contact-activity';
+import { buildThreadContactState } from '@/lib/contact-display';
 import {
   resolveOutboundContextFromCommunicationEntry,
   resolveOutboundContextFromLastActivity,
 } from '@/lib/department-selection';
 import { canListAllCompanyDepartments } from '@/lib/roles';
-import { formatPhoneNumber, getPhoneNumberOptionLabel } from '@/lib/utils';
+import { cn, formatPhoneNumber, getPhoneNumberOptionLabel } from '@/lib/utils';
 import { resolveDefaultFromNumberForDepartment } from '@/lib/phone-numbers';
 import {
   getPhoneCommunicationHistory,
   type CallHistoryPagination,
   type PhoneCommunicationEntry,
 } from '@/services/callLogService';
-import { findContactByPhone } from '@/services/contactService';
+import { findContactByPhone, getContacts } from '@/services/contactService';
 import { getDepartments } from '@/services/departmentService';
 import { getCompanyPhoneNumbers } from '@/services/phoneNumberService';
 import { sendMms } from '@/services/twilioService';
@@ -71,6 +73,8 @@ export default function PhoneCallHistoryPage() {
 
   const [loading, setLoading] = useState(true);
   const [contact, setContact] = useState<Contact | null>(null);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
   const [communications, setCommunications] = useState<PhoneCommunicationEntry[]>([]);
   const [pagination, setPagination] = useState<CallHistoryPagination>(DEFAULT_PAGINATION);
   const [totalCalls, setTotalCalls] = useState(0);
@@ -129,12 +133,19 @@ export default function PhoneCallHistoryPage() {
     if (!phoneNumber || !user?.company_id) return;
     let cancelled = false;
 
-    findContactByPhone(user.company_id, phoneNumber)
-      .then((matchedContact) => {
-        if (!cancelled) setContact(matchedContact);
+    Promise.all([
+      findContactByPhone(user.company_id, phoneNumber),
+      getContacts(user.company_id),
+    ])
+      .then(([matchedContact, companyContacts]) => {
+        if (cancelled) return;
+        setContact(matchedContact);
+        setContacts(Array.isArray(companyContacts) ? companyContacts : []);
       })
       .catch(() => {
-        if (!cancelled) setContact(null);
+        if (cancelled) return;
+        setContact(null);
+        setContacts([]);
       });
 
     return () => {
@@ -213,6 +224,26 @@ export default function PhoneCallHistoryPage() {
     () => sortCommunicationsChronologically(communications).map(phoneEntryToCommunication),
     [communications]
   );
+
+  const threadContact = useMemo(
+    () => buildThreadContactState(feedCommunications, phoneNumber, contact),
+    [feedCommunications, phoneNumber, contact]
+  );
+
+  const refreshContactState = useCallback(async () => {
+    if (!phoneNumber || !user?.company_id) return;
+    try {
+      const [matchedContact, companyContacts] = await Promise.all([
+        findContactByPhone(user.company_id, phoneNumber),
+        getContacts(user.company_id),
+      ]);
+      setContact(matchedContact);
+      setContacts(Array.isArray(companyContacts) ? companyContacts : []);
+      await fetchCommunications();
+    } catch {
+      // Keep current UI if refresh fails.
+    }
+  }, [phoneNumber, user?.company_id, fetchCommunications]);
 
   useEffect(() => {
     if (loading) return;
@@ -332,7 +363,7 @@ export default function PhoneCallHistoryPage() {
     }
   };
 
-  const displayName = contact?.name || formatPhoneNumber(phoneNumber);
+  const displayName = threadContact.name || formatPhoneNumber(phoneNumber);
   const hasAnyRecords = totalCalls + totalSms > 0;
   const canCompose = Boolean(selectedDepartmentId && selectedFromNumber);
 
@@ -348,131 +379,145 @@ export default function PhoneCallHistoryPage() {
           onDialerOpenChange={setDialerOpen}
         />
 
-        <header className="z-20 flex shrink-0 border-b bg-background/95 backdrop-blur-sm">
-          <div className="flex h-16 w-full items-center justify-between gap-3 px-4 md:px-8">
-            <div className="flex min-w-0 items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => router.back()}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div className="min-w-0">
-                <h1 className="truncate text-xl font-bold">{displayName}</h1>
-                <p className="truncate text-sm text-muted-foreground">
-                  Other: {formatPhoneNumber(phoneNumber)}
-                  {contact?.email ? ` · ${contact.email}` : ''}
-                </p>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                title="Send message"
-                onClick={() =>
-                  events.emit('openMessageDialog', {
-                    recipient: phoneNumber,
-                    departmentId: selectedDepartmentId || undefined,
-                  })
-                }
-              >
-                <MessageSquare className="h-4 w-4" />
-              </Button>
-              <Button
-                title="Call"
-                onClick={() => handleMakeCall(phoneNumber)}
-                disabled={loadingSetup}
-              >
-                <Phone className="mr-2 h-4 w-4" />
-                Call
-              </Button>
-            </div>
-          </div>
-        </header>
-
-        <main ref={chatScrollRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
-          {loading ? (
-            <div className="flex items-center justify-center py-24 text-muted-foreground">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Loading communication history...
-            </div>
-          ) : !hasAnyRecords ? (
-            <div className="py-24 text-center text-sm text-muted-foreground">
-              No calls or messages found for this contact.
-            </div>
-          ) : (
-            <>
-              {pagination.totalPages > 1 ? (
-                <div className="border-b bg-muted/20 px-4 py-3 md:px-8">
-                  <PaginationControls
-                    currentPage={pagination.currentPage}
-                    totalPages={pagination.totalPages}
-                    totalRecords={pagination.totalRecords}
-                    limit={pagination.perPage}
-                    onPageChange={handlePageChange}
-                    onLimitChange={handleLimitChange}
-                    isLoading={loading}
-                    className="mb-0"
-                  />
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div className={cn('flex min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground')}>
+            <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b bg-background/95 px-4 backdrop-blur-sm md:px-8">
+              <div className="flex min-w-0 items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={() => router.back()}>
+                  <ArrowLeft />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Call Now"
+                  className="text-left"
+                  disabled={!phoneNumber || loadingSetup}
+                  onClick={() => handleMakeCall(phoneNumber)}
+                >
+                  <Phone className="h-4 w-4" />
+                </Button>
+                <div className="relative min-w-0 flex-1">
+                  <h1 className="truncate text-xl font-bold">{displayName}</h1>
+                  {(threadContact.sublabel || phoneNumber) && (
+                    <p className="truncate text-sm text-muted-foreground">
+                      {[threadContact.sublabel, formatPhoneNumber(phoneNumber)]
+                        .filter(Boolean)
+                        .join(' • ')}
+                    </p>
+                  )}
                 </div>
-              ) : null}
-              <CallLog
-                calls={feedCommunications as Communication[]}
-                phoneNumbers={phoneNumbers}
-                onMakeCall={handleMakeCall}
-                isClickable={false}
-                onCommunicationSelect={handleCommunicationSelect}
-              />
-            </>
-          )}
-          <div ref={messagesEndRef} />
-        </main>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsProfileSidebarOpen(!isProfileSidebarOpen)}
+              >
+                {isProfileSidebarOpen ? <PanelRightClose /> : <User />}
+              </Button>
+            </header>
 
-        <footer className="shrink-0 space-y-2 border-t bg-background p-4">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <Select
-              value={selectedDepartmentId}
-              onValueChange={setSelectedDepartmentId}
-              disabled={loadingSetup || departments.length === 0}
+            <main
+              ref={chatScrollRef}
+              className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select department" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((dept) => (
-                  <SelectItem key={dept.id} value={String(dept.id)}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={selectedFromNumber}
-              onValueChange={setSelectedFromNumber}
-              disabled={loadingSetup || !selectedDepartmentId || filteredPhoneNumbers.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    selectedDepartmentId ? 'Select number' : 'Select department first'
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredPhoneNumbers.map((num) => (
-                  <SelectItem key={num.id} value={num.phone_no}>
-                    {getPhoneNumberOptionLabel(num)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {loading ? (
+                <div className="flex items-center justify-center py-24 text-muted-foreground">
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Loading communication history...
+                </div>
+              ) : !hasAnyRecords ? (
+                <div className="py-24 text-center text-sm text-muted-foreground">
+                  No calls or messages found for this contact.
+                </div>
+              ) : (
+                <>
+                  {pagination.totalPages > 1 ? (
+                    <div className="border-b bg-muted/20 px-4 py-3 md:px-8">
+                      <PaginationControls
+                        currentPage={pagination.currentPage}
+                        totalPages={pagination.totalPages}
+                        totalRecords={pagination.totalRecords}
+                        limit={pagination.perPage}
+                        onPageChange={handlePageChange}
+                        onLimitChange={handleLimitChange}
+                        isLoading={loading}
+                        className="mb-0"
+                      />
+                    </div>
+                  ) : null}
+                  <CallLog
+                    calls={feedCommunications as Communication[]}
+                    contacts={contacts}
+                    phoneNumbers={phoneNumbers}
+                    onMakeCall={handleMakeCall}
+                    isClickable={false}
+                    onCommunicationSelect={handleCommunicationSelect}
+                  />
+                </>
+              )}
+              <div ref={messagesEndRef} />
+            </main>
+
+            <footer className="shrink-0 space-y-2 border-t bg-background p-4">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Select
+                  value={selectedDepartmentId}
+                  onValueChange={setSelectedDepartmentId}
+                  disabled={loadingSetup || departments.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={String(dept.id)}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={selectedFromNumber}
+                  onValueChange={setSelectedFromNumber}
+                  disabled={loadingSetup || !selectedDepartmentId || filteredPhoneNumbers.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        selectedDepartmentId ? 'Select number' : 'Select department first'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredPhoneNumbers.map((num) => (
+                      <SelectItem key={num.id} value={num.phone_no}>
+                        {getPhoneNumberOptionLabel(num)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <MessageComposer
+                messageBody={messageBody}
+                onMessageBodyChange={setMessageBody}
+                onSend={handleSendMessage}
+                isSending={isSending}
+                placeholder={canCompose ? 'New message' : 'Select a department to send a message'}
+              />
+            </footer>
           </div>
-          <MessageComposer
-            messageBody={messageBody}
-            onMessageBodyChange={setMessageBody}
-            onSend={handleSendMessage}
-            isSending={isSending}
-            placeholder={canCompose ? 'New message' : 'Select a department to send a message'}
-          />
-        </footer>
+
+          {isProfileSidebarOpen && (
+            <aside className="h-full w-full max-w-[380px] border-l bg-background overflow-y-auto">
+              <ContactProfile
+                contact={threadContact}
+                contacts={contacts}
+                onContactUpdate={refreshContactState}
+                onCollapse={() => setIsProfileSidebarOpen(false)}
+              />
+            </aside>
+          )}
+        </div>
       </div>
     </div>
   );
