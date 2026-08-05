@@ -104,7 +104,7 @@ export const updateDndStatus = async (departmentId: number, userId: number, isDn
     return response.data;
 };
 
-export const getDndStatus = async (departmentId: number, userId: number): Promise<{ is_dnd: boolean }> => {
+export const getDndStatus = async (departmentId: number, userId: number): Promise<{ is_dnd: boolean | number }> => {
     const response = await axios.post('/api/departments/getDndStatus', {
         department_id: departmentId,
         user_id: userId,

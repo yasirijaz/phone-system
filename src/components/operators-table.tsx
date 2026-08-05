@@ -96,10 +96,14 @@ export default function OperatorsTable({
   }, [operators, currentUserId, activityName]);
 
   useEffect(() => {
+    // Only an explicitly department-scoped event may flip a department's DND badge.
+    // Account-wide availability changes arrive without a department_id and must not
+    // be spread across every department the operator belongs to.
     const handleDndStatusChange = (data: Record<string, unknown>) => {
       if (!data || data.user_id == null || data.is_dnd == null) return;
-      const eventDepartmentId =
-        data.department_id != null ? Number(data.department_id) : undefined;
+      if (data.department_id == null) return;
+
+      const eventDepartmentId = Number(data.department_id);
       const userId = Number(data.user_id);
       const isDnd = toFlag(data.is_dnd);
 
@@ -107,24 +111,31 @@ export default function OperatorsTable({
         prevRows.map((operator) => {
           if (Number(operator.id) !== userId) return operator;
 
-          const nextDepartments = (operator.departments ?? []).map((department: OperatorDepartment) => {
-            const shouldUpdateDepartment =
-              eventDepartmentId != null
-                ? Number(department.id) === eventDepartmentId
-                : scope === "department"
-                ? departmentId == null || Number(department.id) === Number(departmentId)
-                : true;
-
-            return shouldUpdateDepartment
+          const nextDepartments = (operator.departments ?? []).map((department: OperatorDepartment) =>
+            Number(department.id) === eventDepartmentId
               ? { ...department, is_dnd: isDnd }
-              : department;
-          });
+              : department
+          );
 
           return {
             ...operator,
             departments: nextDepartments,
           };
         })
+      );
+    };
+
+    const handleOverallDndChange = (data: Record<string, unknown>) => {
+      if (!data || data.user_id == null || data.do_not_disturb == null) return;
+      const userId = Number(data.user_id);
+      const doNotDisturb = toFlag(data.do_not_disturb);
+
+      setRows((prevRows) =>
+        prevRows.map((operator) =>
+          Number(operator.id) === userId
+            ? { ...operator, do_not_disturb: doNotDisturb }
+            : operator
+        )
       );
     };
 
@@ -154,15 +165,17 @@ export default function OperatorsTable({
     };
 
     events.on("refreshOperators", handleDndStatusChange);
+    events.on("refreshOverallDnd", handleOverallDndChange);
     events.on("refreshInCallStatus", handleInCallStatusChange);
     events.on("refreshWorkerStatus", handleWorkerStatusChange);
 
     return () => {
       events.off("refreshOperators", handleDndStatusChange);
+      events.off("refreshOverallDnd", handleOverallDndChange);
       events.off("refreshInCallStatus", handleInCallStatusChange);
       events.off("refreshWorkerStatus", handleWorkerStatusChange);
     };
-  }, [scope, departmentId]);
+  }, []);
 
   const sortedRows = useMemo(
     () => [...rows].sort((a, b) => a.name.localeCompare(b.name)),

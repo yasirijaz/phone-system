@@ -840,6 +840,14 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   };
 
   const handleEndClick = () => {
+    // No leg of our own while the conference still has people in it means we never
+    // joined (another agent answered first). Tear down this UI only — ending the
+    // conference would drop the customer and the agent who is actually talking.
+    if (!agentCallSid && currentParticipants.length > 0) {
+      void onEndCallForAll(null);
+      return;
+    }
+
     if (otherAgents.length > 0 && effectiveConferenceSid && agentCallSid) {
       setIsEndDialogOpen(true);
       return;

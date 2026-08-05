@@ -252,16 +252,22 @@ export default function AppHeader({
                 }
 
                 if (data.method_type === "refresh_listing") {
-                    events.emitDebounced("refreshCalls", 3000);
+                    // Coalesce bursty call events so every agent doesn't refetch threads at once.
+                    events.emitDebounced("refreshCalls", 5000);
                 }
 
                 if (data.method_type == "dnd_notification" && data.task_type == "dnd_status_change") {
-                    console.log("📢 DND status change notification received:", data.data);
-                    events.emit("refreshOperators", data.data);
+                    console.log("📢 Department DND status change notification received:", data.data);
+                    if (data.data?.department_id != null) {
+                        events.emit("refreshOperators", data.data);
+                    }
                 }
                 if (data.method_type == "dnd_notification" && data.task_type == "overall_dnd_status_change") {
-                    console.log("📢 DND status change notification received:", data.data);
-                    events.emit("refreshOperators", data.data);
+                    console.log("📢 Overall DND status change notification received:", data.data);
+                    events.emit("refreshOverallDnd", {
+                        user_id: data.data?.user_id,
+                        do_not_disturb: data.data?.do_not_disturb ?? data.data?.is_dnd,
+                    });
                 }
 
                 if (data.method_type == "in_call_notification" && data.task_type == "user_in_call_status") {

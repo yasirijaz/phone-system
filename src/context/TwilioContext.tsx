@@ -610,6 +610,45 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     [broadcastWorkerStatus, hasLiveCallMedia, logReservationState]
   );
 
+  /**
+   * Accepting is optimistic: the call bar, the reservation ref and the Unavailable
+   * broadcast all happen before TaskRouter confirms. When two dispatchers answer the same
+   * call, the loser's accept is rejected and that optimistic state would otherwise stick
+   * around as a dead call bar with no audio (and a worker parked on Unavailable).
+   */
+  const abandonLostReservation = useCallback(
+    async (reservation: Reservation, reason: string) => {
+      if (activeReservationRef.current !== reservation) return;
+
+      let status = reservation.status;
+      try {
+        status = (await reservation.fetchLatestVersion()).status;
+      } catch {
+        // Fall back to the cached reservation snapshot.
+      }
+
+      // We won after all — leave the live call alone.
+      if (status === 'accepted' || status === 'wrapping') return;
+      if (findLiveCallOnDevice(deviceRef.current)) return;
+      if (activeReservationRef.current !== reservation) return;
+
+      logReservationState('Releasing reservation the agent did not win', reservation, {
+        reason,
+        status,
+      });
+
+      expectingReservationDeviceLegRef.current = false;
+      clearActiveCallState();
+      void dismissActiveCall();
+      await restoreWorkerToAvailable(reason);
+      toast({
+        title: 'Call already answered',
+        description: 'Another agent picked up this call.',
+      });
+    },
+    [clearActiveCallState, logReservationState, restoreWorkerToAvailable, toast]
+  );
+
   const attachReservationLifecycleHandlers = useCallback((reservation: Reservation) => {
     if (reservationLifecycleAttachedRef.current.has(reservation)) {
       return;
@@ -969,6 +1008,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         if (!status) return;
 
         const onCall = hasLiveCallMedia() || Boolean(activeReservationRef.current);
+        const isRingingIncoming = Boolean(incomingReservationRef.current);
 
         // While on a call, TaskRouter may bounce between Offline/Unavailable/Available.
         // Update local UI only — do not hit /operators/presence on every bounce.
@@ -980,6 +1020,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           if (isUnavailableLikeActivity(status)) {
             void broadcastWorkerStatus(status, 'status_change', { localOnly: true });
           }
+          return;
+        }
+
+        // While ringing, TaskRouter correctly parks the worker on reservationActivitySid
+        // (Unavailable). Do not force Available here — that races the pending reservation.
+        if (isRingingIncoming && isUnavailableLikeActivity(status)) {
+          void broadcastWorkerStatus(status, 'status_change', { localOnly: true });
           return;
         }
 
@@ -1092,14 +1139,23 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           }, 500);
         });
 
-        const clearReservation = () => {
-          logReservationState('Clearing reservation UI state', reservation);
+        const clearReservation = (reason: string) => {
+          logReservationState('Clearing reservation UI state', reservation, { reason });
           stopIncomingRingSound();
           setIncomingReservation(null);
           setShowReservationModal(false);
           incomingReservationRef.current = null;
-          if (!isAgentOnCall()) {
+          // isAgentOnCall() counts this reservation itself, so when the reservation we
+          // optimistically accepted is the one being cancelled (another agent won the
+          // race) it would block its own cleanup. Only a *different* live call may.
+          const isOptimisticallyActive = activeReservationRef.current === reservation;
+          const busyWithAnotherCall = isAgentOnCall() && !isOptimisticallyActive;
+          if (!busyWithAnotherCall && !findLiveCallOnDevice(deviceRef.current)) {
             clearActiveCallState();
+            // TaskRouter leaves the worker on reservation/assignment Unavailable after a
+            // missed/canceled ring. activityUpdated often does not fire again (already
+            // Unavailable), so restore explicitly here or the agent stays unroutable.
+            void restoreWorkerToAvailable(reason);
           }
           try {
             if (isElectron() && window.electronAPI) {
@@ -1108,16 +1164,16 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           } catch {}
         };
 
-        reservation.on('rescinded', () => { console.log('Reservation rescinded'); clearReservation(); });
-        reservation.on('timeout', () => { console.log('Reservation timed out.'); clearReservation(); });
-        reservation.on('rejected', () => { console.log('Reservation rejected.'); clearReservation();  
+        reservation.on('rescinded', () => { console.log('Reservation rescinded'); clearReservation('reservation.rescinded'); });
+        reservation.on('timeout', () => { console.log('Reservation timed out.'); clearReservation('reservation.timeout'); });
+        reservation.on('rejected', () => { console.log('Reservation rejected.'); clearReservation('reservation.rejected');  
           if (typeof window !== 'undefined' && window.electronAPI) {
             window.electronAPI.send('successfully-rejected-call');
           }
 
         });
-        reservation.on('canceled', () => { console.log('Reservation canceled.'); clearReservation(); });
-        reservation.on('completed', () => { console.log('Reservation completed.'); clearReservation(); });
+        reservation.on('canceled', () => { console.log('Reservation canceled.'); clearReservation('reservation.canceled'); });
+        reservation.on('completed', () => { console.log('Reservation completed.'); clearReservation('reservation.completed.ui'); });
       });
 
     } catch (err: any) {
@@ -1347,13 +1403,23 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const endCallForAll = async (conferenceSid?: string | null) => {
     const reservationToFinalize = activeReservationRef.current;
+    const ownCallSid =
+      connectionRef.current?.parameters?.CallSid ??
+      findLiveCallOnDevice(deviceRef.current)?.parameters?.CallSid ??
+      readActiveCallSession()?.callSid ??
+      null;
 
-    if (conferenceSid) {
+    if (conferenceSid && ownCallSid) {
       try {
         await endConferenceApi(conferenceSid);
       } catch (error) {
         console.warn('Failed to end conference via API:', error);
       }
+    } else if (conferenceSid) {
+      // We hold no leg in this conference (typically because another agent answered
+      // first). Ending it here would hang up the customer and the agent who did answer,
+      // so only our own stale UI is torn down.
+      console.warn('Skipping end-conference: no local call leg', { conferenceSid });
     }
 
     if (connection) {
@@ -1498,6 +1564,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       if (!isIgnorableReservationError(error)) {
         console.warn('Failed to accept reservation conference:', error);
       }
+      void abandonLostReservation(reservation, 'reservation.accept_failed');
     });
   };
 

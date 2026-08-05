@@ -152,20 +152,20 @@ export default function ManageUsersPage() {
 
   // Handle DND status change notifications
   useEffect(() => {
-    const handleDndStatusChange = (data: any) => {
-      if (data?.is_dnd === undefined) return;
+    const handleOverallDndChange = (data: any) => {
+      if (data?.do_not_disturb === undefined) return;
 
       setUsers(prevUsers =>
         prevUsers.map(user =>
           Number(user.id) === Number(data.user_id)
-            ? { ...user, is_dnd: data.is_dnd }
+            ? { ...user, do_not_disturb: Number(data.do_not_disturb) ? 1 : 0 }
             : user
         )
       );
     };
 
-    events.on('refreshOperators', handleDndStatusChange);
-    return () => events.off('refreshOperators', handleDndStatusChange);
+    events.on('refreshOverallDnd', handleOverallDndChange);
+    return () => events.off('refreshOverallDnd', handleOverallDndChange);
   }, []);
 
   // Handle in-call status change notifications

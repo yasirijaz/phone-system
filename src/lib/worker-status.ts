@@ -63,12 +63,22 @@ export function dispatchOperatorStatusUpdate(
     events.emit('refreshInCallStatus', data);
   }
 
-  const dndValue = data.is_dnd ?? data.do_not_disturb;
-  if (dndValue != null) {
+  // Department DND and account-wide DND are different flags. A payload without a
+  // department_id describes the account-wide flag, so it must never be replayed as a
+  // per-department DND change.
+  if (data.department_id != null && data.is_dnd != null) {
     events.emit('refreshOperators', {
       user_id: data.user_id,
-      is_dnd: dndValue,
-      department_id: data.department_id,
+      is_dnd: data.is_dnd,
+      department_id: Number(data.department_id),
+    });
+  }
+
+  const overallDnd = data.do_not_disturb ?? (data.department_id == null ? data.is_dnd : null);
+  if (overallDnd != null) {
+    events.emit('refreshOverallDnd', {
+      user_id: data.user_id,
+      do_not_disturb: overallDnd,
     });
   }
 }

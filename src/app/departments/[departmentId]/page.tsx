@@ -160,7 +160,7 @@ export default function DepartmentDetailPage() {
             ]);
             
             setPhoneNumbers(numbers);
-            setDndStatus(dnd.is_dnd);
+            setDndStatus(Boolean(Number(dnd.is_dnd)));
 
             markDepartmentAsRead(departmentId)
               .then(() => {
@@ -174,6 +174,19 @@ export default function DepartmentDetailPage() {
     fetchInitialDepartmentData();
   }, [user, departmentId, toast]);
   
+  useEffect(() => {
+    const handleDndStatusChange = (data: any) => {
+      if (!user || data?.is_dnd === undefined) return;
+      if (Number(data?.department_id) !== departmentId) return;
+      if (Number(data?.user_id) !== Number(user.id)) return;
+
+      setDndStatus(Boolean(Number(data.is_dnd)));
+    };
+
+    events.on('refreshOperators', handleDndStatusChange);
+    return () => events.off('refreshOperators', handleDndStatusChange);
+  }, [user, departmentId]);
+
   const handlePageChange = (page: number) => {
       fetchCommunicationData(activeTab, page, pagination[activeTab].limit);
   };
