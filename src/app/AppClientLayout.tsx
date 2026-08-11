@@ -35,6 +35,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     rejectReservation,
     activeCallMeta,
     syncActiveCallState,
+    isOnLiveCall,
   } = useTwilio();
 
   const { user } = useAuth();
@@ -95,7 +96,8 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     isIncomingDeviceCall && !activeReservation && !incomingReservation && !showReservationModal;
   const isActiveCall =
     hasLiveConnection ||
-    !!activeReservation;
+    !!activeReservation ||
+    isOnLiveCall;
 
   const isAgentOnCall =
     isActiveCall && !isIncomingDeviceCall;

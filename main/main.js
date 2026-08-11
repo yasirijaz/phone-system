@@ -21,6 +21,7 @@ let currentBadgeCount = 0;
 let callProgressWindow = null;
 let callProgressStartedAt = null;
 let callProgressInfo = { callerName: '', callerNumber: '' };
+let callProgressOnHold = false;
 let pendingCallInfo = null;
 let isdev = false;
 let updateReady = false;
@@ -600,12 +601,13 @@ function destroyCallProgressWindow(resetSession = true) {
   if (resetSession) {
     callProgressStartedAt = null;
     callProgressInfo = { callerName: '', callerNumber: '' };
+    callProgressOnHold = false;
   }
 }
 
 function getCallProgressBounds() {
   const workArea = screen.getPrimaryDisplay().workArea;
-  const windowWidth = 360;
+  const windowWidth = 380;
   const windowHeight = 56;
   const margin = 16;
   return {
@@ -617,19 +619,27 @@ function getCallProgressBounds() {
 }
 
 function showCallProgressWindow(callInfo = {}) {
-  const { callerName = '', callerNumber = '', startedAt } = callInfo;
+  const { callerName = '', callerNumber = '', startedAt, isOnHold } = callInfo;
   const effectiveStartedAt = startedAt || callProgressStartedAt;
   if (!effectiveStartedAt) return;
 
   callProgressStartedAt = effectiveStartedAt;
-  callProgressInfo = { callerName, callerNumber };
+  if (callerName || callerNumber) {
+    callProgressInfo = {
+      callerName: callerName || callProgressInfo.callerName,
+      callerNumber: callerNumber || callProgressInfo.callerNumber,
+    };
+  }
+  if (typeof isOnHold === 'boolean') {
+    callProgressOnHold = isOnHold;
+  }
 
   if (pendingCallInfo) {
     syncIncomingOverlayWindow({
       ...pendingCallInfo,
       activeCall: {
-        callerName,
-        callerNumber,
+        callerName: callProgressInfo.callerName,
+        callerNumber: callProgressInfo.callerNumber,
         startedAt: effectiveStartedAt,
       },
     });
@@ -639,9 +649,10 @@ function showCallProgressWindow(callInfo = {}) {
   if (callProgressWindow && !callProgressWindow.isDestroyed()) {
     callProgressWindow.setBounds(getCallProgressBounds());
     callProgressWindow.webContents.send('call-progress-update', {
-      callerName,
-      callerNumber,
+      callerName: callProgressInfo.callerName,
+      callerNumber: callProgressInfo.callerNumber,
       startedAt: effectiveStartedAt,
+      isOnHold: callProgressOnHold,
     });
     if (!callProgressWindow.isVisible()) {
       callProgressWindow.show();
@@ -839,7 +850,8 @@ ipcMain.on('show-call-progress', (_event, callInfo) => {
 });
 
 ipcMain.on('hide-call-progress', () => {
-  destroyCallProgressWindow(true);
+  // Hide the progress window but keep the session info so it can be restored
+  destroyCallProgressWindow(false);
 });
 
 ipcMain.on('focus-main-window', () => {
@@ -855,6 +867,23 @@ ipcMain.on('focus-main-window', () => {
 ipcMain.on('end-call-from-progress', () => {
   if (Mainwindow && !Mainwindow.isDestroyed()) {
     Mainwindow.webContents.send('end-call-from-progress');
+  }
+});
+
+ipcMain.on('hold-call-from-progress', () => {
+  if (Mainwindow && !Mainwindow.isDestroyed()) {
+    Mainwindow.webContents.send('hold-call-from-progress');
+  }
+});
+
+ipcMain.on('restore-active-call-ui', () => {
+  if (Mainwindow && !Mainwindow.isDestroyed()) {
+    if (Mainwindow.isMinimized()) {
+      Mainwindow.restore();
+    }
+    Mainwindow.show();
+    Mainwindow.focus();
+    Mainwindow.webContents.send('restore-active-call-ui');
   }
 });
 

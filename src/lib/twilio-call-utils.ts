@@ -5,20 +5,54 @@ export function isLiveCallStatus(status?: string | null): boolean {
   return Boolean(normalized) && !['pending', 'ringing', 'closed', ''].includes(normalized);
 }
 
-export function findLiveCallOnDevice(device: Device | null | undefined): Call | null {
+function* iterateDeviceCalls(calls: unknown): Iterable<Call> {
+  if (!calls) return;
+  if (typeof (calls as Map<string, Call>).values === 'function') {
+    yield* (calls as Map<string, Call>).values();
+    return;
+  }
+  if (Array.isArray(calls)) {
+    yield* calls as Call[];
+    return;
+  }
+  if (typeof (calls as Iterable<Call>)[Symbol.iterator] === 'function') {
+    yield* calls as Iterable<Call>;
+  }
+}
+
+/**
+ * Find a live Call on the Device.
+ *
+ * After accept, Twilio Voice SDK moves the Call from `device.calls` (ringing/pending)
+ * into private `_activeCall`. Pass `trackedCall` (our liveCallRef) so restore/clear
+ * guards still work after React state was wiped.
+ */
+export function findLiveCallOnDevice(
+  device: Device | null | undefined,
+  trackedCall?: Call | null
+): Call | null {
+  if (trackedCall && isLiveCallStatus(trackedCall.status?.())) {
+    return trackedCall;
+  }
+
   if (!device) return null;
 
   try {
-    const calls = (device as Device & { calls?: Map<string, Call> }).calls;
-    if (!calls || typeof calls.values !== 'function') return null;
+    // Voice SDK keeps accepted media on private `_activeCall` (not on public `calls`).
+    const d = device as unknown as { calls?: unknown; _activeCall?: Call | null };
 
-    for (const call of calls.values()) {
-      if (isLiveCallStatus(call.status?.())) {
+    for (const call of iterateDeviceCalls(d.calls)) {
+      if (isLiveCallStatus(call?.status?.())) {
         return call;
       }
     }
+
+    const active = d._activeCall;
+    if (active && isLiveCallStatus(active.status?.())) {
+      return active;
+    }
   } catch {
-    return null;
+    return trackedCall && isLiveCallStatus(trackedCall.status?.()) ? trackedCall : null;
   }
 
   return null;

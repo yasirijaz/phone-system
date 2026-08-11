@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, type CSSProperties } from 'react';
-import { Phone, PhoneOff } from 'lucide-react';
+import { Pause, Phone, PhoneOff, Play } from 'lucide-react';
 
 type ElectronWindowStyle = CSSProperties & {
   WebkitAppRegion?: 'drag' | 'no-drag';
@@ -25,6 +25,8 @@ export default function CallProgressBarContent() {
   );
   const [duration, setDuration] = useState(0);
   const [isEnding, setIsEnding] = useState(false);
+  const [isOnHold, setIsOnHold] = useState(false);
+  const [isHoldLoading, setIsHoldLoading] = useState(false);
 
   useEffect(() => {
     document.documentElement.style.background = 'transparent';
@@ -33,9 +35,10 @@ export default function CallProgressBarContent() {
   }, []);
 
   useEffect(() => {
-    const update = (payload: { callerName?: string; startedAt?: number }) => {
+    const update = (payload: { callerName?: string; startedAt?: number; isOnHold?: boolean }) => {
       if (payload.callerName) setCallerName(payload.callerName);
       if (payload.startedAt) setStartedAt(payload.startedAt);
+      if (typeof payload.isOnHold === 'boolean') setIsOnHold(payload.isOnHold);
     };
 
     const off = window.electronAPI?.on('call-progress-update', update);
@@ -53,8 +56,9 @@ export default function CallProgressBarContent() {
     return () => window.clearInterval(id);
   }, [startedAt]);
 
-  const handleFocusMain = () => {
+  const handleOpenMainControls = () => {
     window.electronAPI?.send('focus-main-window');
+    window.electronAPI?.send('restore-active-call-ui');
   };
 
   const handleEndCall = () => {
@@ -63,10 +67,17 @@ export default function CallProgressBarContent() {
     window.electronAPI?.send('end-call-from-progress');
   };
 
+  const handleToggleHold = () => {
+    if (isHoldLoading || isEnding) return;
+    setIsHoldLoading(true);
+    window.electronAPI?.send('hold-call-from-progress');
+    window.setTimeout(() => setIsHoldLoading(false), 1200);
+  };
+
   return (
     <div className="flex h-screen w-screen items-start justify-end p-2">
       <div
-        className="flex w-full max-w-[340px] items-center gap-2 rounded-full border border-white/15 px-3 py-2 shadow-2xl"
+        className="flex w-full max-w-[380px] items-center gap-2 rounded-full border border-white/15 px-3 py-2 shadow-2xl"
         style={{
           ...dragRegionStyle,
           background: 'rgba(15, 23, 42, 0.78)',
@@ -79,19 +90,36 @@ export default function CallProgressBarContent() {
         </span>
         <button
           type="button"
-          onClick={handleFocusMain}
+          onClick={handleOpenMainControls}
           className="shrink-0 rounded-full p-0.5 text-green-400 transition-colors hover:text-green-300"
           style={noDragRegionStyle}
-          aria-label="Focus main window"
+          aria-label="Open call controls"
         >
           <Phone className="h-4 w-4" />
         </button>
-        <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">
+        <button
+          type="button"
+          onClick={handleOpenMainControls}
+          className="min-w-0 flex-1 truncate text-left text-sm font-medium text-white"
+          style={noDragRegionStyle}
+          title="Open in-app call bar"
+        >
           {callerName}
-        </p>
+        </button>
         <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-white">
           {formatTime(duration)}
         </span>
+        <button
+          type="button"
+          onClick={handleToggleHold}
+          disabled={isHoldLoading || isEnding}
+          className="shrink-0 rounded-full p-1 text-amber-300 transition-colors hover:bg-amber-500/20 hover:text-amber-200 disabled:opacity-50"
+          style={noDragRegionStyle}
+          aria-label={isOnHold ? 'Resume call' : 'Hold call'}
+          title={isOnHold ? 'Resume' : 'Hold'}
+        >
+          {isOnHold ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+        </button>
         <button
           type="button"
           onClick={handleEndCall}

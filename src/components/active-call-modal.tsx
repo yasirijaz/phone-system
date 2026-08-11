@@ -461,6 +461,17 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       setIsCollapsed(false);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const expand = () => setIsCollapsed(false);
+    const onHoldChanged = (hold: boolean) => setIsOnHold(Boolean(hold));
+    events.on('expandActiveCallBar', expand);
+    events.on('customerHoldChanged', onHoldChanged);
+    return () => {
+      events.off('expandActiveCallBar', expand);
+      events.off('customerHoldChanged', onHoldChanged);
+    };
+  }, []);
   
   const syncParticipantState = (participantList: ConferenceParticipant[]) => {
     setCurrentParticipants(participantList);
@@ -589,6 +600,14 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
           setActiveExternalCallSid(targetSid);
         }
         await fetchParticipants({ silent: true });
+        try {
+          events.emit('customerHoldChanged', hold);
+          if (typeof window !== 'undefined' && window.electronAPI) {
+            window.electronAPI.send('show-call-progress', { isOnHold: hold });
+          }
+        } catch {
+          // ignore
+        }
         toast({ title: hold ? "Caller on Hold" : "Caller Resumed"});
     } catch (err) {
         toast({ title: "Error", description: "Failed to toggle hold status.", variant: 'destructive' });
