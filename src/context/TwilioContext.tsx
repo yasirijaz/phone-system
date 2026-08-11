@@ -330,6 +330,17 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     syncInFlightRef.current = true;
 
     try {
+      const recentlyClearedMs = lastClearedAtRef.current > 0
+        ? Date.now() - lastClearedAtRef.current
+        : Infinity;
+      const justCleared = recentlyClearedMs < 15_000;
+
+      // After an intentional hangup, do not rehydrate UI from a lagging Device._activeCall.
+      if (justCleared) {
+        setIsOnLiveCall(false);
+        return;
+      }
+
       const liveDeviceCall = getLiveCall();
       const currentConnection = connectionRef.current;
       const currentStatus = currentConnection?.status?.() ?? null;
@@ -393,12 +404,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       // Guard: if the call was explicitly ended recently, don't restore from the API even
       // if the backend webhook hasn't arrived yet (userInCallRef may still be true for a
       // few seconds after clearActiveCallState() runs).
-      const recentlyClearedMs = lastClearedAtRef.current > 0
-        ? Date.now() - lastClearedAtRef.current
-        : Infinity;
-      const justCleared = recentlyClearedMs < 15_000;
-
-      if (!justCleared && (userInCallRef.current || readActiveCallSession()) && user?.id) {
+      if ((userInCallRef.current || readActiveCallSession()) && user?.id) {
         const activeCallLog = await getActiveCall();
 
         const clearedDuringFetch = lastClearedAtRef.current > 0
@@ -981,6 +987,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           clearPendingConferenceInvite();
           expectingReservationDeviceLegRef.current = false;
           if (connectionSourceRef.current === 'device') {
+            const justCleared =
+              lastClearedAtRef.current > 0 &&
+              Date.now() - lastClearedAtRef.current < 15_000;
+            if (justCleared) {
+              clearActiveCallState();
+              return;
+            }
             const liveCall = getLiveCall();
             if (liveCall) {
               adoptLiveConnection(liveCall);
@@ -1031,6 +1044,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       newDevice.on('disconnect', () => {
         console.log('Call disconnected (device event).');
+        const justCleared =
+          lastClearedAtRef.current > 0 &&
+          Date.now() - lastClearedAtRef.current < 15_000;
+        if (justCleared) {
+          clearActiveCallState();
+          return;
+        }
         const liveCall = findLiveCallOnDevice(newDevice, liveCallRef.current);
         if (liveCall) {
           adoptLiveConnection(liveCall);
@@ -1425,6 +1445,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     const offEndCall = window.electronAPI.on('end-call-from-progress', () => {
       try {
         hangUpFromOverlayRef.current();
+        if (window.electronAPI) {
+          window.electronAPI.send('hide-call-progress');
+        }
       } catch (e) {
         console.error('Failed to end call from progress overlay:', e);
       }
@@ -1518,17 +1541,31 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       await leaveConferenceApi(conferenceSid, callSid);
     } catch (error) {
       console.warn('Failed to leave conference via API:', error);
-      if (connection) {
-        try {
-          connection.disconnect();
-        } catch (disconnectError) {
-          console.warn('Failed to disconnect call leg:', disconnectError);
-        }
-      }
     }
+
+    const localCall =
+      connectionRef.current ||
+      liveCallRef.current ||
+      findLiveCallOnDevice(deviceRef.current, liveCallRef.current);
 
     scheduleReservationFinalize(reservationToFinalize);
     clearActiveCallState();
+    try {
+      if (isElectron() && window.electronAPI) {
+        window.electronAPI.send('hide-call-progress');
+      }
+    } catch {
+      // ignore
+    }
+
+    if (localCall) {
+      try {
+        localCall.disconnect();
+      } catch (disconnectError) {
+        console.warn('Failed to disconnect call leg:', disconnectError);
+      }
+    }
+
     void dismissActiveCall().then(() => {
       if (user?.id) {
         events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
@@ -1541,6 +1578,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     const reservationToFinalize = activeReservationRef.current;
     const ownCallSid =
       connectionRef.current?.parameters?.CallSid ??
+      liveCallRef.current?.parameters?.CallSid ??
       findLiveCallOnDevice(deviceRef.current, liveCallRef.current)?.parameters?.CallSid ??
       readActiveCallSession()?.callSid ??
       null;
@@ -1558,16 +1596,30 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       console.warn('Skipping end-conference: no local call leg', { conferenceSid });
     }
 
-    if (connection) {
+    const localCall =
+      connectionRef.current ||
+      liveCallRef.current ||
+      findLiveCallOnDevice(deviceRef.current, null);
+
+    // Mark hangup before disconnect so sync/disconnect handlers don't rehydrate the UI.
+    scheduleReservationFinalize(reservationToFinalize);
+    clearActiveCallState();
+    try {
+      if (isElectron() && window.electronAPI) {
+        window.electronAPI.send('hide-call-progress');
+      }
+    } catch {
+      // ignore
+    }
+
+    if (localCall) {
       try {
-        connection.disconnect();
+        localCall.disconnect();
       } catch (error) {
         console.warn('Failed to disconnect call leg:', error);
       }
     }
 
-    scheduleReservationFinalize(reservationToFinalize);
-    clearActiveCallState();
     void dismissActiveCall().then(() => {
       if (user?.id) {
         events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });

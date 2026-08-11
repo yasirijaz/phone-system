@@ -850,8 +850,9 @@ ipcMain.on('show-call-progress', (_event, callInfo) => {
 });
 
 ipcMain.on('hide-call-progress', () => {
-  // Hide the progress window but keep the session info so it can be restored
-  destroyCallProgressWindow(false);
+  // Full reset — keeping startedAt made the pill resurrect after hangup
+  // (notification dismiss / restore paths reuse callProgressStartedAt).
+  destroyCallProgressWindow(true);
 });
 
 ipcMain.on('focus-main-window', () => {
@@ -865,6 +866,8 @@ ipcMain.on('focus-main-window', () => {
 });
 
 ipcMain.on('end-call-from-progress', () => {
+  // Drop the widget immediately; don't wait for renderer React state to catch up.
+  destroyCallProgressWindow(true);
   if (Mainwindow && !Mainwindow.isDestroyed()) {
     Mainwindow.webContents.send('end-call-from-progress');
   }
