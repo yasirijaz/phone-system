@@ -1,7 +1,7 @@
 {
   "name": "voice",
   "productName": "Voice",
-  "version": "0.3.11",
+  "version": "0.4.1",
   "private": true,
   "main": "main/main.js",
   "author": "Yasir",
