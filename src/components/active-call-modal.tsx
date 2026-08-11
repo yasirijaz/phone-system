@@ -1008,8 +1008,11 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       onPointerUp={handleFloatingTogglePointerUp}
       onPointerCancel={handleFloatingTogglePointerUp}
       className={cn(
-        "fixed z-[110] flex touch-none cursor-move select-none items-center gap-2.5 rounded-full bg-background px-4 py-2.5 shadow-2xl ring-1 ring-border transition-colors hover:bg-muted/50",
-        floatingTogglePosition ? "" : "bottom-4 right-4"
+        "fixed z-[110] flex touch-none cursor-move select-none items-center gap-3 rounded-full px-5 py-3.5",
+        "bg-emerald-600 text-white shadow-[0_12px_40px_rgba(5,150,105,0.55)]",
+        "ring-2 ring-emerald-300/80 ring-offset-2 ring-offset-background",
+        "transition-colors hover:bg-emerald-500",
+        floatingTogglePosition ? "" : "bottom-5 right-5"
       )}
       style={
         floatingTogglePosition
@@ -1018,21 +1021,26 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       }
       aria-label={isCollapsed ? 'Expand active call controls' : 'Collapse active call controls'}
     >
-      <span className="relative flex h-2.5 w-2.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+      <span className="relative flex h-3 w-3 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/80 opacity-75" />
+        <span className="relative inline-flex h-3 w-3 rounded-full bg-white" />
       </span>
-      <Phone className="h-4 w-4 text-green-600" />
+      <Phone className="h-5 w-5 shrink-0 text-white" strokeWidth={2.25} />
+      <span className="hidden text-sm font-semibold tracking-wide sm:inline">
+        {pendingOutgoing ? `Waiting · ${pendingOutgoing.name}` : 'On call'}
+      </span>
       {pendingOutgoing ? (
-        <span className="max-w-[140px] truncate text-xs font-medium text-amber-700 dark:text-amber-300">
+        <span className="max-w-[140px] truncate text-xs font-medium text-emerald-50 sm:hidden">
           Waiting for {pendingOutgoing.name}
         </span>
       ) : null}
-      <span className="font-mono text-sm font-semibold tabular-nums">{formatTime(duration)}</span>
+      <span className="font-mono text-base font-bold tabular-nums tracking-wider">
+        {formatTime(duration)}
+      </span>
       {isCollapsed ? (
-        <ChevronUp className="h-4 w-4 text-muted-foreground" />
+        <ChevronUp className="h-5 w-5 shrink-0 text-emerald-100" />
       ) : (
-        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        <ChevronDown className="h-5 w-5 shrink-0 text-emerald-100" />
       )}
     </button>
   );

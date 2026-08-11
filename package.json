@@ -1,7 +1,7 @@
 {
   "name": "voice",
   "productName": "Voice",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "private": true,
   "main": "main/main.js",
   "author": "Yasir",
@@ -32,7 +32,7 @@
     "appId": "com.windshieldhub.voice",
     "productName": "Voice",
     "directories": {
-      "output": "dist",
+      "output": "release-build",
       "buildResources": "public"
     },
     "files": [

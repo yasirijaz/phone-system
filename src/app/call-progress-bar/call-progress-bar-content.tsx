@@ -75,60 +75,60 @@ export default function CallProgressBarContent() {
   };
 
   return (
-    <div className="flex h-screen w-screen items-start justify-end p-2">
+    <div className="flex h-screen w-screen items-start justify-end p-3">
       <div
-        className="flex w-full max-w-[380px] items-center gap-2 rounded-full border border-white/15 px-3 py-2 shadow-2xl"
+        className="flex w-full max-w-[440px] items-center gap-3 rounded-full px-4 py-3 shadow-[0_12px_40px_rgba(5,150,105,0.55)]"
         style={{
           ...dragRegionStyle,
-          background: 'rgba(15, 23, 42, 0.78)',
-          backdropFilter: 'blur(10px)',
+          background: '#059669',
+          boxShadow: '0 12px 40px rgba(5, 150, 105, 0.55), 0 0 0 2px rgba(167, 243, 208, 0.85)',
         }}
       >
-        <span className="relative flex h-2.5 w-2.5 shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+        <span className="relative flex h-3 w-3 shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/80 opacity-75" />
+          <span className="relative inline-flex h-3 w-3 rounded-full bg-white" />
         </span>
         <button
           type="button"
           onClick={handleOpenMainControls}
-          className="shrink-0 rounded-full p-0.5 text-green-400 transition-colors hover:text-green-300"
+          className="shrink-0 rounded-full p-0.5 text-white transition-colors hover:bg-white/15"
           style={noDragRegionStyle}
           aria-label="Open call controls"
         >
-          <Phone className="h-4 w-4" />
+          <Phone className="h-5 w-5" strokeWidth={2.25} />
         </button>
         <button
           type="button"
           onClick={handleOpenMainControls}
-          className="min-w-0 flex-1 truncate text-left text-sm font-medium text-white"
+          className="min-w-0 flex-1 truncate text-left text-sm font-semibold tracking-wide text-white"
           style={noDragRegionStyle}
           title="Open in-app call bar"
         >
-          {callerName}
+          {callerName || 'On call'}
         </button>
-        <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-white">
+        <span className="shrink-0 font-mono text-base font-bold tabular-nums tracking-wider text-white">
           {formatTime(duration)}
         </span>
         <button
           type="button"
           onClick={handleToggleHold}
           disabled={isHoldLoading || isEnding}
-          className="shrink-0 rounded-full p-1 text-amber-300 transition-colors hover:bg-amber-500/20 hover:text-amber-200 disabled:opacity-50"
+          className="shrink-0 rounded-full p-1.5 text-white transition-colors hover:bg-white/15 disabled:opacity-50"
           style={noDragRegionStyle}
           aria-label={isOnHold ? 'Resume call' : 'Hold call'}
           title={isOnHold ? 'Resume' : 'Hold'}
         >
-          {isOnHold ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+          {isOnHold ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
         </button>
         <button
           type="button"
           onClick={handleEndCall}
           disabled={isEnding}
-          className="shrink-0 rounded-full p-1 text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300 disabled:opacity-50"
+          className="shrink-0 rounded-full bg-red-500 p-1.5 text-white transition-colors hover:bg-red-400 disabled:opacity-50"
           style={noDragRegionStyle}
           aria-label="End call"
         >
-          <PhoneOff className="h-4 w-4" />
+          <PhoneOff className="h-5 w-5" />
         </button>
       </div>
     </div>

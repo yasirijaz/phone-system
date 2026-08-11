@@ -607,8 +607,8 @@ function destroyCallProgressWindow(resetSession = true) {
 
 function getCallProgressBounds() {
   const workArea = screen.getPrimaryDisplay().workArea;
-  const windowWidth = 380;
-  const windowHeight = 56;
+  const windowWidth = 440;
+  const windowHeight = 72;
   const margin = 16;
   return {
     width: windowWidth,
