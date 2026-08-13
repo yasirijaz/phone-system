@@ -111,17 +111,9 @@ export function dispatchOperatorStatusUpdate(
     events.emit('refreshInCallStatus', data);
   }
 
-  // Department DND and account-wide DND are different flags. A payload without a
-  // department_id describes the account-wide flag, so it must never be replayed as a
-  // per-department DND change.
-  if (data.department_id != null && data.is_dnd != null) {
-    events.emit('refreshOperators', {
-      user_id: data.user_id,
-      is_dnd: data.is_dnd,
-      department_id: Number(data.department_id),
-    });
-  }
-
+  // Department DND is only published on `dnd_notification` / `dnd_status_change`.
+  // Presence payloads must not be replayed as a per-department DND change — even
+  // when they happen to include both department_id and is_dnd.
   const overallDnd = data.do_not_disturb ?? (data.department_id == null ? data.is_dnd : null);
   if (overallDnd != null) {
     events.emit('refreshOverallDnd', {

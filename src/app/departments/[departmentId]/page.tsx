@@ -172,7 +172,7 @@ export default function DepartmentDetailPage() {
         }
     };
     fetchInitialDepartmentData();
-  }, [user, departmentId, toast]);
+  }, [user?.id, user?.company_id, departmentId, toast]);
   
   useEffect(() => {
     const handleDndStatusChange = (data: any) => {

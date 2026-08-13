@@ -57,7 +57,7 @@ interface RecentItem {
 }
 
 const SIDEBAR_CACHE_TTL = 2 * 60_000;
-const SIDEBAR_CACHE_VERSION = 'v3';
+const SIDEBAR_CACHE_VERSION = 'v4';
 
 let badgeCanvas: HTMLCanvasElement | null = null;
 
@@ -103,7 +103,7 @@ function mapSummaryToDepartment(
     company_id: companyId,
     workflow_sid: row.workflow_sid ?? undefined,
     unread_count: row.unread.total,
-    is_dnd: Boolean(row.is_dnd),
+    is_dnd: Boolean(Number(row.is_dnd)),
   };
 }
 
@@ -435,16 +435,39 @@ export function InAppSidebar() {
       void refreshInboxAndRecents();
     }, 1500);
 
-    const handleDndStatusChange = (data: { department_id?: number; is_dnd?: boolean }) => {
+    const handleDndStatusChange = (data: {
+      user_id?: number;
+      department_id?: number;
+      is_dnd?: boolean | number | string;
+    }) => {
+      // DND is per user+department. Another agent's toggle for this department
+      // must not flip our BellOff icon.
       if (data?.department_id == null || data?.is_dnd === undefined) return;
+      if (Number(data.user_id) !== Number(user.id)) return;
 
-      setDepartments((prevDepartments) =>
-        prevDepartments.map((dept) =>
-          dept.id === data.department_id
-            ? { ...dept, is_dnd: Boolean(data.is_dnd) }
+      const isDnd = Boolean(Number(data.is_dnd));
+      setDepartments((prevDepartments) => {
+        const next = prevDepartments.map((dept) =>
+          Number(dept.id) === Number(data.department_id)
+            ? { ...dept, is_dnd: isDnd }
             : dept
-        )
-      );
+        );
+
+        const cached = cacheGet<{
+          departments: DepartmentWithUnread[];
+          recentItems: RecentItem[];
+          inboxUnread: number;
+        }>(sidebarCacheKey(user.id));
+        if (cached) {
+          cacheSet(
+            sidebarCacheKey(user.id),
+            { ...cached, departments: next },
+            SIDEBAR_CACHE_TTL
+          );
+        }
+
+        return next;
+      });
     };
 
     events.on('refreshDepartmentsUnread', handleUnreadRefresh);

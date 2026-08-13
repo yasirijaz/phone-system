@@ -69,7 +69,7 @@ export default function DepartmentUsersPage() {
       setDepartmentUsers(prevUsers =>
         prevUsers.map(user =>
           user.user && Number(user.user.id) === Number(data.user_id)
-            ? { ...user, is_dnd: data.is_dnd ? 1 : 0 }
+            ? { ...user, is_dnd: Number(data.is_dnd) ? 1 : 0 }
             : user
         )
       );
