@@ -25,6 +25,54 @@ export function isUnavailableLikeActivity(status: string | null | undefined): bo
   return normalized === 'Unavailable' || normalized === 'Offline';
 }
 
+const MANUAL_UNAVAILABLE_KEY = 'wsh-manual-unavailable';
+const PRESENCE_UNLOAD_KEY = 'wsh-presence-unload';
+
+/** True when the agent explicitly chose Unavailable/Offline in this browser session. */
+export function readManualUnavailableIntent(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return sessionStorage.getItem(MANUAL_UNAVAILABLE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function writeManualUnavailableIntent(unavailable: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (unavailable) {
+      sessionStorage.setItem(MANUAL_UNAVAILABLE_KEY, '1');
+    } else {
+      sessionStorage.removeItem(MANUAL_UNAVAILABLE_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/** Mark that this tab is unloading (reload or close). sessionStorage survives reload only. */
+export function markPresenceUnload(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(PRESENCE_UNLOAD_KEY, String(Date.now()));
+  } catch {
+    // ignore
+  }
+}
+
+/** True when this boot follows a reload (sessionStorage survived). */
+export function consumePresenceReload(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const at = Number(sessionStorage.getItem(PRESENCE_UNLOAD_KEY) || 0);
+    sessionStorage.removeItem(PRESENCE_UNLOAD_KEY);
+    return at > 0 && Date.now() - at < 30_000;
+  } catch {
+    return false;
+  }
+}
+
 export function getWorkerStatusFromUser(
   user: User | Record<string, unknown> | null | undefined
 ): WorkerActivityName | undefined {

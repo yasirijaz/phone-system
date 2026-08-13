@@ -39,8 +39,12 @@ import {
 } from '@/lib/active-call-session';
 import { findLiveCallOnDevice, isLiveCallStatus } from '@/lib/twilio-call-utils';
 import {
+  consumePresenceReload,
   isUnavailableLikeActivity,
+  markPresenceUnload,
   normalizeWorkerActivityName,
+  readManualUnavailableIntent,
+  writeManualUnavailableIntent,
 } from '@/lib/worker-status';
 import { startTabPresence, type TabPresenceHandle } from '@/lib/tab-presence';
 import { getActiveCall, dismissActiveCall } from '@/services/callLogService';
@@ -130,9 +134,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const reservationLifecycleAttachedRef = useRef<WeakSet<Reservation>>(new WeakSet());
   const availableActivitySidRef = useRef<string | null>(null);
   /** User explicitly chose Unavailable/Offline — do not auto-restore Available after calls. */
-  const suppressAutoAvailableRef = useRef(false);
+  const suppressAutoAvailableRef = useRef(readManualUnavailableIntent());
   const tabPresenceRef = useRef<TabPresenceHandle | null>(null);
   const restoreRetryTimerRef = useRef<number | null>(null);
+  const availableRestoreTimersRef = useRef<number[]>([]);
+  const expectingLegTimerRef = useRef<number | null>(null);
   const lastPresenceBroadcastRef = useRef<{ status: string; at: number } | null>(null);
   const restoreInFlightRef = useRef(false);
   const conferenceSidRef = useRef<string | null>(null);
@@ -621,6 +627,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
    * a leftover reservation alone — those are the main reasons agents get stuck Unavailable.
    */
   const hasLiveCallMedia = useCallback(() => {
+    // After an intentional hangup, lagging Device._activeCall must not block Available restore.
+    const justCleared =
+      lastClearedAtRef.current > 0 && Date.now() - lastClearedAtRef.current < 15_000;
+    if (justCleared) {
+      return false;
+    }
     if (expectingReservationDeviceLegRef.current) {
       return true;
     }
@@ -650,7 +662,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         userInCallRef.current = false;
       }
 
-      if (suppressAutoAvailableRef.current) {
+      if (suppressAutoAvailableRef.current || readManualUnavailableIntent()) {
         logReservationState('Skipping Available restore (user chose Unavailable/Offline)', null, {
           reason,
         });
@@ -712,6 +724,26 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       }
     },
     [broadcastWorkerStatus, hasLiveCallMedia, logReservationState]
+  );
+
+  const scheduleAvailableRestore = useCallback(
+    (reason: string) => {
+      if (suppressAutoAvailableRef.current || readManualUnavailableIntent()) {
+        return;
+      }
+      availableRestoreTimersRef.current.forEach((id) => window.clearTimeout(id));
+      availableRestoreTimersRef.current = [];
+      void restoreWorkerToAvailable(reason);
+      // pagehide sends an Offline keepalive on refresh; beat that race.
+      for (const delayMs of [2000, 5000]) {
+        const id = window.setTimeout(() => {
+          if (suppressAutoAvailableRef.current || readManualUnavailableIntent()) return;
+          void restoreWorkerToAvailable(`${reason}:delayed-${delayMs}`);
+        }, delayMs);
+        availableRestoreTimersRef.current.push(id);
+      }
+    },
+    [restoreWorkerToAvailable]
   );
 
   /**
@@ -795,6 +827,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     tabPresenceRef.current = presence;
 
     const handlePageHide = () => {
+      markPresenceUnload();
       const { otherTabsRemain } = presence.markClosed();
       tabPresenceRef.current = null;
 
@@ -804,6 +837,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // Reload also fires pagehide. The next boot restores Available unless the
+      // agent explicitly chose Unavailable (see worker.ready + delayed restore).
       broadcastOperatorPresenceKeepalive({ event: 'offline', worker_status: 'Offline' });
     };
 
@@ -1114,10 +1149,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           availableActivitySidRef.current = availableSid;
         }
 
-        // Multi-tab / reconnect often leaves the shared worker Offline/Unavailable.
-        // Restore Available unless the user explicitly chose an unavailable-like status.
-        if (isUnavailableLikeActivity(status) && !suppressAutoAvailableRef.current) {
-          void restoreWorkerToAvailable('worker.ready');
+        // Refresh/pagehide races an Offline keepalive. Restore Available unless the
+        // agent explicitly chose Unavailable/Offline this session.
+        const justReloaded = consumePresenceReload();
+        const stayUnavailable =
+          suppressAutoAvailableRef.current || readManualUnavailableIntent();
+        if (!stayUnavailable && (isUnavailableLikeActivity(status) || justReloaded)) {
+          scheduleAvailableRestore(justReloaded ? 'worker.ready-reload' : 'worker.ready');
           return;
         }
 
@@ -1164,6 +1202,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
         if (status === 'Available') {
           suppressAutoAvailableRef.current = false;
+          writeManualUnavailableIntent(false);
           void broadcastWorkerStatus(status, 'status_change', { force: true });
         }
       });
@@ -1307,7 +1346,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsConnecting(false);
     }
-  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, restoreWorkerToAvailable, clearActiveCallState, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound, persistActiveCallMeta, isAgentOnCall, hasLiveCallMedia, getLiveCall, adoptLiveConnection, logReservationState]);
+  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, restoreWorkerToAvailable, scheduleAvailableRestore, clearActiveCallState, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound, persistActiveCallMeta, isAgentOnCall, hasLiveCallMedia, getLiveCall, adoptLiveConnection, logReservationState]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1571,6 +1610,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
       }
     });
+    void restoreWorkerToAvailable('leaveCall');
     toast({ title: 'Left call' });
   };
 
@@ -1625,6 +1665,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
       }
     });
+    void restoreWorkerToAvailable('endCallForAll');
     toast({ title: 'Call Ended' });
   };
 
@@ -1789,6 +1830,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     connectionSourceRef.current = 'reservation';
     expectingReservationDeviceLegRef.current = true;
+    if (expectingLegTimerRef.current != null) {
+      window.clearTimeout(expectingLegTimerRef.current);
+    }
+    expectingLegTimerRef.current = window.setTimeout(() => {
+      expectingReservationDeviceLegRef.current = false;
+      expectingLegTimerRef.current = null;
+    }, 25_000);
     setActiveReservation(reservation);
     activeReservationRef.current = reservation;
     attachReservationLifecycleHandlers(reservation);
@@ -1927,6 +1975,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     if (newActivity) {
       const normalizedName = normalizeWorkerActivityName(newActivity.name) || newActivity.name;
       suppressAutoAvailableRef.current = isUnavailableLikeActivity(normalizedName);
+      writeManualUnavailableIntent(suppressAutoAvailableRef.current);
+      if (!suppressAutoAvailableRef.current) {
+        availableRestoreTimersRef.current.forEach((id) => window.clearTimeout(id));
+        availableRestoreTimersRef.current = [];
+      }
       logReservationState('Manually updating worker activity', activeReservationRef.current, {
         activity: normalizedName,
         activitySid: newActivity.sid ?? null,
@@ -1945,6 +1998,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       if (restoreRetryTimerRef.current != null) {
         window.clearTimeout(restoreRetryTimerRef.current);
         restoreRetryTimerRef.current = null;
+      }
+      availableRestoreTimersRef.current.forEach((id) => window.clearTimeout(id));
+      availableRestoreTimersRef.current = [];
+      if (expectingLegTimerRef.current != null) {
+        window.clearTimeout(expectingLegTimerRef.current);
+        expectingLegTimerRef.current = null;
       }
       currentDevice?.disconnectAll();
       currentDevice?.destroy();
