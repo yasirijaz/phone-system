@@ -1,4 +1,10 @@
 {
     "IDX.aI.enableInlineCompletion": true,
-    "IDX.aI.enableCodebaseIndexing": true
+    "IDX.aI.enableCodebaseIndexing": true,
+    "files.watcherExclude": {
+        "**/release-build/**": true
+    },
+    "search.exclude": {
+        "**/release-build": true
+    }
 }
