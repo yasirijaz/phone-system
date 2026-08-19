@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { formatPhoneNumber } from '@/lib/utils';
-import { GitMerge, Pause, Phone, PhoneOff } from 'lucide-react';
+import { GitMerge, Minimize2, Pause, Phone, PhoneOff } from 'lucide-react';
 import type { CSSProperties } from 'react';
 
 export type CallWaitingSummary = {
@@ -31,6 +31,7 @@ type CallWaitingPanelProps = {
   onAcceptEndCurrent: () => void;
   onAcceptHold: () => void;
   onAcceptMerge: () => void;
+  onMinimize?: () => void;
   compact?: boolean;
   overlayChrome?: boolean;
   isBusy?: boolean;
@@ -103,6 +104,7 @@ export default function CallWaitingPanel({
   onAcceptEndCurrent,
   onAcceptHold,
   onAcceptMerge,
+  onMinimize,
   compact = false,
   overlayChrome = false,
   isBusy = false,
@@ -165,6 +167,18 @@ export default function CallWaitingPanel({
             className={`flex flex-wrap gap-2 ${onCall ? '' : 'justify-end'}`}
             style={overlayChrome ? noDragRegionStyle : undefined}
           >
+            {onMinimize ? (
+              <Button
+                variant={compact ? 'secondary' : 'outline'}
+                size={compact ? 'sm' : 'lg'}
+                className={compact ? 'rounded-full' : 'h-12 rounded-full px-6'}
+                onClick={onMinimize}
+                disabled={isBusy}
+              >
+                <Minimize2 className="mr-2 h-4 w-4" />
+                Ignore
+              </Button>
+            ) : null}
             <Button
               variant="destructive"
               size={compact ? 'sm' : 'lg'}

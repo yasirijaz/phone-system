@@ -43,6 +43,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   const isOverlayRoute = isElectronOverlayRoute(pathname);
   const showInAppShell = isInAppRoute(pathname);
   const [updateMessage, setUpdateMessage] = useState<string>('');
+  const [incomingMinimized, setIncomingMinimized] = useState(false);
   const callStartedAtRef = useRef<number | null>(null);
   const prevIsActiveCallRef = useRef(false);
 
@@ -152,6 +153,32 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     activeReservation?.task?.sid ||
     incomingReservation?.task?.sid ||
     'idle';
+  const incomingCallKey =
+    incomingReservation?.sid ||
+    incomingReservation?.task?.sid ||
+    (isIncomingDeviceCall ? connection?.parameters?.CallSid : null) ||
+    '';
+
+  useEffect(() => {
+    setIncomingMinimized(false);
+  }, [incomingCallKey]);
+
+  useEffect(() => {
+    if (!isElectron() || !window.electronAPI || isOverlayRoute) return;
+    const offIgnored = window.electronAPI.on('incoming-call-ignored', () => {
+      setIncomingMinimized(true);
+    });
+    return () => {
+      offIgnored?.();
+    };
+  }, [isOverlayRoute]);
+
+  const minimizeIncomingCall = () => {
+    setIncomingMinimized(true);
+    if (isElectron() && window.electronAPI && !isOverlayRoute) {
+      window.electronAPI.send('ignore-incoming-overlay');
+    }
+  };
 
   useEffect(() => {
     if (!isElectron() || !window.electronAPI || isOverlayRoute) return;
@@ -187,10 +214,13 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         departmentName={departmentName}
         onAccept={acceptCall}
         onReject={rejectCall}
+        isMinimized={incomingMinimized}
+        onMinimize={minimizeIncomingCall}
+        onExpand={() => setIncomingMinimized(false)}
       />
        <ActiveCallBar
         key={activeCallKey}
-        isOpen={!!isActiveCall && !showReservationModal}
+        isOpen={!!isActiveCall && (!showReservationModal || incomingMinimized)}
         contactNumber={callerNumber}
         callerName={callerName}
         departmentName={departmentName}
@@ -221,6 +251,9 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         onAcceptHold={acceptReservationWithHold}
         onAcceptMerge={acceptReservationAndMerge}
         onReject={rejectReservation}
+        isMinimized={incomingMinimized}
+        onMinimize={minimizeIncomingCall}
+        onExpand={() => setIncomingMinimized(false)}
       />
       <UpdateProgress message={updateMessage} />
     </>

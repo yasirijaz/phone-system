@@ -3,6 +3,7 @@
 import { Reservation } from 'twilio-taskrouter';
 import { useEffect, useState } from 'react';
 import CallWaitingPanel, { type CallWaitingSummary } from '@/components/call-waiting-panel';
+import { IncomingCallMinimizedPill } from '@/components/incoming-call-modal';
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -14,6 +15,9 @@ interface ReservationModalProps {
   onAcceptHold: (reservation: Reservation) => void;
   onAcceptMerge: (reservation: Reservation) => void;
   onReject: (reservation: Reservation) => void;
+  isMinimized?: boolean;
+  onMinimize?: () => void;
+  onExpand?: () => void;
 }
 
 export default function ReservationModal({
@@ -25,6 +29,9 @@ export default function ReservationModal({
   onAcceptHold,
   onAcceptMerge,
   onReject,
+  isMinimized = false,
+  onMinimize,
+  onExpand,
 }: ReservationModalProps) {
   const [activeCallDisplay, setActiveCallDisplay] = useState<CallWaitingSummary | null>(activeCall ?? null);
 
@@ -63,6 +70,15 @@ export default function ReservationModal({
   const departmentName = reservation.task.attributes.department_name || '';
   const onCall = Boolean(activeCallDisplay);
 
+  if (isMinimized) {
+    return (
+      <IncomingCallMinimizedPill
+        callerName={callerName}
+        onExpand={() => onExpand?.()}
+      />
+    );
+  }
+
   return (
     <div
       className="fixed bottom-4 left-1/2 z-[120] w-[95%] max-w-5xl -translate-x-1/2 animate-in slide-in-from-bottom-4 duration-300"
@@ -77,6 +93,7 @@ export default function ReservationModal({
         onAcceptEndCurrent={() => onAcceptEndCurrent(reservation)}
         onAcceptHold={() => (onCall ? onAcceptHold(reservation) : onAccept(reservation))}
         onAcceptMerge={() => onAcceptMerge(reservation)}
+        onMinimize={onMinimize}
       />
     </div>
   );

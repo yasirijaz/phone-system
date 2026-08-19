@@ -82,6 +82,9 @@ export default function IncomingCallNotificationContent() {
   };
 
   const handleReject = () => sendAction('reject-call');
+  const handleIgnore = () => {
+    window.electronAPI?.send('ignore-incoming-overlay');
+  };
   const handleAcceptHold = () =>
     sendAction(activeCall ? 'accept-call-hold' : 'accept-call');
   const handleAcceptEndCurrent = () => sendAction('accept-call-end-current');
@@ -100,6 +103,7 @@ export default function IncomingCallNotificationContent() {
           onAcceptEndCurrent={handleAcceptEndCurrent}
           onAcceptHold={handleAcceptHold}
           onAcceptMerge={handleAcceptMerge}
+          onMinimize={handleIgnore}
           compact
           overlayChrome
           isBusy={isBusy}

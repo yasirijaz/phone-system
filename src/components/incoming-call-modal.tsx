@@ -2,7 +2,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Phone, PhoneOff } from 'lucide-react';
+import { Minimize2, Phone, PhoneOff } from 'lucide-react';
 import { formatPhoneNumber } from '@/lib/utils';
 import { Avatar, AvatarFallback } from './ui/avatar';
 
@@ -14,6 +14,9 @@ interface IncomingCallModalProps {
   departmentName?: string | null;
   onAccept: () => void;
   onReject: () => void;
+  isMinimized?: boolean;
+  onMinimize?: () => void;
+  onExpand?: () => void;
 }
 
 function formatCallerNumber(callerNumber: string) {
@@ -23,6 +26,32 @@ function formatCallerNumber(callerNumber: string) {
   return formatPhoneNumber(callerNumber);
 }
 
+export function IncomingCallMinimizedPill({
+  callerName,
+  onExpand,
+}: {
+  callerName: string;
+  onExpand: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      className="fixed z-[110] bottom-5 right-5 flex max-w-[min(100%-2.5rem,22rem)] items-center gap-3 rounded-full bg-emerald-600 px-5 py-3.5 text-white shadow-[0_12px_40px_rgba(5,150,105,0.55)] ring-2 ring-emerald-300/80 ring-offset-2 ring-offset-background transition-colors hover:bg-emerald-500"
+      aria-label={`Incoming call from ${callerName}. Restore incoming call controls.`}
+    >
+      <span className="relative flex h-3 w-3 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/80 opacity-75" />
+        <span className="relative inline-flex h-3 w-3 rounded-full bg-white" />
+      </span>
+      <Phone className="h-5 w-5 shrink-0 text-white" strokeWidth={2.25} />
+      <span className="min-w-0 truncate text-sm font-semibold tracking-wide">
+        Incoming · {callerName}
+      </span>
+    </button>
+  );
+}
+
 export default function IncomingCallModal({
   isOpen,
   callerName,
@@ -30,16 +59,28 @@ export default function IncomingCallModal({
   departmentName,
   onAccept,
   onReject,
+  isMinimized = false,
+  onMinimize,
+  onExpand,
 }: IncomingCallModalProps) {
   if (!isOpen) {
     return null;
+  }
+
+  if (isMinimized) {
+    return (
+      <IncomingCallMinimizedPill
+        callerName={callerName || 'Unknown Caller'}
+        onExpand={() => onExpand?.()}
+      />
+    );
   }
 
   const contactInitial = callerName ? callerName.charAt(0).toUpperCase() : '?';
 
   return (
     <div
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-50 animate-in slide-in-from-bottom-4 duration-300"
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-[110] animate-in slide-in-from-bottom-4 duration-300"
       role="region"
       aria-label="Incoming call"
       aria-live="assertive"
@@ -81,6 +122,17 @@ export default function IncomingCallModal({
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
+            {onMinimize ? (
+              <Button
+                variant="outline"
+                size="lg"
+                className="h-12 flex-1 rounded-full px-6 sm:flex-none sm:min-w-[130px]"
+                onClick={onMinimize}
+              >
+                <Minimize2 className="mr-2 h-5 w-5" />
+                Ignore
+              </Button>
+            ) : null}
             <Button
               variant="destructive"
               size="lg"

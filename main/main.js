@@ -23,6 +23,7 @@ let callProgressStartedAt = null;
 let callProgressInfo = { callerName: '', callerNumber: '' };
 let callProgressOnHold = false;
 let pendingCallInfo = null;
+let incomingOverlayIgnored = false;
 let isdev = false;
 let updateReady = false;
 let updateCheckTimer = null;
@@ -463,6 +464,7 @@ function isMainWindowForeground() {
 
 function shouldShowIncomingOverlay() {
   if (!Mainwindow || Mainwindow.isDestroyed()) return false;
+  if (incomingOverlayIgnored) return false;
   return !isMainWindowForeground();
 }
 
@@ -486,7 +488,7 @@ function buildIncomingCallUrl(callInfo = {}) {
 function getIncomingOverlayBounds(hasActiveCall = false) {
   const workArea = screen.getPrimaryDisplay().workArea;
   const windowWidth = 420;
-  const windowHeight = hasActiveCall ? 240 : 190;
+  const windowHeight = hasActiveCall ? 280 : 230;
   const margin = 16;
   return {
     width: windowWidth,
@@ -577,6 +579,7 @@ function destroyNotificationWindow(restoreCallProgress = true, clearPending = tr
   notificationWindow = null;
   if (clearPending) {
     pendingCallInfo = null;
+    incomingOverlayIgnored = false;
   }
 
   if (restoreCallProgress && callProgressStartedAt) {
@@ -762,6 +765,7 @@ ipcMain.on('incoming-sms', (_event, sms) => {
 ipcMain.on('incoming-call', (_event, callInfo) => {
   const payload = callInfo || null;
   pendingCallInfo = payload;
+  incomingOverlayIgnored = false;
   if (shouldShowIncomingOverlay()) {
     syncIncomingOverlayWindow(payload);
   } else {
@@ -839,8 +843,17 @@ ipcMain.on('successfully-rejected-call', () => {
   pendingCallInfo = null;
 });
 
+ipcMain.on('ignore-incoming-overlay', () => {
+  incomingOverlayIgnored = true;
+  destroyNotificationWindow(true, false);
+  if (Mainwindow && !Mainwindow.isDestroyed()) {
+    Mainwindow.webContents.send('incoming-call-ignored');
+  }
+});
+
 // Renderer can request overlay dismissal when reservation clears
 ipcMain.on('dismiss-incoming-overlay', () => {
+  incomingOverlayIgnored = false;
   destroyNotificationWindow();
   pendingCallInfo = null;
 });
