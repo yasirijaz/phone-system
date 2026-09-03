@@ -16,6 +16,10 @@ import { isElectron } from '@/lib/is-electron';
 import { InAppShell } from '@/components/in-app-shell';
 import { isLiveCallStatus } from '@/lib/twilio-call-utils';
 import { readActiveCallSession } from '@/lib/active-call-session';
+import {
+  pickDisplayablePhoneNumber,
+  resolveActiveCallDisplayName,
+} from '@/lib/call-party-display';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const {
@@ -126,19 +130,32 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         activeCallMeta.callerNumber === activeReservation.task?.attributes?.from)
   );
 
-  const callerName =
-    activeReservation?.task?.attributes?.contact_name ||
-    connection?.parameters?.FriendlyName ||
-    (storedMetaApplies ? activeCallMeta?.callerName : null) ||
-    'Unknown Caller';
-  const callerNumber =
-    activeReservation?.task?.attributes?.from ||
-    connection?.parameters?.From ||
-    connection?.parameters?.To ||
-    (storedMetaApplies ? activeCallMeta?.callerNumber : null) ||
-    '';
+  const reservationAttrs = activeReservation?.task?.attributes;
+  const customTo =
+    (() => {
+      try {
+        return connection?.customParameters?.get?.('To') || connection?.customParameters?.get?.('to') || '';
+      } catch {
+        return '';
+      }
+    })();
+
+  const callerNumber = pickDisplayablePhoneNumber(
+    reservationAttrs?.from,
+    storedMetaApplies ? activeCallMeta?.callerNumber : null,
+    customTo,
+    connection?.parameters?.To,
+    connection?.parameters?.From
+  );
+
+  const callerName = resolveActiveCallDisplayName(
+    reservationAttrs?.contact_name ||
+      connection?.parameters?.FriendlyName ||
+      (storedMetaApplies ? activeCallMeta?.callerName : null),
+    callerNumber
+  );
   const departmentName =
-    activeReservation?.task?.attributes?.department_name ||
+    reservationAttrs?.department_name ||
     incomingReservation?.task?.attributes?.department_name ||
     (storedMetaApplies ? activeCallMeta?.departmentName : null) ||
     null;

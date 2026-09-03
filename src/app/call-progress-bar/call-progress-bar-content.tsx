@@ -3,11 +3,11 @@
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Pause, Phone, PhoneOff, Play } from 'lucide-react';
+import { formatPhoneNumber } from '@/lib/utils';
 
 type ElectronWindowStyle = CSSProperties & {
   WebkitAppRegion?: 'drag' | 'no-drag';
 };
-
 const dragRegionStyle: ElectronWindowStyle = { WebkitAppRegion: 'drag' };
 const noDragRegionStyle: ElectronWindowStyle = { WebkitAppRegion: 'no-drag' };
 
@@ -17,9 +17,22 @@ function formatTime(seconds: number) {
   return `${mins}:${secs}`;
 }
 
+function resolveProgressLabel(name: string, number: string): string {
+  const trimmedName = (name || '').trim();
+  const formattedNumber = number ? formatPhoneNumber(number) : '';
+  const placeholder = !trimmedName || /^(unknown caller|unknown|on call)$/i.test(trimmedName);
+
+  if (!placeholder && formattedNumber && trimmedName !== formattedNumber && trimmedName !== number) {
+    return `${trimmedName} · ${formattedNumber}`;
+  }
+  if (!placeholder) return trimmedName;
+  return formattedNumber || trimmedName || 'On call';
+}
+
 export default function CallProgressBarContent() {
   const searchParams = useSearchParams();
   const [callerName, setCallerName] = useState(searchParams.get('callerName') || 'On Call');
+  const [callerNumber, setCallerNumber] = useState(searchParams.get('callerNumber') || '');
   const [startedAt, setStartedAt] = useState(
     Number(searchParams.get('startedAt')) || Date.now()
   );
@@ -35,8 +48,14 @@ export default function CallProgressBarContent() {
   }, []);
 
   useEffect(() => {
-    const update = (payload: { callerName?: string; startedAt?: number; isOnHold?: boolean }) => {
+    const update = (payload: {
+      callerName?: string;
+      callerNumber?: string;
+      startedAt?: number;
+      isOnHold?: boolean;
+    }) => {
       if (payload.callerName) setCallerName(payload.callerName);
+      if (payload.callerNumber != null) setCallerNumber(payload.callerNumber);
       if (payload.startedAt) setStartedAt(payload.startedAt);
       if (typeof payload.isOnHold === 'boolean') setIsOnHold(payload.isOnHold);
     };
@@ -74,6 +93,8 @@ export default function CallProgressBarContent() {
     window.setTimeout(() => setIsHoldLoading(false), 1200);
   };
 
+  const label = resolveProgressLabel(callerName, callerNumber);
+
   return (
     <div className="flex h-screen w-screen items-start justify-end p-3">
       <div
@@ -102,9 +123,9 @@ export default function CallProgressBarContent() {
           onClick={handleOpenMainControls}
           className="min-w-0 flex-1 truncate text-left text-sm font-semibold tracking-wide text-white"
           style={noDragRegionStyle}
-          title="Open in-app call bar"
+          title={label}
         >
-          {callerName || 'On call'}
+          {label}
         </button>
         <span className="shrink-0 font-mono text-base font-bold tabular-nums tracking-wider text-white">
           {formatTime(duration)}

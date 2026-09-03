@@ -39,6 +39,12 @@ import {
 } from '@/lib/active-call-session';
 import { findLiveCallOnDevice, isLiveCallStatus } from '@/lib/twilio-call-utils';
 import {
+  getRemotePartyNameFromCall,
+  getRemotePartyNumberFromCall,
+  isPlaceholderCallerName,
+  pickDisplayablePhoneNumber,
+} from '@/lib/call-party-display';
+import {
   consumePresenceReload,
   isUnavailableLikeActivity,
   markPresenceUnload,
@@ -369,22 +375,28 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
         const callSid = connectionAfterSync.parameters?.CallSid ?? null;
         const attrs = reservation?.task?.attributes;
+        const existing = readActiveCallSession();
+        const remoteNumber = pickDisplayablePhoneNumber(
+          attrs?.from,
+          getRemotePartyNumberFromCall(connectionAfterSync),
+          existing?.callerNumber
+        );
+        const remoteName =
+          attrs?.contact_name ||
+          getRemotePartyNameFromCall(connectionAfterSync) ||
+          (!isPlaceholderCallerName(existing?.callerName) ? existing?.callerName : null) ||
+          remoteNumber ||
+          existing?.callerNumber ||
+          'Unknown Caller';
         persistActiveCallMeta({
           callSid,
-          callerName:
-            attrs?.contact_name ||
-            connectionAfterSync.parameters?.FriendlyName ||
-            'Unknown Caller',
-          callerNumber:
-            attrs?.from ||
-            connectionAfterSync.parameters?.From ||
-            connectionAfterSync.parameters?.To ||
-            '',
-          departmentName: attrs?.department_name || null,
+          callerName: remoteName,
+          callerNumber: remoteNumber || existing?.callerNumber || '',
+          departmentName: attrs?.department_name || existing?.departmentName || null,
           conferenceSid:
             attrs?.conference?.sid ||
             connectionAfterSync.customParameters?.get?.('conferenceSid') ||
-            readActiveCallSession()?.conferenceSid ||
+            existing?.conferenceSid ||
             null,
         });
         return;
@@ -1065,16 +1077,25 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       newDevice.on('connect', (conn: Call) => {
         console.log('Successfully established call!', conn);
         adoptLiveConnection(conn);
-        persistActiveCallMeta(
-          {
-            callSid: conn.parameters?.CallSid ?? null,
-            callerName: conn.parameters?.FriendlyName || conn.parameters?.To || 'Unknown Caller',
-            callerNumber: conn.parameters?.From || conn.parameters?.To || '',
-            conferenceSid: null,
-            startedAt: Date.now(),
-          },
-          { replace: true }
+        const existing = readActiveCallSession();
+        const remoteNumber = pickDisplayablePhoneNumber(
+          getRemotePartyNumberFromCall(conn),
+          existing?.callerNumber
         );
+        const remoteName =
+          getRemotePartyNameFromCall(conn) ||
+          (!isPlaceholderCallerName(existing?.callerName) ? existing?.callerName : null) ||
+          remoteNumber ||
+          existing?.callerNumber ||
+          'Unknown Caller';
+        // Merge — do not replace. Outbound dialer already stored the dialed number via
+        // registerOutboundConnection; wiping it here is what made the bar say Unknown Caller.
+        persistActiveCallMeta({
+          callSid: conn.parameters?.CallSid ?? null,
+          callerName: remoteName,
+          callerNumber: remoteNumber || existing?.callerNumber || '',
+          conferenceSid: existing?.conferenceSid ?? null,
+        });
       });
 
       newDevice.on('disconnect', () => {

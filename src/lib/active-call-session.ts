@@ -15,7 +15,9 @@ export function readActiveCallSession(): ActiveCallSession | null {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ActiveCallSession;
-    if (!parsed?.conferenceSid && !parsed?.callSid) return null;
+    // Outbound dials store the number before Twilio assigns a CallSid/conference.
+    // Keep those sessions so the UI does not fall back to "Unknown Caller".
+    if (!parsed?.conferenceSid && !parsed?.callSid && !parsed?.callerNumber) return null;
     return parsed;
   } catch {
     return null;
@@ -85,11 +87,31 @@ export function mergeActiveCallSession(patch: Partial<ActiveCallSession>): Activ
     return replaceActiveCallSession({ ...patch, startedAt: patch.startedAt ?? Date.now() });
   }
 
+  const existingName = existing?.callerName ?? '';
+  const patchName = patch.callerName;
+  const preferExistingName =
+    patchName != null &&
+    /^(unknown caller|unknown|on call)?$/i.test(String(patchName).trim()) &&
+    existingName &&
+    !/^(unknown caller|unknown|on call)?$/i.test(existingName.trim());
+
+  const existingNumber = existing?.callerNumber ?? '';
+  const patchNumber = patch.callerNumber;
+  const preferExistingNumber =
+    patchNumber != null &&
+    (!String(patchNumber).trim() || String(patchNumber).toLowerCase().startsWith('client:')) &&
+    existingNumber &&
+    !String(existingNumber).toLowerCase().startsWith('client:');
+
   const merged: ActiveCallSession = {
     callSid: patch.callSid ?? existing?.callSid ?? null,
     conferenceSid: patch.conferenceSid ?? existing?.conferenceSid ?? null,
-    callerName: patch.callerName ?? existing?.callerName ?? 'Unknown Caller',
-    callerNumber: patch.callerNumber ?? existing?.callerNumber ?? '',
+    callerName: preferExistingName
+      ? existingName
+      : (patchName ?? existingName ?? 'Unknown Caller'),
+    callerNumber: preferExistingNumber
+      ? existingNumber
+      : (patchNumber ?? existingNumber ?? ''),
     departmentName: patch.departmentName ?? existing?.departmentName ?? null,
     startedAt: patch.startedAt ?? existing?.startedAt ?? Date.now(),
   };

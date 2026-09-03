@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTwilio } from '@/context/TwilioContext';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { cn, formatPhoneNumber } from '@/lib/utils';
+import { isPlaceholderCallerName, pickDisplayablePhoneNumber } from '@/lib/call-party-display';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 import { allParticipant, removeParticipant, addParticipant, holdParticipant, initiateConsultCall, consultSwap, consultMerge, consultSwitch, consultEnsureAgent, type ConferenceParticipant } from '@/services/twilioService';
@@ -906,7 +907,22 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     return `${mins}:${secs}`;
   };
 
-  const contactInitial = callerName ? callerName.charAt(0).toUpperCase() : '?';
+  const contactNumberDisplay = pickDisplayablePhoneNumber(contactNumber);
+  const formattedContactNumber = contactNumberDisplay
+    ? contactNumberDisplay.toLowerCase().startsWith('client:')
+      ? contactNumberDisplay.length > 20
+        ? `${contactNumberDisplay.substring(0, 20)}...`
+        : contactNumberDisplay
+      : formatPhoneNumber(contactNumberDisplay)
+    : '';
+  const displayCallerName = isPlaceholderCallerName(callerName)
+    ? formattedContactNumber || callerName || 'Unknown Caller'
+    : callerName;
+  const contactInitial = displayCallerName ? displayCallerName.charAt(0).toUpperCase() : '?';
+  const showNumberSublabel =
+    Boolean(formattedContactNumber) &&
+    formattedContactNumber !== displayCallerName &&
+    contactNumberDisplay !== displayCallerName;
 
   const renderParticipantStatusBadge = (status: ReturnType<typeof getParticipantConnectionStatus>) => {
     const label = getParticipantStatusLabel(status);
@@ -1026,8 +1042,10 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
         <span className="relative inline-flex h-3 w-3 rounded-full bg-white" />
       </span>
       <Phone className="h-5 w-5 shrink-0 text-white" strokeWidth={2.25} />
-      <span className="hidden text-sm font-semibold tracking-wide sm:inline">
-        {pendingOutgoing ? `Waiting · ${pendingOutgoing.name}` : 'On call'}
+      <span className="hidden text-sm font-semibold tracking-wide sm:inline max-w-[160px] truncate">
+        {pendingOutgoing
+          ? `Waiting · ${pendingOutgoing.name}`
+          : displayCallerName || 'On call'}
       </span>
       {pendingOutgoing ? (
         <span className="max-w-[140px] truncate text-xs font-medium text-emerald-50 sm:hidden">
@@ -1065,16 +1083,16 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                     <AvatarFallback>{contactInitial}</AvatarFallback>
                 </Avatar>
                 <div>
-                    <p className="font-semibold text-lg truncate max-w-[200px]">{callerName}</p>
+                    <p className="font-semibold text-lg truncate max-w-[200px]">{displayCallerName}</p>
                     
                     <p className="text-sm text-muted-foreground truncate max-w-[200px]">
-                    {contactNumber?.toLowerCase().startsWith("client:")
-                      ? contactNumber.length > 20
-                        ? contactNumber.substring(0, 20) + "..."
-                        : contactNumber
-                      : formatPhoneNumber(contactNumber)
-                    }
-                       &bull; {formatTime(duration)}</p>
+                    {showNumberSublabel ? (
+                      <>
+                        {formattedContactNumber}
+                        {' · '}
+                      </>
+                    ) : null}
+                       {formatTime(duration)}</p>
                     {resolvedDepartmentName ? (
                       <p className="text-sm text-muted-foreground truncate max-w-[200px]">
                         Department: {resolvedDepartmentName}
