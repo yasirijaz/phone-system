@@ -549,27 +549,26 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   }, [conferenceSid, agentCallSid]);
 
   const ensureConferenceSid = async () => {
-    if (effectiveConferenceSid) {
-      return effectiveConferenceSid;
-    }
     const callSid = resolveActionAgentCallSid();
-    if (!callSid) {
-      return null;
-    }
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        const response = await getconferenceSid(callSid);
-        if (response?.conferenceSid) {
-          setVerifiedConferenceSid(response.conferenceSid);
-          setConferenceSid(response.conferenceSid);
-          return response.conferenceSid;
+    // Always prefer the conference attached to this agent's live CallSid.
+    // A stale context SID (previous reservation / restored session) can belong
+    // to another agent's call and 403 consult-initiate.
+    if (callSid) {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const response = await getconferenceSid(callSid);
+          if (response?.conferenceSid) {
+            setVerifiedConferenceSid(response.conferenceSid);
+            setConferenceSid(response.conferenceSid);
+            return response.conferenceSid;
+          }
+        } catch {
+          // retry — conference SID may not be persisted yet
         }
-      } catch (error) {
-        // retry a few times because conference SID may not be persisted yet
+        await new Promise((resolve) => setTimeout(resolve, 400));
       }
-      await new Promise((resolve) => setTimeout(resolve, 400));
     }
-    return null;
+    return effectiveConferenceSid;
   };
 
   const toggleMute = () => {

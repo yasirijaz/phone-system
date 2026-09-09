@@ -225,6 +225,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     const live = findLiveCallOnDevice(deviceRef.current, liveCallRef.current);
     if (live) {
       liveCallRef.current = live;
+      // Media is still up — undo a recent false clear so restore paths work again.
+      if (lastClearedAtRef.current > 0) {
+        lastClearedAtRef.current = 0;
+      }
       return live;
     }
     return null;
@@ -233,6 +237,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const adoptLiveConnection = useCallback((call: Call) => {
     liveCallRef.current = call;
     connectionSourceRef.current = 'device';
+    lastClearedAtRef.current = 0;
     setConnection(call);
     setIsOnLiveCall(true);
   }, []);
@@ -260,6 +265,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
    */
   const clearActiveCallStateIfIdle = useCallback(
     (reason: string): boolean => {
+      // Mid-accept: TaskRouter may complete/cancel UI signals before the Device leg lands.
+      if (expectingReservationDeviceLegRef.current) {
+        logReservationState('Keeping active call UI — expecting device leg', activeReservationRef.current, {
+          reason,
+        });
+        return false;
+      }
+
       const live = getLiveCall();
       if (live) {
         logReservationState('Keeping active call UI — live media still present', activeReservationRef.current, {
@@ -269,6 +282,27 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         adoptLiveConnection(live);
         return false;
       }
+
+      // Connection React state can lag behind Device._activeCall; also keep UI if we still
+      // have a live connection object or an active reservation with conference media pending.
+      const conn = connectionRef.current;
+      if (conn && isLiveCallStatus(conn.status?.())) {
+        adoptLiveConnection(conn);
+        return false;
+      }
+
+      if (activeReservationRef.current && reason !== 'leaveCall' && reason !== 'endCallForAll') {
+        // Reservation still active without a detectable Device leg yet — keep the bar.
+        const ageMs = Date.now() - (readActiveCallSession()?.startedAt ?? Date.now());
+        if (ageMs < 30_000) {
+          logReservationState('Keeping active call UI — reservation still active', activeReservationRef.current, {
+            reason,
+            ageMs,
+          });
+          return false;
+        }
+      }
+
       clearActiveCallState();
       return true;
     },
@@ -463,16 +497,28 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         // Debounce clearing to avoid transient false negatives from the device/reservation checks.
         if (!clearCallTimerRef.current) {
           clearCallTimerRef.current = window.setTimeout(() => {
-            if (getLiveCall()) {
-              clearCallTimerRef.current = null;
+            clearCallTimerRef.current = null;
+            // Never drop liveCallRef / isOnLiveCall here unless media is truly gone.
+            // A false negative used to wipe the tracked Call so later restores failed.
+            if (getLiveCall() || expectingReservationDeviceLegRef.current) {
+              return;
+            }
+            const conn = connectionRef.current;
+            if (conn && isLiveCallStatus(conn.status?.())) {
+              adoptLiveConnection(conn);
               return;
             }
             clearActiveCallSession();
             setActiveCallMeta(null);
             userInCallRef.current = false;
             setIsOnLiveCall(false);
-            liveCallRef.current = null;
-            clearCallTimerRef.current = null;
+            // Keep liveCallRef if the Call object still reports a non-closed status —
+            // only null it when the tracked call is closed/missing.
+            const tracked = liveCallRef.current;
+            const trackedStatus = tracked?.status?.() ?? null;
+            if (!tracked || !isLiveCallStatus(trackedStatus)) {
+              liveCallRef.current = null;
+            }
           }, 2500);
         }
       } else {
@@ -489,6 +535,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const registerOutboundConnection = useCallback((conn: Call, meta?: Partial<ActiveCallSession>) => {
     adoptLiveConnection(conn);
+    userInCallRef.current = true;
     persistActiveCallMeta(
       {
         callSid: conn.parameters?.CallSid ?? null,
@@ -615,6 +662,25 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     [user?.id, isAgentOnCall]
   );
 
+  // Outbound never creates a TaskRouter reservation, so Activity stays Available until the
+  // conference-join webhook — that window lets new inbound calls ring the agent. As soon as
+  // we have live outbound media, flip Unavailable in Twilio so routing stops for this worker.
+  const markedBusyCallSidRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isOnLiveCall) {
+      markedBusyCallSidRef.current = null;
+      return;
+    }
+    // Inbound accept already broadcasts Unavailable; this covers outbound (no reservation).
+    if (activeReservation) return;
+    const conn = connection ?? getLiveCall();
+    if (!conn || !isLiveCallStatus(conn.status?.())) return;
+    const callSid = conn.parameters?.CallSid ?? 'outbound-pending';
+    if (markedBusyCallSidRef.current === callSid) return;
+    markedBusyCallSidRef.current = callSid;
+    void broadcastWorkerStatus('Unavailable', 'status_change', { force: true, syncTwilio: true });
+  }, [isOnLiveCall, activeReservation, connection, broadcastWorkerStatus, getLiveCall]);
+
   const resolveAvailableActivitySid = useCallback(() => {
     if (availableActivitySidRef.current) {
       return availableActivitySidRef.current;
@@ -639,17 +705,18 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
    * a leftover reservation alone — those are the main reasons agents get stuck Unavailable.
    */
   const hasLiveCallMedia = useCallback(() => {
-    // After an intentional hangup, lagging Device._activeCall must not block Available restore.
-    const justCleared =
-      lastClearedAtRef.current > 0 && Date.now() - lastClearedAtRef.current < 15_000;
-    if (justCleared) {
-      return false;
+    // Prefer live Device media over the recent-hangup guard. A false clear used to
+    // black out detection for 15s and leave agents with audio but no call bar.
+    if (getLiveCall()) {
+      return true;
     }
     if (expectingReservationDeviceLegRef.current) {
       return true;
     }
-    if (getLiveCall()) {
-      return true;
+    const justCleared =
+      lastClearedAtRef.current > 0 && Date.now() - lastClearedAtRef.current < 15_000;
+    if (justCleared) {
+      return false;
     }
     const status = String(connectionRef.current?.status?.() ?? '').toLowerCase();
     return Boolean(status) && !['pending', 'ringing', 'closed', ''].includes(status);
@@ -963,6 +1030,23 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           expectingReservationDeviceLegRef.current ||
           (!isConferenceInvite && (autoAccept === '1' || autoAccept === 'true'));
 
+        // Already on a live call and this is not our expected conference/reservation leg —
+        // reject quietly so outbound agents are not interrupted by a second ring.
+        const alreadyOnLiveCall = Boolean(
+          getLiveCall() &&
+            getLiveCall() !== conn &&
+            isLiveCallStatus(getLiveCall()?.status?.())
+        );
+        if (alreadyOnLiveCall && !shouldAutoAccept && !isConferenceInvite) {
+          console.warn('Rejecting unexpected incoming Device call while already on a live call');
+          try {
+            conn.reject();
+          } catch (e) {
+            console.warn('Failed to reject unexpected incoming call:', e);
+          }
+          return;
+        }
+
         const clearPendingConferenceInvite = () => {
           pendingConferenceInviteRef.current = null;
         };
@@ -1034,23 +1118,28 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           clearPendingConferenceInvite();
           expectingReservationDeviceLegRef.current = false;
           if (connectionSourceRef.current === 'device') {
+            // Always prefer live media over the recent-clear guard. A prior false clear
+            // used to force another wipe and leave audio with no call bar.
+            const liveCall = getLiveCall();
+            if (liveCall && liveCall !== conn) {
+              adoptLiveConnection(liveCall);
+              return;
+            }
+            if (liveCall && isLiveCallStatus(liveCall.status?.())) {
+              adoptLiveConnection(liveCall);
+              return;
+            }
             const justCleared =
               lastClearedAtRef.current > 0 &&
               Date.now() - lastClearedAtRef.current < 15_000;
             if (justCleared) {
-              clearActiveCallState();
-              return;
-            }
-            const liveCall = getLiveCall();
-            if (liveCall) {
-              adoptLiveConnection(liveCall);
               return;
             }
             const reservation = activeReservationRef.current;
             if (reservation) {
               finalizeAfterDisconnectRef.current(reservation);
             } else {
-              clearActiveCallState();
+              clearActiveCallStateIfIdle('conn.disconnect');
               void restoreWorkerToAvailable('conn.disconnect');
             }
           }
@@ -1100,16 +1189,15 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       newDevice.on('disconnect', () => {
         console.log('Call disconnected (device event).');
+        const liveCall = findLiveCallOnDevice(newDevice, liveCallRef.current);
+        if (liveCall) {
+          adoptLiveConnection(liveCall);
+          return;
+        }
         const justCleared =
           lastClearedAtRef.current > 0 &&
           Date.now() - lastClearedAtRef.current < 15_000;
         if (justCleared) {
-          clearActiveCallState();
-          return;
-        }
-        const liveCall = findLiveCallOnDevice(newDevice, liveCallRef.current);
-        if (liveCall) {
-          adoptLiveConnection(liveCall);
           return;
         }
         if (connectionSourceRef.current === 'device') {
@@ -1117,7 +1205,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           if (reservation) {
             finalizeAfterDisconnectRef.current(reservation);
           } else {
-            clearActiveCallState();
+            clearActiveCallStateIfIdle('device.disconnect');
             void restoreWorkerToAvailable('device.disconnect');
           }
         }
@@ -1192,10 +1280,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         const isRingingIncoming = Boolean(incomingReservationRef.current);
 
         // While on a call, TaskRouter may bounce between Offline/Unavailable/Available.
-        // Update local UI only — do not hit /operators/presence on every bounce.
+        // If Twilio flipped us back to Available, push Unavailable for real — localOnly
+        // left the worker routable and inbound calls kept ringing during outbound.
         if (onCall) {
           if (status === 'Available') {
-            void broadcastWorkerStatus('Unavailable', 'status_change', { localOnly: true });
+            void broadcastWorkerStatus('Unavailable', 'status_change', {
+              force: true,
+              syncTwilio: true,
+            });
             return;
           }
           if (isUnavailableLikeActivity(status)) {
@@ -1230,6 +1322,21 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       newWorker.on('reservationCreated', (reservation: Reservation) => {
         console.log('Reservation created:', reservation);
+
+        // Agent is already on a live call (typically outbound). Do not ring / show the
+        // second-call UI — reject so TaskRouter can offer the task to someone else.
+        if (hasLiveCallMedia() || (isAgentOnCall() && getLiveCall())) {
+          logReservationState('Auto-rejecting reservation — agent already on a call', reservation);
+          stopIncomingRingSound();
+          void safeRejectReservation(reservation);
+          try {
+            if (isElectron() && window.electronAPI) {
+              window.electronAPI.send('dismiss-incoming-overlay');
+            }
+          } catch {}
+          return;
+        }
+
         if (!isAgentOnCall()) {
           clearActiveCallSession();
           setActiveCallMeta(null);
@@ -1367,7 +1474,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsConnecting(false);
     }
-  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, restoreWorkerToAvailable, scheduleAvailableRestore, clearActiveCallState, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound, persistActiveCallMeta, isAgentOnCall, hasLiveCallMedia, getLiveCall, adoptLiveConnection, logReservationState]);
+  }, [twilio, user, isConnecting, toast, broadcastWorkerStatus, restoreWorkerToAvailable, scheduleAvailableRestore, clearActiveCallState, clearActiveCallStateIfIdle, clearDeviceConnectionState, attachReservationLifecycleHandlers, startIncomingRing, stopIncomingRingSound, persistActiveCallMeta, isAgentOnCall, hasLiveCallMedia, getLiveCall, adoptLiveConnection, logReservationState, safeRejectReservation]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1387,7 +1494,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           return;
         }
         if (!activeReservationRef.current) {
-          clearActiveCallState();
+          clearActiveCallStateIfIdle('in_call_cleared');
           void restoreWorkerToAvailable('in_call_cleared');
         }
       }
@@ -1397,7 +1504,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     return () => {
       events.off('refreshInCallStatus', handleInCallStatus);
     };
-  }, [user?.id, syncActiveCallState, clearActiveCallState, restoreWorkerToAvailable, getLiveCall, adoptLiveConnection]);
+  }, [user?.id, syncActiveCallState, clearActiveCallStateIfIdle, restoreWorkerToAvailable, getLiveCall, adoptLiveConnection]);
 
   useEffect(() => {
     void syncActiveCallState();
@@ -1406,6 +1513,50 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     }, 3000);
     return () => window.clearInterval(interval);
   }, [syncActiveCallState]);
+
+  // Watchdog: if Device still has live media but React UI was cleared, restore the bar.
+  useEffect(() => {
+    const tick = () => {
+      const justCleared =
+        lastClearedAtRef.current > 0 && Date.now() - lastClearedAtRef.current < 2_000;
+      if (justCleared) return;
+
+      const live = getLiveCall();
+      if (!live) return;
+
+      const connMissing = !connectionRef.current || !isLiveCallStatus(connectionRef.current.status?.());
+      const uiMissing = !isOnLiveCall || connMissing;
+      if (!uiMissing) return;
+
+      console.warn('Call UI watchdog: restoring ActiveCallBar from live Device media');
+      adoptLiveConnection(live);
+      const session = readActiveCallSession();
+      if (session) {
+        setActiveCallMeta(session);
+        if (session.conferenceSid) {
+          setConferenceSid(session.conferenceSid);
+        }
+      } else {
+        persistActiveCallMeta({
+          callSid: live.parameters?.CallSid ?? null,
+          callerName:
+            getRemotePartyNameFromCall(live) ||
+            getRemotePartyNumberFromCall(live) ||
+            'Unknown Caller',
+          callerNumber: getRemotePartyNumberFromCall(live),
+        });
+      }
+      try {
+        events.emit('expandActiveCallBar');
+      } catch {
+        // ignore
+      }
+    };
+
+    const id = window.setInterval(tick, 2000);
+    tick();
+    return () => window.clearInterval(id);
+  }, [adoptLiveConnection, getLiveCall, isOnLiveCall, persistActiveCallMeta]);
 
   // Listen for accept/reject actions coming back from Electron main
   useEffect(() => {

@@ -50,10 +50,24 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
   const [incomingMinimized, setIncomingMinimized] = useState(false);
   const callStartedAtRef = useRef<number | null>(null);
   const prevIsActiveCallRef = useRef(false);
+  const hideProgressTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     void syncActiveCallState();
   }, [pathname, syncActiveCallState]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      void syncActiveCallState();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [syncActiveCallState]);
    useEffect(() => {
     if(window.api)
       window.api.receive('updatelog', handleUpdates);
@@ -99,10 +113,18 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     !!connection && (callStatus === 'pending' || callStatus === 'ringing');
   const isIncomingCall =
     isIncomingDeviceCall && !activeReservation && !incomingReservation && !showReservationModal;
+  // Soft signal: outbound/inbound meta can outlive a brief React connection wipe.
+  // Cap at 3 hours so a stale session never keeps the bar forever.
+  const hasRecentCallMeta = Boolean(
+    activeCallMeta &&
+      !isIncomingDeviceCall &&
+      Date.now() - (activeCallMeta.startedAt || 0) < 3 * 60 * 60_000
+  );
   const isActiveCall =
     hasLiveConnection ||
     !!activeReservation ||
-    isOnLiveCall;
+    isOnLiveCall ||
+    hasRecentCallMeta;
 
   const isAgentOnCall =
     isActiveCall && !isIncomingDeviceCall;
@@ -201,8 +223,12 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     if (!isElectron() || !window.electronAPI || isOverlayRoute) return;
 
     if (isActiveCall) {
+      if (hideProgressTimerRef.current != null) {
+        window.clearTimeout(hideProgressTimerRef.current);
+        hideProgressTimerRef.current = null;
+      }
       if (!callStartedAtRef.current) {
-        callStartedAtRef.current = Date.now();
+        callStartedAtRef.current = activeCallMeta?.startedAt ?? Date.now();
       }
       window.electronAPI.send('show-call-progress', {
         callerName,
@@ -212,9 +238,24 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
       return;
     }
 
-    callStartedAtRef.current = null;
-    window.electronAPI.send('hide-call-progress');
-  }, [isActiveCall, callerName, callerNumber, isOverlayRoute]);
+    // Debounce hide — brief isActiveCall flickers were destroying the Electron widget
+    // while the agent was still on the call.
+    if (hideProgressTimerRef.current != null) {
+      window.clearTimeout(hideProgressTimerRef.current);
+    }
+    hideProgressTimerRef.current = window.setTimeout(() => {
+      hideProgressTimerRef.current = null;
+      callStartedAtRef.current = null;
+      window.electronAPI?.send('hide-call-progress');
+    }, 2000);
+
+    return () => {
+      if (hideProgressTimerRef.current != null) {
+        window.clearTimeout(hideProgressTimerRef.current);
+        hideProgressTimerRef.current = null;
+      }
+    };
+  }, [isActiveCall, callerName, callerNumber, isOverlayRoute, activeCallMeta?.startedAt]);
 
   if (isOverlayRoute) {
     return <>{children}</>;

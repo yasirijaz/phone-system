@@ -623,7 +623,7 @@ function getCallProgressBounds() {
 
 function showCallProgressWindow(callInfo = {}) {
   const { callerName = '', callerNumber = '', startedAt, isOnHold } = callInfo;
-  const effectiveStartedAt = startedAt || callProgressStartedAt;
+  const effectiveStartedAt = startedAt || callProgressStartedAt || Date.now();
   if (!effectiveStartedAt) return;
 
   callProgressStartedAt = effectiveStartedAt;
@@ -637,7 +637,10 @@ function showCallProgressWindow(callInfo = {}) {
     callProgressOnHold = isOnHold;
   }
 
-  if (pendingCallInfo) {
+  // Incoming overlay wins only while the main window is in the background.
+  // When the agent is focused in-app, still keep/create the progress window so a
+  // vanished ActiveCallBar is not the only missing control surface.
+  if (pendingCallInfo && shouldShowIncomingOverlay()) {
     syncIncomingOverlayWindow({
       ...pendingCallInfo,
       activeCall: {

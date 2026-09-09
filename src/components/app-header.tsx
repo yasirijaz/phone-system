@@ -581,7 +581,8 @@ export default function AppHeader({
         const isInLiveCall = callStatus === 'open';
         const isCallConnecting =
           !!callStatus && !['closed', 'disconnected'].includes(callStatus) && !isInLiveCall;
-        const conferenceSidForConsult = twilioConferenceSid;
+        const liveCallSid = liveConnection?.parameters?.CallSid as string | undefined;
+        let conferenceSidForConsult = twilioConferenceSid;
 
         if (isCallConnecting) {
             toast({
@@ -593,6 +594,17 @@ export default function AppHeader({
         }
 
         if (isInLiveCall && liveConnection) {
+            if (liveCallSid) {
+                try {
+                    const resolved = await getconferenceSid(liveCallSid);
+                    if (resolved?.conferenceSid) {
+                        conferenceSidForConsult = resolved.conferenceSid;
+                        setConferenceSid(resolved.conferenceSid);
+                    }
+                } catch {
+                    // fall back to context SID
+                }
+            }
             if (!conferenceSidForConsult) {
                 toast({
                     title: "Call not ready",

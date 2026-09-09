@@ -39,17 +39,22 @@ export function findLiveCallOnDevice(
 
   try {
     // Voice SDK keeps accepted media on private `_activeCall` (not on public `calls`).
-    const d = device as unknown as { calls?: unknown; _activeCall?: Call | null };
+    const d = device as unknown as {
+      calls?: unknown;
+      _activeCall?: Call | null;
+      activeCall?: Call | null;
+      _call?: Call | null;
+    };
+
+    const active = d._activeCall ?? d.activeCall ?? d._call ?? null;
+    if (active && isLiveCallStatus(active.status?.())) {
+      return active;
+    }
 
     for (const call of iterateDeviceCalls(d.calls)) {
       if (isLiveCallStatus(call?.status?.())) {
         return call;
       }
-    }
-
-    const active = d._activeCall;
-    if (active && isLiveCallStatus(active.status?.())) {
-      return active;
     }
   } catch {
     return trackedCall && isLiveCallStatus(trackedCall.status?.()) ? trackedCall : null;
