@@ -44,18 +44,10 @@ export const searchContacts = async (
 };
 
 export const getAllContacts = async (companyId: number): Promise<Contact[]> => {
-  const perPage = 500;
-  let page = 1;
-  let all: Contact[] = [];
-
-  while (true) {
-    const batch = await getContactsPaginated(companyId, { page, per_page: perPage });
-    all = all.concat(batch.data ?? []);
-    if (page >= batch.last_page) break;
-    page += 1;
-  }
-
-  return all;
+  // Boot paths (header, inbox, sidebar) must not page the entire directory.
+  // Typeahead uses searchContacts; the contacts page uses getContactsPaginated.
+  const batch = await getContactsPaginated(companyId, { page: 1, per_page: 100 });
+  return batch.data ?? [];
 };
 
 export const getContacts = async (companyId: number): Promise<Contact[]> => {
@@ -64,7 +56,7 @@ export const getContacts = async (companyId: number): Promise<Contact[]> => {
   if (cached) return cached;
 
   const contacts = await getAllContacts(companyId);
-  cacheSet(cacheKey, contacts, 2 * 60 * 1000);
+  cacheSet(cacheKey, contacts, 5 * 60 * 1000);
   return contacts;
 };
 

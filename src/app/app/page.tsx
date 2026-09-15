@@ -6,13 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
-import type { Communication, Contact, Operator, PaginatedCommunicationsResponse, User, PhoneNumber } from "@/types";
+import type { Communication, Operator, PaginatedCommunicationsResponse, User, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useTwilio } from '@/context/TwilioContext';
 import { useToast } from "@/hooks/use-toast";
 import { getCommunications, enrichThreadsWithLastAttendee } from "@/services/callLogService";
 import { getOperators, type OperatorsScope } from "@/services/departmentService";
-import { getContacts } from "@/services/contactService";
 import { getUsersByCompany } from "@/services/userService";
 import { getCompanyPhoneNumbers } from "@/services/phoneNumberService";
 import CallLog from "@/components/call-log";
@@ -55,7 +54,6 @@ export default function AppUIPage() {
   });
   const [operators, setOperators] = useState<Operator[]>([]);
   const [operatorsScope, setOperatorsScope] = useState<OperatorsScope>('assigned_departments');
-  const [contacts, setContacts] = useState<Contact[]>([]);
   const [companyUsers, setCompanyUsers] = useState<User[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [pagination, setPagination] = useState<Record<TabName, PaginationState>>({
@@ -84,7 +82,6 @@ export default function AppUIPage() {
 
   useEffect(() => {
     if (!user?.company_id) return;
-    getContacts(user.company_id).then((list) => setContacts(Array.isArray(list) ? list : []));
     getUsersByCompany(user.company_id).then((result) => {
       setCompanyUsers(Array.isArray(result.data) ? result.data : []);
     });
@@ -262,7 +259,6 @@ export default function AppUIPage() {
         <Card className="overflow-hidden">
           <CallLog
             calls={currentData || []}
-            contacts={contacts}
             companyUsers={companyUsers}
             phoneNumbers={phoneNumbers}
             onMakeCall={handleMakeCall}

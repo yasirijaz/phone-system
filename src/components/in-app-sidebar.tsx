@@ -9,7 +9,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { getCommunications } from '@/services/callLogService';
-import type { Department, Communication, Contact } from '@/types';
+import type { Department, Communication } from '@/types';
 import { Badge } from './ui/badge';
 import { isElectron } from '@/lib/is-electron';
 import { events } from '@/lib/events';
@@ -23,7 +23,6 @@ import {
   leaveDepartment,
   type DepartmentSummaryItem,
 } from '@/services/departmentService';
-import { getContacts } from '@/services/contactService';
 import { debounce } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -223,10 +222,7 @@ export function InAppSidebar() {
     if (!user?.id || !user?.company_id) return;
 
     try {
-      const [recentCommsResponse, contacts] = await Promise.all([
-        getCommunications({ limit: 50, scope: 'assigned' }),
-        getContacts(user.company_id),
-      ]);
+      const recentCommsResponse = await getCommunications({ limit: 50, scope: 'assigned' });
 
       const recentComms = Array.isArray(recentCommsResponse.results) ? recentCommsResponse.results : [];
       const newInboxUnread = recentComms.filter((c) => !c.is_read).length;
@@ -238,10 +234,7 @@ export function InAppSidebar() {
         const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
 
         if (!uniqueRecents[otherPartyNumber]) {
-          const contact = contacts
-            ? contacts.find((c: Contact) => c.phone_no === otherPartyNumber)
-            : null;
-          const display = getOtherPartyDisplay(comm, contact);
+          const display = getOtherPartyDisplay(comm);
           uniqueRecents[otherPartyNumber] = {
             id: otherPartyNumber,
             name: display.displayName,
@@ -349,10 +342,9 @@ export function InAppSidebar() {
         setDepartmentsLoading(true);
         setRecentsLoading(true);
 
-        const [summary, recentCommsResponse, contacts] = await Promise.all([
+        const [summary, recentCommsResponse] = await Promise.all([
           getDepartmentsSummary(undefined, { assignedOnly: true }),
           getCommunications({ limit: 50, scope: 'assigned' }),
-          getContacts(companyId),
         ]);
 
         const deptsWithCounts = summary.departments.map((row) => {
@@ -373,10 +365,7 @@ export function InAppSidebar() {
           const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
 
           if (!uniqueRecents[otherPartyNumber]) {
-            const contact = contacts
-              ? contacts.find((c: Contact) => c.phone_no === otherPartyNumber)
-              : null;
-            const display = getOtherPartyDisplay(comm, contact);
+            const display = getOtherPartyDisplay(comm);
             uniqueRecents[otherPartyNumber] = {
               id: otherPartyNumber,
               name: display.displayName,

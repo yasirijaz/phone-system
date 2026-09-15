@@ -504,12 +504,6 @@ export default function AppHeader({
               setPhoneNumbers(cached.phoneNumbers);
               setCompanyUsers(cached.companyUsers);
               setLoadingDepartments(false);
-              try {
-                const freshContacts = await getContacts(user.company_id);
-                if (!cancelled) setContacts(freshContacts);
-              } catch {
-                // Keep cached contacts on refresh failure.
-              }
               return;
             }
 
@@ -517,30 +511,46 @@ export default function AppHeader({
             setLoadingNumbers(true);
             try {
                 const canFetchAllDepts = canListAllCompanyDepartments(user.role_id);
-                const [fetchedDepts, fetchedContacts, fetchedNumbers, usersResponse] = await Promise.all([
+                const [fetchedDepts, fetchedNumbers, usersResponse] = await Promise.all([
                     canFetchAllDepts
                         ? getDepartments(user.company_id)
                         : getUserDepartments(user.id),
-                    getContacts(user.company_id),
                     getCompanyPhoneNumbers(user.company_id),
                     getUsersByCompany(user.company_id),
                 ]);
                 if (cancelled) return;
                 const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
-                const contactList = Array.isArray(fetchedContacts) ? fetchedContacts : [];
                 const numbers = Array.isArray(fetchedNumbers) ? fetchedNumbers : [];
                 const users = Array.isArray(usersResponse.data) ? usersResponse.data : [];
                 setDepartments(depts);
-                setContacts(contactList);
                 setPhoneNumbers(numbers);
                 setCompanyUsers(users);
+                setLoadingDepartments(false);
+                setLoadingNumbers(false);
 
                 cacheSet(cacheKey, {
                   departments: depts,
-                  contacts: contactList,
+                  contacts: [],
                   phoneNumbers: numbers,
                   companyUsers: users,
-                }, 60_000);
+                }, 5 * 60_000);
+
+                void getContacts(user.company_id)
+                  .then((freshContacts) => {
+                    if (cancelled) return;
+                    const contactList = Array.isArray(freshContacts) ? freshContacts : [];
+                    setContacts(contactList);
+                    cacheSet(cacheKey, {
+                      departments: depts,
+                      contacts: contactList,
+                      phoneNumbers: numbers,
+                      companyUsers: users,
+                    }, 5 * 60_000);
+                  })
+                  .catch(() => {
+                    // Dialer/global search still work via searchContacts.
+                  });
+                return;
             } catch (error) {
                 if (!cancelled) {
                   toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });

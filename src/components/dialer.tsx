@@ -9,7 +9,9 @@ import { Phone, Delete } from "lucide-react";
 import type { Department, PhoneNumber, Contact } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
-import { formatPhoneNumber, getPhoneNumberOptionLabel } from '@/lib/utils';
+import { formatPhoneNumber, getPhoneNumberOptionLabel, phonesMatch } from '@/lib/utils';
+import { searchContacts } from '@/services/contactService';
+import { useAuth } from '@/context/AuthContext';
 
 interface DialerProps {
     onMakeCall: (number: string, fromNumber?: string) => void;
@@ -44,6 +46,7 @@ export default function Dialer({
     onSetSelectedFromNumber,
     contacts = [],
 }: DialerProps) {
+    const { user } = useAuth();
     const [number, setNumber] = useState('');
     const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
     
@@ -52,6 +55,7 @@ export default function Dialer({
             handleNumberChange(initialValue);
         } else {
             setNumber('');
+            setFilteredContacts([]);
         }
     }, [initialValue, open]);
 
@@ -88,20 +92,52 @@ export default function Dialer({
     
     const handleNumberChange = (value: string) => {
         setNumber(formatDialerNumber(value));
-         if (value.length >= 1) {
-            const searchTerm = value.toLowerCase();
-            const searchDigits = value.replace(/\D/g, '');
-            const matchingContacts = contacts.filter(contact => 
-                contact.name.toLowerCase().includes(searchTerm) ||
-                contact.phone_no.includes(searchTerm) ||
-                (searchDigits.length > 0 &&
-                  contact.phone_no.replace(/\D/g, '').includes(searchDigits))
-            );
-            setFilteredContacts(matchingContacts);
-        } else {
-            setFilteredContacts([]);
-        }
     };
+
+    useEffect(() => {
+        const searchTerm = number.trim();
+        const searchDigits = number.replace(/\D/g, '');
+        if (open === false || searchTerm.length < 1) {
+            setFilteredContacts([]);
+            return;
+        }
+
+        const localMatches = contacts.filter((contact) =>
+            contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            contact.phone_no.includes(searchTerm) ||
+            (searchDigits.length > 0 &&
+              contact.phone_no.replace(/\D/g, '').includes(searchDigits))
+        );
+
+        const companyId = user?.company_id;
+        if (!companyId) {
+            setFilteredContacts(localMatches);
+            return;
+        }
+
+        let cancelled = false;
+        const timer = window.setTimeout(() => {
+            void searchContacts(companyId, searchDigits || searchTerm, 25)
+                .then((matches) => {
+                    if (cancelled) return;
+                    const merged = [...matches];
+                    for (const contact of localMatches) {
+                        if (!merged.some((item) => phonesMatch(item.phone_no, contact.phone_no))) {
+                            merged.push(contact);
+                        }
+                    }
+                    setFilteredContacts(merged);
+                })
+                .catch(() => {
+                    if (!cancelled) setFilteredContacts(localMatches);
+                });
+        }, 200);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
+    }, [open, number, contacts, user?.company_id]);
     
     const handleContactSelect = (contact: Contact) => {
         handleNumberChange(contact.phone_no.replace(/^\+1/, ""));

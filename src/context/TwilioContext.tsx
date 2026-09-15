@@ -1510,7 +1510,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     void syncActiveCallState();
     const interval = window.setInterval(() => {
       void syncActiveCallState();
-    }, 3000);
+    }, 10000);
     return () => window.clearInterval(interval);
   }, [syncActiveCallState]);
 
