@@ -156,6 +156,8 @@ export interface ConferenceParticipant {
     label: string;
     hold?: boolean;
     muted?: boolean;
+    coaching?: boolean;
+    call_sid_to_coach?: string | null;
     is_agent?: boolean;
     call_status?: string | null;
     connection_status?: 'ringing' | 'connecting' | 'connected' | 'on-hold' | 'ended';

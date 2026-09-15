@@ -9,10 +9,11 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  Ear,
   Filter,
   Flame,
   Loader2,
-  MoreHorizontal,
+  Mic,
   Phone,
   Search,
   Smile,
@@ -499,7 +500,9 @@ export default function LiveCallsPage() {
       });
       toast({
         title: "Success",
-        description: silent ? "Listening to the call." : "You have joined the call.",
+        description: silent
+          ? "Listening in silently. The agent and customer cannot hear you."
+          : "You joined as coach. You can speak to the agent.",
       });
     } catch {
       toast({
@@ -731,21 +734,22 @@ export default function LiveCallsPage() {
                             </span>
                             <Button
                               size="sm"
+                              variant="outline"
+                              className="rounded-full"
+                              disabled={joining || !selected.conference_sid}
+                              onClick={() => handleJoin(selected, true)}
+                            >
+                              <Ear className="h-4 w-4" />
+                              Listen in
+                            </Button>
+                            <Button
+                              size="sm"
                               className="rounded-full bg-violet-600 px-4 hover:bg-violet-700"
                               disabled={joining || !selected.conference_sid}
                               onClick={() => handleJoin(selected, false)}
                             >
-                              Join Call
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 rounded-full"
-                              disabled={joining || !selected.conference_sid}
-                              onClick={() => handleJoin(selected, true)}
-                              title="Listen"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
+                              <Mic className="h-4 w-4" />
+                              Coach
                             </Button>
                           </div>
                         </div>

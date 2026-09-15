@@ -138,6 +138,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
   const [isEndingCall, setIsEndingCall] = useState(false);
   const [pendingOutgoing, setPendingOutgoing] = useState<PendingOutgoingParticipant | null>(null);
+  const [callOwnerUserId, setCallOwnerUserId] = useState<number | null>(null);
   const effectiveConferenceSid = conferenceSid || verifiedConferenceSid;
   const agentCallSid = connection?.parameters?.CallSid ?? fallbackAgentCallSid ?? null;
 
@@ -193,6 +194,17 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   );
   const otherAgents = (currentParticipants as ConferenceParticipant[]).filter(
     (participant) => participant.is_agent && participant.call_sid !== agentCallSid
+  );
+  const myParticipant = (currentParticipants as ConferenceParticipant[]).find(
+    (participant) => participant.call_sid === agentCallSid
+  );
+  const isJoinOrListenLeg = Boolean(
+    myParticipant?.coaching
+    || (
+      callOwnerUserId != null
+      && authUser?.id != null
+      && Number(callOwnerUserId) !== Number(authUser.id)
+    )
   );
   const canSwitchBetweenCalls = externalParticipants.length >= 2;
   const hasConsultCall = canSwitchBetweenCalls;
@@ -280,6 +292,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     setPendingOutgoing(null);
     setDuration(0);
     setIsCollapsed(false);
+    setCallOwnerUserId(null);
   }, [callIdentity, departmentName, conferenceSid]);
 
    useEffect(() => {
@@ -296,6 +309,10 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
             if (matchingCall?.conference_sid) {
                 setVerifiedConferenceSid(matchingCall.conference_sid);
                 setConferenceSid(matchingCall.conference_sid);
+            }
+
+            if (matchingCall?.user_id) {
+              setCallOwnerUserId(Number(matchingCall.user_id));
             }
 
             if (matchingCall?.customer_sid) {
@@ -340,6 +357,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       setVerifiedConferenceSid(null);
       setPendingOutgoing(null);
       setCallDepartmentId(null);
+      setCallOwnerUserId(null);
     }
   }, [isOpen, contactNumber, connection, departmentName, fallbackAgentCallSid, setConferenceSid]);
 
@@ -858,23 +876,6 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     }
   };
 
-  const handleEndClick = () => {
-    // No leg of our own while the conference still has people in it means we never
-    // joined (another agent answered first). Tear down this UI only — ending the
-    // conference would drop the customer and the agent who is actually talking.
-    if (!agentCallSid && currentParticipants.length > 0) {
-      void onEndCallForAll(null);
-      return;
-    }
-
-    if (otherAgents.length > 0 && effectiveConferenceSid && agentCallSid) {
-      setIsEndDialogOpen(true);
-      return;
-    }
-
-    void handleEndCallForAll();
-  };
-
   const handleEndCallForAll = async () => {
     setIsEndingCall(true);
     try {
@@ -887,7 +888,9 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
 
   const handleLeaveCall = async () => {
     if (!effectiveConferenceSid || !agentCallSid) {
-      await handleEndCallForAll();
+      // Never complete the conference when this is a barge / listen-in.
+      await onEndCallForAll(isJoinOrListenLeg ? null : effectiveConferenceSid);
+      setIsEndDialogOpen(false);
       return;
     }
 
@@ -898,6 +901,29 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       setIsEndingCall(false);
       setIsEndDialogOpen(false);
     }
+  };
+
+  const handleEndClick = () => {
+    // No leg of our own while the conference still has people in it means we never
+    // joined (another agent answered first). Tear down this UI only — ending the
+    // conference would drop the customer and the agent who is actually talking.
+    if (!agentCallSid && currentParticipants.length > 0) {
+      void onEndCallForAll(null);
+      return;
+    }
+
+    // Join / listen (barge or silent monitor) must only drop this agent.
+    if (isJoinOrListenLeg) {
+      void handleLeaveCall();
+      return;
+    }
+
+    if (otherAgents.length > 0 && effectiveConferenceSid && agentCallSid) {
+      setIsEndDialogOpen(true);
+      return;
+    }
+
+    void handleEndCallForAll();
   };
 
   const formatTime = (seconds: number) => {
@@ -1344,16 +1370,18 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                   >
                     Leave call
                   </AlertDialogAction>
-                  <AlertDialogAction
-                    disabled={isEndingCall}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      void handleEndCallForAll();
-                    }}
-                  >
-                    End for everyone
-                  </AlertDialogAction>
+                  {!isJoinOrListenLeg ? (
+                    <AlertDialogAction
+                      disabled={isEndingCall}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        void handleEndCallForAll();
+                      }}
+                    >
+                      End for everyone
+                    </AlertDialogAction>
+                  ) : null}
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
