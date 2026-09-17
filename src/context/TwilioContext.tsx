@@ -54,6 +54,7 @@ import {
 } from '@/lib/worker-status';
 import { startTabPresence, type TabPresenceHandle } from '@/lib/tab-presence';
 import { getActiveCall, dismissActiveCall } from '@/services/callLogService';
+import { resolveSavedContactName } from '@/lib/live-contact-name';
 
 interface TwilioContextType {
   device: Device | null;
@@ -318,6 +319,11 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     userInCallRef.current = Boolean(user?.in_call);
   }, [user?.in_call]);
 
+  const userCompanyIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    userCompanyIdRef.current = user?.company_id ?? null;
+  }, [user?.company_id]);
+
   useEffect(() => {
     const handleConferenceInvite = (data: Record<string, unknown>) => {
       pendingConferenceInviteRef.current = {
@@ -536,17 +542,29 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const registerOutboundConnection = useCallback((conn: Call, meta?: Partial<ActiveCallSession>) => {
     adoptLiveConnection(conn);
     userInCallRef.current = true;
+    const callerNumber = meta?.callerNumber ?? '';
     persistActiveCallMeta(
       {
         callSid: conn.parameters?.CallSid ?? null,
-        callerName: meta?.callerName ?? meta?.callerNumber ?? 'Unknown Caller',
-        callerNumber: meta?.callerNumber ?? '',
+        callerName: meta?.callerName ?? callerNumber ?? 'Unknown Caller',
+        callerNumber,
         departmentName: meta?.departmentName ?? null,
         conferenceSid: null,
         startedAt: Date.now(),
       },
       { replace: true }
     );
+    void resolveSavedContactName(
+      userCompanyIdRef.current,
+      callerNumber,
+      meta?.callerName
+    ).then((resolvedName) => {
+      if (!resolvedName) return;
+      persistActiveCallMeta({
+        callerName: resolvedName,
+        callerNumber,
+      });
+    });
   }, [adoptLiveConnection, persistActiveCallMeta]);
 
   const isIgnorableReservationError = (error: unknown) => {
@@ -1051,12 +1069,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           pendingConferenceInviteRef.current = null;
         };
 
-        const persistIncomingCallMeta = () => {
+        const persistIncomingCallMeta = (callerName = incomingCallerName) => {
           persistActiveCallMeta(
             {
               callSid: conn.parameters?.CallSid ?? null,
               conferenceSid: incomingConferenceSid || reservationAttrs?.conference?.sid || null,
-              callerName: incomingCallerName,
+              callerName,
               callerNumber: incomingCallerNumber,
               departmentName: reservationAttrs?.department_name || null,
               startedAt: Date.now(),
@@ -1070,6 +1088,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
             }
           );
         };
+
+        void resolveSavedContactName(
+          userCompanyIdRef.current,
+          incomingCallerNumber,
+          incomingCallerName
+        ).then((resolvedName) => {
+          persistIncomingCallMeta(resolvedName || incomingCallerName);
+        });
 
         if (shouldAutoAccept) {
           clearPendingConferenceInvite();
@@ -1350,20 +1376,26 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         try {
           if (isElectron() && window.electronAPI) {
             const attrs: any = reservation.task?.attributes || {};
-            const from = attrs.contact_name || attrs.callerName || attrs.from || '';
-            const callerName = attrs.callerName || attrs.contact_name || '';
-            const session = readActiveCallSession();
-            const onCall = isAgentOnCall();
-            window.electronAPI.send('incoming-call', {
+            const from = attrs.from || '';
+            void resolveSavedContactName(
+              userCompanyIdRef.current,
               from,
-              callerName,
-              activeCall: onCall
-                ? {
-                    callerName: session?.callerName || 'On Call',
-                    callerNumber: session?.callerNumber || '',
-                    startedAt: session?.startedAt || Date.now(),
-                  }
-                : null,
+              attrs.contact_name || attrs.callerName
+            ).then((resolvedName) => {
+              const callerName = resolvedName || attrs.contact_name || attrs.callerName || from || '';
+              const session = readActiveCallSession();
+              const onCall = isAgentOnCall();
+              window.electronAPI.send('incoming-call', {
+                from,
+                callerName,
+                activeCall: onCall
+                  ? {
+                      callerName: session?.callerName || 'On Call',
+                      callerNumber: session?.callerNumber || '',
+                      startedAt: session?.startedAt || Date.now(),
+                    }
+                  : null,
+              });
             });
           }
         } catch (e) {

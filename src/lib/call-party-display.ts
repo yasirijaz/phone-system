@@ -75,7 +75,7 @@ export function resolveActiveCallDisplayName(
   const trimmedName = String(name ?? '').trim();
   const displayNumber = pickDisplayablePhoneNumber(number);
 
-  if (!isPlaceholderCallerName(trimmedName) && !isClientIdentity(trimmedName)) {
+  if (!isPlaceholderCallerName(trimmedName) && !isClientIdentity(trimmedName) && /[a-zA-Z]/.test(trimmedName)) {
     return trimmedName;
   }
 

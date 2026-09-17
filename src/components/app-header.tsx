@@ -664,8 +664,9 @@ export default function AppHeader({
             setDialerOpen(false);
 
             const selectedDepartment = departments.find((dept) => String(dept.id) === selectedDepartmentId);
+            const localContact = findLocalContactByPhone(contactsRef.current, number);
             registerOutboundConnection(connection, {
-                callerName: number,
+                callerName: localContact?.name || number,
                 callerNumber: number,
                 departmentName: selectedDepartment?.name || null,
             });

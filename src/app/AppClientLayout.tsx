@@ -20,6 +20,7 @@ import {
   pickDisplayablePhoneNumber,
   resolveActiveCallDisplayName,
 } from '@/lib/call-party-display';
+import { useResolvedContactName } from '@/hooks/use-resolved-contact-name';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const {
@@ -170,10 +171,17 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
     connection?.parameters?.From
   );
 
-  const callerName = resolveActiveCallDisplayName(
+  const hintedCallerName =
     reservationAttrs?.contact_name ||
-      connection?.parameters?.FriendlyName ||
-      (storedMetaApplies ? activeCallMeta?.callerName : null),
+    connection?.parameters?.FriendlyName ||
+    (storedMetaApplies ? activeCallMeta?.callerName : null);
+  const savedContactName = useResolvedContactName(
+    user?.company_id,
+    callerNumber,
+    hintedCallerName
+  );
+  const callerName = resolveActiveCallDisplayName(
+    savedContactName || hintedCallerName,
     callerNumber
   );
   const departmentName =

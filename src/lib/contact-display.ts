@@ -144,6 +144,13 @@ export function buildThreadContactState(
   };
 }
 
+function usablePersonName(value?: string | null): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  if (trimmed.toLowerCase().startsWith('client:')) return null;
+  return trimmed;
+}
+
 /** Resolve a human-readable name; contact_name from the API takes priority. */
 export function resolveContactName(
   comm: Communication,
@@ -151,10 +158,10 @@ export function resolveContactName(
 ): string | null {
   const isOutbound = comm.direction === 'outbound';
   return (
-    comm.contact_name?.trim() ||
-    (isOutbound ? comm.to_name?.name : comm.from_name?.name)?.trim() ||
-    comm.client_name?.trim() ||
-    localContact?.name?.trim() ||
+    usablePersonName(comm.contact_name) ||
+    usablePersonName(isOutbound ? comm.to_name?.name : comm.from_name?.name) ||
+    usablePersonName(comm.client_name) ||
+    usablePersonName(localContact?.name) ||
     null
   );
 }

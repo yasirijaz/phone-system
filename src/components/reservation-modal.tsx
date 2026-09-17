@@ -4,6 +4,8 @@ import { Reservation } from 'twilio-taskrouter';
 import { useEffect, useState } from 'react';
 import CallWaitingPanel, { type CallWaitingSummary } from '@/components/call-waiting-panel';
 import { IncomingCallMinimizedPill } from '@/components/incoming-call-modal';
+import { useAuth } from '@/context/AuthContext';
+import { useResolvedContactName } from '@/hooks/use-resolved-contact-name';
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -33,7 +35,14 @@ export default function ReservationModal({
   onMinimize,
   onExpand,
 }: ReservationModalProps) {
+  const { user } = useAuth();
   const [activeCallDisplay, setActiveCallDisplay] = useState<CallWaitingSummary | null>(activeCall ?? null);
+  const callerNumber = reservation?.task?.attributes?.from || '';
+  const savedContactName = useResolvedContactName(
+    user?.company_id,
+    callerNumber,
+    reservation?.task?.attributes?.contact_name
+  );
 
   useEffect(() => {
     if (!activeCall) {
@@ -65,8 +74,7 @@ export default function ReservationModal({
 
   if (!isOpen || !reservation) return null;
 
-  const callerName = reservation.task.attributes.contact_name || 'Unknown Caller';
-  const callerNumber = reservation.task.attributes.from || '';
+  const callerName = savedContactName || reservation.task.attributes.contact_name || 'Unknown Caller';
   const departmentName = reservation.task.attributes.department_name || '';
   const onCall = Boolean(activeCallDisplay);
 
