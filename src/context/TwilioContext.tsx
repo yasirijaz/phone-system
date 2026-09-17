@@ -1375,6 +1375,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         // Inform Electron main to show native/mini window notification
         try {
           if (isElectron() && window.electronAPI) {
+            const electronAPI = window.electronAPI;
             const attrs: any = reservation.task?.attributes || {};
             const from = attrs.from || '';
             void resolveSavedContactName(
@@ -1385,7 +1386,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
               const callerName = resolvedName || attrs.contact_name || attrs.callerName || from || '';
               const session = readActiveCallSession();
               const onCall = isAgentOnCall();
-              window.electronAPI.send('incoming-call', {
+              electronAPI.send('incoming-call', {
                 from,
                 callerName,
                 activeCall: onCall
