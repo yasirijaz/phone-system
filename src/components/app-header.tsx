@@ -74,7 +74,7 @@ export default function AppHeader({
 }: AppHeaderProps) {
     const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
     const [isVideoOpen, setIsVideoOpen] = useState(false);
-    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid, connection: twilioConnection, conferenceSid: twilioConferenceSid, registerOutboundConnection } = useTwilio();
+    const { device, isDeviceReady, connectTwilio, activityName, toggleActivity, setFromNumber, setConferenceSid, connection: twilioConnection, conferenceSid: twilioConferenceSid, registerOutboundConnection, prepareLocalAudio } = useTwilio();
     const { toast } = useToast();
     const router = useRouter();
 
@@ -657,6 +657,7 @@ export default function AppHeader({
                 setFromNumber(fromNumber);
                 localStorage.setItem("twilioFromNumber", fromNumber);
             }
+            await prepareLocalAudio();
             const connection = await device.connect({ params });
             if (connection.status() === 'pending') {
                 connection.accept();

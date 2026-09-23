@@ -81,6 +81,8 @@ interface TwilioContextType {
   toggleHoldFromProgress: () => Promise<boolean>;
   acceptCall: () => void;
   rejectCall: () => void;
+  /** Open the saved mic only when placing or answering a call. */
+  prepareLocalAudio: () => Promise<void>;
   hangUp: () => void;
   leaveCall: (conferenceSid: string, callSid: string) => Promise<void>;
   endCallForAll: (conferenceSid?: string | null) => Promise<void>;
@@ -106,6 +108,17 @@ declare global {
 }
 
 const TwilioContext = createContext<TwilioContextType | undefined>(undefined);
+
+async function applySavedMicrophone(device: Device | null | undefined): Promise<void> {
+  if (!device?.audio) return;
+  const savedMicrophoneId = localStorage.getItem('hardware_selected_microphone');
+  if (!savedMicrophoneId) return;
+  try {
+    await device.audio.setInputDevice(savedMicrophoneId);
+  } catch (error) {
+    console.warn('Could not apply saved microphone:', error);
+  }
+}
 
 export function TwilioProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -258,6 +271,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     connectionSourceRef.current = null;
     clearActiveCallSession();
     setActiveCallMeta(null);
+    const audio = deviceRef.current?.audio;
+    if (audio?.unsetInputDevice) {
+      void audio.unsetInputDevice().catch(() => undefined);
+    }
   }, []);
 
   /**
@@ -1100,11 +1117,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         if (shouldAutoAccept) {
           clearPendingConferenceInvite();
           persistIncomingCallMeta();
-          conn.accept();
-          expectingReservationDeviceLegRef.current = false;
-          if (!isReservationLeg) {
-            toast({ title: "Incoming Call Accepted" });
-          }
+          void applySavedMicrophone(newDevice).then(() => {
+            conn.accept();
+            expectingReservationDeviceLegRef.current = false;
+            if (!isReservationLeg) {
+              toast({ title: "Incoming Call Accepted" });
+            }
+          });
         } else {
           startIncomingRing();
           try {
@@ -1238,34 +1257,19 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       });
 
 
-      // --- AUDIO HARDWARE INITIALIZATION ---
+      // Speakers only — do not open the microphone until a call starts.
       try {
-        // 1. Request microphone access so device names and IDs can map properly
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-
-        // 2. Fetch saved keys from local storage
-        const savedMicrophoneId = localStorage.getItem('hardware_selected_microphone');
         const savedSpeakerId = localStorage.getItem('hardware_selected_speaker');
-
-        // 3. Bind saved mic hardware selection
-        if (savedMicrophoneId && newDevice.audio) {
-          await newDevice.audio.setInputDevice(savedMicrophoneId);
-          console.log('Applied saved mic:', savedMicrophoneId);
-        }
-
-        // 4. Bind saved speaker hardware selections
         if (savedSpeakerId && newDevice.audio) {
           await newDevice.audio.speakerDevices.set([savedSpeakerId]);
           await newDevice.audio.ringtoneDevices.set([savedSpeakerId]);
           newDevice.audio.incoming(false);
-          console.log('Applied saved speaker output routes:', savedSpeakerId);
         } else if (newDevice.audio) {
           newDevice.audio.incoming(false);
         }
       } catch (audioErr) {
-        console.warn('Could not initialize custom local storage audio routing:', audioErr);
+        console.warn('Could not initialize speaker routing:', audioErr);
       }
-      // --- END AUDIO HARDWARE INITIALIZATION ---
 
       await newDevice.register();
 
@@ -1619,7 +1623,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       ) {
         try {
           stopIncomingRingSound();
-          pendingConnection.accept();
+          void applySavedMicrophone(deviceRef.current).then(() => {
+            pendingConnection.accept();
+          });
         } catch (e) {
           console.error('Failed to accept device call from IPC:', e);
         }
@@ -1727,12 +1733,18 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const prepareLocalAudio = useCallback(async () => {
+    await applySavedMicrophone(deviceRef.current);
+  }, []);
+
   const acceptCall = () => {
     if (connection) {
       console.log(`Accepting call`);
       stopIncomingRingSound();
-      connection.accept();
-      toast({ title: "Call Accepted" });
+      void applySavedMicrophone(deviceRef.current).then(() => {
+        connection.accept();
+        toast({ title: "Call Accepted" });
+      });
     }
   }
 
@@ -2031,6 +2043,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   const acceptReservation = (reservation: Reservation) => {
     stopIncomingRingSound();
+    void applySavedMicrophone(deviceRef.current);
     console.log('accepting reservation', reservation);
 
     connectionSourceRef.current = 'reservation';
@@ -2238,6 +2251,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     toggleHoldFromProgress,
     acceptCall,
     rejectCall,
+    prepareLocalAudio,
     hangUp,
     leaveCall,
     endCallForAll,

@@ -42,7 +42,11 @@ export default function HardwareSettings() {
         camera: 'hardware_selected_camera',
     };
 
-    const getDevices = async () => {
+    const stopStream = (stream?: MediaStream | null) => {
+        stream?.getTracks().forEach((track) => track.stop());
+    };
+
+    const getDevices = async (requestLabels = false) => {
         if (!navigator.mediaDevices?.enumerateDevices) {
             console.warn('Media Devices API not supported.');
             setDevicesLoading(false);
@@ -52,30 +56,29 @@ export default function HardwareSettings() {
         setDevicesLoading(true);
 
         try {
-            try {
-            await navigator.mediaDevices.getUserMedia({
-                audio: true,
-            });
-            } catch (err) {
-            console.warn(
-                'Could not get audio permissions:',
-                err
-            );
-            }
+            let devices = await navigator.mediaDevices.enumerateDevices();
+            const needsAudioLabels = requestLabels && devices.some((d) => d.kind === 'audioinput' && !d.label);
+            const needsVideoLabels = requestLabels && devices.some((d) => d.kind === 'videoinput' && !d.label);
 
-            try {
-            await navigator.mediaDevices.getUserMedia({
-                video: true,
-            });
-            } catch (err) {
-            console.warn(
-                'Could not get video permissions:',
-                err
-            );
+            // Labels require a one-shot permission prompt. Stop tracks immediately so
+            // the tab does not keep the mic or camera after the picker opens.
+            if (needsAudioLabels) {
+                try {
+                    stopStream(await navigator.mediaDevices.getUserMedia({ audio: true }));
+                } catch (err) {
+                    console.warn('Could not get audio permissions:', err);
+                }
             }
-
-            const devices =
-            await navigator.mediaDevices.enumerateDevices();
+            if (needsVideoLabels) {
+                try {
+                    stopStream(await navigator.mediaDevices.getUserMedia({ video: true }));
+                } catch (err) {
+                    console.warn('Could not get video permissions:', err);
+                }
+            }
+            if (needsAudioLabels || needsVideoLabels) {
+                devices = await navigator.mediaDevices.enumerateDevices();
+            }
 
             const audioInputs = devices.filter(
             (device) => device.kind === 'audioinput'
@@ -161,7 +164,7 @@ export default function HardwareSettings() {
 
     useEffect(() => {
         if (isOpen) {
-            getDevices();
+            void getDevices(true);
         } else {
             stopMicTest();
         }
@@ -169,7 +172,8 @@ export default function HardwareSettings() {
 
     useEffect(() => {
         const handleDeviceChange = () => {
-            getDevices();
+            if (!isOpen) return;
+            void getDevices(true);
         };
 
         navigator.mediaDevices?.addEventListener(
@@ -182,6 +186,12 @@ export default function HardwareSettings() {
             'devicechange',
             handleDeviceChange
             );
+        };
+    }, [isOpen]);
+
+    useEffect(() => {
+        return () => {
+            stopMicTest();
         };
     }, []);
 
@@ -244,7 +254,6 @@ export default function HardwareSettings() {
     };
 
     const stopMicTest = () => {
-        if (!isTestingMic && !animationFrameRef.current) return;
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
           animationFrameRef.current = null;
