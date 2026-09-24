@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react';
 import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup, SidebarGroupLabel } from '@/components/ui/sidebar';
-import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, BellOff, Phone, MoreVertical, LogOut, User as UserIcon } from 'lucide-react';
+import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, BellOff, Phone, MoreVertical, LogOut, User as UserIcon, CheckCheck } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -649,6 +649,16 @@ export function InAppSidebar() {
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
+                <SidebarMenuItem>
+                    <SidebarMenuButton
+                      type="button"
+                      disabled={markingAllRead}
+                      onClick={() => { void handleReadAll(); }}
+                    >
+                      <CheckCheck />
+                      <span>{markingAllRead ? 'Marking...' : 'Mark all read'}</span>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
                  <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith('/messages')}>
                         <Link href="/messages">
@@ -787,19 +797,7 @@ export function InAppSidebar() {
             </SidebarMenu>
         </SidebarGroup>
          <SidebarGroup>
-            <SidebarGroupLabel className="flex items-center justify-between pr-2">
-              <span>Recent Activity</span>
-              {(inboxUnread > 0 || departments.some((dept) => dept.unread_count > 0) || recentItems.some((item) => item.unread_count > 0)) && (
-                <button
-                  type="button"
-                  className="text-[11px] font-medium text-[#6D28D9] hover:underline disabled:opacity-50"
-                  disabled={markingAllRead}
-                  onClick={() => { void handleReadAll(); }}
-                >
-                  {markingAllRead ? 'Marking...' : 'Read all'}
-                </button>
-              )}
-            </SidebarGroupLabel>
+            <SidebarGroupLabel>Recent Activity</SidebarGroupLabel>
             <SidebarMenu>
                  {recentsLoading ? (
                     <SidebarMenuItem>
