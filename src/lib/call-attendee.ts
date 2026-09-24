@@ -283,6 +283,18 @@ export function formatCallTypeDurationLine(comm: Communication): string {
   return directionLabel;
 }
 
+export function formatSidebarTimestamp(createdAt?: string | null): string {
+  if (!createdAt) return '';
+  try {
+    const date = parseISO(createdAt);
+    if (isToday(date)) return format(date, 'h:mma').toLowerCase();
+    if (isYesterday(date)) return 'Yesterday';
+    return format(date, 'MMM d');
+  } catch {
+    return '';
+  }
+}
+
 export function formatListingTimestamp(createdAt?: string | null): string {
   if (!createdAt) return '';
   try {

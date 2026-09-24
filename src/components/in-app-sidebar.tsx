@@ -41,7 +41,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { formatListingTimestamp } from '@/lib/call-attendee';
+import { formatSidebarTimestamp } from '@/lib/call-attendee';
 import { sidebarPreview } from '@/lib/activity-display';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -63,7 +63,7 @@ interface RecentItem {
 }
 
 const SIDEBAR_CACHE_TTL = 2 * 60_000;
-const SIDEBAR_CACHE_VERSION = 'v5';
+const SIDEBAR_CACHE_VERSION = 'v6';
 
 function buildRecentItems(recentComms: Communication[], showDepartment: boolean): RecentItem[] {
   const uniqueRecents: { [key: string]: RecentItem & { latestAt: string } } = {};
@@ -86,7 +86,7 @@ function buildRecentItems(recentComms: Communication[], showDepartment: boolean)
         href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}${query ? `?${query}` : ''}`,
         unread_count: 0,
         preview: sidebarPreview(comm),
-        time: formatListingTimestamp(createdAt),
+        time: formatSidebarTimestamp(createdAt),
         kind: comm.type === 'sms' || comm.latest_type === 'sms' ? 'sms' : 'call',
         departmentName: showDepartment ? (comm.department_name || comm.department?.name || null) : null,
         hasContactName: display.hasContactName,
@@ -683,29 +683,28 @@ export function InAppSidebar() {
                 ) : recentItems.length > 0 ? (
                     recentItems.map((item) => (
                         <SidebarMenuItem key={item.id}>
-                            <SidebarMenuButton asChild isActive={pathname.includes(item.href)}>
-                                <Link href={item.href} className="flex w-full items-start justify-between gap-2">
-                                    <div className="flex min-w-0 items-start gap-2">
-                                        <span className="mt-0.5 flex items-center gap-1 text-muted-foreground">
-                                          {!item.hasContactName && <UserIcon className="h-3.5 w-3.5" />}
-                                          {item.kind === 'sms' ? <MessageSquare className="h-3.5 w-3.5" /> : <Phone className="h-3.5 w-3.5" />}
-                                        </span>
-                                        <span className="min-w-0">
-                                          <span className="block truncate text-sm">{item.name}</span>
-                                          <span className="block truncate text-[11px] text-muted-foreground">{item.preview}</span>
-                                          {item.departmentName && (
-                                            <span className="block truncate text-[11px] text-muted-foreground">{item.departmentName}</span>
-                                          )}
-                                        </span>
-                                    </div>
-                                    <span className="flex shrink-0 flex-col items-end gap-1">
-                                      <span className="text-[10px] text-muted-foreground">{item.time}</span>
-                                      {item.unread_count > 0 && (
-                                        <Badge className="h-5 bg-[#6D28D9] hover:bg-[#6D28D9]">{item.unread_count}</Badge>
-                                      )}
-                                    </span>
-                                </Link>
-                            </SidebarMenuButton>
+                            <Link
+                              href={item.href}
+                              title={item.name}
+                              className="grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+                            >
+                                <span className="row-span-2 text-muted-foreground">
+                                  {item.hasContactName
+                                    ? (item.kind === 'sms' ? <MessageSquare className="h-3.5 w-3.5" /> : <Phone className="h-3.5 w-3.5" />)
+                                    : <UserIcon className="h-3.5 w-3.5" />}
+                                </span>
+                                <span className="truncate font-medium leading-4">{item.name}</span>
+                                <span className="shrink-0 text-[10px] leading-4 text-muted-foreground">{item.time}</span>
+                                <span className="truncate text-[11px] leading-4 text-muted-foreground">{item.preview}</span>
+                                {item.unread_count > 0 ? (
+                                  <Badge className="h-4 min-w-4 justify-center px-1 text-[10px] bg-[#6D28D9] hover:bg-[#6D28D9]">{item.unread_count}</Badge>
+                                ) : (
+                                  <span />
+                                )}
+                                {item.departmentName && (
+                                  <span className="col-start-2 col-span-2 truncate text-[10px] leading-4 text-muted-foreground">{item.departmentName}</span>
+                                )}
+                            </Link>
                         </SidebarMenuItem>
                     ))
                 ) : (
