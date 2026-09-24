@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react
 import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup, SidebarGroupLabel } from '@/components/ui/sidebar';
 import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, BellOff, Phone, MoreVertical, LogOut, User as UserIcon } from 'lucide-react';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { getCommunications, markAllNotificationsRead } from '@/services/callLogService';
@@ -23,7 +23,7 @@ import {
   leaveDepartment,
   type DepartmentSummaryItem,
 } from '@/services/departmentService';
-import { debounce, phonesMatch } from '@/lib/utils';
+import { cn, debounce, isSameConversationThread, phonesMatch } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,6 +65,27 @@ interface RecentItem {
 const SIDEBAR_CACHE_TTL = 2 * 60_000;
 const SIDEBAR_CACHE_VERSION = 'v6';
 const MISSED_CALL_STATUSES = new Set(['missed', 'no-answer', 'no_answer', 'busy', 'canceled', 'cancelled']);
+
+function isRecentConversationActive(item: RecentItem, pathname: string, departmentId: string | null): boolean {
+  const parts = pathname.split('/').filter(Boolean);
+  if (parts[0] !== 'conversations' || !parts[1] || !parts[2]) return false;
+
+  const [path, query = ''] = item.href.split('?');
+  const itemParts = path.split('/').filter(Boolean);
+  if (itemParts.length < 3) return false;
+
+  const sameThread = isSameConversationThread(
+    decodeURIComponent(parts[1]),
+    decodeURIComponent(parts[2]),
+    decodeURIComponent(itemParts[1]),
+    decodeURIComponent(itemParts[2]),
+  );
+  if (!sameThread) return false;
+
+  const itemDepartmentId = new URLSearchParams(query).get('departmentId');
+  if (departmentId && itemDepartmentId) return departmentId === itemDepartmentId;
+  return true;
+}
 
 function isNotificationUnread(comm: Communication): boolean {
   if (comm.direction !== 'inbound' || Number(comm.is_read) !== 0) return false;
@@ -168,6 +189,7 @@ function mapSummaryToDepartment(
 
 export function InAppSidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -784,31 +806,41 @@ export function InAppSidebar() {
                         <SidebarMenuButton disabled>Loading...</SidebarMenuButton>
                     </SidebarMenuItem>
                 ) : recentItems.length > 0 ? (
-                    recentItems.map((item) => (
+                    recentItems.map((item) => {
+                        const isActive = isRecentConversationActive(item, pathname, searchParams.get('departmentId'));
+                        return (
                         <SidebarMenuItem key={item.id}>
                             <Link
                               href={item.href}
                               title={item.name}
-                              className="grid h-11 grid-cols-[16px_minmax(0,1fr)_auto] grid-rows-2 items-center gap-x-2 rounded-md px-2 text-sm hover:bg-accent"
+                              aria-current={isActive ? 'page' : undefined}
+                              className={cn(
+                                'grid h-11 grid-cols-[16px_minmax(0,1fr)_auto] grid-rows-2 items-center gap-x-2 rounded-md px-2 text-sm hover:bg-accent',
+                                isActive && 'bg-[#6D28D9] text-white hover:bg-[#6D28D9] hover:text-white'
+                              )}
                             >
-                                <span className="row-span-2 text-muted-foreground">
+                                <span className={cn('row-span-2', isActive ? 'text-white' : 'text-muted-foreground')}>
                                   {item.hasContactName
                                     ? (item.kind === 'sms' ? <MessageSquare className="h-3.5 w-3.5" /> : <Phone className="h-3.5 w-3.5" />)
                                     : <UserIcon className="h-3.5 w-3.5" />}
                                 </span>
                                 <span className="truncate font-medium leading-4">{item.name}</span>
-                                <span className="shrink-0 pl-2 text-[10px] leading-4 text-muted-foreground">{item.time}</span>
-                                <span className="truncate text-[11px] leading-4 text-muted-foreground">
+                                <span className={cn('shrink-0 pl-2 text-[10px] leading-4', isActive ? 'text-white/80' : 'text-muted-foreground')}>{item.time}</span>
+                                <span className={cn('truncate text-[11px] leading-4', isActive ? 'text-white/80' : 'text-muted-foreground')}>
                                   {item.departmentName ? `${item.preview} · ${item.departmentName}` : item.preview}
                                 </span>
                                 {item.unread_count > 0 ? (
-                                  <Badge className="h-4 min-w-4 justify-center px-1 text-[10px] bg-[#6D28D9] hover:bg-[#6D28D9]">{item.unread_count}</Badge>
+                                  <Badge className={cn(
+                                    'h-4 min-w-4 justify-center px-1 text-[10px]',
+                                    isActive ? 'bg-white text-[#6D28D9] hover:bg-white' : 'bg-[#6D28D9] hover:bg-[#6D28D9]'
+                                  )}>{item.unread_count}</Badge>
                                 ) : (
                                   <span className="h-4" />
                                 )}
                             </Link>
                         </SidebarMenuItem>
-                    ))
+                        );
+                    })
                 ) : (
                      <SidebarMenuItem>
                         <SidebarMenuButton disabled>No recent activity</SidebarMenuButton>
