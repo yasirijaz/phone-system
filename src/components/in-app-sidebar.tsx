@@ -590,6 +590,7 @@ export function InAppSidebar() {
                               <SidebarMenuButton
                                 asChild
                                 isActive={pathname === `/departments/${dept.id}`}
+                                className="data-[active=true]:bg-[#6D28D9] data-[active=true]:text-white"
                                 className="!pr-2 group-hover/dept:!pr-[5.5rem] group-focus-within/dept:!pr-[5.5rem]"
                               >
                                   <Link href={`/departments/${dept.id}`} className="flex min-w-0 items-center gap-2 overflow-hidden">

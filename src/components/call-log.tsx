@@ -534,12 +534,25 @@ function CommunicationCard({
                         <span className="truncate">{activity.label}</span>
                       </span>
                       {followUp && (
-                        <span className={cn(
-                          'shrink-0 rounded-md px-2 py-1 text-[10px] font-medium',
-                          comm.follow_up?.status === 'completed' ? 'bg-green-50 text-[#166534]' : 'bg-amber-50 text-[#92400E]'
-                        )}>
-                          {followUp}
-                        </span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={cn(
+                                'shrink-0 rounded-md px-2 py-1 text-[10px] font-medium',
+                                comm.follow_up?.status === 'completed' ? 'bg-green-50 text-[#166534]' : 'bg-amber-50 text-[#92400E]'
+                              )}>
+                                {followUp}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {comm.follow_up?.status === 'completed'
+                                ? `Completed${comm.follow_up.completed_by ? ` by ${comm.follow_up.completed_by}` : ''}${comm.follow_up.completed_at ? ` at ${comm.follow_up.completed_at}` : ''}${comm.follow_up.note ? `. ${comm.follow_up.note}` : ''}`
+                                : comm.follow_up?.status === 'in_progress'
+                                  ? `Claimed${comm.follow_up.claimed_by ? ` by ${comm.follow_up.claimed_by}` : ''}`
+                                  : 'This item still needs a callback or reply. Reading it does not complete follow-up.'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                     </div>
 
@@ -727,8 +740,9 @@ export default function CallLog({
   if(isClickable) {
     return (
         <div className="divide-y divide-border/60">
+            <div className="hidden items-center gap-3 px-4 py-2 md:flex">
             <div className={cn(
-              'hidden md:grid items-center gap-x-4 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground',
+              'grid flex-1 items-center gap-x-4 text-xs font-medium uppercase tracking-wide text-muted-foreground',
               showDepartment
                 ? 'grid-cols-[36px_minmax(0,1.3fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_88px]'
                 : 'grid-cols-[36px_minmax(0,1.4fr)_minmax(0,1.6fr)_minmax(0,1fr)_88px]'
@@ -739,6 +753,8 @@ export default function CallLog({
               {showDepartment && <span>Department</span>}
               <span>Agent</span>
               <span className="text-right">Time</span>
+            </div>
+            <span className="w-9 text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Act</span>
             </div>
             {communications.map((comm, index) => {
                 const stableKey = generateKey(comm, index);

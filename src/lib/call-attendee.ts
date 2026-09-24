@@ -288,10 +288,11 @@ export function formatListingTimestamp(createdAt?: string | null): string {
   try {
     const date = parseISO(createdAt);
     const minutesAgo = differenceInMinutes(new Date(), date);
+    const time = format(date, 'h:mma').toLowerCase();
     if (minutesAgo < 1) return 'Just now';
-    if (isToday(date)) return format(date, 'h:mma').toLowerCase();
-    if (isYesterday(date)) return 'Yesterday';
-    return format(date, 'MMM d');
+    if (isToday(date)) return time;
+    if (isYesterday(date)) return `Yesterday, ${time}`;
+    return format(date, 'MMM d, h:mma').toLowerCase();
   } catch {
     return '';
   }

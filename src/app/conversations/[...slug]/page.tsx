@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { getCommunicationThread, markRead } from "@/services/callLogService";
+import { getCommunicationThread } from "@/services/callLogService";
 import type { Communication, Contact, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -85,14 +85,6 @@ export default function ConversationDetailPage() {
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);
 
-            const unreadLogs = sortedLogs.filter((l) => l.id && l.is_read === 0);
-            if (unreadLogs.length > 0) {
-                await Promise.all(
-                    unreadLogs.map((log) => markRead(String(log.id), log.type))
-                );
-                try { events.emitDebounced('refreshDepartmentsUnread', 2500); } catch (_) {}
-            }
-
              if (sortedLogs.length > 0) {
                 const latestComm = sortedLogs[sortedLogs.length - 1];
                 const otherPartyNumber = latestComm.direction === 'inbound' ? latestComm.from : latestComm.to;
@@ -158,15 +150,6 @@ export default function ConversationDetailPage() {
                 
                 const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                 setAllComms(sortedLogs);
-                
-                const unreadLogs = sortedLogs.filter(l => l.id && (l.is_read === 0));
-                
-                if (unreadLogs.length > 0) {
-                    await Promise.all(
-                        unreadLogs.map(log => markRead(String(log.id), log.type))
-                    );
-                    try { events.emitDebounced('refreshDepartmentsUnread', 2500); } catch (_) {}
-                }
                 
                 const allCompanyNumbers = new Set<string>();
                 const numberToDeptMap: Record<string, string> = {};
