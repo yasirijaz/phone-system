@@ -23,7 +23,7 @@ import {
   leaveDepartment,
   type DepartmentSummaryItem,
 } from '@/services/departmentService';
-import { debounce } from '@/lib/utils';
+import { debounce, phonesMatch } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,6 +64,15 @@ interface RecentItem {
 
 const SIDEBAR_CACHE_TTL = 2 * 60_000;
 const SIDEBAR_CACHE_VERSION = 'v6';
+const MISSED_CALL_STATUSES = new Set(['missed', 'no-answer', 'no_answer', 'busy', 'canceled', 'cancelled']);
+
+function isNotificationUnread(comm: Communication): boolean {
+  if (comm.direction !== 'inbound' || Number(comm.is_read) !== 0) return false;
+  const type = comm.latest_type || comm.type;
+  if (type === 'sms') return true;
+  const status = (comm.call_status || '').toLowerCase();
+  return MISSED_CALL_STATUSES.has(status) || Boolean(comm.voice_mail);
+}
 
 function buildRecentItems(recentComms: Communication[], showDepartment: boolean): RecentItem[] {
   const uniqueRecents: { [key: string]: RecentItem & { latestAt: string } } = {};
@@ -99,8 +108,7 @@ function buildRecentItems(recentComms: Communication[], showDepartment: boolean)
     const [departmentId, number] = item.id.split('|');
     item.unread_count = recentComms.filter((comm) => {
       const otherParty = comm.direction === 'inbound' ? comm.from : comm.to;
-      const incoming = comm.direction === 'inbound' && Number(comm.is_read) === 0;
-      return incoming && otherParty === number && String(comm.department_id ?? 0) === departmentId;
+      return isNotificationUnread(comm) && phonesMatch(otherParty, number) && String(comm.department_id ?? 0) === departmentId;
     }).length;
   });
 
@@ -174,6 +182,12 @@ export function InAppSidebar() {
   const initialLoadRef = useRef<Promise<void> | null>(null);
   const unreadRefreshRef = useRef<Promise<void> | null>(null);
   const departmentsRef = useRef<DepartmentWithUnread[]>([]);
+  const pathnameRef = useRef(pathname);
+  const inboxUnreadRef = useRef(0);
+  const recentItemsRef = useRef<RecentItem[]>([]);
+  pathnameRef.current = pathname;
+  inboxUnreadRef.current = inboxUnread;
+  recentItemsRef.current = recentItems;
 
   const handleDepartmentCallClick = (departmentId: number, event: MouseEvent) => {
     event.preventDefault();
@@ -274,7 +288,7 @@ export function InAppSidebar() {
     if (!user?.id || !user?.company_id) return;
 
     try {
-      const departmentMatch = pathname.match(/^\/departments\/(\d+)/);
+      const departmentMatch = pathnameRef.current.match(/^\/departments\/(\d+)/);
       const selectedDepartmentId = departmentMatch?.[1];
       const recentCommsResponse = await getCommunications({
         limit: 50,
@@ -283,7 +297,7 @@ export function InAppSidebar() {
       });
 
       const recentComms = Array.isArray(recentCommsResponse.results) ? recentCommsResponse.results : [];
-      const newInboxUnread = recentComms.filter((c) => c.direction === 'inbound' && Number(c.is_read) === 0).length;
+      const newInboxUnread = recentComms.filter((c) => isNotificationUnread(c)).length;
       setInboxUnread(newInboxUnread);
 
       const recents = buildRecentItems(recentComms, !selectedDepartmentId);
@@ -308,7 +322,7 @@ export function InAppSidebar() {
     } catch (e) {
       console.error('Failed to refresh inbox/recents unread counts', e);
     }
-  }, [user?.id, user?.company_id, sendBadgeCount, pathname]);
+  }, [user?.id, user?.company_id, sendBadgeCount]);
 
   const refreshDepartmentUnreadBadges = useCallback(async (targetDepartmentId?: number) => {
     if (!user?.id) return;
@@ -334,7 +348,7 @@ export function InAppSidebar() {
 
         // Also update Electron badge after department refresh
         const deptTotal = summary.departments.reduce((sum, d) => sum + (d.unread?.total ?? 0), 0);
-        sendBadgeCount(deptTotal, inboxUnread);
+        sendBadgeCount(deptTotal, inboxUnreadRef.current);
       } catch (e) {
         console.error('Failed to refresh department unread badges', e);
       } finally {
@@ -344,7 +358,7 @@ export function InAppSidebar() {
 
     unreadRefreshRef.current = request;
     await request;
-  }, [user?.id, applySummaryUpdates, inboxUnread, sendBadgeCount]);
+  }, [user?.id, applySummaryUpdates, sendBadgeCount]);
 
   const fetchInitialSidebarData = useCallback(async () => {
     if (!user?.id || !user?.company_id) return;
@@ -376,7 +390,7 @@ export function InAppSidebar() {
         setDepartmentsLoading(true);
         setRecentsLoading(true);
 
-        const departmentMatch = pathname.match(/^\/departments\/(\d+)/);
+        const departmentMatch = pathnameRef.current.match(/^\/departments\/(\d+)/);
         const [summary, recentCommsResponse] = await Promise.all([
           getDepartmentsSummary(undefined, { assignedOnly: true }),
           getCommunications({
@@ -395,7 +409,7 @@ export function InAppSidebar() {
         setDepartments(deptsWithCounts);
 
         const recentComms = Array.isArray(recentCommsResponse.results) ? recentCommsResponse.results : [];
-        const inboxUnreadCount = recentComms.filter((c) => c.direction === 'inbound' && Number(c.is_read) === 0).length;
+        const inboxUnreadCount = recentComms.filter((c) => isNotificationUnread(c)).length;
         setInboxUnread(inboxUnreadCount);
 
         const recents = buildRecentItems(recentComms, !departmentMatch?.[1]);
@@ -422,7 +436,7 @@ export function InAppSidebar() {
 
     initialLoadRef.current = request;
     await request;
-  }, [user, sendBadgeCount, pathname]);
+  }, [user, sendBadgeCount]);
 
   useEffect(() => {
     if (!user) return;
@@ -474,25 +488,80 @@ export function InAppSidebar() {
       });
     };
 
+    const handleThreadReadFailed = () => {
+      void refreshDepartmentUnreadBadges();
+      void refreshInboxAndRecents();
+    };
+
     events.on('refreshDepartmentsUnread', handleUnreadRefresh);
     events.on('refreshCalls', debouncedInboxRefresh);
     events.on('refreshOperators', handleDndStatusChange);
+    events.on('threadReadFailed', handleThreadReadFailed);
 
     return () => {
       events.off('refreshDepartmentsUnread', handleUnreadRefresh);
       events.off('refreshCalls', debouncedInboxRefresh);
       events.off('refreshOperators', handleDndStatusChange);
+      events.off('threadReadFailed', handleThreadReadFailed);
     };
   }, [user, fetchInitialSidebarData, refreshDepartmentUnreadBadges, refreshInboxAndRecents]);
 
   const selectedDepartmentKey = pathname.match(/^\/departments\/(\d+)/)?.[1] ?? 'all';
+  const departmentRefreshReady = useRef(false);
+  const clearedConversationRef = useRef('');
 
   useEffect(() => {
     if (!user) return;
-    setRecentItems([]);
-    setRecentsLoading(true);
-    void refreshInboxAndRecents().finally(() => setRecentsLoading(false));
+    if (!departmentRefreshReady.current) {
+      departmentRefreshReady.current = true;
+      return;
+    }
+    void refreshInboxAndRecents();
   }, [selectedDepartmentKey, user, refreshInboxAndRecents]);
+
+  useEffect(() => {
+    const parts = pathname.split('/').filter(Boolean);
+    if (parts[0] !== 'conversations' || !parts[1] || !parts[2]) {
+      clearedConversationRef.current = '';
+      return;
+    }
+
+    const openedFrom = decodeURIComponent(parts[1]);
+    const openedTo = decodeURIComponent(parts[2]);
+    const departmentId = typeof window === 'undefined'
+      ? null
+      : new URLSearchParams(window.location.search).get('departmentId');
+    const conversationKey = `${pathname}|${departmentId ?? ''}`;
+    if (clearedConversationRef.current === conversationKey) return;
+
+    const matches = recentItemsRef.current.filter((item) => {
+      const [itemDepartmentId, itemNumber] = item.id.split('|');
+      const sameContact = phonesMatch(itemNumber, openedFrom) || phonesMatch(itemNumber, openedTo);
+      const sameDepartment = !departmentId || itemDepartmentId === departmentId;
+      return sameContact && sameDepartment && item.unread_count > 0;
+    });
+    if (matches.length === 0) return;
+    clearedConversationRef.current = conversationKey;
+
+    const clearedByDepartment = new Map<string, number>();
+    let clearedTotal = 0;
+    matches.forEach((item) => {
+      const [itemDepartmentId] = item.id.split('|');
+      clearedByDepartment.set(itemDepartmentId, (clearedByDepartment.get(itemDepartmentId) ?? 0) + item.unread_count);
+      clearedTotal += item.unread_count;
+    });
+    const clearedIds = new Set(matches.map((item) => item.id));
+
+    setRecentItems((prev) => prev.map((item) => (
+      clearedIds.has(item.id) ? { ...item, unread_count: 0 } : item
+    )));
+    setDepartments((prev) => prev.map((dept) => {
+      const cleared = clearedByDepartment.get(String(dept.id)) ?? 0;
+      if (cleared === 0) return dept;
+      return { ...dept, unread_count: Math.max(0, dept.unread_count - cleared) };
+    }));
+    setInboxUnread((prev) => Math.max(0, prev - clearedTotal));
+  }, [pathname]);
 
   return (
     <>
@@ -686,7 +755,7 @@ export function InAppSidebar() {
                             <Link
                               href={item.href}
                               title={item.name}
-                              className="grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+                              className="grid h-11 grid-cols-[16px_minmax(0,1fr)_auto] grid-rows-2 items-center gap-x-2 rounded-md px-2 text-sm hover:bg-accent"
                             >
                                 <span className="row-span-2 text-muted-foreground">
                                   {item.hasContactName
@@ -694,15 +763,14 @@ export function InAppSidebar() {
                                     : <UserIcon className="h-3.5 w-3.5" />}
                                 </span>
                                 <span className="truncate font-medium leading-4">{item.name}</span>
-                                <span className="shrink-0 text-[10px] leading-4 text-muted-foreground">{item.time}</span>
-                                <span className="truncate text-[11px] leading-4 text-muted-foreground">{item.preview}</span>
+                                <span className="shrink-0 pl-2 text-[10px] leading-4 text-muted-foreground">{item.time}</span>
+                                <span className="truncate text-[11px] leading-4 text-muted-foreground">
+                                  {item.departmentName ? `${item.preview} · ${item.departmentName}` : item.preview}
+                                </span>
                                 {item.unread_count > 0 ? (
                                   <Badge className="h-4 min-w-4 justify-center px-1 text-[10px] bg-[#6D28D9] hover:bg-[#6D28D9]">{item.unread_count}</Badge>
                                 ) : (
-                                  <span />
-                                )}
-                                {item.departmentName && (
-                                  <span className="col-start-2 col-span-2 truncate text-[10px] leading-4 text-muted-foreground">{item.departmentName}</span>
+                                  <span className="h-4" />
                                 )}
                             </Link>
                         </SidebarMenuItem>

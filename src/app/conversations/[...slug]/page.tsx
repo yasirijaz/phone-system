@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { getCommunicationThread } from "@/services/callLogService";
+import { getCommunicationThread, markThreadAsRead } from "@/services/callLogService";
 import type { Communication, Contact, Department, PhoneNumber } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -101,6 +101,23 @@ export default function ConversationDetailPage() {
             console.error('Failed to refresh conversation thread', e);
         }
     }, [from, to, user, searchParams]);
+
+    const departmentIdParam = searchParams.get('departmentId');
+
+    useEffect(() => {
+        if (!user || !from || !to) return;
+        let cancelled = false;
+        markThreadAsRead(from, to, departmentIdParam)
+            .then(() => {
+                if (!cancelled) events.emit('refreshDepartmentsUnread');
+            })
+            .catch(() => {
+                if (!cancelled) events.emit('threadReadFailed');
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [user, from, to, departmentIdParam]);
 
      const handleDepartmentChange = useCallback((departmentId: string) => {
         setSelectedDepartmentId(departmentId);

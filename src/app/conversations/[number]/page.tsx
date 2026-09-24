@@ -87,14 +87,12 @@ export default function ConversationDetailPage() {
                     setContactSublabel(null);
                 }
 
-                const hasUnread = logs.some((l: any) => l?.is_read === 0 || l?.is_read === false);
-                if (hasUnread) {
-                    await markThreadAsRead(from, to);
-                    try { events.emitDebounced('refreshDepartmentsUnread', 2500); } catch (_) {}
-                }
+                await markThreadAsRead(from, to);
+                try { events.emit('refreshDepartmentsUnread'); } catch (_) {}
 
             } catch (error) {
                 console.error("Failed to fetch communication logs", error);
+                try { events.emit('threadReadFailed'); } catch (_) {}
             } finally {
                 setLoading(false);
             }
