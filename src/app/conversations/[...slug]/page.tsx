@@ -73,8 +73,9 @@ export default function ConversationDetailPage() {
     const refreshThread = useCallback(async (options?: { bypassCache?: boolean }) => {
         if (!user) return;
         try {
+            const departmentId = searchParams.get('departmentId');
             const [logs, fetchedContacts] = await Promise.all([
-                getCommunicationThread(from, to, { bypassCache: options?.bypassCache }),
+                getCommunicationThread(from, to, { bypassCache: options?.bypassCache, departmentId }),
                 user.company_id ? getContacts(user.company_id) : Promise.resolve([])
             ]);
             
@@ -107,7 +108,7 @@ export default function ConversationDetailPage() {
         } catch (e) {
             console.error('Failed to refresh conversation thread', e);
         }
-    }, [from, to, user]);
+    }, [from, to, user, searchParams]);
 
      const handleDepartmentChange = useCallback((departmentId: string) => {
         setSelectedDepartmentId(departmentId);
@@ -144,7 +145,7 @@ export default function ConversationDetailPage() {
                         ? getDepartments(user.company_id)
                         : getUserDepartments(user.id),
                     user.company_id ? getContacts(user.company_id) : Promise.resolve([]),
-                    getCommunicationThread(from, to),
+                    getCommunicationThread(from, to, { departmentId: searchParams.get('departmentId') }),
                     user.company_id ? getCompanyPhoneNumbers(user.company_id) : Promise.resolve([]),
                 ]);
                 const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
@@ -215,7 +216,7 @@ export default function ConversationDetailPage() {
                 }
 
                 // Determine and set the correct department and from number
-                let resolvedDeptId: string | null = numberToDeptIdMap[ourNumber] ?? null;
+                let resolvedDeptId: string | null = searchParams.get('departmentId') || numberToDeptIdMap[ourNumber] || null;
 
                 if (!resolvedDeptId && sortedLogs.length > 0) {
                     resolvedDeptId = findLastUsedDepartmentId(sortedLogs);
@@ -333,7 +334,7 @@ export default function ConversationDetailPage() {
                 mediaFiles.length ? mediaFiles : undefined
             );
             toast({ title: "Success", description: mediaFiles.length ? "MMS sent successfully." : "Message sent successfully." });
-            const logs = await getCommunicationThread(from, to);
+            const logs = await getCommunicationThread(from, to, { bypassCache: true, departmentId: selectedDepartmentId || searchParams.get('departmentId') });
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);
         } finally {
@@ -370,9 +371,9 @@ export default function ConversationDetailPage() {
                                             </Button>
                                             <div className="relative flex-1">
                                                 <h1 className="text-xl font-bold">{contact?.name}</h1>
-                                                {(contact?.sublabel || departmentName) && (
+                                                {(contact?.sublabel || departmentName || selectedFromNumber) && (
                                                   <p className="text-sm text-muted-foreground">
-                                                    {[contact?.sublabel, departmentName].filter(Boolean).join(' • ')}
+                                                    {[departmentName, selectedFromNumber ? formatPhoneNumber(selectedFromNumber) : null, contact?.sublabel].filter(Boolean).join(' · ')}
                                                   </p>
                                                 )}
                                             </div>

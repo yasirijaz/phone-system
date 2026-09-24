@@ -2,7 +2,7 @@
 
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useState, useEffect, useCallback } from "react";
@@ -97,6 +97,7 @@ export default function AppUIPage() {
     if (!force && lastFetchKeyRef.current === fetchKey) return;
     lastFetchKeyRef.current = fetchKey;
 
+    setData(prev => ({ ...prev, [tab]: [] }));
     setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
     
     try {
@@ -186,7 +187,8 @@ export default function AppUIPage() {
 
   useEffect(() => {
     lastFetchKeyRef.current = null;
-    fetchCommunicationData(activeTab, pagination[activeTab].currentPage, pagination[activeTab].limit);
+    setData(prev => ({ ...prev, [activeTab]: [] }));
+    fetchCommunicationData(activeTab, 1, pagination[activeTab].limit);
   }, [activeTab, fetchCommunicationData]);
 
   const handlePageChange = (page: number) => {
@@ -257,14 +259,21 @@ export default function AppUIPage() {
           showControls={false}
         />
         <Card className="overflow-hidden">
+          {currentPagination.loading ? (
+            <div className="flex h-48 items-center justify-center text-muted-foreground">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Loading activity…
+            </div>
+          ) : (
           <CallLog
             calls={currentData || []}
             companyUsers={companyUsers}
             phoneNumbers={phoneNumbers}
             onMakeCall={handleMakeCall}
             source={tabName === 'unread' ? 'unread' : undefined}
-            highlightFailedCalls
+            showDepartment
           />
+          )}
           <PaginationControls
             {...currentPagination}
             onPageChange={handlePageChange}
@@ -286,20 +295,18 @@ export default function AppUIPage() {
                   />
 
                   <main className="flex-1 p-6 overflow-y-auto">
-                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabName)}>
+                    <h1 className="mb-4 text-2xl font-bold">All My Departments — Recent Activity</h1>
+                    <Tabs value={activeTab} onValueChange={(value) => {
+                      setActiveTab(value as TabName);
+                      setData(prev => ({ ...prev, [value]: [] }));
+                    }}>
                       <TabsList>
-                        <TabsTrigger value="all">All</TabsTrigger>
-                        <TabsTrigger value="unread">Unread</TabsTrigger>
-                        <TabsTrigger value="calls">Calls</TabsTrigger>
-                        <TabsTrigger value="missed">Missed</TabsTrigger>
-                        <TabsTrigger value="meetings">Meetings</TabsTrigger>
-                        <TabsTrigger value="voicemails">Voicemails</TabsTrigger>
-                        <TabsTrigger value="recordings">Recordings</TabsTrigger>
-                        <TabsTrigger value="messages">Messages</TabsTrigger>
-                        <TabsTrigger value="operators">Operators</TabsTrigger>
-                        <TabsTrigger value="starred">Starred</TabsTrigger>
-                        {/* <TabsTrigger value="spam">Spam</TabsTrigger>
-                        <TabsTrigger value="unlogged">Unlogged</TabsTrigger> */}
+                        <TabsTrigger className="data-[state=active]:bg-[#6D28D9] data-[state=active]:text-white" value="all">All</TabsTrigger>
+                        <TabsTrigger className="data-[state=active]:bg-[#6D28D9] data-[state=active]:text-white" value="unread">Unread</TabsTrigger>
+                        <TabsTrigger className="data-[state=active]:bg-[#6D28D9] data-[state=active]:text-white" value="calls">Calls</TabsTrigger>
+                        <TabsTrigger className="data-[state=active]:bg-[#6D28D9] data-[state=active]:text-white" value="missed">Missed Calls</TabsTrigger>
+                        <TabsTrigger className="data-[state=active]:bg-[#6D28D9] data-[state=active]:text-white" value="messages">Messages</TabsTrigger>
+                        <TabsTrigger className="data-[state=active]:bg-[#6D28D9] data-[state=active]:text-white" value="voicemails">Voicemails</TabsTrigger>
                       </TabsList>
                       <div className="mt-6">
                         {activeTab === 'spam' ? (

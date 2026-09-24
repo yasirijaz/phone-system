@@ -13,16 +13,17 @@ import CallLog from "@/components/call-log";
 import AppHeader from "@/components/app-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { getOperators, getDepartments, updateDndStatus, getDndStatus, markDepartmentAsRead } from "@/services/departmentService";
+import { getOperators, getDepartments, updateDndStatus, getDndStatus } from "@/services/departmentService";
 import { getContacts } from "@/services/contactService";
 import { getUsersByCompany } from "@/services/userService";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import OperatorsTable from "@/components/operators-table";
 import PaginationControls from "@/components/pagination-controls";
 import { events } from '@/lib/events';
 import { getPhoneNumberOptionLabel } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Loader2 } from "lucide-react";
 import { MessageSquare, Phone } from "lucide-react";
 import {
   resolveOutboundContextForDepartment,
@@ -110,6 +111,7 @@ export default function DepartmentDetailPage() {
       return;
     }
 
+    setData(prev => ({ ...prev, [tab]: [] }));
     setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
     
     try {
@@ -143,8 +145,13 @@ export default function DepartmentDetailPage() {
   }, [user, departmentId, toast]);
 
   useEffect(() => {
-    fetchCommunicationData(activeTab, pagination[activeTab].currentPage, pagination[activeTab].limit);
-  }, [activeTab]);
+    setPagination(prev => ({
+      ...prev,
+      [activeTab]: { ...prev[activeTab], currentPage: 1, loading: true },
+    }));
+    setData(prev => ({ ...prev, [activeTab]: [] }));
+    fetchCommunicationData(activeTab, 1, pagination[activeTab].limit);
+  }, [activeTab, departmentId]);
 
   useEffect(() => {
     const fetchInitialDepartmentData = async () => {
@@ -161,12 +168,6 @@ export default function DepartmentDetailPage() {
             
             setPhoneNumbers(numbers);
             setDndStatus(Boolean(Number(dnd.is_dnd)));
-
-            markDepartmentAsRead(departmentId)
-              .then(() => {
-                try { events.emitDebounced('refreshDepartmentsUnread', 1000); } catch (_) {}
-              })
-              .catch(() => {});
         } catch (error) {
              toast({ title: "Error", description: "Failed to load initial department data.", variant: "destructive" });
         }
@@ -268,6 +269,12 @@ export default function DepartmentDetailPage() {
           showControls={false}
         />
         <Card>
+          {currentPagination.loading ? (
+            <div className="flex h-48 items-center justify-center text-muted-foreground">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Loading activity…
+            </div>
+          ) : (
           <CallLog
             calls={currentData || []}
             contacts={contacts}
@@ -277,6 +284,7 @@ export default function DepartmentDetailPage() {
             onMakeCall={handleMakeCall}
             source={tabName === 'unread' ? 'unread' : undefined}
           />
+          )}
           <PaginationControls
             {...currentPagination}
             onPageChange={handlePageChange}
@@ -302,7 +310,7 @@ export default function DepartmentDetailPage() {
                   <main className="flex-1 p-6 overflow-y-auto">
                     <div className="flex items-center justify-between mb-6">
                         <div>
-                          <h1 className="text-2xl font-bold">{department?.name || 'Department'}</h1>
+                          <h1 className="text-2xl font-bold">{department?.name || 'Department'} — Recent Activity</h1>
                           <p className="text-sm text-muted-foreground">{departmentPhoneNumber}</p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -314,42 +322,41 @@ export default function DepartmentDetailPage() {
                               <MessageSquare className="mr-2 h-4 w-4" />
                               Message
                             </Button>
-                            <Label htmlFor="dnd-switch">DO NOT DISTURB</Label>
-                            <Switch 
-                              id="dnd-switch"
-                              checked={dndStatus}
-                              onCheckedChange={handleDndChange}
-                              disabled={dndLoading}
-                            />
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-2">
+                                    <Label htmlFor="dnd-switch">Mute notifications</Label>
+                                    <Switch 
+                                      id="dnd-switch"
+                                      checked={dndStatus}
+                                      onCheckedChange={handleDndChange}
+                                      disabled={dndLoading}
+                                    />
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Mutes incoming call and message notifications for this department, for you only.
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                         </div>
                     </div>
                     <Tabs defaultValue="all" onValueChange={(value) => setActiveTab(value as TabName)}>
                       <TabsList>
-                        <TabsTrigger value="all">All</TabsTrigger>
-                        <TabsTrigger value="unread">Unread</TabsTrigger>
-                        <TabsTrigger value="calls">Calls</TabsTrigger>
-                        <TabsTrigger value="messages">Messages</TabsTrigger>
-                        <TabsTrigger value="operators">Operators</TabsTrigger>
-                        <TabsTrigger value="missed">Missed</TabsTrigger>
-                        <TabsTrigger value="voicemails">Voicemails</TabsTrigger>
-                        <TabsTrigger value="recordings">Recordings</TabsTrigger>
+                        <TabsTrigger className="data-[state=active]:bg-[#6D28D9] data-[state=active]:text-white" value="all">All</TabsTrigger>
+                        <TabsTrigger className="data-[state=active]:bg-[#6D28D9] data-[state=active]:text-white" value="unread">Unread</TabsTrigger>
+                        <TabsTrigger className="data-[state=active]:bg-[#6D28D9] data-[state=active]:text-white" value="calls">Calls</TabsTrigger>
+                        <TabsTrigger className="data-[state=active]:bg-[#6D28D9] data-[state=active]:text-white" value="messages">Messages</TabsTrigger>
+                        <TabsTrigger className="data-[state=active]:bg-[#6D28D9] data-[state=active]:text-white" value="missed">Missed Calls</TabsTrigger>
+                        <TabsTrigger className="data-[state=active]:bg-[#6D28D9] data-[state=active]:text-white" value="voicemails">Voicemails</TabsTrigger>
                       </TabsList>
                       <TabsContent value="all" className="mt-6">{renderTabContent('all')}</TabsContent>
                       <TabsContent value="unread" className="mt-6">{renderTabContent('unread')}</TabsContent>
                       <TabsContent value="calls" className="mt-6">{renderTabContent('calls')}</TabsContent>
                       <TabsContent value="messages" className="mt-6">{renderTabContent('messages')}</TabsContent>
-                      <TabsContent value="operators" className="mt-6">
-                        <OperatorsTable
-                          operators={operators}
-                          scope="department"
-                          departmentId={departmentId}
-                          currentUserId={user?.id}
-                          emptyMessage="No operators assigned"
-                        />
-                      </TabsContent>
                        <TabsContent value="missed" className="mt-6">{renderTabContent('missed')}</TabsContent>
                        <TabsContent value="voicemails" className="mt-6">{renderTabContent('voicemails')}</TabsContent>
-                       <TabsContent value="recordings" className="mt-6">{renderTabContent('recordings')}</TabsContent>
                     </Tabs>
                   </main>
                 </div>

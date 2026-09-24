@@ -52,9 +52,10 @@ export function invalidateCommunicationThreadCache(from: string, to: string): vo
 export const getCommunicationThread = async (
   from: string,
   to: string,
-  options?: { bypassCache?: boolean }
+  options?: { bypassCache?: boolean; departmentId?: string | number | null }
 ): Promise<Communication[]> => {
-    const cacheKey = `thread-logs:${from}:${to}`;
+    const departmentKey = options?.departmentId ? `:dept:${options.departmentId}` : '';
+    const cacheKey = `thread-logs:${from}:${to}${departmentKey}`;
 
     if (options?.bypassCache) {
         invalidateCommunicationThreadCache(from, to);
@@ -66,7 +67,9 @@ export const getCommunicationThread = async (
     let inFlight = inFlightThreadRequests.get(cacheKey);
     if (!inFlight) {
       inFlight = axios
-        .get(`/api/communications/thread/${from}/${to}`)
+        .get(`/api/communications/thread/${from}/${to}`, {
+          params: options?.departmentId ? { department_id: options.departmentId } : undefined,
+        })
         .then((response) => {
           const logs = response.data.logs ?? [];
           cacheSet(cacheKey, logs, THREAD_LOGS_CACHE_TTL);
@@ -242,6 +245,37 @@ export const getUnreadCallLogs = async (departmentId?: number): Promise<Communic
   const data = response.data.data ?? [];
   cacheSet(cacheKey, data, 5_000);
   return data;
+};
+
+export const setActivityReadState = async (
+  id: string | number,
+  type: 'call' | 'sms',
+  isRead: boolean
+): Promise<void> => {
+  await axios.post('/api/communications/read-state', {
+    id: Number(id),
+    type,
+    is_read: isRead,
+  });
+  cacheInvalidatePrefix('unread-logs:');
+  cacheInvalidatePrefix('dept-summary:');
+  cacheInvalidatePrefix('sidebar:');
+  cacheInvalidatePrefix('comm:');
+};
+
+export const updateActivityFollowUp = async (
+  id: string | number,
+  type: 'call' | 'sms',
+  status: 'needs_follow_up' | 'in_progress' | 'completed',
+  note?: string
+): Promise<void> => {
+  await axios.post('/api/communications/follow-up', {
+    id: Number(id),
+    type,
+    status,
+    note,
+  });
+  cacheInvalidatePrefix('comm:');
 };
 
 export const markRead = async (id: string, type: 'call' | 'sms'): Promise<void> => {

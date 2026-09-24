@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback, type MouseEvent } from 'react';
 import { SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarContent, SidebarGroup, SidebarGroupLabel } from '@/components/ui/sidebar';
-import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, BellOff, Phone, MoreVertical, LogOut } from 'lucide-react';
+import { Hash, Inbox, LayoutGrid, MessageSquare, Users, Building, BellOff, Phone, MoreVertical, LogOut, User as UserIcon } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -41,6 +41,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { formatListingTimestamp } from '@/lib/call-attendee';
+import { sidebarPreview } from '@/lib/activity-display';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface DepartmentWithUnread extends Department {
     unread_count: number;
@@ -51,12 +54,61 @@ interface RecentItem {
     id: string;
     name: string;
     href: string;
-    initials: string;
     unread_count: number;
+    preview: string;
+    time: string;
+    kind: 'call' | 'sms';
+    departmentName?: string | null;
+    hasContactName: boolean;
 }
 
 const SIDEBAR_CACHE_TTL = 2 * 60_000;
-const SIDEBAR_CACHE_VERSION = 'v4';
+const SIDEBAR_CACHE_VERSION = 'v5';
+
+function buildRecentItems(recentComms: Communication[], showDepartment: boolean): RecentItem[] {
+  const uniqueRecents: { [key: string]: RecentItem & { latestAt: string } } = {};
+
+  recentComms.forEach((comm: Communication) => {
+    const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
+    const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
+    const departmentId = comm.department_id ?? 0;
+    const key = `${departmentId}|${otherPartyNumber}`;
+    const createdAt = comm.latest_created_at || comm.created_at;
+
+    if (!uniqueRecents[key] || createdAt > uniqueRecents[key].latestAt) {
+      const display = getOtherPartyDisplay(comm);
+      const params = new URLSearchParams();
+      if (departmentId) params.set('departmentId', String(departmentId));
+      const query = params.toString();
+      uniqueRecents[key] = {
+        id: key,
+        name: display.displayName,
+        href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}${query ? `?${query}` : ''}`,
+        unread_count: 0,
+        preview: sidebarPreview(comm),
+        time: formatListingTimestamp(createdAt),
+        kind: comm.type === 'sms' || comm.latest_type === 'sms' ? 'sms' : 'call',
+        departmentName: showDepartment ? (comm.department_name || comm.department?.name || null) : null,
+        hasContactName: display.hasContactName,
+        latestAt: createdAt,
+      };
+    }
+  });
+
+  Object.values(uniqueRecents).forEach((item) => {
+    const [departmentId, number] = item.id.split('|');
+    item.unread_count = recentComms.filter((comm) => {
+      const otherParty = comm.direction === 'inbound' ? comm.from : comm.to;
+      const incoming = comm.direction === 'inbound' && Number(comm.is_read) === 0;
+      return incoming && otherParty === number && String(comm.department_id ?? 0) === departmentId;
+    }).length;
+  });
+
+  return Object.values(uniqueRecents)
+    .sort((a, b) => (a.latestAt < b.latestAt ? 1 : -1))
+    .slice(0, 12)
+    .map(({ latestAt: _latestAt, ...item }) => item);
+}
 
 let badgeCanvas: HTMLCanvasElement | null = null;
 
@@ -222,37 +274,19 @@ export function InAppSidebar() {
     if (!user?.id || !user?.company_id) return;
 
     try {
-      const recentCommsResponse = await getCommunications({ limit: 50, scope: 'assigned' });
+      const departmentMatch = pathname.match(/^\/departments\/(\d+)/);
+      const selectedDepartmentId = departmentMatch?.[1];
+      const recentCommsResponse = await getCommunications({
+        limit: 50,
+        scope: 'assigned',
+        ...(selectedDepartmentId ? { department_id: selectedDepartmentId } : {}),
+      });
 
       const recentComms = Array.isArray(recentCommsResponse.results) ? recentCommsResponse.results : [];
-      const newInboxUnread = recentComms.filter((c) => !c.is_read).length;
+      const newInboxUnread = recentComms.filter((c) => c.direction === 'inbound' && Number(c.is_read) === 0).length;
       setInboxUnread(newInboxUnread);
 
-      const uniqueRecents: { [key: string]: RecentItem } = {};
-      recentComms.forEach((comm: Communication) => {
-        const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
-        const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
-
-        if (!uniqueRecents[otherPartyNumber]) {
-          const display = getOtherPartyDisplay(comm);
-          uniqueRecents[otherPartyNumber] = {
-            id: otherPartyNumber,
-            name: display.displayName,
-            href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}`,
-            initials: display.initial,
-            unread_count: 0,
-          };
-        }
-      });
-
-      Object.keys(uniqueRecents).forEach((number) => {
-        const unreadCount = recentComms.filter(
-          (c) => (c.direction === 'inbound' ? c.from : c.to) === number && !c.is_read
-        ).length;
-        uniqueRecents[number].unread_count = unreadCount;
-      });
-
-      const recents = Object.values(uniqueRecents).slice(0, 10);
+      const recents = buildRecentItems(recentComms, !selectedDepartmentId);
       setRecentItems(recents);
 
       // Update sidebar cache with fresh inbox/recents data
@@ -274,7 +308,7 @@ export function InAppSidebar() {
     } catch (e) {
       console.error('Failed to refresh inbox/recents unread counts', e);
     }
-  }, [user?.id, user?.company_id, sendBadgeCount]);
+  }, [user?.id, user?.company_id, sendBadgeCount, pathname]);
 
   const refreshDepartmentUnreadBadges = useCallback(async (targetDepartmentId?: number) => {
     if (!user?.id) return;
@@ -342,9 +376,14 @@ export function InAppSidebar() {
         setDepartmentsLoading(true);
         setRecentsLoading(true);
 
+        const departmentMatch = pathname.match(/^\/departments\/(\d+)/);
         const [summary, recentCommsResponse] = await Promise.all([
           getDepartmentsSummary(undefined, { assignedOnly: true }),
-          getCommunications({ limit: 50, scope: 'assigned' }),
+          getCommunications({
+            limit: 50,
+            scope: 'assigned',
+            ...(departmentMatch?.[1] ? { department_id: departmentMatch[1] } : {}),
+          }),
         ]);
 
         const deptsWithCounts = summary.departments.map((row) => {
@@ -356,34 +395,10 @@ export function InAppSidebar() {
         setDepartments(deptsWithCounts);
 
         const recentComms = Array.isArray(recentCommsResponse.results) ? recentCommsResponse.results : [];
-        const uniqueRecents: { [key: string]: RecentItem } = {};
-        const inboxUnreadCount = recentComms.filter((c) => !c.is_read).length;
+        const inboxUnreadCount = recentComms.filter((c) => c.direction === 'inbound' && Number(c.is_read) === 0).length;
         setInboxUnread(inboxUnreadCount);
 
-        recentComms.forEach((comm: Communication) => {
-          const otherPartyNumber = comm.direction === 'inbound' ? comm.from : comm.to;
-          const fromNumber = comm.direction === 'inbound' ? comm.to : comm.from;
-
-          if (!uniqueRecents[otherPartyNumber]) {
-            const display = getOtherPartyDisplay(comm);
-            uniqueRecents[otherPartyNumber] = {
-              id: otherPartyNumber,
-              name: display.displayName,
-              href: `/conversations/${encodeURIComponent(fromNumber)}/${encodeURIComponent(otherPartyNumber)}`,
-              initials: display.initial,
-              unread_count: 0,
-            };
-          }
-        });
-
-        Object.keys(uniqueRecents).forEach((number) => {
-          const unreadCount = recentComms.filter(
-            (c) => (c.direction === 'inbound' ? c.from : c.to) === number && !c.is_read
-          ).length;
-          uniqueRecents[number].unread_count = unreadCount;
-        });
-
-        const recents = Object.values(uniqueRecents).slice(0, 10);
+        const recents = buildRecentItems(recentComms, !departmentMatch?.[1]);
         setRecentItems(recents);
 
         cacheSet(cacheKey, {
@@ -407,7 +422,7 @@ export function InAppSidebar() {
 
     initialLoadRef.current = request;
     await request;
-  }, [user, sendBadgeCount]);
+  }, [user, sendBadgeCount, pathname]);
 
   useEffect(() => {
     if (!user) return;
@@ -469,6 +484,15 @@ export function InAppSidebar() {
       events.off('refreshOperators', handleDndStatusChange);
     };
   }, [user, fetchInitialSidebarData, refreshDepartmentUnreadBadges, refreshInboxAndRecents]);
+
+  const selectedDepartmentKey = pathname.match(/^\/departments\/(\d+)/)?.[1] ?? 'all';
+
+  useEffect(() => {
+    if (!user) return;
+    setRecentItems([]);
+    setRecentsLoading(true);
+    void refreshInboxAndRecents().finally(() => setRecentsLoading(false));
+  }, [selectedDepartmentKey, user, refreshInboxAndRecents]);
 
   return (
     <>
@@ -541,6 +565,21 @@ export function InAppSidebar() {
          <SidebarGroup>
             <SidebarGroupLabel>Departments</SidebarGroupLabel>
             <SidebarMenu>
+                {!departmentsLoading && departments.length > 1 && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname === '/app'}>
+                      <Link href="/app">
+                        <LayoutGrid />
+                        <span className="min-w-0 flex-1 truncate">All My Departments</span>
+                        {departments.reduce((sum, dept) => sum + dept.unread_count, 0) > 0 && (
+                          <Badge className="h-5 bg-[#6D28D9] hover:bg-[#6D28D9]">
+                            {departments.reduce((sum, dept) => sum + dept.unread_count, 0)}
+                          </Badge>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {departmentsLoading ? (
                     <SidebarMenuItem>
                         <SidebarMenuButton disabled>Loading...</SidebarMenuButton>
@@ -559,10 +598,19 @@ export function InAppSidebar() {
                                         {dept.name}
                                       </span>
                                       {dept.is_dnd ? (
-                                        <BellOff className="h-3 w-3 shrink-0 text-amber-600" />
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span className="inline-flex shrink-0" aria-label={`Notifications muted for ${dept.name}`}>
+                                              <BellOff className="h-3 w-3 text-amber-600" />
+                                            </span>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            Notifications muted for {dept.name}. Incoming calls and messages for this department are silenced for you. Other agents are not affected.
+                                          </TooltipContent>
+                                        </Tooltip>
                                       ) : null}
                                       {dept.unread_count > 0 ? (
-                                          <Badge className="h-5 max-w-[3rem] shrink-0 truncate tabular-nums group-hover/dept:invisible group-focus-within/dept:invisible">
+                                          <Badge className="h-5 max-w-[3rem] shrink-0 truncate tabular-nums bg-[#6D28D9] hover:bg-[#6D28D9] group-hover/dept:invisible group-focus-within/dept:invisible">
                                             {dept.unread_count}
                                           </Badge>
                                       ) : null}
@@ -626,7 +674,7 @@ export function InAppSidebar() {
             </SidebarMenu>
         </SidebarGroup>
          <SidebarGroup>
-            <SidebarGroupLabel>Recents</SidebarGroupLabel>
+            <SidebarGroupLabel>Recent Activity</SidebarGroupLabel>
             <SidebarMenu>
                  {recentsLoading ? (
                     <SidebarMenuItem>
@@ -636,16 +684,26 @@ export function InAppSidebar() {
                     recentItems.map((item) => (
                         <SidebarMenuItem key={item.id}>
                             <SidebarMenuButton asChild isActive={pathname.includes(item.href)}>
-                                <Link href={item.href} className="flex justify-between items-center w-full">
-                                    <div className="flex items-center gap-2">
-                                        <Avatar className="h-5 w-5 text-xs">
-                                            <AvatarFallback>{item.initials}</AvatarFallback>
-                                        </Avatar>
-                                        <span className="truncate">{item.name}</span>
+                                <Link href={item.href} className="flex w-full items-start justify-between gap-2">
+                                    <div className="flex min-w-0 items-start gap-2">
+                                        <span className="mt-0.5 flex items-center gap-1 text-muted-foreground">
+                                          {!item.hasContactName && <UserIcon className="h-3.5 w-3.5" />}
+                                          {item.kind === 'sms' ? <MessageSquare className="h-3.5 w-3.5" /> : <Phone className="h-3.5 w-3.5" />}
+                                        </span>
+                                        <span className="min-w-0">
+                                          <span className="block truncate text-sm">{item.name}</span>
+                                          <span className="block truncate text-[11px] text-muted-foreground">{item.preview}</span>
+                                          {item.departmentName && (
+                                            <span className="block truncate text-[11px] text-muted-foreground">{item.departmentName}</span>
+                                          )}
+                                        </span>
                                     </div>
-                                     {item.unread_count > 0 && (
-                                        <Badge className="h-5">{item.unread_count}</Badge>
-                                    )}
+                                    <span className="flex shrink-0 flex-col items-end gap-1">
+                                      <span className="text-[10px] text-muted-foreground">{item.time}</span>
+                                      {item.unread_count > 0 && (
+                                        <Badge className="h-5 bg-[#6D28D9] hover:bg-[#6D28D9]">{item.unread_count}</Badge>
+                                      )}
+                                    </span>
                                 </Link>
                             </SidebarMenuButton>
                         </SidebarMenuItem>

@@ -45,6 +45,15 @@ export interface Communication {
     user?: Partial<User>;
   }[];
   latest_type?: 'call' | 'sms';
+  department_name?: string | null;
+  follow_up?: {
+    status: 'needs_follow_up' | 'in_progress' | 'completed';
+    claimed_by?: string | null;
+    claimed_at?: string | null;
+    completed_by?: string | null;
+    completed_at?: string | null;
+    note?: string | null;
+  } | null;
   latest_created_at?: string;
   sms_count?: number;
   call_count?: number;

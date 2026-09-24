@@ -11,7 +11,7 @@ import { Badge } from './ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { addParticipant } from '@/services/twilioService';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { markCommunicationField, markRead } from '@/services/callLogService';
+import { markCommunicationField, markRead, setActivityReadState, updateActivityFollowUp } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
 import { cn, formatPhoneNumber, getContactAvatarColorClass } from '@/lib/utils';
@@ -44,6 +44,8 @@ import {
   resolveOutboundContextFromCommunication,
   type OutboundContext,
 } from '@/lib/outbound-context';
+import { activityToneClass, followUpLabel, getActivityPresentation } from '@/lib/activity-display';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 function parseRecordingDurationSeconds(
   ...values: (string | undefined | null)[]
@@ -69,6 +71,7 @@ interface CallLogProps {
   onCommunicationSelect?: (comm: Communication) => void;
   source?: string;
   highlightFailedCalls?: boolean;
+  showDepartment?: boolean;
 }
 
 function CommunicationCard({ 
@@ -82,6 +85,7 @@ function CommunicationCard({
     onCommunicationSelect,
     source,
     highlightFailedCalls,
+    showDepartment,
     isFirstInGroup,
     isLastInGroup,
     isMiddleOfGroup
@@ -96,6 +100,7 @@ function CommunicationCard({
     onCommunicationSelect?: (comm: Communication) => void,
     source?: string,
     highlightFailedCalls?: boolean,
+    showDepartment?: boolean,
     isFirstInGroup: boolean,
     isLastInGroup: boolean,
     isMiddleOfGroup: boolean | null
@@ -466,31 +471,39 @@ function CommunicationCard({
        const contactColorClass = getContactAvatarColorClass(
          otherParty.hasContactName ? mainPageContactName : mainPageContactNumber
        );
-       const isUnreadSms = (comm.latest_type === 'sms' || comm.type === 'sms') && Number(comm.is_read) === 0;
+       const isUnread = Number(comm.is_read) === 0 && comm.direction === 'inbound';
+       const activity = getActivityPresentation(comm);
+       const departmentLabel = comm.department?.name || comm.department_name;
+       const followUp = followUpLabel(comm.follow_up?.status);
+       const agentName = comm.user_name || attendee?.name || null;
+       const systemAgent = Boolean((comm.meta_data as { automated?: boolean; system?: boolean } | null)?.automated
+         || (comm.meta_data as { system?: boolean } | null)?.system);
+       const departmentQuery = comm.department_id ? `${queryString ? '&' : '?'}departmentId=${comm.department_id}` : '';
 
       return (
            <div
              className={cn(
                'flex items-center gap-3 px-4 py-3 group transition-colors',
-               isUnreadSms
-                ? 'bg-red-100 hover:bg-red-200'
-                : isFailedCall
-                 ? 'bg-destructive/10 hover:bg-destructive/15 border-l-4 border-l-destructive'
-                 : 'hover:bg-muted/40'
+               isUnread
+                ? 'bg-[#6D28D9]/10 hover:bg-[#6D28D9]/15'
+                : 'hover:bg-muted/40'
              )}
            >
                 <Link
-                  href={`/conversations/${from}/${to}${queryString}`}
-                  key={comm.id || `${comm.from}-${comm.to}`}
-                  className="grid flex-1 grid-cols-[36px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.6fr)_72px] items-center gap-x-6 min-w-0"
+                  href={`/conversations/${from}/${to}${queryString}${departmentQuery}`}
+                  key={comm.id || `${comm.from}-${comm.to}-${comm.department_id || ''}`}
+                  className={cn(
+                    'grid flex-1 items-center gap-x-4 min-w-0',
+                    showDepartment
+                      ? 'grid-cols-[36px_minmax(0,1.3fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_88px]'
+                      : 'grid-cols-[36px_minmax(0,1.4fr)_minmax(0,1.6fr)_minmax(0,1fr)_88px]'
+                  )}
                 >
-                    <Avatar className={cn('h-9 w-9', isFailedCall && 'ring-2 ring-destructive/40')}>
+                    <Avatar className="h-9 w-9">
                         <AvatarFallback
                           className={cn(
                             'text-xs font-medium',
-                            isFailedCall
-                              ? 'bg-destructive/15 text-destructive'
-                              : otherParty.hasContactName || contact
+                            otherParty.hasContactName || contact
                                 ? contactColorClass
                                 : 'bg-muted text-muted-foreground'
                           )}
@@ -502,52 +515,52 @@ function CommunicationCard({
                     <div className="flex min-w-0 flex-col">
                       <span
                         className={cn(
-                          'truncate text-sm font-medium',
-                          isFailedCall ? 'text-destructive font-semibold' : 'text-foreground',
-                          !comm.is_read && !isFailedCall && 'font-semibold'
+                          'truncate text-sm text-foreground',
+                          isUnread ? 'font-bold' : 'font-medium'
                         )}
                       >
                         {mainPageContactName}
                       </span>
                       {mainPageContactSublabel && (
-                        <span className={cn(
-                          'truncate text-xs',
-                          isFailedCall ? 'text-destructive/80' : 'text-muted-foreground'
-                        )}>
+                        <span className="truncate text-xs text-muted-foreground">
                           {mainPageContactSublabel}
                         </span>
                       )}
                     </div>
 
                     <div className="flex min-w-0 items-center gap-2">
-                      {failedCallLabel && (
-                        <Badge variant="destructive" className="shrink-0 text-[10px] uppercase tracking-wide">
-                          {failedCallLabel}
-                        </Badge>
-                      )}
-                      <span className={cn(
-                        'truncate text-sm',
-                        isFailedCall ? 'font-medium text-destructive' : 'text-muted-foreground'
-                      )}>
-                        {callTypeLine}
+                      <span className={cn('inline-flex max-w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium', activityToneClass(activity.tone))}>
+                        {activity.icon === 'message' ? <MessageSquare className="h-3.5 w-3.5 shrink-0" /> : activity.icon === 'voicemail' ? <FileText className="h-3.5 w-3.5 shrink-0" /> : <PhoneIcon className="h-3.5 w-3.5 shrink-0" />}
+                        <span className="truncate">{activity.label}</span>
                       </span>
+                      {followUp && (
+                        <span className={cn(
+                          'shrink-0 rounded-md px-2 py-1 text-[10px] font-medium',
+                          comm.follow_up?.status === 'completed' ? 'bg-green-50 text-[#166534]' : 'bg-amber-50 text-[#92400E]'
+                        )}>
+                          {followUp}
+                        </span>
+                      )}
                     </div>
 
+                    {showDepartment && (
+                      <span className="truncate text-sm text-foreground">{departmentLabel || 'Not available'}</span>
+                    )}
+
                     <div className="flex items-center gap-2 min-w-0">
-                      {attendee ? (
-                        <>
-                          <Avatar className="h-7 w-7 shrink-0">
-                            {attendee.profile_picture ? (
-                              <AvatarImage src={attendee.profile_picture} alt={attendee.name} />
-                            ) : null}
-                            <AvatarFallback className="bg-muted text-[10px] font-medium text-muted-foreground">
-                              {attendeeInitials}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="truncate text-sm text-muted-foreground">{attendee.name}</span>
-                        </>
+                      {systemAgent ? (
+                        <span className="truncate text-sm text-foreground">System</span>
+                      ) : agentName ? (
+                        <span className="truncate text-sm text-foreground">{agentName}</span>
                       ) : (
-                        <span className="text-sm text-muted-foreground/50">—</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="truncate text-sm text-muted-foreground">Not available</span>
+                            </TooltipTrigger>
+                            <TooltipContent>This activity has no agent recorded. Nothing is guessed.</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                     </div>
 
@@ -590,13 +603,42 @@ function CommunicationCard({
                         <DropdownMenuItem onClick={() => {
                             const context = phoneNumbers?.length
                               ? resolveOutboundContextFromCommunication(comm, phoneNumbers, fallbackDepartmentId)
-                              : fallbackDepartmentId
+                              : comm.department_id
+                                ? { departmentId: String(comm.department_id) }
+                                : fallbackDepartmentId
                                 ? { departmentId: fallbackDepartmentId }
                                 : undefined;
                             onMakeCall(mainPageContactNumber, context);
                         }}>
-                            Call {formatPhoneNumber(mainPageContactNumber)}
+                            Call back
                         </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/conversations/${from}/${to}${queryString}${departmentQuery}`}>
+                            {isSms ? 'Reply' : 'View details'}
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          const itemType = isSms ? 'sms' : 'call';
+                          void setActivityReadState(comm.id, itemType, Number(comm.is_read) !== 0 ? false : true).then(() => {
+                            events.emit('refreshCalls');
+                            events.emit('refreshDepartmentsUnread');
+                          });
+                        }}>
+                          {Number(comm.is_read) === 0 ? 'Mark as read' : 'Mark as unread'}
+                        </DropdownMenuItem>
+                        {comm.follow_up && (
+                          <>
+                            <DropdownMenuItem onClick={() => void updateActivityFollowUp(comm.id, isSms ? 'sms' : 'call', 'in_progress').then(() => events.emit('refreshCalls'))}>
+                              Claim follow-up
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              const note = window.prompt('Completion note') || undefined;
+                              void updateActivityFollowUp(comm.id, isSms ? 'sms' : 'call', 'completed', note).then(() => events.emit('refreshCalls'));
+                            }}>
+                              Complete follow-up
+                            </DropdownMenuItem>
+                          </>
+                        )}
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
@@ -667,6 +709,7 @@ export default function CallLog({
   onCommunicationSelect,
   source,
   highlightFailedCalls = false,
+  showDepartment = false,
 }: CallLogProps) {
   if (!communications || communications.length === 0) {
     return (
@@ -684,10 +727,16 @@ export default function CallLog({
   if(isClickable) {
     return (
         <div className="divide-y divide-border/60">
-            <div className="hidden md:grid grid-cols-[36px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.6fr)_72px] items-center gap-x-6 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <div className={cn(
+              'hidden md:grid items-center gap-x-4 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground',
+              showDepartment
+                ? 'grid-cols-[36px_minmax(0,1.3fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_88px]'
+                : 'grid-cols-[36px_minmax(0,1.4fr)_minmax(0,1.6fr)_minmax(0,1fr)_88px]'
+            )}>
               <span />
               <span>Contact</span>
-              <span>Call</span>
+              <span>Activity</span>
+              {showDepartment && <span>Department</span>}
               <span>Agent</span>
               <span className="text-right">Time</span>
             </div>
@@ -706,6 +755,7 @@ export default function CallLog({
                         onCommunicationSelect={onCommunicationSelect}
                         source={source}
                         highlightFailedCalls={highlightFailedCalls}
+                        showDepartment={showDepartment}
                         isFirstInGroup={true}
                         isLastInGroup={true}
                         isMiddleOfGroup={false}
