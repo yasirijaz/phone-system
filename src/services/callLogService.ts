@@ -290,6 +290,14 @@ export const markRead = async (id: string, type: 'call' | 'sms'): Promise<void> 
     cacheInvalidatePrefix('sidebar:');
 };
 
+export const markAllNotificationsRead = async (): Promise<void> => {
+  await axios.post('/api/communications/mark-all-read');
+  cacheInvalidatePrefix('unread-logs:');
+  cacheInvalidatePrefix('dept-summary:');
+  cacheInvalidatePrefix('sidebar:');
+  cacheInvalidatePrefix('comm:');
+};
+
 export const markThreadAsRead = async (
   from: string,
   to: string,

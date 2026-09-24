@@ -8,7 +8,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { getCommunications } from '@/services/callLogService';
+import { getCommunications, markAllNotificationsRead } from '@/services/callLogService';
 import type { Department, Communication } from '@/types';
 import { Badge } from './ui/badge';
 import { isElectron } from '@/lib/is-electron';
@@ -178,6 +178,7 @@ export function InAppSidebar() {
   const [inboxUnread, setInboxUnread] = useState(0);
   const [leaveTarget, setLeaveTarget] = useState<DepartmentWithUnread | null>(null);
   const [leavingDepartment, setLeavingDepartment] = useState(false);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
   const inElectron = isElectron();
   const initialLoadRef = useRef<Promise<void> | null>(null);
   const unreadRefreshRef = useRef<Promise<void> | null>(null);
@@ -193,6 +194,27 @@ export function InAppSidebar() {
     event.preventDefault();
     event.stopPropagation();
     events.emit('openDialer', { departmentId: String(departmentId) });
+  };
+
+  const handleReadAll = async () => {
+    if (markingAllRead) return;
+    setMarkingAllRead(true);
+    setInboxUnread(0);
+    setDepartments((prev) => prev.map((dept) => ({ ...dept, unread_count: 0 })));
+    setRecentItems((prev) => prev.map((item) => ({ ...item, unread_count: 0 })));
+    try {
+      await markAllNotificationsRead();
+      events.emit('refreshDepartmentsUnread');
+    } catch (error: any) {
+      toast({
+        title: 'Could not mark notifications read',
+        description: error?.response?.data?.message || 'Please try again.',
+        variant: 'destructive',
+      });
+      events.emit('threadReadFailed');
+    } finally {
+      setMarkingAllRead(false);
+    }
   };
 
   const handleDepartmentMessageClick = (departmentId: number, event: MouseEvent) => {
@@ -743,7 +765,19 @@ export function InAppSidebar() {
             </SidebarMenu>
         </SidebarGroup>
          <SidebarGroup>
-            <SidebarGroupLabel>Recent Activity</SidebarGroupLabel>
+            <SidebarGroupLabel className="flex items-center justify-between pr-2">
+              <span>Recent Activity</span>
+              {(inboxUnread > 0 || departments.some((dept) => dept.unread_count > 0) || recentItems.some((item) => item.unread_count > 0)) && (
+                <button
+                  type="button"
+                  className="text-[11px] font-medium text-[#6D28D9] hover:underline disabled:opacity-50"
+                  disabled={markingAllRead}
+                  onClick={() => { void handleReadAll(); }}
+                >
+                  {markingAllRead ? 'Marking...' : 'Read all'}
+                </button>
+              )}
+            </SidebarGroupLabel>
             <SidebarMenu>
                  {recentsLoading ? (
                     <SidebarMenuItem>
