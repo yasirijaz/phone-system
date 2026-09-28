@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -14,6 +14,15 @@ type ScheduledSmsActionsProps = {
   isMine?: boolean;
 };
 
+/** Survives remounts so a second click/request cannot race the first. */
+const inFlightActions = new Set<string>();
+
+function isAlreadyDoneError(error: any): boolean {
+  const status = error?.response?.status;
+  const message = String(error?.response?.data?.message || error?.message || '').toLowerCase();
+  return status === 422 && message.includes('no longer scheduled');
+}
+
 export default function ScheduledSmsActions({
   smsId,
   scheduledAt,
@@ -22,7 +31,6 @@ export default function ScheduledSmsActions({
   const { toast } = useToast();
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [busy, setBusy] = useState<'send' | 'discard' | null>(null);
-  const inFlightRef = useRef(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -37,41 +45,53 @@ export default function ScheduledSmsActions({
   };
 
   const handleSendNow = async () => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
+    const key = `send:${smsId}`;
+    if (inFlightActions.has(key) || inFlightActions.has(`discard:${smsId}`)) return;
+    inFlightActions.add(key);
     setBusy('send');
     try {
       await sendScheduledSmsNow(smsId);
       toast({ title: 'Message sent' });
       refreshThread();
     } catch (error: any) {
-      toast({
-        title: 'Could not send',
-        description: error?.response?.data?.message || 'Try again.',
-        variant: 'destructive',
-      });
+      if (isAlreadyDoneError(error)) {
+        toast({ title: 'Message sent' });
+        refreshThread();
+      } else {
+        toast({
+          title: 'Could not send',
+          description: error?.response?.data?.message || 'Try again.',
+          variant: 'destructive',
+        });
+      }
     } finally {
-      inFlightRef.current = false;
+      inFlightActions.delete(key);
       setBusy(null);
     }
   };
 
   const handleDiscard = async () => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
+    const key = `discard:${smsId}`;
+    if (inFlightActions.has(key) || inFlightActions.has(`send:${smsId}`)) return;
+    inFlightActions.add(key);
     setBusy('discard');
     try {
       await discardScheduledSms(smsId);
       toast({ title: 'Scheduled message discarded' });
       refreshThread();
     } catch (error: any) {
-      toast({
-        title: 'Could not discard',
-        description: error?.response?.data?.message || 'Try again.',
-        variant: 'destructive',
-      });
+      if (isAlreadyDoneError(error)) {
+        toast({ title: 'Scheduled message discarded' });
+        refreshThread();
+      } else {
+        toast({
+          title: 'Could not discard',
+          description: error?.response?.data?.message || 'Try again.',
+          variant: 'destructive',
+        });
+      }
     } finally {
-      inFlightRef.current = false;
+      inFlightActions.delete(key);
       setBusy(null);
     }
   };
