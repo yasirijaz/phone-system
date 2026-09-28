@@ -762,8 +762,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
    * always restore Available (especially when the JS SDK fails ReservationDescriptor updates),
    * so force Available after wrap-up/completion.
    */
+  const classificationHoldRef = useRef(false);
+
   const restoreWorkerToAvailable = useCallback(
     async (reason: string) => {
+      if (classificationHoldRef.current) {
+        return;
+      }
       if (hasLiveCallMedia()) {
         logReservationState('Skipping Available restore (live media)', activeReservationRef.current, {
           reason,
@@ -840,6 +845,24 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     [broadcastWorkerStatus, hasLiveCallMedia, logReservationState]
   );
 
+  const holdWorkerForClassification = useCallback(() => {
+    classificationHoldRef.current = true;
+    void broadcastWorkerStatus('Unavailable', 'status_change', { force: true, syncTwilio: true });
+  }, [broadcastWorkerStatus]);
+
+  const requestCallClassification = useCallback(() => {
+    holdWorkerForClassification();
+    events.emit('callClassificationRequired');
+  }, [holdWorkerForClassification]);
+
+  const releaseWorkerAfterClassification = useCallback(() => {
+    if (!classificationHoldRef.current) {
+      return;
+    }
+    classificationHoldRef.current = false;
+    void restoreWorkerToAvailable('classification-released');
+  }, [restoreWorkerToAvailable]);
+
   const scheduleAvailableRestore = useCallback(
     (reason: string) => {
       if (suppressAutoAvailableRef.current || readManualUnavailableIntent()) {
@@ -907,6 +930,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     reservation.on('wrapup', () => {
       logReservationState('Reservation entered wrapup', reservation);
+      requestCallClassification();
       void (async () => {
         await safeCompleteReservation(reservation);
         await restoreWorkerToAvailable('reservation.wrapup');
@@ -923,7 +947,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       clearActiveCallStateIfIdle('reservation.completed');
       void restoreWorkerToAvailable('reservation.completed');
     });
-  }, [clearActiveCallStateIfIdle, restoreWorkerToAvailable, safeCompleteReservation, logReservationState]);
+  }, [clearActiveCallStateIfIdle, restoreWorkerToAvailable, safeCompleteReservation, logReservationState, requestCallClassification]);
 
   const clearDeviceConnectionState = useCallback(() => {
     setConnection(null);
@@ -1181,6 +1205,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
               return;
             }
             const reservation = activeReservationRef.current;
+            requestCallClassification();
             if (reservation) {
               finalizeAfterDisconnectRef.current(reservation);
             } else {
@@ -1247,6 +1272,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         }
         if (connectionSourceRef.current === 'device') {
           const reservation = activeReservationRef.current;
+          requestCallClassification();
           if (reservation) {
             finalizeAfterDisconnectRef.current(reservation);
           } else {
@@ -1791,6 +1817,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   }, [scheduleReservationFinalize, clearActiveCallStateIfIdle, user?.id]);
 
   const leaveCall = async (conferenceSid: string, callSid: string) => {
+    requestCallClassification();
     const reservationToFinalize = activeReservationRef.current;
 
     try {
@@ -1832,6 +1859,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   };
 
   const endCallForAll = async (conferenceSid?: string | null) => {
+    requestCallClassification();
     const reservationToFinalize = activeReservationRef.current;
     const ownCallSid =
       connectionRef.current?.parameters?.CallSid ??
@@ -2255,6 +2283,8 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     hangUp,
     leaveCall,
     endCallForAll,
+    holdWorkerForClassification,
+    releaseWorkerAfterClassification,
     acceptReservation,
     acceptReservationAndEndCurrent,
     acceptReservationWithHold,

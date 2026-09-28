@@ -54,6 +54,11 @@ export interface Communication {
     completed_at?: string | null;
     note?: string | null;
   } | null;
+  classification?: {
+    label: string;
+    note?: string | null;
+    user_name?: string | null;
+  } | null;
   latest_created_at?: string;
   sms_count?: number;
   call_count?: number;

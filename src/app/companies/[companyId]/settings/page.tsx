@@ -28,6 +28,7 @@ import { ArrowLeft, PlusCircle, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import AppHeader from "@/components/app-header";
 import { canAccessCompanySettings } from "@/lib/roles";
+import CallOutcomesSettings from "@/components/call-outcomes-settings";
 
 const businessHoursSchema = z.object({
   day: z.string(),
@@ -421,7 +422,7 @@ export default function CompanySettingsPage() {
             <Form {...form}>
               <form id="settings-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                  <Tabs defaultValue="call-settings">
-                    <TabsList className="grid w-full grid-cols-7">
+                    <TabsList className="flex h-auto w-full flex-wrap">
                         <TabsTrigger value="call-settings">Call Settings</TabsTrigger>
                         <TabsTrigger value="voicemail">Voicemail</TabsTrigger>
                         <TabsTrigger value="business-hours">Business Hours</TabsTrigger>
@@ -429,6 +430,7 @@ export default function CompanySettingsPage() {
                         <TabsTrigger value="routing">Routing</TabsTrigger>
                         <TabsTrigger value="slack">Slack</TabsTrigger>
                         <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                        <TabsTrigger value="call-outcomes">Call outcomes</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="call-settings">
@@ -851,6 +853,10 @@ export default function CompanySettingsPage() {
                                 {availableIntegrations.length > 0 && integrationFields.length === 0 && <p className="text-muted-foreground">Loading integrations...</p>}
                             </CardContent>
                         </Card>
+                    </TabsContent>
+
+                    <TabsContent value="call-outcomes">
+                        <CallOutcomesSettings companyId={Number(companyId)} />
                     </TabsContent>
 
                  </Tabs>

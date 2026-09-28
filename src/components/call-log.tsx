@@ -533,6 +533,11 @@ function CommunicationCard({
                         {activity.icon === 'message' ? <MessageSquare className="h-3.5 w-3.5 shrink-0" /> : activity.icon === 'voicemail' ? <FileText className="h-3.5 w-3.5 shrink-0" /> : <PhoneIcon className="h-3.5 w-3.5 shrink-0" />}
                         <span className="truncate">{activity.label}</span>
                       </span>
+                      {comm.classification?.label && (
+                        <span className="shrink-0 rounded-md bg-sky-50 px-2 py-1 text-[10px] font-medium text-sky-900">
+                          {comm.classification.label}
+                        </span>
+                      )}
                       {followUp && (
                         <TooltipProvider>
                           <Tooltip>

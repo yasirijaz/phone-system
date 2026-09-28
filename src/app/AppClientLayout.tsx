@@ -21,6 +21,7 @@ import {
   resolveActiveCallDisplayName,
 } from '@/lib/call-party-display';
 import { useResolvedContactName } from '@/hooks/use-resolved-contact-name';
+import CallClassificationSheet from '@/components/call-classification-sheet';
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   const {
@@ -322,6 +323,7 @@ export default function AppClientLayout({ children }: { children: React.ReactNod
         onExpand={() => setIncomingMinimized(false)}
       />
       <UpdateProgress message={updateMessage} />
+      <CallClassificationSheet />
     </>
   );
 }
