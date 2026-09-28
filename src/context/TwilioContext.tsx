@@ -86,6 +86,8 @@ interface TwilioContextType {
   hangUp: () => void;
   leaveCall: (conferenceSid: string, callSid: string) => Promise<void>;
   endCallForAll: (conferenceSid?: string | null) => Promise<void>;
+  holdWorkerForClassification: () => void;
+  releaseWorkerAfterClassification: () => void;
   acceptReservation: (reservation: Reservation) => void;
   acceptReservationAndEndCurrent: (reservation: Reservation) => Promise<void>;
   acceptReservationWithHold: (reservation: Reservation) => Promise<void>;
