@@ -87,7 +87,10 @@ export function hasSupervisorAccess(roleId?: number | null): boolean {
   return isPlatformAdmin(roleId) || isCompanyAdmin(roleId) || isManager(roleId);
 }
 
-/** Call Analysis page — Admin only (temporary rollout; managers/users restricted). */
+/** Call outcomes report — Company Admin or Super Admin. */
+export function canAccessCallOutcomes(roleId?: number | null): boolean {
+  return isPlatformAdmin(roleId) || isCompanyAdmin(roleId);
+}
 export function canAccessCallAnalysis(roleId?: number | null): boolean {
   return isPlatformAdmin(roleId) || isCompanyAdmin(roleId);
 }

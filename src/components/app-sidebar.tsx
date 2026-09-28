@@ -11,7 +11,7 @@ import {
   SidebarGroupLabel,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
-import { LogOut, Phone, Building, Users, Settings, LayoutGrid, UserCog, Package, CreditCard, AppWindow, UploadCloud, Plug, Radio, FileSearch } from 'lucide-react';
+import { LogOut, Phone, Building, Users, Settings, LayoutGrid, UserCog, Package, CreditCard, AppWindow, UploadCloud, Plug, Radio, FileSearch, Tags } from 'lucide-react';
 import { Button } from './ui/button';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -28,6 +28,7 @@ import {
   canAccessBilling,
   canAccessCompanySettings,
   canAccessCallAnalysis,
+  canAccessCallOutcomes,
   canAccessLiveIntel,
   canAccessDashboard,
 } from '@/lib/roles';
@@ -52,6 +53,7 @@ export function AppSidebar() {
   const showDashboard = canAccessDashboard(user?.role_id);
   const showLiveIntel = canAccessLiveIntel(user?.role_id);
   const showCallAnalysis = canAccessCallAnalysis(user?.role_id);
+  const showCallOutcomes = canAccessCallOutcomes(user?.role_id);
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
   const usersLink = user?.company_id ? `/companies/${user.company_id}/members` : '/companies';
@@ -113,6 +115,16 @@ export function AppSidebar() {
                     <Link href="/call-analysis">
                       <FileSearch />
                       <span>Analysis</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {showCallOutcomes && !inElectron && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith('/call-outcomes')} tooltip="Call Outcomes">
+                    <Link href="/call-outcomes">
+                      <Tags />
+                      <span>Outcomes</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

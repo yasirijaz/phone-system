@@ -58,3 +58,48 @@ export const reorderCallDispositions = async (companyId: number, ids: number[]) 
   const response = await axios.put(`/api/companies/${companyId}/call-dispositions/reorder`, { ids });
   return response.data;
 };
+
+export interface CallOutcomeSummary {
+  key: string;
+  label: string;
+  disposition_id: number | null;
+  custom_label: string | null;
+  count: number;
+}
+
+export interface CallOutcomeCall {
+  id: number;
+  from: string;
+  to: string;
+  direction: string;
+  call_status?: string;
+  duration?: string | number | null;
+  created_at?: string | null;
+  caller_label: string;
+  agent_name?: string | null;
+  department_name?: string | null;
+  classification?: {
+    label: string;
+    note?: string | null;
+    user_name?: string | null;
+  } | null;
+}
+
+export const getCallOutcomeSummary = async () => {
+  const response = await axios.get('/api/call-outcomes');
+  return response.data as { status: string; outcomes: CallOutcomeSummary[] };
+};
+
+export const getCallOutcomeCalls = async (params: {
+  disposition_id?: number | null;
+  custom_label?: string | null;
+  page?: number;
+  per_page?: number;
+}) => {
+  const response = await axios.get('/api/call-outcomes/calls', { params });
+  return response.data as {
+    status: string;
+    calls: CallOutcomeCall[];
+    pagination: { page: number; per_page: number; total: number; total_pages: number };
+  };
+};

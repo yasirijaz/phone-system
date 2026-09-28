@@ -403,6 +403,18 @@ function CommunicationCard({
                             <span className="mx-2">&bull;</span>
                             <span>{endTime}</span>
                         </div>
+                        {c.classification?.label && (
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className="rounded-md bg-sky-50 px-2 py-1 text-[10px] font-medium text-sky-900">
+                              {c.classification.label}
+                            </span>
+                            {c.classification.note && (
+                              <span className="text-xs text-muted-foreground">
+                                Note: {c.classification.note}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </>
                     )}
                     {isTranscribing && <p className="text-xs text-muted-foreground mt-2">Transcribing...</p>}
@@ -537,9 +549,20 @@ function CommunicationCard({
                         <span className="truncate">{activity.label}</span>
                       </span>
                       {comm.classification?.label && (
-                        <span className="shrink-0 rounded-md bg-sky-50 px-2 py-1 text-[10px] font-medium text-sky-900">
-                          {comm.classification.label}
-                        </span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="shrink-0 rounded-md bg-sky-50 px-2 py-1 text-[10px] font-medium text-sky-900">
+                                {comm.classification.label}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {comm.classification.note
+                                ? `Note: ${comm.classification.note}`
+                                : `Classified as ${comm.classification.label}${comm.classification.user_name ? ` by ${comm.classification.user_name}` : ''}`}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                       {followUp && (
                         <TooltipProvider>
