@@ -852,18 +852,44 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     void broadcastWorkerStatus('Unavailable', 'status_change', { force: true, syncTwilio: true });
   }, [broadcastWorkerStatus]);
 
+  const clearInCallAfterHangup = useCallback((reason: string) => {
+    void dismissActiveCall()
+      .then(() => {
+        if (user?.id) {
+          events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
+        }
+      })
+      .catch((error) => {
+        console.warn('Failed to clear in-call status after hangup', { reason, error });
+        if (user?.id) {
+          events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
+        }
+      });
+  }, [user?.id]);
+
+  const clearInCallAfterHangupRef = useRef(clearInCallAfterHangup);
+  useEffect(() => {
+    clearInCallAfterHangupRef.current = clearInCallAfterHangup;
+  }, [clearInCallAfterHangup]);
+
   const requestCallClassification = useCallback(() => {
     holdWorkerForClassification();
     events.emit('callClassificationRequired');
   }, [holdWorkerForClassification]);
+
+  const requestCallClassificationRef = useRef(requestCallClassification);
+  useEffect(() => {
+    requestCallClassificationRef.current = requestCallClassification;
+  }, [requestCallClassification]);
 
   const releaseWorkerAfterClassification = useCallback(() => {
     if (!classificationHoldRef.current) {
       return;
     }
     classificationHoldRef.current = false;
+    clearInCallAfterHangup('classification-released');
     void restoreWorkerToAvailable('classification-released');
-  }, [restoreWorkerToAvailable]);
+  }, [restoreWorkerToAvailable, clearInCallAfterHangup]);
 
   const scheduleAvailableRestore = useCallback(
     (reason: string) => {
@@ -1207,11 +1233,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
               return;
             }
             const reservation = activeReservationRef.current;
-            requestCallClassification();
+            requestCallClassificationRef.current();
             if (reservation) {
               finalizeAfterDisconnectRef.current(reservation);
             } else {
               clearActiveCallStateIfIdle('conn.disconnect');
+              clearInCallAfterHangupRef.current('conn.disconnect');
               void restoreWorkerToAvailable('conn.disconnect');
             }
           }
@@ -1274,11 +1301,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         }
         if (connectionSourceRef.current === 'device') {
           const reservation = activeReservationRef.current;
-          requestCallClassification();
+          requestCallClassificationRef.current();
           if (reservation) {
             finalizeAfterDisconnectRef.current(reservation);
           } else {
             clearActiveCallStateIfIdle('device.disconnect');
+            clearInCallAfterHangupRef.current('device.disconnect');
             void restoreWorkerToAvailable('device.disconnect');
           }
         }
@@ -1810,13 +1838,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       if (!clearActiveCallStateIfIdle('finalizeAfterDisconnect')) {
         return;
       }
-      void dismissActiveCall().then(() => {
-        if (user?.id) {
-          events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
-        }
-      });
+      clearInCallAfterHangup('finalizeAfterDisconnect');
     };
-  }, [scheduleReservationFinalize, clearActiveCallStateIfIdle, user?.id]);
+  }, [scheduleReservationFinalize, clearActiveCallStateIfIdle, clearInCallAfterHangup]);
 
   const leaveCall = async (conferenceSid: string, callSid: string) => {
     requestCallClassification();
@@ -1851,11 +1875,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    void dismissActiveCall().then(() => {
-      if (user?.id) {
-        events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
-      }
-    });
+    void clearInCallAfterHangup('leaveCall');
     void restoreWorkerToAvailable('leaveCall');
     toast({ title: 'Left call' });
   };
@@ -1907,11 +1927,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    void dismissActiveCall().then(() => {
-      if (user?.id) {
-        events.emit('refreshInCallStatus', { user_id: user.id, in_call: 0 });
-      }
-    });
+    void clearInCallAfterHangup('endCallForAll');
     void restoreWorkerToAvailable('endCallForAll');
     toast({ title: 'Call Ended' });
   };

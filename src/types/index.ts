@@ -238,6 +238,7 @@ export interface DepartmentSettings {
     call_settings: {
         greeting_message: string;
         hold_music_url?: string;
+        require_call_classification?: boolean;
     };
     business_hours: {
         is_24_7: boolean;

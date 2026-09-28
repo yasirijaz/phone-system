@@ -106,16 +106,22 @@ export default function CallClassificationSheet() {
         note: note.trim() || null,
       });
       events.emit('refreshCalls');
-      await refresh(true);
+      // Unblock immediately after save — do not wait on pending refetch.
+      setCall(null);
+      setBlocking(false);
+      releaseWorkerAfterClassification();
+      setSaving(false);
+      void getPendingClassifications()
+        .then((data) => applyPending(data.pending ?? [], data.dispositions ?? []))
+        .catch((error) => console.warn('Failed to refresh pending classifications', error));
     } catch (error) {
       console.warn('Failed to save call classification', error);
+      setSaving(false);
       toast({
         title: 'Could not save',
         description: 'Try again. This call still needs an outcome.',
         variant: 'destructive',
       });
-    } finally {
-      setSaving(false);
     }
   };
 

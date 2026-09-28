@@ -49,6 +49,7 @@ const settingsSchema = z.object({
   call_settings: z.object({
     greeting_message: z.string().optional().default(""),
     hold_music_url: z.string().url().optional().or(z.literal('')),
+    require_call_classification: z.boolean().default(false),
   }),
   business_hours: z.object({
     is_24_7: z.boolean().default(false),
@@ -90,7 +91,7 @@ export default function DepartmentSettingsPage() {
     resolver: zodResolver(settingsSchema),
     defaultValues: {
       timezone: "UTC",
-      call_settings: { greeting_message: "", hold_music_url: "" },
+      call_settings: { greeting_message: "", hold_music_url: "", require_call_classification: false },
       business_hours: {
         is_24_7: false,
         days: [
@@ -127,7 +128,8 @@ export default function DepartmentSettingsPage() {
         timezone: settings.timezone || "UTC",
         call_settings: {
             greeting_message: settings.call_settings?.greeting_message || "",
-            hold_music_url: settings.call_settings?.hold_music_url || ""
+            hold_music_url: settings.call_settings?.hold_music_url || "",
+            require_call_classification: settings.call_settings?.require_call_classification ?? false,
         },
         business_hours: settings.business_hours || { is_24_7: false, days: [] },
         ivr_menu: {
@@ -287,6 +289,23 @@ export default function DepartmentSettingsPage() {
                         <FormField control={form.control} name="call_settings.hold_music_url" render={({ field }) => (
                           <FormItem><FormLabel>Hold Music URL (Optional)</FormLabel><FormControl><Input type="url" placeholder="e.g. https://example.com/music.mp3" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
                         )}/>
+                        <FormField
+                          control={form.control}
+                          name="call_settings.require_call_classification"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">Require call classification</FormLabel>
+                                <p className="text-sm text-muted-foreground">
+                                  After a connected call in this department, agents must choose an outcome before they can take another call.
+                                </p>
+                              </div>
+                              <FormControl>
+                                <Switch checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
                       </CardContent>
                     </Card>
                   </TabsContent>
