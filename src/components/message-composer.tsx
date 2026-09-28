@@ -23,7 +23,12 @@ interface PendingMedia {
 interface MessageComposerProps {
   messageBody: string;
   onMessageBodyChange: (value: string) => void;
-  onSend: (payload: { body: string; mediaFiles: File[]; scheduledAt?: string }) => Promise<void>;
+  onSend: (payload: {
+    body: string;
+    mediaFiles: File[];
+    scheduledAt?: string;
+    timezone?: string;
+  }) => Promise<void>;
   isSending?: boolean;
   placeholder?: string;
   className?: string;
@@ -118,6 +123,7 @@ export default function MessageComposer({
     if (!canSend || busy) return;
 
     let scheduledAt: string | undefined;
+    let timezone: string | undefined;
     if (scheduleOpen && scheduleAt) {
       const when = new Date(scheduleAt);
       if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now() + 30_000) {
@@ -128,7 +134,9 @@ export default function MessageComposer({
         });
         return;
       }
-      scheduledAt = when.toISOString();
+      // Keep the wall-clock time the agent picked; send their timezone separately.
+      scheduledAt = scheduleAt.length === 16 ? `${scheduleAt}:00` : scheduleAt;
+      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
     }
 
     setIsProcessing(true);
@@ -139,6 +147,7 @@ export default function MessageComposer({
         body: messageBody.trim(),
         mediaFiles,
         scheduledAt,
+        timezone,
       });
 
       pendingMedia.forEach((item) => URL.revokeObjectURL(item.previewUrl));
@@ -242,7 +251,7 @@ export default function MessageComposer({
             disabled={busy}
           />
           <span className="text-xs text-muted-foreground">
-            {scheduleAt ? 'Sends at this time' : 'Choose when to send'}
+            {scheduleAt ? 'Sends at this local time' : 'Choose a time in your local timezone'}
           </span>
         </div>
       )}

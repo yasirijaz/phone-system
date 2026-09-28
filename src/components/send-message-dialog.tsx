@@ -128,7 +128,7 @@ export default function SendMessageDialog({
     setFilteredContacts([]);
   };
 
-  const handleSendMessage = async ({ body, mediaFiles, scheduledAt }: { body: string; mediaFiles: File[]; scheduledAt?: string }) => {
+  const handleSendMessage = async ({ body, mediaFiles, scheduledAt, timezone }: { body: string; mediaFiles: File[]; scheduledAt?: string; timezone?: string }) => {
     if (!selectedDepartmentId) {
       toast({
         title: 'Select a department',
@@ -171,7 +171,8 @@ export default function SendMessageDialog({
         recipient,
         body,
         mediaFiles.length ? mediaFiles : undefined,
-        scheduledAt
+        scheduledAt,
+        timezone
       );
       toast({
         title: 'Success',

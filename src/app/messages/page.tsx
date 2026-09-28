@@ -135,7 +135,7 @@ export default function MessagesPage() {
       setFilteredContacts([]);
   };
 
-  const handleSendMessage = async ({ body, mediaFiles, scheduledAt }: { body: string; mediaFiles: File[]; scheduledAt?: string }) => {
+  const handleSendMessage = async ({ body, mediaFiles, scheduledAt, timezone }: { body: string; mediaFiles: File[]; scheduledAt?: string; timezone?: string }) => {
     if (!selectedDepartmentId) {
         toast({ title: "Select a department", description: "Choose which department this message should be sent from.", variant: "destructive" });
         return;
@@ -166,7 +166,8 @@ export default function MessagesPage() {
             recipient,
             body,
             mediaFiles.length ? mediaFiles : undefined,
-            scheduledAt
+            scheduledAt,
+            timezone
         );
         toast({
             title: "Success",

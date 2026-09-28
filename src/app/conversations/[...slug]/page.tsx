@@ -299,7 +299,7 @@ export default function ConversationDetailPage() {
         setDialerOpen(true);
     };
 
-    const handleSendMessage = async ({ body, mediaFiles, scheduledAt }: { body: string; mediaFiles: File[]; scheduledAt?: string }) => {
+    const handleSendMessage = async ({ body, mediaFiles, scheduledAt, timezone }: { body: string; mediaFiles: File[]; scheduledAt?: string; timezone?: string }) => {
         const recipient = contact?.phone_no;
         if (!selectedDepartmentId) {
             toast({ title: "Select a department", description: "Choose which department this message should be sent from.", variant: "destructive" });
@@ -332,7 +332,8 @@ export default function ConversationDetailPage() {
                 recipient,
                 body,
                 mediaFiles.length ? mediaFiles : undefined,
-                scheduledAt
+                scheduledAt,
+                timezone
             );
             toast({
                 title: "Success",

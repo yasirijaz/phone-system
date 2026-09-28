@@ -77,7 +77,8 @@ export const sendMms = async (
     to: string,
     body: string,
     media_urls?: File[],
-    scheduledAt?: string
+    scheduledAt?: string,
+    timezone?: string
 ): Promise<any> => {
     const formData = new FormData();
 
@@ -86,6 +87,10 @@ export const sendMms = async (
     formData.append('body', body ?? '');
     if (scheduledAt) {
         formData.append('send_at', scheduledAt);
+        formData.append(
+            'timezone',
+            timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+        );
     }
 
     if (media_urls?.length) {
@@ -108,6 +113,16 @@ export const sendMms = async (
 };
 
 export const sendSms = sendMms;
+
+export const sendScheduledSmsNow = async (id: number) => {
+  const response = await axios.post(`/api/sms-logs/${id}/send-now`);
+  return response.data;
+};
+
+export const discardScheduledSms = async (id: number) => {
+  const response = await axios.post(`/api/sms-logs/${id}/discard`);
+  return response.data;
+};
 
 export const holdParticipant = async (conferenceSid: string, callSid: string, hold: boolean): Promise<any> => {
     const response = await axios.post('/api/twilio/hold', {

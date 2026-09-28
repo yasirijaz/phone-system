@@ -189,6 +189,18 @@ export default function PhoneCallHistoryPage() {
   }, [fetchCommunications]);
 
   useEffect(() => {
+    const refresh = () => {
+      void fetchCommunications();
+    };
+    events.on('refreshConversation', refresh);
+    events.on('refreshCalls', refresh);
+    return () => {
+      events.off('refreshConversation', refresh);
+      events.off('refreshCalls', refresh);
+    };
+  }, [fetchCommunications]);
+
+  useEffect(() => {
     setPage(1);
     setSelectedDepartmentId('');
     setSelectedFromNumber('');
@@ -295,10 +307,12 @@ export default function PhoneCallHistoryPage() {
     body,
     mediaFiles,
     scheduledAt,
+    timezone,
   }: {
     body: string;
     mediaFiles: File[];
     scheduledAt?: string;
+    timezone?: string;
   }) => {
     if (!selectedDepartmentId) {
       toast({
@@ -347,7 +361,8 @@ export default function PhoneCallHistoryPage() {
         phoneNumber,
         body,
         mediaFiles.length ? mediaFiles : undefined,
-        scheduledAt
+        scheduledAt,
+        timezone
       );
       toast({
         title: 'Success',

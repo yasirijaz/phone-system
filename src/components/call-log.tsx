@@ -46,6 +46,7 @@ import {
 } from '@/lib/outbound-context';
 import { activityToneClass, followUpLabel, getActivityPresentation } from '@/lib/activity-display';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import ScheduledSmsActions from '@/components/scheduled-sms-actions';
 
 function parseRecordingDurationSeconds(
   ...values: (string | undefined | null)[]
@@ -336,15 +337,24 @@ function CommunicationCard({
                 {c.body}
               </p>
             )}
-            <div className={cn(
-                "text-xs transition-opacity",
-                c.status === 'scheduled' ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-                isMine ? "text-primary-foreground/70" : "text-muted-foreground/70"
-            )}>
-                {c.status === 'scheduled' && c.scheduled_at
-                  ? `Scheduled ${format(parseISO(c.scheduled_at), 'PPp')}`
-                  : time}
-            </div>
+            {c.status === 'scheduled' && c.scheduled_at && c.id ? (
+              <ScheduledSmsActions
+                smsId={Number(c.id)}
+                scheduledAt={c.scheduled_at}
+                isMine={isMine}
+              />
+            ) : c.status === 'cancelled' ? (
+              <div className={cn('text-xs opacity-100', isMine ? 'text-primary-foreground/70' : 'text-muted-foreground/70')}>
+                Discarded
+              </div>
+            ) : (
+              <div className={cn(
+                  "text-xs opacity-0 group-hover:opacity-100 transition-opacity",
+                  isMine ? "text-primary-foreground/70" : "text-muted-foreground/70"
+              )}>
+                  {time}
+              </div>
+            )}
         </div>
     );
   };
