@@ -62,7 +62,8 @@ export interface Communication {
   latest_created_at?: string;
   sms_count?: number;
   call_count?: number;
-  status?: string; // for SMS
+  status?: string;
+  scheduled_at?: string | null;
 }
 
 export interface Call {

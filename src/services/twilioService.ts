@@ -66,6 +66,7 @@ export interface SendMmsPayload {
   to: string;
   body: string;
   media_urls?: File[];
+  scheduledAt?: string;
 }
 
 /** @deprecated Use SendMmsPayload */
@@ -75,13 +76,17 @@ export const sendMms = async (
     from: string,
     to: string,
     body: string,
-    media_urls?: File[]
+    media_urls?: File[],
+    scheduledAt?: string
 ): Promise<any> => {
     const formData = new FormData();
 
     formData.append('from', from);
     formData.append('to', to);
     formData.append('body', body ?? '');
+    if (scheduledAt) {
+        formData.append('send_at', scheduledAt);
+    }
 
     if (media_urls?.length) {
         media_urls.forEach((file) => {

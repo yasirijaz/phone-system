@@ -337,10 +337,13 @@ function CommunicationCard({
               </p>
             )}
             <div className={cn(
-                "text-xs opacity-0 group-hover:opacity-100 transition-opacity",
+                "text-xs transition-opacity",
+                c.status === 'scheduled' ? "opacity-100" : "opacity-0 group-hover:opacity-100",
                 isMine ? "text-primary-foreground/70" : "text-muted-foreground/70"
             )}>
-                {time}
+                {c.status === 'scheduled' && c.scheduled_at
+                  ? `Scheduled ${format(parseISO(c.scheduled_at), 'PPp')}`
+                  : time}
             </div>
         </div>
     );

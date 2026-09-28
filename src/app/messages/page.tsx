@@ -135,7 +135,7 @@ export default function MessagesPage() {
       setFilteredContacts([]);
   };
 
-  const handleSendMessage = async ({ body, mediaFiles }: { body: string; mediaFiles: File[] }) => {
+  const handleSendMessage = async ({ body, mediaFiles, scheduledAt }: { body: string; mediaFiles: File[]; scheduledAt?: string }) => {
     if (!selectedDepartmentId) {
         toast({ title: "Select a department", description: "Choose which department this message should be sent from.", variant: "destructive" });
         return;
@@ -165,9 +165,15 @@ export default function MessagesPage() {
             selectedFromNumber,
             recipient,
             body,
-            mediaFiles.length ? mediaFiles : undefined
+            mediaFiles.length ? mediaFiles : undefined,
+            scheduledAt
         );
-        toast({ title: "Success", description: mediaFiles.length ? "MMS sent successfully." : "Message sent successfully." });
+        toast({
+            title: "Success",
+            description: scheduledAt
+                ? "Message scheduled."
+                : mediaFiles.length ? "MMS sent successfully." : "Message sent successfully.",
+        });
         setMessageBody("");
         router.push(`/conversations/${encodeURIComponent(selectedFromNumber)}/${encodeURIComponent(recipient)}`);
     } finally {

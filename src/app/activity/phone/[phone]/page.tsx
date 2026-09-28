@@ -294,9 +294,11 @@ export default function PhoneCallHistoryPage() {
   const handleSendMessage = async ({
     body,
     mediaFiles,
+    scheduledAt,
   }: {
     body: string;
     mediaFiles: File[];
+    scheduledAt?: string;
   }) => {
     if (!selectedDepartmentId) {
       toast({
@@ -344,11 +346,14 @@ export default function PhoneCallHistoryPage() {
         selectedFromNumber,
         phoneNumber,
         body,
-        mediaFiles.length ? mediaFiles : undefined
+        mediaFiles.length ? mediaFiles : undefined,
+        scheduledAt
       );
       toast({
         title: 'Success',
-        description: mediaFiles.length ? 'MMS sent successfully.' : 'Message sent successfully.',
+        description: scheduledAt
+          ? 'Message scheduled.'
+          : mediaFiles.length ? 'MMS sent successfully.' : 'Message sent successfully.',
       });
       setMessageBody('');
       await fetchCommunications();

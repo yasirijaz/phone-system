@@ -299,7 +299,7 @@ export default function ConversationDetailPage() {
         setDialerOpen(true);
     };
 
-    const handleSendMessage = async ({ body, mediaFiles }: { body: string; mediaFiles: File[] }) => {
+    const handleSendMessage = async ({ body, mediaFiles, scheduledAt }: { body: string; mediaFiles: File[]; scheduledAt?: string }) => {
         const recipient = contact?.phone_no;
         if (!selectedDepartmentId) {
             toast({ title: "Select a department", description: "Choose which department this message should be sent from.", variant: "destructive" });
@@ -331,9 +331,15 @@ export default function ConversationDetailPage() {
                 selectedFromNumber,
                 recipient,
                 body,
-                mediaFiles.length ? mediaFiles : undefined
+                mediaFiles.length ? mediaFiles : undefined,
+                scheduledAt
             );
-            toast({ title: "Success", description: mediaFiles.length ? "MMS sent successfully." : "Message sent successfully." });
+            toast({
+                title: "Success",
+                description: scheduledAt
+                    ? "Message scheduled."
+                    : mediaFiles.length ? "MMS sent successfully." : "Message sent successfully.",
+            });
             const logs = await getCommunicationThread(from, to, { bypassCache: true, departmentId: selectedDepartmentId || searchParams.get('departmentId') });
             const sortedLogs = logs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
             setAllComms(sortedLogs);

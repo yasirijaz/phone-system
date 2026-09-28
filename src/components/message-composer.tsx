@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Mic, Paperclip, Send, X } from 'lucide-react';
+import { Loader2, Mic, Paperclip, Send, X, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   MAX_MESSAGE_MEDIA,
@@ -23,7 +23,7 @@ interface PendingMedia {
 interface MessageComposerProps {
   messageBody: string;
   onMessageBodyChange: (value: string) => void;
-  onSend: (payload: { body: string; mediaFiles: File[] }) => Promise<void>;
+  onSend: (payload: { body: string; mediaFiles: File[]; scheduledAt?: string }) => Promise<void>;
   isSending?: boolean;
   placeholder?: string;
   className?: string;
@@ -57,6 +57,8 @@ export default function MessageComposer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState('');
 
   const busy = isSending || isProcessing;
   const canSend = Boolean(messageBody.trim() || pendingMedia.length);
@@ -115,6 +117,20 @@ export default function MessageComposer({
   const handleSend = async () => {
     if (!canSend || busy) return;
 
+    let scheduledAt: string | undefined;
+    if (scheduleOpen && scheduleAt) {
+      const when = new Date(scheduleAt);
+      if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now() + 30_000) {
+        toast({
+          title: 'Pick a later time',
+          description: 'Schedule the message at least a minute from now.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      scheduledAt = when.toISOString();
+    }
+
     setIsProcessing(true);
     try {
       const mediaFiles = pendingMedia.map((item) => item.file);
@@ -122,10 +138,13 @@ export default function MessageComposer({
       await onSend({
         body: messageBody.trim(),
         mediaFiles,
+        scheduledAt,
       });
 
       pendingMedia.forEach((item) => URL.revokeObjectURL(item.previewUrl));
       setPendingMedia([]);
+      setScheduleOpen(false);
+      setScheduleAt('');
       onMessageBodyChange('');
     } catch (error: any) {
       if (error?.response) {
@@ -171,7 +190,7 @@ export default function MessageComposer({
       <div className="relative">
         <Textarea
           placeholder={placeholder}
-          className="min-h-[88px] resize-none pr-24"
+          className="min-h-[88px] resize-none pr-32"
           value={messageBody}
           onChange={(e) => onMessageBodyChange(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -190,17 +209,48 @@ export default function MessageComposer({
             type="button"
             variant="ghost"
             size="icon"
+            onClick={() => setScheduleOpen((open) => !open)}
+            disabled={busy}
+            title="Schedule message"
+            className={scheduleOpen ? 'text-primary' : undefined}
+          >
+            <Clock className="h-5 w-5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={handlePickMedia}
             disabled={busy || pendingMedia.length >= MAX_MESSAGE_MEDIA}
             title="Attach image, video, or audio"
           >
             <Paperclip className="h-5 w-5" />
           </Button>
-          <Button type="button" size="icon" onClick={() => void handleSend()} disabled={!canSend || busy}>
+          <Button type="button" size="icon" onClick={() => void handleSend()} disabled={!canSend || busy || (scheduleOpen && !scheduleAt)}>
             {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
           </Button>
         </div>
       </div>
+      {scheduleOpen && (
+        <div className="flex items-center gap-2">
+          <input
+            type="datetime-local"
+            className="h-9 rounded-md border bg-background px-2 text-sm"
+            value={scheduleAt}
+            min={localDateTimeInputValue(new Date(Date.now() + 60_000))}
+            onChange={(event) => setScheduleAt(event.target.value)}
+            disabled={busy}
+          />
+          <span className="text-xs text-muted-foreground">
+            {scheduleAt ? 'Sends at this time' : 'Choose when to send'}
+          </span>
+        </div>
+      )}
     </div>
   );
+}
+
+function localDateTimeInputValue(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
