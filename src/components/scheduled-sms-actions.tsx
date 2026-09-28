@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +22,7 @@ export default function ScheduledSmsActions({
   const { toast } = useToast();
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [busy, setBusy] = useState<'send' | 'discard' | null>(null);
+  const inFlightRef = useRef(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -31,12 +32,13 @@ export default function ScheduledSmsActions({
   const remaining = formatScheduleRemaining(scheduledAt, nowMs);
 
   const refreshThread = () => {
-    events.emit('refreshConversation');
     events.emit('refreshCalls');
+    events.emit('refreshConversation');
   };
 
   const handleSendNow = async () => {
-    if (busy) return;
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setBusy('send');
     try {
       await sendScheduledSmsNow(smsId);
@@ -49,12 +51,14 @@ export default function ScheduledSmsActions({
         variant: 'destructive',
       });
     } finally {
+      inFlightRef.current = false;
       setBusy(null);
     }
   };
 
   const handleDiscard = async () => {
-    if (busy) return;
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setBusy('discard');
     try {
       await discardScheduledSms(smsId);
@@ -67,6 +71,7 @@ export default function ScheduledSmsActions({
         variant: 'destructive',
       });
     } finally {
+      inFlightRef.current = false;
       setBusy(null);
     }
   };

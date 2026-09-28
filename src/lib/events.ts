@@ -21,7 +21,13 @@ class EventEmitter {
 
   emit(event: string, ...args: any[]): void {
     if (!this.events[event]) return;
-    this.events[event].forEach(listener => listener(...args));
+    this.events[event].forEach((listener) => {
+      try {
+        listener(...args);
+      } catch (error) {
+        console.warn(`Event listener for "${event}" failed`, error);
+      }
+    });
   }
 
   /** Coalesce rapid emits (e.g. WebSocket bursts) into a single listener invocation. */

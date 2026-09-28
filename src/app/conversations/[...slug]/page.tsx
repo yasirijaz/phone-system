@@ -251,8 +251,8 @@ export default function ConversationDetailPage() {
     }, [user, from, to, toast, handleDepartmentChange, searchParams]);
 
     useEffect(() => {
-        const handler = (payload: { from: string; to: string }) => {
-            if (isSameConversationThread(from, to, payload.from, payload.to)) {
+        const handler = (payload?: { from?: string; to?: string }) => {
+            if (!payload?.from || !payload?.to || isSameConversationThread(from, to, payload.from, payload.to)) {
                 void refreshThread({ bypassCache: true });
             }
         };
