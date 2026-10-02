@@ -11,7 +11,7 @@ import { Badge } from './ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { addParticipant } from '@/services/twilioService';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { markCommunicationField, markRead, setActivityReadState, updateActivityFollowUp } from '@/services/callLogService';
+import { markCommunicationField, markRead, markThreadAsRead, setActivityReadState, updateActivityFollowUp } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
 import { cn, formatPhoneNumber, getContactAvatarColorClass } from '@/lib/utils';
@@ -126,12 +126,13 @@ function CommunicationCard({
         return;
     }
 
+    const itemType = comm.type || comm.latest_type;
     const observer = new IntersectionObserver(
         ([entry]) => {
             if (entry.isIntersecting) {
-                if (comm.id && comm.type) {
+                if (comm.id && itemType) {
                   setIsRead(true);
-                  markRead(String(comm.id), comm.type)
+                  markRead(String(comm.id), itemType)
                     .then(() => {
                       try { events.emitDebounced('refreshDepartmentsUnread', 2500); } catch(_) {}
                     })
@@ -148,14 +149,16 @@ function CommunicationCard({
     return () => {
         observer.disconnect();
     };
-  }, [comm.id, comm.type, isRead, isClickable]);
+  }, [comm.id, comm.type, comm.latest_type, isRead, isClickable]);
 
   const handleToggleStar = async () => {
     if (!comm?.id) return;
+    const itemType = comm.type || comm.latest_type;
+    if (!itemType) return;
     const next = !comm.is_starred;
     setIsTogglingStar(true);
     try {
-      await markCommunicationField(comm.id, comm.type, 'is_starred', next);
+      await markCommunicationField(comm.id, itemType, 'is_starred', next);
       toast({ title: 'Success', description: `Communication ${next ? 'starred' : 'unstarred'}.` });
       events.emit('refreshCalls');
     } catch (e) {
@@ -673,7 +676,13 @@ function CommunicationCard({
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => {
                           const itemType = isSms ? 'sms' : 'call';
-                          void setActivityReadState(comm.id, itemType, Number(comm.is_read) !== 0 ? false : true).then(() => {
+                          const currentlyRead = Number(comm.is_read) !== 0;
+                          const threadFrom = comm.direction === 'inbound' ? comm.to : comm.from;
+                          const threadTo = comm.direction === 'inbound' ? comm.from : comm.to;
+                          const request = currentlyRead
+                            ? setActivityReadState(comm.id, itemType, false)
+                            : markThreadAsRead(threadFrom, threadTo, comm.department_id);
+                          void request.then(() => {
                             events.emit('refreshCalls');
                             events.emit('refreshDepartmentsUnread');
                           });
@@ -724,7 +733,7 @@ function CommunicationCard({
                 )}
                 <div className={cn("flex min-w-0 max-w-full items-start gap-2", isMine ? 'flex-row-reverse' : 'flex-row')}>
                     {wrapSelectableBubble(
-                      comm.type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)
+                      comm.type === 'sms' || comm.latest_type === 'sms' ? renderMessageBubble(comm) : renderCallBubble(comm)
                     )}
                     <Button
                         variant="ghost"

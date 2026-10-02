@@ -11,14 +11,12 @@ import {
   ChevronDown,
   Ear,
   Filter,
-  Flame,
   Loader2,
   Mic,
   Phone,
   Search,
   Smile,
   Sparkles,
-  Star,
   TrendingUp,
 } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -31,7 +29,6 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Collapsible,
@@ -43,7 +40,12 @@ import { useToast } from "@/hooks/use-toast";
 import { canAccessLiveIntel } from "@/lib/roles";
 import { events } from "@/lib/events";
 import { formatPhoneNumber, cn } from "@/lib/utils";
+import { primaryStarsValue } from "@/lib/analysis-profiles";
 import { addParticipant } from "@/services/twilioService";
+import {
+  AnalysisWidgetFields,
+  IntentTag,
+} from "@/components/analysis-widget-fields";
 import {
   getLiveCalls,
   leaveLiveDashboardWatching,
@@ -109,59 +111,6 @@ function DirectionBadge({ direction }: { direction?: string | null }) {
     >
       {isOutbound ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownLeft className="h-3 w-3" />}
       {isOutbound ? "Outbound" : "Inbound"}
-    </span>
-  );
-}
-
-function StarRating({ value }: { value: number }) {
-  const filled = Math.max(0, Math.min(5, Math.round(value)));
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star
-          key={i}
-          className={cn(
-            "h-3.5 w-3.5",
-            i < filled ? "fill-amber-400 text-amber-400" : "text-slate-300"
-          )}
-        />
-      ))}
-    </div>
-  );
-}
-
-function IntentTag({ analysis }: { analysis?: LiveCallAnalysis | null }) {
-  const intent = analysis?.buying_intent ?? 0;
-  const risk = analysis?.risk_level;
-  const sentiment = analysis?.sentiment;
-
-  if (risk === "high" || sentiment === "negative") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
-        <Flame className="h-3 w-3" />
-        At Risk
-      </span>
-    );
-  }
-  if (intent >= 4) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-600">
-        <Flame className="h-3 w-3" />
-        High Intent
-      </span>
-    );
-  }
-  if (risk === "low" && sentiment === "positive") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
-        <Check className="h-3 w-3" />
-        Low Risk
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-      Neutral
     </span>
   );
 }
@@ -687,7 +636,7 @@ export default function LiveCallsPage() {
                                             "w-[2px] rounded-full",
                                             call.live_analysis?.risk_level === "high"
                                               ? "bg-red-400"
-                                              : (call.live_analysis?.buying_intent ?? 0) >= 4
+                                              : primaryStarsValue(call.live_analysis) >= 4
                                                 ? "bg-orange-400"
                                                 : "bg-emerald-400"
                                           )}
@@ -862,54 +811,13 @@ export default function LiveCallsPage() {
                               {analysis.sentiment || "—"}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-slate-500">Buying Intent</span>
-                            <StarRating value={analysis.buying_intent ?? 0} />
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-slate-500">Current Stage</span>
-                            <span className="font-medium text-slate-800">{analysis.stage || "—"}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-slate-500">Detected Objection</span>
-                            <span
-                              className={cn(
-                                "rounded-full px-2 py-0.5 text-xs font-semibold",
-                                analysis.objection && analysis.objection !== "none"
-                                  ? "bg-red-50 text-red-600"
-                                  : "bg-slate-100 text-slate-600"
-                              )}
-                            >
-                              {analysis.objection && analysis.objection !== "none"
-                                ? analysis.objection
-                                : "None"}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-slate-500">Risk Level</span>
-                            <span
-                              className={cn(
-                                "rounded-full px-2 py-0.5 text-xs font-semibold capitalize",
-                                analysis.risk_level === "high" && "bg-red-50 text-red-600",
-                                analysis.risk_level === "medium" && "bg-orange-50 text-orange-600",
-                                analysis.risk_level === "low" && "bg-emerald-50 text-emerald-600"
-                              )}
-                            >
-                              {analysis.risk_level || "—"}
-                            </span>
-                          </div>
-                          <div className="pt-1">
-                            <div className="mb-1.5 flex items-center justify-between">
-                              <span className="text-slate-500">Probability of Booking</span>
-                              <span className="font-semibold text-violet-700">
-                                {analysis.booking_probability ?? 0}%
-                              </span>
+                          <AnalysisWidgetFields analysis={analysis} />
+                          {analysis.insight_alert && (
+                            <div className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-amber-800">
+                              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                              <p className="text-xs font-medium">{analysis.insight_alert}</p>
                             </div>
-                            <Progress
-                              value={analysis.booking_probability ?? 0}
-                              className="h-2 bg-violet-100"
-                            />
-                          </div>
+                          )}
                         </div>
                       )}
                     </div>

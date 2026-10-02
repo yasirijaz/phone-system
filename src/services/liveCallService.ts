@@ -21,7 +21,15 @@ export type LiveMoment = {
   at?: string;
 };
 
+export type AnalysisWidgetField = {
+  key: string;
+  label: string;
+  type: 'stars' | 'percent' | 'badge' | 'text' | string;
+  value: string | number;
+};
+
 export type LiveCallAnalysis = {
+  profile?: string;
   agenda?: string;
   purpose?: string;
   topic?: string;
@@ -43,6 +51,7 @@ export type LiveCallAnalysis = {
   };
   suggested_scripts?: string[];
   journey?: LiveJourneyStep[];
+  widget_fields?: AnalysisWidgetField[];
   updated_at?: string;
   is_final?: boolean;
 };
