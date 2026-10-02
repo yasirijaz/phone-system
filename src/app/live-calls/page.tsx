@@ -785,7 +785,16 @@ export default function LiveCallsPage() {
                   {/* AI Analysis */}
                   <div className="space-y-3">
                     <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-                      <h3 className="mb-3 text-sm font-semibold text-slate-900">AI Analysis (Live)</h3>
+                      <div className="mb-3 flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold text-slate-900">AI Analysis (Live)</h3>
+                          {selected?.department?.name ? (
+                            <p className="mt-0.5 truncate text-xs font-medium text-violet-700">
+                              {selected.department.name}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
                       {!analysis ? (
                         <p className="text-sm text-slate-400">
                           Analysis appears as the transcript builds.

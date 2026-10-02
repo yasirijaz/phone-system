@@ -607,9 +607,16 @@ export default function CallAnalysisPage() {
               {/* Analysis panels */}
               <div className="space-y-3">
                 <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-slate-900">AI Analysis</h3>
-                    {analyzing && <Loader2 className="h-4 w-4 animate-spin text-violet-500" />}
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-slate-900">AI Analysis</h3>
+                      {detail?.department?.name ? (
+                        <p className="mt-0.5 truncate text-xs font-medium text-violet-700">
+                          {detail.department.name}
+                        </p>
+                      ) : null}
+                    </div>
+                    {analyzing && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-500" />}
                   </div>
                   {!analysis && !analyzing ? (
                     <p className="text-sm text-slate-400">
