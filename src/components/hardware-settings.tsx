@@ -36,6 +36,7 @@ export default function HardwareSettings() {
     const chunksRef = useRef<Blob[]>([]);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const speakerTestAudioRef = useRef<HTMLAudioElement | null>(null);
+    const [isTestingSpeaker, setIsTestingSpeaker] = useState(false);
     const [speakerTestError, setSpeakerTestError] = useState('');
 
     const STORAGE_KEYS = {
@@ -169,8 +170,7 @@ export default function HardwareSettings() {
             void getDevices(true);
         } else {
             stopMicTest();
-            speakerTestAudioRef.current?.pause();
-            speakerTestAudioRef.current = null;
+            stopSpeakerTest();
             setSpeakerTestError('');
         }
     }, [isOpen]);
@@ -197,6 +197,7 @@ export default function HardwareSettings() {
     useEffect(() => {
         return () => {
             stopMicTest();
+            stopSpeakerTest();
         };
     }, []);
 
@@ -276,13 +277,31 @@ export default function HardwareSettings() {
     };
 
     // 🔹 Speaker Test
+    const stopSpeakerTest = () => {
+        const audio = speakerTestAudioRef.current;
+        if (audio) {
+            audio.onended = null;
+            audio.pause();
+            audio.currentTime = 0;
+            speakerTestAudioRef.current = null;
+        }
+        setIsTestingSpeaker(false);
+    };
+
     const testSpeaker = async () => {
         setSpeakerTestError('');
-        speakerTestAudioRef.current?.pause();
+        stopSpeakerTest();
 
         const testAudio = new Audio('/sounds/reservation.mp3');
         testAudio.volume = 1;
         speakerTestAudioRef.current = testAudio;
+        setIsTestingSpeaker(true);
+        testAudio.onended = () => {
+            if (speakerTestAudioRef.current === testAudio) {
+                speakerTestAudioRef.current = null;
+            }
+            setIsTestingSpeaker(false);
+        };
 
         const speakerIsAvailable = audioOutputDevices.some(
             (device) => device.deviceId === selectedSpeaker
@@ -296,12 +315,25 @@ export default function HardwareSettings() {
             }
         }
 
+        if (speakerTestAudioRef.current !== testAudio) return;
+
         try {
             await testAudio.play();
+            if (speakerTestAudioRef.current !== testAudio) {
+                testAudio.pause();
+                testAudio.currentTime = 0;
+            }
         } catch (err) {
+            if (speakerTestAudioRef.current !== testAudio) return;
             console.error('Error testing speaker:', err);
             setSpeakerTestError('Could not play the speaker test.');
+            stopSpeakerTest();
         }
+    };
+
+    const toggleSpeakerTest = () => {
+        if (isTestingSpeaker) stopSpeakerTest();
+        else void testSpeaker();
     };
     
     // 🔹 Skype-like Loopback Test
@@ -432,8 +464,8 @@ export default function HardwareSettings() {
                             <Label htmlFor="speaker-select" className="flex items-center gap-2">
                                 <Volume2 className="h-4 w-4"/>Speaker / Headset
                             </Label>
-                             <Button variant="link" size="sm" className="p-0 h-auto" onClick={testSpeaker}>
-                                Test
+                             <Button variant="link" size="sm" className="p-0 h-auto" onClick={toggleSpeakerTest}>
+                                {isTestingSpeaker ? 'Stop' : 'Test'}
                             </Button>
                         </div>
                         <Select value={selectedSpeaker} onValueChange={handleSpeakerChange}>

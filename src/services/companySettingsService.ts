@@ -37,8 +37,10 @@ export const createOrUpdateCompanySettings = async (id: number | undefined, sett
     }
 };
 
-export const getIntegrations = async (): Promise<Integration[]> => {
-    const response = await axios.get('/api/integrations');
+export const getIntegrations = async (companyId?: number): Promise<Integration[]> => {
+    const response = await axios.get('/api/integrations', {
+        params: companyId ? { company_id: companyId } : undefined,
+    });
     return response.data.data;
 };
 

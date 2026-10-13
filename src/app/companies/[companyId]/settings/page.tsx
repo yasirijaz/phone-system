@@ -8,8 +8,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import type { CompanySettings, MediaFile, Integration } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { getCompanySettings, createOrUpdateCompanySettings, updateCompanyIntegration, getCompanyIntegration, deleteCompanyIntegration } from "@/services/companySettingsService";
-import { getIntegrations } from "@/services/integrationService";
+import { getCompanySettings, createOrUpdateCompanySettings } from "@/services/companySettingsService";
+import { getIntegrations, createIntegration, updateIntegration } from "@/services/integrationService";
 import { uploadMedia } from "@/services/mediaService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -27,8 +27,10 @@ import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, PlusCircle, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import AppHeader from "@/components/app-header";
-import { canAccessCompanySettings } from "@/lib/roles";
+import { canAccessCompanySettings, isPlatformAdmin } from "@/lib/roles";
 import CallOutcomesSettings from "@/components/call-outcomes-settings";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const businessHoursSchema = z.object({
   day: z.string(),
@@ -40,12 +42,6 @@ const businessHoursSchema = z.object({
 const holidaySchema = z.object({
   name: z.string().min(1, "Holiday name is required"),
   date: z.string().min(1, "Date is required"),
-});
-
-const integrationSettingSchema = z.object({
-  integration_id: z.number(),
-  enabled: z.boolean(),
-  api_key: z.string().optional(),
 });
 
 const settingsSchema = z.object({
@@ -75,7 +71,6 @@ const settingsSchema = z.object({
     client_id: z.string().optional(),
     client_secret: z.string().optional(),
   }).optional(),
-  integrations: z.array(integrationSettingSchema).optional(),
 });
 
 export default function CompanySettingsPage() {
@@ -86,7 +81,10 @@ export default function CompanySettingsPage() {
 
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [availableIntegrations, setAvailableIntegrations] = useState<Integration[]>([]);
-  const [existingCompanyIntegrations, setExistingCompanyIntegrations] = useState<Set<number>>(new Set());
+  const [integrationDialogOpen, setIntegrationDialogOpen] = useState(false);
+  const [integrationName, setIntegrationName] = useState("");
+  const [savingIntegration, setSavingIntegration] = useState(false);
+  const [togglingIntegrationId, setTogglingIntegrationId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -112,7 +110,6 @@ export default function CompanySettingsPage() {
       holiday_schedule: { holidays: [] },
       routing_preferences: { default_route: "voicemail", timeout: 30 },
       slack_settings: { bot_token: "", client_id: "", client_secret: "" },
-      integrations: [],
     },
   });
   
@@ -121,11 +118,6 @@ export default function CompanySettingsPage() {
     name: "holiday_schedule.holidays",
   });
 
-  const { fields: integrationFields, replace: replaceIntegrationFields } = useFieldArray({
-    control: form.control,
-    name: "integrations",
-  });
-  
   const { fields: businessHoursFields } = useFieldArray({
     control: form.control,
     name: "business_hours.days",
@@ -136,12 +128,12 @@ export default function CompanySettingsPage() {
   useEffect(() => {
     if (!user) return;
 
-    if (!canAccessCompanySettings(user.role_id)) {
+    if (!isPlatformAdmin(user.role_id) && !canAccessCompanySettings(user.role_id)) {
        router.replace('/app');
        return;
     }
 
-    if(user?.role_id === 2 && user?.company_id !== companyId) {
+    if(user?.role_id === 2 && Number(user?.company_id) !== companyId) {
         router.replace('/');
         return;
     }
@@ -153,73 +145,32 @@ export default function CompanySettingsPage() {
   }, [user, companyId, router]);
 
   useEffect(() => {
-    console.log('Form reset effect triggered. Settings:', !!settings, 'Available integrations:', availableIntegrations.length, 'Existing integrations:', existingCompanyIntegrations.size);
-    
-    if (availableIntegrations.length > 0) {
-      if (settings) {
-        // Has settings and integrations - merge them
-        const integrationSettings = availableIntegrations.map(availInt => {
-          const savedInt = settings.integrations?.find(si => si.integration_id === availInt.id);
-          const isExistingIntegration = existingCompanyIntegrations.has(availInt.id);
-          return {
-            integration_id: availInt.id,
-            enabled: savedInt ? savedInt.enabled : isExistingIntegration,
-            api_key: savedInt?.api_key || "",
-          };
-        });
-        
-        console.log('Setting integration settings with saved data:', integrationSettings);
-        
-        form.reset({
-          call_settings: settings.call_settings || { record_calls: false, greeting_message: "", hold_music_url: "" },
-          voicemail_settings: settings.voicemail_settings || { enabled: true, greeting: "", send_transcription: false },
-          business_hours: settings.business_hours || {
-            is_24_7: false,
-            days: [
-              { day: "Monday", enabled: true, open: "09:00", close: "17:00" },
-              { day: "Tuesday", enabled: true, open: "09:00", close: "17:00" },
-              { day: "Wednesday", enabled: true, open: "09:00", close: "17:00" },
-              { day: "Thursday", enabled: true, open: "09:00", close: "17:00" },
-              { day: "Friday", enabled: true, open: "09:00", close: "17:00" },
-              { day: "Saturday", enabled: false, open: "09:00", close: "17:00" },
-              { day: "Sunday", enabled: false, open: "09:00", close: "17:00" },
-            ],
-          },
-          holiday_schedule: settings.holiday_schedule || { holidays: [] },
-          routing_preferences: settings.routing_preferences || { default_route: "voicemail", timeout: 30 },
-          slack_settings: {
-            bot_token: "",
-            client_id: settings.slack_settings?.client_id || "",
-            client_secret: "",
-          },
-          integrations: integrationSettings,
-        });
-      } else {
-        // No settings but have integrations - create default integration settings based on existing company integrations
-        const integrationSettings = availableIntegrations.map(availInt => ({
-          integration_id: availInt.id,
-          enabled: existingCompanyIntegrations.has(availInt.id),
-          api_key: "",
-        }));
-        
-        console.log('Setting default integration settings based on existing integrations:', integrationSettings);
-        
-        form.setValue('integrations', integrationSettings);
-      }
-    } else if (settings) {
-      // Has settings but no integrations - reset with empty integrations
-      console.log('Settings available but no integrations, resetting with empty integrations');
-      form.reset({
-        ...settings,
-        slack_settings: {
-          bot_token: "",
-          client_id: settings.slack_settings?.client_id || "",
-          client_secret: "",
-        },
-        integrations: [],
-      });
-    }
-  }, [settings, availableIntegrations, existingCompanyIntegrations, form]);
+    if (!settings) return;
+
+    form.reset({
+      call_settings: settings.call_settings || { record_calls: false, greeting_message: "", hold_music_url: "" },
+      voicemail_settings: settings.voicemail_settings || { enabled: true, greeting: "", send_transcription: false },
+      business_hours: settings.business_hours || {
+        is_24_7: false,
+        days: [
+          { day: "Monday", enabled: true, open: "09:00", close: "17:00" },
+          { day: "Tuesday", enabled: true, open: "09:00", close: "17:00" },
+          { day: "Wednesday", enabled: true, open: "09:00", close: "17:00" },
+          { day: "Thursday", enabled: true, open: "09:00", close: "17:00" },
+          { day: "Friday", enabled: true, open: "09:00", close: "17:00" },
+          { day: "Saturday", enabled: false, open: "09:00", close: "17:00" },
+          { day: "Sunday", enabled: false, open: "09:00", close: "17:00" },
+        ],
+      },
+      holiday_schedule: settings.holiday_schedule || { holidays: [] },
+      routing_preferences: settings.routing_preferences || { default_route: "voicemail", timeout: 30 },
+      slack_settings: {
+        bot_token: "",
+        client_id: settings.slack_settings?.client_id || "",
+        client_secret: "",
+      },
+    });
+  }, [settings, form]);
 
   const fetchSettings = async () => {
     try {
@@ -236,63 +187,72 @@ export default function CompanySettingsPage() {
 
   const fetchIntegrations = async () => {
       try {
-          console.log('Fetching integrations...');
-          const data = await getIntegrations();
-          console.log('Integrations data received:', data);
-          console.log('Data type:', typeof data);
-          console.log('Is array:', Array.isArray(data));
-          
-          let integrations: Integration[] = [];
-          
-          if (Array.isArray(data)) {
-              integrations = data;
-              console.log('Set integrations:', data.length, 'items');
-          } else {
-              console.log('No valid integrations data found, using fallback');
-              // Fallback integrations for testing
-              integrations = [
-                { id: 1, integration_name: 'CRM Integration' },
-                { id: 2, integration_name: 'Email Marketing' },
-                { id: 3, integration_name: 'Slack Notification' },
-                { id: 4, integration_name: 'Zapier Webhook' }
-              ];
-          }
-          
-          setAvailableIntegrations(integrations);
-          
-          // Check which integrations are already enabled for this company
-          const existingIntegrations = new Set<number>();
-          const checkPromises = integrations.map(async (integration) => {
-            try {
-              const companyIntegration = await getCompanyIntegration(companyId, integration.id);
-              console.log(`Company integration ${integration.id}:`, companyIntegration);
-              if (companyIntegration && companyIntegration.data) {
-                existingIntegrations.add(integration.id);
-              }
-            } catch (error) {
-              console.log(`No existing integration found for ${integration.id}:`, error);
-              // This is expected for integrations that aren't enabled
-            }
-          });
-          
-          await Promise.all(checkPromises);
-          console.log('Existing company integrations:', existingIntegrations);
-          setExistingCompanyIntegrations(existingIntegrations);
-          
+          const data = await getIntegrations(companyId);
+          setAvailableIntegrations(Array.isArray(data) ? data : []);
       } catch (error) {
           console.error('Error fetching integrations:', error);
-          // Use fallback integrations when API fails
-          const fallbackIntegrations = [
-            { id: 1, integration_name: 'CRM Integration' },
-            { id: 2, integration_name: 'Email Marketing' },
-            { id: 3, integration_name: 'Slack Notification' },
-            { id: 4, integration_name: 'Zapier Webhook' }
-          ];
-          setAvailableIntegrations(fallbackIntegrations);
-          setExistingCompanyIntegrations(new Set());
-          toast({ title: "Warning", description: "Using fallback integrations. API connection failed.", variant: "destructive" });
+          setAvailableIntegrations([]);
+          toast({ title: "Error", description: "Could not load this company's integrations.", variant: "destructive" });
       }
   }
+
+  const openIntegrationDialog = () => {
+    setIntegrationName("");
+    setIntegrationDialogOpen(true);
+  };
+
+  const saveIntegration = async () => {
+    const name = integrationName.trim();
+    if (name.length < 2) {
+      toast({ title: "Name required", description: "Integration name must be at least 2 characters.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setSavingIntegration(true);
+      const created = await createIntegration({ integration_name: name, company_id: companyId });
+      toast({
+        title: "Integration added",
+        description: created.api_key
+          ? `This key is shown once: ${created.api_key}`
+          : "Integration added for this company.",
+      });
+      setIntegrationDialogOpen(false);
+      await fetchIntegrations();
+    } catch (error: any) {
+      const message = error.response?.data?.message
+        || error.response?.data?.errors?.integration_name?.[0]
+        || "Could not save this integration.";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setSavingIntegration(false);
+    }
+  };
+
+  const setIntegrationEnabled = async (integration: Integration, enabled: boolean) => {
+    try {
+      setTogglingIntegrationId(integration.id);
+      setAvailableIntegrations((current) =>
+        current.map((row) => (row.id === integration.id ? { ...row, enabled } : row))
+      );
+      await updateIntegration(integration.id, {
+        company_id: companyId,
+        integration_name: integration.integration_name,
+        enabled,
+      });
+    } catch (error: any) {
+      setAvailableIntegrations((current) =>
+        current.map((row) => (row.id === integration.id ? { ...row, enabled: !enabled } : row))
+      );
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Could not update this integration.",
+        variant: "destructive",
+      });
+    } finally {
+      setTogglingIntegrationId(null);
+    }
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -316,39 +276,6 @@ export default function CompanySettingsPage() {
       }
     }
   };
-
-  const handleIntegrationToggle = async (integrationId: number, enabled: boolean, apiKey?: string) => {
-    try {
-        if (enabled) {
-            // Enable integration - create/update
-            await updateCompanyIntegration(companyId, integrationId);
-            toast({
-                title: "Success",
-                description: `Integration enabled successfully.`
-            });
-        } else {
-            // Disable integration - delete
-            await deleteCompanyIntegration(companyId, integrationId);
-            toast({
-                title: "Success",
-                description: `Integration disabled successfully.`
-            });
-        }
-    } catch(error) {
-        console.error('Integration toggle error:', error);
-        toast({
-            title: "Error",
-            description: `Failed to ${enabled ? 'enable' : 'disable'} integration.`,
-            variant: "destructive"
-        });
-        // Revert the switch state on error
-        const currentIntegrations = form.getValues('integrations') || [];
-        const updatedIntegrations = currentIntegrations.map(int => 
-            int.integration_id === integrationId ? { ...int, enabled: !enabled } : int
-        );
-        form.setValue('integrations', updatedIntegrations);
-    }
-  }
 
   const onSubmit = async (values: z.infer<typeof settingsSchema>) => {
     try {
@@ -804,55 +731,80 @@ export default function CompanySettingsPage() {
 
                     <TabsContent value="integrations">
                         <Card>
-                            <CardHeader>
-                                <CardTitle>Integrations</CardTitle>
-                                <CardDescription>Connect with third-party applications.</CardDescription>
+                            <CardHeader className="flex flex-row items-start justify-between gap-4">
+                                <div>
+                                    <CardTitle>Integrations</CardTitle>
+                                    <CardDescription>These integrations belong only to this company. Another company does not see or share them.</CardDescription>
+                                </div>
+                                <Button type="button" onClick={() => openIntegrationDialog()}>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add integration
+                                </Button>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                               
-                                {integrationFields.map((field, index) => {
-                                  const integrationInfo = availableIntegrations.find(i => i.id === field.integration_id);
-                                  console.log(`Field ${index}:`, field, 'Integration info:', integrationInfo);
-                                  if (!integrationInfo) {
-                                    console.log(`No integration info found for field ${index} with integration_id ${field.integration_id}`);
-                                    return null;
-                                  }
-                                  
-                                  const isEnabled = form.watch(`integrations.${index}.enabled`);
-                                  
-                                  return (
-                                    <div key={field.id} className="space-y-4 rounded-lg border p-4">
-                                      <FormField
-                                        control={form.control}
-                                        name={`integrations.${index}.enabled`}
-                                        render={({ field: switchField }) => (
-                                          <FormItem className="flex flex-row items-center justify-between">
-                                              <div className="space-y-0.5">
-                                                  <FormLabel className="text-base">{integrationInfo.integration_name}</FormLabel>
-                                              </div>
-                                              <FormControl>
-                                                  <Switch
-                                                      checked={switchField.value}
-                                                      onCheckedChange={(checked) => {
-                                                          switchField.onChange(checked);
-                                                          handleIntegrationToggle(integrationInfo.id, checked);
-                                                      }}
-                                                  />
-                                              </FormControl>
-                                              {isEnabled && (
-                                                field.api_key
-                                              )}
-                                          </FormItem>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Name</TableHead>
+                                            <TableHead className="text-right">Enabled</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {availableIntegrations.map((integration) => {
+                                            const enabled = integration.enabled !== false;
+                                            return (
+                                            <TableRow key={integration.id}>
+                                                <TableCell className="font-medium">{integration.integration_name}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <button
+                                                        type="button"
+                                                        role="switch"
+                                                        aria-checked={enabled}
+                                                        aria-label={enabled ? `Disable ${integration.integration_name}` : `Enable ${integration.integration_name}`}
+                                                        disabled={togglingIntegrationId === integration.id}
+                                                        onClick={() => setIntegrationEnabled(integration, !enabled)}
+                                                        className={`relative inline-flex h-7 w-14 shrink-0 rounded-full transition-colors disabled:opacity-50 ${enabled ? "bg-green-500" : "bg-red-500"}`}
+                                                    >
+                                                        <span
+                                                            className={`pointer-events-none absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-7" : "translate-x-0"}`}
+                                                        />
+                                                    </button>
+                                                </TableCell>
+                                            </TableRow>
+                                            );
+                                        })}
+                                        {availableIntegrations.length === 0 && (
+                                            <TableRow>
+                                                <TableCell colSpan={2} className="h-24 text-center text-muted-foreground">
+                                                    No integrations for this company yet.
+                                                </TableCell>
+                                            </TableRow>
                                         )}
-                                      />
-                                      
-                                    </div>
-                                  )
-                                })}
-                                {availableIntegrations.length === 0 && <p className="text-muted-foreground">No integrations available.</p>}
-                                {availableIntegrations.length > 0 && integrationFields.length === 0 && <p className="text-muted-foreground">Loading integrations...</p>}
+                                    </TableBody>
+                                </Table>
                             </CardContent>
                         </Card>
+                        <Dialog open={integrationDialogOpen} onOpenChange={setIntegrationDialogOpen}>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Add integration</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium" htmlFor="company-integration-name">Name</label>
+                                    <Input
+                                        id="company-integration-name"
+                                        value={integrationName}
+                                        onChange={(event) => setIntegrationName(event.target.value)}
+                                        placeholder="e.g. Slack"
+                                    />
+                                </div>
+                                <DialogFooter>
+                                    <Button type="button" variant="secondary" onClick={() => setIntegrationDialogOpen(false)}>Cancel</Button>
+                                    <Button type="button" onClick={saveIntegration} disabled={savingIntegration}>
+                                        {savingIntegration ? "Saving..." : "Save"}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </TabsContent>
 
                     <TabsContent value="call-outcomes">

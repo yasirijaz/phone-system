@@ -2,8 +2,10 @@
 import axios from '@/lib/axios';
 import type { Integration } from '@/types';
 
-export const getIntegrations = async (): Promise<Integration[]> => {
-  const response = await axios.get('/api/integrations');
+export const getIntegrations = async (companyId?: number): Promise<Integration[]> => {
+  const response = await axios.get('/api/integrations', {
+    params: companyId ? { company_id: companyId } : undefined,
+  });
   return response.data.data;
 };
 

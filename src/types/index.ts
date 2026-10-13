@@ -177,6 +177,13 @@ export interface Holiday {
 export interface Integration {
     id: number;
     integration_name: string;
+    enabled?: boolean;
+    company_id?: number;
+    api_key?: string;
+    company?: {
+        id: number;
+        name: string;
+    };
 }
 
 export interface CompanySettings {

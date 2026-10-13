@@ -2,6 +2,11 @@
 import axios from '@/lib/axios';
 import type { Company, PaginatedResponse } from '@/types';
 
+export const getAllCompanies = async (): Promise<Company[]> => {
+  const response = await axios.get('/api/companies?all=1');
+  return response.data.companies;
+};
+
 export const getCompanies = async (page: number = 1): Promise<PaginatedResponse<Company>> => {
   const response = await axios.get(`/api/companies?page=${page}`);
   return response.data.companies;

@@ -5,9 +5,10 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import type { Integration } from "@/types";
+import type { Company, Integration } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { getIntegrations, createIntegration, updateIntegration, deleteIntegration } from "@/services/integrationService";
+import { getAllCompanies } from "@/services/companyService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle, Edit, Trash2, Plug } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
@@ -24,13 +26,15 @@ import { useRouter } from 'next/navigation';
 import AppHeader from "@/components/app-header";
 
 const integrationSchema = z.object({
-  integration_name: z.string().min(2, "Integration name is required.")
+  integration_name: z.string().min(2, "Integration name is required."),
+  company_id: z.coerce.number().int().positive("Choose a company."),
 });
 
 export default function IntegrationsPage() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
@@ -38,7 +42,7 @@ export default function IntegrationsPage() {
 
   const form = useForm<z.infer<typeof integrationSchema>>({
     resolver: zodResolver(integrationSchema),
-    defaultValues: { integration_name: ""},
+    defaultValues: { integration_name: "", company_id: 0 },
   });
 
   useEffect(() => {
@@ -47,6 +51,9 @@ export default function IntegrationsPage() {
       return;
     }
     fetchIntegrations();
+    getAllCompanies()
+      .then((rows) => setCompanies(Array.isArray(rows) ? rows : []))
+      .catch(() => setCompanies([]));
   }, [user, router]);
 
   const fetchIntegrations = async () => {
@@ -68,9 +75,12 @@ export default function IntegrationsPage() {
   const handleDialogOpen = (integration: Integration | null = null) => {
     setEditingIntegration(integration);
     if (integration) {
-      form.reset({ integration_name: integration.integration_name });
+      form.reset({
+        integration_name: integration.integration_name,
+        company_id: integration.company_id ?? 0,
+      });
     } else {
-      form.reset({ integration_name: "" });
+      form.reset({ integration_name: "", company_id: 0 });
     }
     setIsDialogOpen(true);
   };
@@ -84,7 +94,8 @@ export default function IntegrationsPage() {
   const onSubmit = async (values: z.infer<typeof integrationSchema>) => {
     try {
       const payload = {
-        integration_name: values.integration_name
+        integration_name: values.integration_name,
+        company_id: values.company_id,
       };
       if (editingIntegration) {
         await updateIntegration(editingIntegration.id, payload);
@@ -153,6 +164,34 @@ export default function IntegrationsPage() {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name="company_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Company</FormLabel>
+                          <Select
+                            disabled={!!editingIntegration}
+                            value={field.value ? String(field.value) : undefined}
+                            onValueChange={(value) => field.onChange(Number(value))}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choose a company" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {companies.map((company) => (
+                                <SelectItem key={company.id} value={String(company.id)}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     
                     <DialogFooter>
                       <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
@@ -168,7 +207,7 @@ export default function IntegrationsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Available Integrations</CardTitle>
-                <CardDescription>A list of all third-party integrations.</CardDescription>
+                <CardDescription>Each integration belongs to one company and is not shared with the others.</CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? <p>Loading...</p> : (
@@ -176,6 +215,7 @@ export default function IntegrationsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
+                        <TableHead>Company</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -183,6 +223,7 @@ export default function IntegrationsPage() {
                       {integrations.map((integration) => (
                         <TableRow key={integration.id}>
                           <TableCell className="font-medium">{integration.integration_name}</TableCell>
+                          <TableCell>{integration.company?.name ?? "—"}</TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="icon" onClick={() => handleDialogOpen(integration)}><Edit className="h-4 w-4" /></Button>
                             <AlertDialog>
