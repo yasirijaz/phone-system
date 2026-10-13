@@ -12,7 +12,7 @@ import {
   isCallThread,
   shouldShowCallAttendee,
 } from '@/lib/call-attendee';
-import { cacheGet, cacheSet, cacheDel, cacheInvalidatePrefix } from '@/lib/simpleCache';
+import { cacheGet, cacheSet, cacheInvalidatePrefix } from '@/lib/simpleCache';
 
 const THREAD_ATTENDEE_CACHE_TTL = 5 * 60_000;
 const THREAD_LOGS_CACHE_TTL = 2 * 60_000;
@@ -42,11 +42,19 @@ export const getCommunicationThreads = async (type: string, page: number = 1, li
     return response.data.data;
 };
 
+export function invalidateAllCommunicationThreadCaches(): void {
+  inFlightThreadRequests.clear();
+  cacheInvalidatePrefix('thread-logs:');
+}
+
 export function invalidateCommunicationThreadCache(from: string, to: string): void {
-  for (const key of [`thread-logs:${from}:${to}`, `thread-logs:${to}:${from}`]) {
-    cacheDel(key);
-    inFlightThreadRequests.delete(key);
+  for (const key of Array.from(inFlightThreadRequests.keys())) {
+    if (key.includes(`${from}:${to}`) || key.includes(`${to}:${from}`)) {
+      inFlightThreadRequests.delete(key);
+    }
   }
+  cacheInvalidatePrefix(`thread-logs:${from}:${to}`);
+  cacheInvalidatePrefix(`thread-logs:${to}:${from}`);
 }
 
 export const getCommunicationThread = async (

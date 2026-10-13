@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import type { Contact } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { getContactsPaginated, createContact, updateContact, deleteContact } from "@/services/contactService";
+import { getContactsPaginated, createContact, updateContact, deleteContact, findContactByPhone } from "@/services/contactService";
 import PaginationControls from "@/components/pagination-controls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -180,12 +180,19 @@ export default function ContactsPage() {
         phone_no: phoneWithCountryCode,
       };
 
+      const contactPayload = { ...payload, company_id: user.company_id };
       if (editingContact) {
-        await updateContact(editingContact.id, { ...payload, company_id: user.company_id });
+        await updateContact(editingContact.id, contactPayload);
         toast({ title: "Success", description: "Contact updated successfully." });
       } else {
-        await createContact({ ...payload, company_id: user.company_id });
-        toast({ title: "Success", description: "Contact created successfully." });
+        const existing = await findContactByPhone(user.company_id, phoneWithCountryCode);
+        if (existing) {
+          await updateContact(existing.id, contactPayload);
+          toast({ title: "Success", description: "Contact updated successfully." });
+        } else {
+          await createContact(contactPayload);
+          toast({ title: "Success", description: "Contact created successfully." });
+        }
       }
       refreshContacts();
       handleDialogClose();

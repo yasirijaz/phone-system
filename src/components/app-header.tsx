@@ -454,6 +454,32 @@ export default function AppHeader({
         };
     }, [applyOutboundContext, setControlledDialerOpen, setDialerOpen]);
 
+    useEffect(() => {
+        if (!user?.company_id || !user?.id) return;
+        const companyId = user.company_id;
+        const cacheKey = `header-init:${user.id}`;
+
+        const refreshContacts = (changedCompanyId?: number) => {
+            if (changedCompanyId && Number(changedCompanyId) !== companyId) return;
+            void getContacts(companyId).then((freshContacts) => {
+                const contactList = Array.isArray(freshContacts) ? freshContacts : [];
+                setContacts(contactList);
+                const cached = cacheGet<{
+                    departments: Department[];
+                    contacts: Contact[];
+                    phoneNumbers: PhoneNumber[];
+                    companyUsers: User[];
+                }>(cacheKey);
+                if (cached) {
+                    cacheSet(cacheKey, { ...cached, contacts: contactList }, 5 * 60_000);
+                }
+            });
+        };
+
+        events.on('contactsChanged', refreshContacts);
+        return () => events.off('contactsChanged', refreshContacts);
+    }, [user?.company_id, user?.id]);
+
     const filteredPhoneNumbers = selectedDepartmentId
         ? phoneNumbers.filter(
             (num) => num.department_id != null && String(num.department_id) === selectedDepartmentId

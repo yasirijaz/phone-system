@@ -35,6 +35,8 @@ export default function HardwareSettings() {
     const recorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const speakerTestAudioRef = useRef<HTMLAudioElement | null>(null);
+    const [speakerTestError, setSpeakerTestError] = useState('');
 
     const STORAGE_KEYS = {
         microphone: 'hardware_selected_microphone',
@@ -167,6 +169,9 @@ export default function HardwareSettings() {
             void getDevices(true);
         } else {
             stopMicTest();
+            speakerTestAudioRef.current?.pause();
+            speakerTestAudioRef.current = null;
+            setSpeakerTestError('');
         }
     }, [isOpen]);
 
@@ -272,14 +277,30 @@ export default function HardwareSettings() {
 
     // 🔹 Speaker Test
     const testSpeaker = async () => {
-        const testAudio = new Audio('/sounds/ringtone.mp3');
-        try {
-            if (selectedSpeaker && (testAudio as any).setSinkId) {
-                await (testAudio as any).setSinkId(selectedSpeaker);
+        setSpeakerTestError('');
+        speakerTestAudioRef.current?.pause();
+
+        const testAudio = new Audio('/sounds/reservation.mp3');
+        testAudio.volume = 1;
+        speakerTestAudioRef.current = testAudio;
+
+        const speakerIsAvailable = audioOutputDevices.some(
+            (device) => device.deviceId === selectedSpeaker
+        );
+        const setSinkId = (testAudio as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }).setSinkId;
+        if (selectedSpeaker && speakerIsAvailable && setSinkId) {
+            try {
+                await setSinkId.call(testAudio, selectedSpeaker);
+            } catch (err) {
+                console.warn('Could not route the speaker test to the selected device:', err);
             }
-            testAudio.play();
+        }
+
+        try {
+            await testAudio.play();
         } catch (err) {
-            console.error("Error testing speaker:", err);
+            console.error('Error testing speaker:', err);
+            setSpeakerTestError('Could not play the speaker test.');
         }
     };
     
@@ -430,6 +451,9 @@ export default function HardwareSettings() {
                                 ))}
                             </SelectContent>
                         </Select>
+                        {speakerTestError && (
+                            <p className="text-sm text-destructive">{speakerTestError}</p>
+                        )}
                     </div>
 
                     {/* Camera */}

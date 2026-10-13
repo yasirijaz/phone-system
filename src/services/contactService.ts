@@ -2,7 +2,9 @@
 import axios from '@/lib/axios';
 import type { Contact, PaginatedResponse } from '@/types';
 import { normalizePhoneDigits, phonesMatch } from '@/lib/utils';
-import { cacheDel, cacheGet, cacheSet } from '@/lib/simpleCache';
+import { cacheDel, cacheGet, cacheInvalidatePrefix, cacheSet } from '@/lib/simpleCache';
+import { events } from '@/lib/events';
+import { invalidateAllCommunicationThreadCaches } from '@/services/callLogService';
 
 export interface GetContactsParams {
   page?: number;
@@ -15,6 +17,9 @@ const headerInitCachePrefix = 'header-init:';
 
 export const invalidateContactsCache = (companyId: number) => {
   cacheDel(contactsCacheKey(companyId));
+  cacheInvalidatePrefix(headerInitCachePrefix);
+  invalidateAllCommunicationThreadCaches();
+  events.emit('contactsChanged', companyId);
 };
 
 export const getContactsPaginated = async (

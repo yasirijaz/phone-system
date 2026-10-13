@@ -442,7 +442,9 @@ export default function ConversationDetailPage() {
                                     <ContactProfile
                                       contact={contact}
                                       contacts={contacts}
-                                      onContactUpdate={refreshThread}
+                                      onContactUpdate={() => {
+                                        void refreshThread({ bypassCache: true });
+                                      }}
                                       onCollapse={() => setIsProfileSidebarOpen(false)}
                                     />
                                 </aside>

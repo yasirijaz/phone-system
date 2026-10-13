@@ -9,7 +9,7 @@ import { Phone, Delete } from "lucide-react";
 import type { Department, PhoneNumber, Contact } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
-import { formatPhoneNumber, getPhoneNumberOptionLabel, phonesMatch } from '@/lib/utils';
+import { formatPhoneNumber, getPhoneNumberOptionLabel, normalizePhoneDigits, phonesMatch } from '@/lib/utils';
 import { searchContacts } from '@/services/contactService';
 import { useAuth } from '@/context/AuthContext';
 
@@ -126,7 +126,13 @@ export default function Dialer({
                             merged.push(contact);
                         }
                     }
-                    setFilteredContacts(merged);
+                    const seenPhones = new Set<string>();
+                    setFilteredContacts(merged.filter((contact) => {
+                        const key = normalizePhoneDigits(contact.phone_no) || `id:${contact.id}`;
+                        if (seenPhones.has(key)) return false;
+                        seenPhones.add(key);
+                        return true;
+                    }));
                 })
                 .catch(() => {
                     if (!cancelled) setFilteredContacts(localMatches);

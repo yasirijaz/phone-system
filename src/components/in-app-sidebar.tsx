@@ -537,16 +537,22 @@ export function InAppSidebar() {
       void refreshInboxAndRecents();
     };
 
+    const handleContactsChanged = () => {
+      void refreshInboxAndRecents();
+    };
+
     events.on('refreshDepartmentsUnread', handleUnreadRefresh);
     events.on('refreshCalls', debouncedInboxRefresh);
     events.on('refreshOperators', handleDndStatusChange);
     events.on('threadReadFailed', handleThreadReadFailed);
+    events.on('contactsChanged', handleContactsChanged);
 
     return () => {
       events.off('refreshDepartmentsUnread', handleUnreadRefresh);
       events.off('refreshCalls', debouncedInboxRefresh);
       events.off('refreshOperators', handleDndStatusChange);
       events.off('threadReadFailed', handleThreadReadFailed);
+      events.off('contactsChanged', handleContactsChanged);
     };
   }, [user, fetchInitialSidebarData, refreshDepartmentUnreadBadges, refreshInboxAndRecents]);
 

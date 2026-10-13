@@ -170,17 +170,14 @@ export default function ContactProfile({ contact, contacts, onContactUpdate, onC
         };
 
         try {
-            if (isSavedContact) {
-                const contactId = await resolveContactId();
-                if (!contactId) {
-                    toast({
-                        title: 'Error',
-                        description: 'Could not find this contact to update. Try refreshing the page.',
-                        variant: 'destructive',
-                    });
-                    return;
+            const contactId = await resolveContactId();
+            if (contactId) {
+                try {
+                    await updateContact(contactId, payload);
+                } catch (error: any) {
+                    if (error?.response?.status !== 404) throw error;
+                    await createContact(payload);
                 }
-                await updateContact(contactId, payload);
                 toast({ title: 'Success', description: 'Contact updated.' });
             } else {
                 await createContact(payload);
