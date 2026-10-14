@@ -179,7 +179,9 @@ export interface Integration {
     integration_name: string;
     enabled?: boolean;
     company_id?: number;
+    api_url?: string | null;
     api_key?: string;
+    has_api_key?: boolean;
     company?: {
         id: number;
         name: string;

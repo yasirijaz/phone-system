@@ -22,6 +22,7 @@ import { allParticipant, removeParticipant, addParticipant, holdParticipant, ini
 import { getDepartmentSettings } from '@/services/departmentSettingsService';
 import { getCompanySettings } from '@/services/companySettingsService';
 import { getCallLogsBySid } from '@/services/callLogService';
+import WindshieldHubTimeline from '@/components/windshield-hub-timeline';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
@@ -129,6 +130,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [isConsultActionLoading, setIsConsultActionLoading] = useState(false);
   const [customerCallSid, setCustomerCallSid] = useState<string | null>(null);
+  const [windshieldCallLogId, setWindshieldCallLogId] = useState<number | null>(null);
   const [consultCallSid, setConsultCallSid] = useState<string | null>(null);
   const [activeExternalCallSid, setActiveExternalCallSid] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -284,6 +286,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     setCompanySettings(null);
     setResolvedDepartmentName(departmentName || null);
     setCustomerCallSid(null);
+    setWindshieldCallLogId(null);
     setConsultCallSid(null);
     setActiveExternalCallSid(null);
     setCurrentParticipants([]);
@@ -302,6 +305,9 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
         try {
           const currentCallSid = lookupCallSid;
           const matchingCall = await getCallLogsBySid(currentCallSid);
+          if (matchingCall?.id) {
+            setWindshieldCallLogId(Number(matchingCall.id));
+          }
           
           
 
@@ -1096,6 +1102,13 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     <>
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-[100]">
         <div className="bg-background rounded-2xl shadow-2xl overflow-hidden">
+            {authUser?.company_id && (windshieldCallLogId || contactNumber) ? (
+              <WindshieldHubTimeline
+                companyId={authUser.company_id}
+                phone={contactNumber}
+                callLogId={windshieldCallLogId}
+              />
+            ) : null}
             {pendingOutgoing ? (
               <div className="border-b bg-amber-50 px-4 py-2.5 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-50">
                 Waiting for <span className="font-medium">{pendingOutgoing.name}</span> to join.

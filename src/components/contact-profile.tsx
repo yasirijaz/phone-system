@@ -20,6 +20,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Label } from './ui/label';
 import { formatPhoneNumber, phonesMatch } from '@/lib/utils';
+import WindshieldHubTimeline from '@/components/windshield-hub-timeline';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 interface ContactProfileProps {
@@ -237,7 +238,15 @@ export default function ContactProfile({ contact, contacts, onContactUpdate, onC
                     <PanelRightOpen className="h-5 w-5" />
                 </Button>
             </header>
-            <div className="flex-1 p-4 space-y-6">
+            <div className="flex-1 overflow-y-auto">
+                {user?.company_id && contact.phone_no ? (
+                  <WindshieldHubTimeline
+                    companyId={user.company_id}
+                    phone={contact.phone_no}
+                    className="border-b-0"
+                  />
+                ) : null}
+            <div className="p-4 space-y-6">
                 <div className="flex items-center gap-4">
                     <Avatar className="h-12 w-12 text-xl">
                         <AvatarFallback>{contactInitial}</AvatarFallback>

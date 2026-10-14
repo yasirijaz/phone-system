@@ -83,8 +83,12 @@ export default function CompanySettingsPage() {
   const [availableIntegrations, setAvailableIntegrations] = useState<Integration[]>([]);
   const [integrationDialogOpen, setIntegrationDialogOpen] = useState(false);
   const [integrationName, setIntegrationName] = useState("");
+  const [integrationOrigin, setIntegrationOrigin] = useState("");
+  const [integrationApiKey, setIntegrationApiKey] = useState("");
   const [savingIntegration, setSavingIntegration] = useState(false);
   const [togglingIntegrationId, setTogglingIntegrationId] = useState<number | null>(null);
+  const [credentialDrafts, setCredentialDrafts] = useState<Record<number, { api_url: string; api_key: string }>>({});
+  const [savingCredentialId, setSavingCredentialId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -196,8 +200,13 @@ export default function CompanySettingsPage() {
       }
   }
 
+  const isWindshieldHubIntegration = (name?: string) =>
+    (name ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "") === "windshieldhub";
+
   const openIntegrationDialog = () => {
     setIntegrationName("");
+    setIntegrationOrigin("");
+    setIntegrationApiKey("");
     setIntegrationDialogOpen(true);
   };
 
@@ -208,15 +217,21 @@ export default function CompanySettingsPage() {
       return;
     }
 
+    const windshieldHub = isWindshieldHubIntegration(name);
+
     try {
       setSavingIntegration(true);
-      const created = await createIntegration({ integration_name: name, company_id: companyId });
-      toast({
-        title: "Integration added",
-        description: created.api_key
-          ? `This key is shown once: ${created.api_key}`
-          : "Integration added for this company.",
+      await createIntegration({
+        integration_name: name,
+        company_id: companyId,
+        ...(windshieldHub
+          ? {
+              api_url: integrationOrigin.trim(),
+              ...(integrationApiKey.trim() ? { api_key: integrationApiKey.trim() } : {}),
+            }
+          : {}),
       });
+      toast({ title: "Integration added", description: "Integration added for this company." });
       setIntegrationDialogOpen(false);
       await fetchIntegrations();
     } catch (error: any) {
@@ -251,6 +266,39 @@ export default function CompanySettingsPage() {
       });
     } finally {
       setTogglingIntegrationId(null);
+    }
+  };
+
+  const saveWindshieldCredentials = async (integration: Integration) => {
+    const draft = credentialDrafts[integration.id] ?? {
+      api_url: integration.api_url ?? "",
+      api_key: "",
+    };
+    try {
+      setSavingCredentialId(integration.id);
+      const updated = await updateIntegration(integration.id, {
+        company_id: companyId,
+        integration_name: integration.integration_name,
+        enabled: integration.enabled !== false,
+        api_url: draft.api_url.trim(),
+        ...(draft.api_key.trim() ? { api_key: draft.api_key.trim() } : {}),
+      });
+      setAvailableIntegrations((current) =>
+        current.map((row) => (row.id === integration.id ? { ...row, ...updated } : row))
+      );
+      setCredentialDrafts((current) => ({
+        ...current,
+        [integration.id]: { api_url: updated.api_url ?? draft.api_url, api_key: "" },
+      }));
+      toast({ title: "Saved", description: "WindshieldHUB credentials saved for this company." });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Could not save WindshieldHUB credentials.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingCredentialId(null);
     }
   };
 
@@ -753,8 +801,54 @@ export default function CompanySettingsPage() {
                                             const enabled = integration.enabled !== false;
                                             return (
                                             <TableRow key={integration.id}>
-                                                <TableCell className="font-medium">{integration.integration_name}</TableCell>
-                                                <TableCell className="text-right">
+                                                <TableCell className="font-medium align-top">
+                                                    <div>{integration.integration_name}</div>
+                                                    {isWindshieldHubIntegration(integration.integration_name) && (
+                                                        <div className="mt-3 max-w-md space-y-2">
+                                                            <label className="block text-xs text-muted-foreground" htmlFor={`wsh-origin-${integration.id}`}>
+                                                                API origin
+                                                            </label>
+                                                            <Input
+                                                                id={`wsh-origin-${integration.id}`}
+                                                                value={credentialDrafts[integration.id]?.api_url ?? integration.api_url ?? ""}
+                                                                onChange={(event) => setCredentialDrafts((current) => ({
+                                                                    ...current,
+                                                                    [integration.id]: {
+                                                                        api_url: event.target.value,
+                                                                        api_key: current[integration.id]?.api_key ?? "",
+                                                                    },
+                                                                }))}
+                                                                placeholder="https://api.windshieldhub.com"
+                                                            />
+                                                            <label className="block text-xs text-muted-foreground" htmlFor={`wsh-key-${integration.id}`}>
+                                                                API key
+                                                            </label>
+                                                            <Input
+                                                                id={`wsh-key-${integration.id}`}
+                                                                type="password"
+                                                                value={credentialDrafts[integration.id]?.api_key ?? ""}
+                                                                onChange={(event) => setCredentialDrafts((current) => ({
+                                                                    ...current,
+                                                                    [integration.id]: {
+                                                                        api_url: current[integration.id]?.api_url ?? integration.api_url ?? "",
+                                                                        api_key: event.target.value,
+                                                                    },
+                                                                }))}
+                                                                placeholder={integration.has_api_key ? "Key saved — enter a new value to replace" : "CRM API key"}
+                                                            />
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                disabled={savingCredentialId === integration.id}
+                                                                onClick={() => saveWindshieldCredentials(integration)}
+                                                            >
+                                                                {savingCredentialId === integration.id ? "Saving..." : "Save credentials"}
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right align-top">
                                                     <button
                                                         type="button"
                                                         role="switch"
@@ -794,9 +888,32 @@ export default function CompanySettingsPage() {
                                         id="company-integration-name"
                                         value={integrationName}
                                         onChange={(event) => setIntegrationName(event.target.value)}
-                                        placeholder="e.g. Slack"
+                                        placeholder="e.g. WindshieldHUB"
                                     />
                                 </div>
+                                {isWindshieldHubIntegration(integrationName) && (
+                                  <>
+                                    <div className="space-y-2">
+                                      <label className="text-sm font-medium" htmlFor="company-integration-origin">API origin</label>
+                                      <Input
+                                        id="company-integration-origin"
+                                        value={integrationOrigin}
+                                        onChange={(event) => setIntegrationOrigin(event.target.value)}
+                                        placeholder="https://api.windshieldhub.com"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="text-sm font-medium" htmlFor="company-integration-key">API key</label>
+                                      <Input
+                                        id="company-integration-key"
+                                        type="password"
+                                        value={integrationApiKey}
+                                        onChange={(event) => setIntegrationApiKey(event.target.value)}
+                                        placeholder="CRM API key"
+                                      />
+                                    </div>
+                                  </>
+                                )}
                                 <DialogFooter>
                                     <Button type="button" variant="secondary" onClick={() => setIntegrationDialogOpen(false)}>Cancel</Button>
                                     <Button type="button" onClick={saveIntegration} disabled={savingIntegration}>
