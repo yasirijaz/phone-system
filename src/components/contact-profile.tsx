@@ -413,6 +413,7 @@ export default function ContactProfile({ contact, contacts, onContactUpdate, onC
                 </div>
 
             </div>
+            </div>
         </div>
     );
 }

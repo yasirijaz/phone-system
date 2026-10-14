@@ -42,6 +42,7 @@ import {
   AnalysisWidgetFields,
   IntentTag,
 } from "@/components/analysis-widget-fields";
+import WindshieldHubTimeline from "@/components/windshield-hub-timeline";
 import {
   getCallAnalysisDetail,
   getCallAnalysisList,
@@ -320,6 +321,13 @@ export default function CallAnalysisPage() {
     }
   };
 
+  const selectedCall = calls.find((call) => call.id === selectedId) ?? null;
+  const windshieldSource = detail ?? selectedCall;
+  const windshieldOutbound = (windshieldSource?.direction || "").toLowerCase().includes("outbound");
+  const windshieldPhone = windshieldOutbound ? windshieldSource?.to : windshieldSource?.from;
+  const windshieldCompanyId =
+    windshieldSource?.company_id ?? user?.company_id ?? null;
+
   const analysis = detail?.live_analysis;
   const journey = analysis?.journey?.length
     ? analysis.journey
@@ -415,7 +423,7 @@ export default function CallAnalysisPage() {
               })}
             </div>
 
-            <div className="grid items-start gap-4 xl:grid-cols-[280px_minmax(0,1.3fr)_280px]">
+            <div className="grid items-start gap-4 xl:grid-cols-[280px_minmax(0,1.2fr)_340px]">
               {/* Call list */}
               <div className="flex h-[min(72vh,720px)] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
                 <div className="shrink-0 border-b border-slate-100 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -605,7 +613,15 @@ export default function CallAnalysisPage() {
               </div>
 
               {/* Analysis panels */}
-              <div className="space-y-3">
+              <div className="flex h-[min(72vh,720px)] flex-col gap-3 overflow-y-auto pr-1 [&>*]:shrink-0">
+                {selectedId && windshieldCompanyId ? (
+                  <WindshieldHubTimeline
+                    companyId={windshieldCompanyId}
+                    phone={windshieldPhone}
+                    callLogId={selectedId}
+                    className="shrink-0 rounded-2xl border border-slate-200/80 bg-white px-4 py-4 shadow-sm"
+                  />
+                ) : null}
                 <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
                   <div className="mb-3 flex items-start justify-between gap-2">
                     <div className="min-w-0">
