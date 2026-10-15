@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { markCommunicationField, markRead, markThreadAsRead, setActivityReadState, updateActivityFollowUp } from '@/services/callLogService';
 import { events } from '@/lib/events';
 import React from 'react';
-import { cn, formatPhoneNumber, getContactAvatarColorClass } from '@/lib/utils';
+import { cn, formatPhoneNumber, getContactAvatarColorClass, normalizePhoneDigits } from '@/lib/utils';
 import { hasSupervisorAccess } from '@/lib/roles';
 import {
   getCommunicationMediaContentTypes,
@@ -805,7 +805,16 @@ export default function CallLog({
   }
 
   const generateKey = (comm: Communication, index: number): string => {
-    return `${comm.id || ''}-${comm.type || ''}-${comm.call_sid || ''}-${comm.created_at || ''}-${index}`;
+    if (isClickable) {
+      const left = normalizePhoneDigits(comm.from);
+      const right = normalizePhoneDigits(comm.to);
+      if (left && right) {
+        const pair = left < right ? `${left}|${right}` : `${right}|${left}`;
+        return `thread:${comm.department_id ?? 0}:${pair}`;
+      }
+    }
+    if (comm.id) return `${comm.type || comm.latest_type || 'item'}-${comm.id}`;
+    return `${comm.call_sid || ''}-${comm.created_at || ''}-${index}`;
   };
 
   if(isClickable) {

@@ -20,7 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import PaginationControls from "@/components/pagination-controls";
 import { events } from '@/lib/events';
-import { getPhoneNumberOptionLabel } from "@/lib/utils";
+import { getPhoneNumberOptionLabel, debounce } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2 } from "lucide-react";
@@ -78,10 +78,19 @@ export default function DepartmentDetailPage() {
   const [dndLoading, setDndLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabName>("all");
   const companyUsersRef = useRef<User[]>([]);
+  const activeTabRef = useRef(activeTab);
+  const paginationRef = useRef(pagination);
+  const navigationKeyRef = useRef('');
+  const backgroundSeqRef = useRef(0);
 
   useEffect(() => {
     companyUsersRef.current = companyUsers;
   }, [companyUsers]);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+    paginationRef.current = pagination;
+  }, [activeTab, pagination]);
 
   useEffect(() => {
     if (!user?.company_id) return;
@@ -91,36 +100,52 @@ export default function DepartmentDetailPage() {
     });
   }, [user?.company_id]);
 
-  const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10) => {
+  const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10, silent = false) => {
     if (!user || !departmentId) return;
+    if (silent && tab === 'operators') return;
+
+    const fetchKey = `${tab}:${page}:${limit}`;
+    if (silent) {
+      if (navigationKeyRef.current !== fetchKey) return;
+      if (paginationRef.current[tab]?.loading) return;
+      backgroundSeqRef.current += 1;
+    } else {
+      navigationKeyRef.current = fetchKey;
+      backgroundSeqRef.current += 1;
+      if (tab !== 'operators') {
+        setData(prev => ({ ...prev, [tab]: [] }));
+      }
+      setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
+    }
+
+    const backgroundSeq = backgroundSeqRef.current;
 
     if (tab === 'operators') {
       try {
-        setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
         const operatorsResponse = await getOperators(departmentId);
+        if (navigationKeyRef.current !== fetchKey || backgroundSeq !== backgroundSeqRef.current) return;
         const validOperators = Array.isArray(operatorsResponse.operators)
           ? operatorsResponse.operators
           : [];
         setOperators(validOperators);
-        // Note: Operator list is not paginated from the API yet.
         setPagination(prev => ({ ...prev, [tab]: { ...initialPaginationState, loading: false, totalRecords: validOperators.length, totalPages: 1 } }));
       } catch (error) {
+        if (navigationKeyRef.current !== fetchKey || backgroundSeq !== backgroundSeqRef.current) return;
         toast({ title: "Error fetching operators", description: "Failed to load data for this tab.", variant: "destructive" });
         setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: false } }));
       }
       return;
     }
-
-    setData(prev => ({ ...prev, [tab]: [] }));
-    setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
     
     try {
         let filters: Record<string, any> = { page, limit, department_id: departmentId };
+        if (silent) filters.fresh = 1;
         if (tab !== 'all') {
             filters.type = tab;
         }
 
         const response = await getCommunications(filters);
+        if (navigationKeyRef.current !== fetchKey || backgroundSeq !== backgroundSeqRef.current) return;
         
         const threadResults = Array.isArray(response.results) ? response.results : [];
         setData(prev => ({ ...prev, [tab]: threadResults }));
@@ -136,11 +161,15 @@ export default function DepartmentDetailPage() {
         }));
 
         enrichThreadsWithLastAttendee(threadResults, companyUsersRef.current).then((enrichedResults) => {
+          if (navigationKeyRef.current !== fetchKey || backgroundSeq !== backgroundSeqRef.current) return;
           setData((prev) => ({ ...prev, [tab]: enrichedResults }));
         });
     } catch (error) {
-        toast({ title: `Error fetching ${tab}`, description: "Failed to load data for this tab.", variant: "destructive" });
-        setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: false } }));
+        if (navigationKeyRef.current !== fetchKey || backgroundSeq !== backgroundSeqRef.current) return;
+        if (!silent) {
+          toast({ title: `Error fetching ${tab}`, description: "Failed to load data for this tab.", variant: "destructive" });
+          setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: false } }));
+        }
     }
   }, [user, departmentId, toast]);
 
@@ -197,12 +226,15 @@ export default function DepartmentDetailPage() {
   };
 
   const handleRefresh = useCallback(() => {
-    fetchCommunicationData(activeTab, pagination[activeTab].currentPage, pagination[activeTab].limit);
-  }, [fetchCommunicationData, activeTab, pagination]);
+    const tab = activeTabRef.current;
+    const pag = paginationRef.current[tab];
+    fetchCommunicationData(tab, pag.currentPage, pag.limit, true);
+  }, [fetchCommunicationData]);
 
   useEffect(() => {
-    events.on('refreshCalls', handleRefresh);
-    return () => events.off('refreshCalls', handleRefresh);
+    const debouncedRefresh = debounce(handleRefresh, 2000);
+    events.on('refreshCalls', debouncedRefresh);
+    return () => events.off('refreshCalls', debouncedRefresh);
   }, [handleRefresh]);
 
   const handleMakeCall = async (number: string, context?: OutboundContext) => {

@@ -70,6 +70,8 @@ export default function AppUIPage() {
   const paginationRef = useRef(pagination);
   const lastFetchKeyRef = useRef<string | null>(null);
   const companyUsersRef = useRef(companyUsers);
+  const navigationKeyRef = useRef('');
+  const backgroundSeqRef = useRef(0);
 
   useEffect(() => {
     companyUsersRef.current = companyUsers;
@@ -90,15 +92,25 @@ export default function AppUIPage() {
     });
   }, [user?.company_id]);
 
-  const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10, force = false) => {
+  const fetchCommunicationData = useCallback(async (tab: TabName, page: number = 1, limit: number = 10, force = false, silent = false) => {
     if (!user) return;
-    
-    const fetchKey = `${tab}:${page}:${limit}`;
-    if (!force && lastFetchKeyRef.current === fetchKey) return;
-    lastFetchKeyRef.current = fetchKey;
+    if (silent && tab === 'operators') return;
 
-    setData(prev => ({ ...prev, [tab]: [] }));
-    setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
+    const fetchKey = `${tab}:${page}:${limit}`;
+    if (silent) {
+      if (navigationKeyRef.current !== fetchKey) return;
+      if (paginationRef.current[tab]?.loading) return;
+      backgroundSeqRef.current += 1;
+    } else {
+      if (!force && lastFetchKeyRef.current === fetchKey) return;
+      lastFetchKeyRef.current = fetchKey;
+      navigationKeyRef.current = fetchKey;
+      backgroundSeqRef.current += 1;
+      setData(prev => ({ ...prev, [tab]: [] }));
+      setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: true } }));
+    }
+
+    const backgroundSeq = backgroundSeqRef.current;
     
     try {
         if (tab === 'operators') {
@@ -122,6 +134,7 @@ export default function AppUIPage() {
         }
 
         let filters: Record<string, any> = { page, limit };
+        if (silent) filters.fresh = 1;
         if (tab !== 'all') {
             if (tab === 'starred') {
                 filters.is_starred = true;
@@ -137,18 +150,19 @@ export default function AppUIPage() {
         if (cached) {
           response = cached;
         } else {
-          // de-dupe in-flight identical requests
-          let inFlight = inFlightRequestsRef.current.get(cacheKey);
+          const flightKey = silent ? `${cacheKey}:fresh` : cacheKey;
+          let inFlight = inFlightRequestsRef.current.get(flightKey);
           if (!inFlight) {
             inFlight = getCommunications(filters);
-            inFlightRequestsRef.current.set(cacheKey, inFlight);
+            inFlightRequestsRef.current.set(flightKey, inFlight);
           }
           response = await inFlight.finally(() => {
-            inFlightRequestsRef.current.delete(cacheKey);
+            inFlightRequestsRef.current.delete(flightKey);
           });
-          // cache results briefly to prevent double fetches on quick state churn
           cacheSet(cacheKey, response, 10_000);
         }
+
+        if (navigationKeyRef.current !== fetchKey || backgroundSeq !== backgroundSeqRef.current) return;
 
         const threadResults = Array.isArray(response.results) ? response.results : [];
         setData(prev => ({ ...prev, [tab]: threadResults }));
@@ -164,11 +178,15 @@ export default function AppUIPage() {
         }));
 
         enrichThreadsWithLastAttendee(threadResults, companyUsersRef.current).then((enrichedResults) => {
+          if (navigationKeyRef.current !== fetchKey || backgroundSeq !== backgroundSeqRef.current) return;
           setData((prev) => ({ ...prev, [tab]: enrichedResults }));
         });
     } catch (error) {
-        toast({ title: "Error", description: `Failed to load data for ${tab}.`, variant: "destructive" });
-        setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: false } }));
+        if (navigationKeyRef.current !== fetchKey || backgroundSeq !== backgroundSeqRef.current) return;
+        if (!silent) {
+          toast({ title: "Error", description: `Failed to load data for ${tab}.`, variant: "destructive" });
+          setPagination(prev => ({ ...prev, [tab]: { ...prev[tab], loading: false } }));
+        }
     }
   }, [user, toast]);
 
@@ -205,7 +223,7 @@ export default function AppUIPage() {
     const tab = activeTabRef.current;
     const pag = paginationRef.current[tab];
     lastFetchKeyRef.current = null;
-    fetchCommunicationData(tab, pag.currentPage, pag.limit, true);
+    fetchCommunicationData(tab, pag.currentPage, pag.limit, true, true);
   }, [fetchCommunicationData]);
 
   useEffect(() => {
