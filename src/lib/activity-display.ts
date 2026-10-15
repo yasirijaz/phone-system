@@ -39,6 +39,17 @@ export function isFailedDelivery(comm: Communication): boolean {
   return comm.type === 'sms' && (status === 'failed' || status === 'undelivered');
 }
 
+export function outboundSmsDeliveryLabel(comm: Communication): string | null {
+  if (comm.type !== 'sms' || comm.direction !== 'outbound') return null;
+  const status = String(comm.status || '').toLowerCase();
+  if (status === 'scheduled' || status === 'cancelled') return null;
+  if (status === 'delivered' || status === 'read') return 'Delivered';
+  if (status === 'sent') return 'Sent';
+  if (status === 'failed' || status === 'undelivered') return 'Not delivered';
+  if (status === 'queued' || status === 'accepted' || status === 'sending') return 'Sending';
+  return null;
+}
+
 export function getActivityPresentation(comm: Communication): {
   tone: ActivityTone;
   label: string;

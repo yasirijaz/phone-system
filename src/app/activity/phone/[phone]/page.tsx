@@ -31,7 +31,7 @@ import {
   resolveOutboundContextFromLastActivity,
 } from '@/lib/department-selection';
 import { canListAllCompanyDepartments } from '@/lib/roles';
-import { cn, formatPhoneNumber, getPhoneNumberOptionLabel } from '@/lib/utils';
+import { cn, formatPhoneNumber, getPhoneNumberOptionLabel, phonesMatch } from '@/lib/utils';
 import { resolveDefaultFromNumberForDepartment } from '@/lib/phone-numbers';
 import {
   getPhoneCommunicationHistory,
@@ -95,6 +95,7 @@ export default function PhoneCallHistoryPage() {
 
   const chatScrollRef = useRef<HTMLElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
 
   const applyDepartmentContext = useCallback((context: OutboundContext) => {
     if (context.departmentId) {
@@ -105,10 +106,10 @@ export default function PhoneCallHistoryPage() {
     }
   }, []);
 
-  const fetchCommunications = useCallback(async () => {
+  const fetchCommunications = useCallback(async (options?: { silent?: boolean }) => {
     if (!phoneNumber) return;
 
-    setLoading(true);
+    if (!options?.silent) setLoading(true);
     try {
       const details = await getPhoneCommunicationHistory(phoneNumber, {
         page,
@@ -189,16 +190,24 @@ export default function PhoneCallHistoryPage() {
   }, [fetchCommunications]);
 
   useEffect(() => {
-    const refresh = () => {
-      void fetchCommunications();
+    stickToBottomRef.current = true;
+  }, [phoneNumber]);
+
+  useEffect(() => {
+    const refresh = (payload?: { from?: string; to?: string }) => {
+      const hasParties = Boolean(payload?.from || payload?.to);
+      const touchesThisContact =
+        !hasParties ||
+        phonesMatch(payload?.from, phoneNumber) ||
+        phonesMatch(payload?.to, phoneNumber);
+      if (!touchesThisContact) return;
+      void fetchCommunications({ silent: true });
     };
     events.on('refreshConversation', refresh);
-    events.on('refreshCalls', refresh);
     return () => {
       events.off('refreshConversation', refresh);
-      events.off('refreshCalls', refresh);
     };
-  }, [fetchCommunications]);
+  }, [fetchCommunications, phoneNumber]);
 
   useEffect(() => {
     setPage(1);
@@ -257,8 +266,14 @@ export default function PhoneCallHistoryPage() {
     }
   }, [phoneNumber, user?.company_id, fetchCommunications]);
 
+  const rememberScrollPosition = () => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
+
   useEffect(() => {
-    if (loading) return;
+    if (loading || !stickToBottomRef.current) return;
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
@@ -438,6 +453,7 @@ export default function PhoneCallHistoryPage() {
 
             <main
               ref={chatScrollRef}
+              onScroll={rememberScrollPosition}
               className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
             >
               {loading ? (

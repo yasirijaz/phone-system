@@ -64,6 +64,8 @@ export default function ConversationDetailPage() {
     
     const slug = params.slug ? (Array.isArray(params.slug) ? params.slug : [params.slug]) : [];
     const [from, to] = slug.map(part => decodeURIComponent(part));
+    const departmentIdParam = searchParams.get('departmentId');
+    const stickToBottomRef = useRef(true);
 
     const findContact = (phone: string, contactList: Contact[]) => {
         if(!contactList || contactList.length === 0) return null;
@@ -73,9 +75,8 @@ export default function ConversationDetailPage() {
     const refreshThread = useCallback(async (options?: { bypassCache?: boolean }) => {
         if (!user) return;
         try {
-            const departmentId = searchParams.get('departmentId');
             const [logs, fetchedContacts] = await Promise.all([
-                getCommunicationThread(from, to, { bypassCache: options?.bypassCache, departmentId }),
+                getCommunicationThread(from, to, { bypassCache: options?.bypassCache, departmentId: departmentIdParam }),
                 user.company_id ? getContacts(user.company_id) : Promise.resolve([])
             ]);
             
@@ -100,9 +101,7 @@ export default function ConversationDetailPage() {
         } catch (e) {
             console.error('Failed to refresh conversation thread', e);
         }
-    }, [from, to, user, searchParams]);
-
-    const departmentIdParam = searchParams.get('departmentId');
+    }, [from, to, user, departmentIdParam]);
 
     useEffect(() => {
         if (!user || !from || !to) return;
@@ -154,7 +153,7 @@ export default function ConversationDetailPage() {
                         ? getDepartments(user.company_id)
                         : getUserDepartments(user.id),
                     user.company_id ? getContacts(user.company_id) : Promise.resolve([]),
-                    getCommunicationThread(from, to, { departmentId: searchParams.get('departmentId') }),
+                    getCommunicationThread(from, to, { departmentId: departmentIdParam }),
                     user.company_id ? getCompanyPhoneNumbers(user.company_id) : Promise.resolve([]),
                 ]);
                 const depts = Array.isArray(fetchedDepts) ? fetchedDepts : [];
@@ -216,7 +215,7 @@ export default function ConversationDetailPage() {
                 }
 
                 // Determine and set the correct department and from number
-                let resolvedDeptId: string | null = searchParams.get('departmentId') || numberToDeptIdMap[ourNumber] || null;
+                let resolvedDeptId: string | null = departmentIdParam || numberToDeptIdMap[ourNumber] || null;
 
                 if (!resolvedDeptId && sortedLogs.length > 0) {
                     resolvedDeptId = findLastUsedDepartmentId(sortedLogs);
@@ -248,7 +247,11 @@ export default function ConversationDetailPage() {
         if (user && from && to) {
             fetchInitialData();
         }
-    }, [user, from, to, toast, handleDepartmentChange, searchParams]);
+    }, [user, from, to, toast, departmentIdParam]);
+
+    useEffect(() => {
+        stickToBottomRef.current = true;
+    }, [from, to]);
 
     useEffect(() => {
         const handler = (payload?: { from?: string; to?: string }) => {
@@ -257,20 +260,20 @@ export default function ConversationDetailPage() {
             }
         };
 
-        const refreshCallsHandler = () => {
-          void refreshThread({ bypassCache: true });
-        };
-
         events.on('refreshConversation', handler);
-        events.on('refreshCalls', refreshCallsHandler);
         return () => {
             events.off('refreshConversation', handler);
-            events.off('refreshCalls', refreshCallsHandler);
         };
     }, [from, to, refreshThread]);
+
+    const rememberScrollPosition = () => {
+        const el = chatScrollRef.current;
+        if (!el) return;
+        stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    };
     
     useEffect(() => {
-        if (loading) return;
+        if (loading || !stickToBottomRef.current) return;
 
         if (chatScrollRef.current) {
             chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
@@ -389,7 +392,7 @@ export default function ConversationDetailPage() {
                                             {isProfileSidebarOpen ? <PanelRightClose /> : <User />}
                                         </Button>
                                     </header>
-                                    <main ref={chatScrollRef} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+                                    <main ref={chatScrollRef} onScroll={rememberScrollPosition} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
                                     {loading ? <p className="p-4">Loading...</p> : (
                                       <CallLog
                                         calls={allComms}

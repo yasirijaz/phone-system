@@ -44,7 +44,7 @@ import {
   resolveOutboundContextFromCommunication,
   type OutboundContext,
 } from '@/lib/outbound-context';
-import { activityToneClass, followUpLabel, getActivityPresentation } from '@/lib/activity-display';
+import { activityToneClass, followUpLabel, getActivityPresentation, isFailedDelivery, outboundSmsDeliveryLabel } from '@/lib/activity-display';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import ScheduledSmsActions from '@/components/scheduled-sms-actions';
 
@@ -107,6 +107,13 @@ function CommunicationCard({
     isMiddleOfGroup: boolean | null
 }) {
   const { user } = useAuth();
+
+  const notifyListsAndThread = () => {
+    events.emit('refreshCalls');
+    if (comm.from && comm.to) {
+      events.emit('refreshConversation', { from: comm.from, to: comm.to });
+    }
+  };
   const isAdmin = hasSupervisorAccess(user?.role_id);
   const { toast } = useToast();
   const [isTogglingStar, setIsTogglingStar] = React.useState(false);
@@ -160,7 +167,7 @@ function CommunicationCard({
     try {
       await markCommunicationField(comm.id, itemType, 'is_starred', next);
       toast({ title: 'Success', description: `Communication ${next ? 'starred' : 'unstarred'}.` });
-      events.emit('refreshCalls');
+      notifyListsAndThread();
     } catch (e) {
       toast({ title: 'Failed', description: 'Could not update star. Try again.', variant: 'destructive' });
     } finally {
@@ -177,7 +184,7 @@ function CommunicationCard({
         await saveTranscription(comm.id, result.transcription);
         setTranscrib(result.transcription)
         toast({ title: "Transcription successful" });
-        events.emit('refreshCalls');
+        notifyListsAndThread();
       } else {
         throw new Error(result.error || "Unknown error");
       }
@@ -318,6 +325,9 @@ function CommunicationCard({
     const contentTypes = getCommunicationMediaContentTypes(c);
     const showBody = Boolean(c.body?.trim()) && !isInlineImageBody(c.body) && !mediaUrls.includes(String(c.body).trim());
     const isUnreadSms = c.type === 'sms' && c.direction === 'inbound' && Number(c.is_read) === 0;
+    const deliveryLabel = outboundSmsDeliveryLabel(c);
+    const deliveryFailed = isFailedDelivery(c);
+    const deliveryError = deliveryFailed ? c.meta_data?.delivery?.error_message : null;
 
     return (
         <div className={cn(
@@ -339,6 +349,17 @@ function CommunicationCard({
               <p className="text-sm whitespace-pre-wrap break-all min-w-0 w-full [overflow-wrap:anywhere]">
                 {c.body}
               </p>
+            )}
+            {deliveryLabel && (
+              <div className={cn(
+                'text-[11px] font-medium',
+                deliveryFailed
+                  ? (isMine ? 'text-red-100' : 'text-red-600')
+                  : (isMine ? 'text-primary-foreground/80' : 'text-muted-foreground')
+              )}>
+                {deliveryLabel}
+                {deliveryError ? ` · ${deliveryError}` : ''}
+              </div>
             )}
             {c.status === 'scheduled' && c.scheduled_at && c.id ? (
               <ScheduledSmsActions
@@ -683,7 +704,7 @@ function CommunicationCard({
                             ? setActivityReadState(comm.id, itemType, false)
                             : markThreadAsRead(threadFrom, threadTo, comm.department_id);
                           void request.then(() => {
-                            events.emit('refreshCalls');
+                            notifyListsAndThread();
                             events.emit('refreshDepartmentsUnread');
                           });
                         }}>
@@ -691,12 +712,12 @@ function CommunicationCard({
                         </DropdownMenuItem>
                         {comm.follow_up && (
                           <>
-                            <DropdownMenuItem onClick={() => void updateActivityFollowUp(comm.id, isSms ? 'sms' : 'call', 'in_progress').then(() => events.emit('refreshCalls'))}>
+                            <DropdownMenuItem onClick={() => void updateActivityFollowUp(comm.id, isSms ? 'sms' : 'call', 'in_progress').then(() => notifyListsAndThread())}>
                               Claim follow-up
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => {
                               const note = window.prompt('Completion note') || undefined;
-                              void updateActivityFollowUp(comm.id, isSms ? 'sms' : 'call', 'completed', note).then(() => events.emit('refreshCalls'));
+                              void updateActivityFollowUp(comm.id, isSms ? 'sms' : 'call', 'completed', note).then(() => notifyListsAndThread());
                             }}>
                               Complete follow-up
                             </DropdownMenuItem>

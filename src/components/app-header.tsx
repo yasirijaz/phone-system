@@ -252,8 +252,15 @@ export default function AppHeader({
                 }
 
                 if (data.method_type === "refresh_listing") {
-                    // Coalesce bursty call events so every agent doesn't refetch threads at once.
+                    // Coalesce bursty call events so every agent doesn't refetch inbox lists at once.
+                    // Open conversations must not reload for an unrelated call: only the matching
+                    // thread is notified, and only when this event actually names its parties.
                     events.emitDebounced("refreshCalls", 5000);
+                    const from = data.data?.from;
+                    const to = data.data?.to;
+                    if (typeof from === "string" && typeof to === "string" && from && to) {
+                        events.emit("refreshConversation", { from, to });
+                    }
                 }
 
                 if (data.method_type == "dnd_notification" && data.task_type == "dnd_status_change") {
@@ -291,6 +298,14 @@ export default function AppHeader({
                     data.data
                 ) {
                     events.emit("conferenceInvite", data.data);
+                }
+
+                if (data.method_type === "sms_status_update" && data.data) {
+                    const { from, to } = data.data;
+                    try {
+                        events.emit("refreshConversation", { from, to });
+                        events.emitDebounced("refreshCalls", 500);
+                    } catch (_) {}
                 }
 
                 if (data.method_type === "show_sms_notification" && data.data) {
