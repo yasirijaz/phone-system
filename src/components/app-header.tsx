@@ -253,9 +253,12 @@ export default function AppHeader({
 
                 if (data.method_type === "refresh_listing") {
                     // Coalesce bursty call events so every agent doesn't refetch inbox lists at once.
-                    // Open conversations must not reload for an unrelated call: only the matching
-                    // thread is notified, and only when this event actually names its parties.
-                    events.emitDebounced("refreshCalls", 5000);
+                    // A terminal status is sent after the row is saved, so refresh that one immediately.
+                    if (data.task_type === "call_status") {
+                        events.emit("refreshCalls");
+                    } else {
+                        events.emitDebounced("refreshCalls", 5000);
+                    }
                     const from = data.data?.from;
                     const to = data.data?.to;
                     if (typeof from === "string" && typeof to === "string" && from && to) {
@@ -280,11 +283,19 @@ export default function AppHeader({
                 if (data.method_type == "in_call_notification" && data.task_type == "user_in_call_status") {
                     console.log("📞 In-call status change notification received:", data.data);
                     events.emit("refreshInCallStatus", data.data);
+                    const inCall = data.data?.in_call;
+                    const callEnded = inCall === 0 || inCall === false || inCall === "0";
+                    if (callEnded) {
+                        events.emit("refreshCalls");
+                    }
                 }
 
                 if (data.method_type === "live_call_notification" && data.data) {
                     if (data.task_type === "live_call_state") {
                         events.emit("liveCallState", data.data);
+                        if (data.data?.event === "ended") {
+                            events.emit("refreshCalls");
+                        }
                     } else if (data.task_type === "live_transcript") {
                         events.emit("liveTranscript", data.data);
                     } else if (data.task_type === "live_analysis") {
