@@ -140,6 +140,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
   const [isEndingCall, setIsEndingCall] = useState(false);
   const [pendingOutgoing, setPendingOutgoing] = useState<PendingOutgoingParticipant | null>(null);
+  const [briefingName, setBriefingName] = useState<string | null>(null);
   const [callOwnerUserId, setCallOwnerUserId] = useState<number | null>(null);
   const effectiveConferenceSid = conferenceSid || verifiedConferenceSid;
   const agentCallSid = connection?.parameters?.CallSid ?? fallbackAgentCallSid ?? null;
@@ -213,7 +214,14 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const activeExternalParticipant = externalParticipants.find((p) => p.call_sid === activeExternalCallSid)
     ?? externalParticipants.find((p) => !p.hold)
     ?? externalParticipants[0];
-  const hasRingingParticipant = externalParticipants.some((participant) => isParticipantRinging(participant));
+  const hasRingingParticipant = [...externalParticipants, ...otherAgents].some((participant) => isParticipantRinging(participant));
+  const customerParticipant = externalParticipants.find((participant) => participant.call_sid === customerCallSid)
+    ?? (externalParticipants.length === 1 ? externalParticipants[0] : undefined);
+  const customerIsOnHold = Boolean(customerParticipant?.hold) || (Boolean(briefingName) && isOnHold);
+  const connectedColleague = otherAgents.find(
+    (participant) => getParticipantConnectionStatus(participant) === 'connected'
+  );
+  const canMergeCustomerIn = hasConsultCall || (customerIsOnHold && Boolean(briefingName) && Boolean(connectedColleague));
   const shouldPollParticipantsQuickly = hasRingingParticipant || Boolean(pendingOutgoing);
   const floatingToggleDragRef = useRef<{
     pointerId: number;
@@ -293,6 +301,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     setIsOnHold(false);
     setVerifiedConferenceSid(conferenceSid || null);
     setPendingOutgoing(null);
+    setBriefingName(null);
     setDuration(0);
     setIsCollapsed(false);
     setCallOwnerUserId(null);
@@ -362,6 +371,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       setIsOnHold(false);
       setVerifiedConferenceSid(null);
       setPendingOutgoing(null);
+      setBriefingName(null);
       setCallDepartmentId(null);
       setCallOwnerUserId(null);
     }
@@ -511,6 +521,9 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
         const pendingStatus = getParticipantConnectionStatus(pendingParticipant);
         if (pendingStatus === 'connected' || pendingStatus === 'ended') {
           setPendingOutgoing(null);
+          if (pendingStatus === 'connected' && pendingParticipant.is_agent) {
+            setIsCollapsed(false);
+          }
         }
       }
     }
@@ -602,6 +615,17 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     setIsMuted(mute);
   };
   
+  const resolveCustomerCallSid = () => {
+    const ownSid = agentCallSid || connection?.parameters?.CallSid;
+    if (customerCallSid && customerCallSid !== ownSid) {
+      return customerCallSid;
+    }
+    const fromList = (currentParticipants as ConferenceParticipant[]).find(
+      (participant) => !participant.is_agent && participant.call_sid !== ownSid
+    );
+    return fromList?.call_sid ?? null;
+  };
+
   const toggleHold = async () => {
     if (!connection) return;
 
@@ -611,8 +635,20 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       return;
     }
 
-    const targetSid = activeExternalParticipant?.call_sid || customerCallSid || connection.parameters.CallSid;
-    const hold = !activeExternalParticipant?.hold;
+    const ownSid = agentCallSid || connection.parameters?.CallSid;
+    const preferredSid = activeExternalParticipant?.call_sid;
+    const targetSid = preferredSid && preferredSid !== ownSid
+      ? preferredSid
+      : resolveCustomerCallSid();
+    if (!targetSid || targetSid === ownSid) {
+      toast({
+        title: "Cannot hold",
+        description: "The customer line is not ready yet, so your own line was left on the call.",
+        variant: 'destructive',
+      });
+      return;
+    }
+    const hold = !(customerParticipant?.call_sid === targetSid ? customerParticipant.hold : activeExternalParticipant?.hold);
 
     try {
         await holdParticipant(sid, targetSid, hold);
@@ -669,6 +705,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       }
       setIsOnHold(false);
       setConsultCallSid(null);
+      setBriefingName(null);
       await fetchParticipants({ silent: true });
       toast({ title: "Calls merged", description: "All callers are now connected." });
     } catch (error: unknown) {
@@ -745,6 +782,13 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       }
       if (pendingOutgoing?.callSid === callSid) {
         setPendingOutgoing(null);
+        setBriefingName(null);
+        const customerSid = resolveCustomerCallSid();
+        if (customerSid) {
+          await holdParticipant(sid, customerSid, false);
+          await consultEnsureAgent(sid);
+          setIsOnHold(false);
+        }
       }
       await fetchParticipants({ silent: true });
       toast({
@@ -788,15 +832,38 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     }
 
     setIsAdding(true);
+    let heldCustomerSid: string | null = null;
     try {
         const phoneNumber = dialerNumber ? `+1${dialerNumber.replace(/\D/g, '')}` : undefined;
         const userId = selectedParticipant || undefined;
-        
-        const response = phoneNumber
-          ? await initiateConsultCall(sid, twilioNumber, phoneNumber)
-          : await addParticipant(sid, twilioNumber, userId, phoneNumber);
+
+        if (userId) {
+          const customerSid = resolveCustomerCallSid();
+          if (!customerSid) {
+            toast({
+              title: "Cannot transfer yet",
+              description: "The customer line is not ready to place on hold.",
+              variant: 'destructive',
+            });
+            return;
+          }
+          await holdParticipant(sid, customerSid, true);
+          heldCustomerSid = customerSid;
+          await consultEnsureAgent(sid);
+          setCustomerCallSid(customerSid);
+          setIsOnHold(true);
+        }
+
+        const response = userId
+          ? await addParticipant(sid, twilioNumber, userId, undefined, { transfer: true })
+          : await initiateConsultCall(sid, twilioNumber, phoneNumber as string);
 
         if (response?.status === false) {
+          if (heldCustomerSid) {
+            await holdParticipant(sid, heldCustomerSid, false).catch(() => undefined);
+            setIsOnHold(false);
+            heldCustomerSid = null;
+          }
           toast({
             title: "Error",
             description: response?.msg || "Failed to add participant.",
@@ -843,9 +910,10 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
           });
         } else if (userId) {
           await fetchParticipants({ silent: true });
+          setBriefingName(outgoingName);
           toast({
-            title: "Calling colleague",
-            description: `${outgoingName} is ringing. Stay on the call until they answer.`,
+            title: "Customer is on hold",
+            description: `${outgoingName} is ringing. Talk with them first, then press Merge to bring the customer in.`,
           });
         } else if (phoneNumber) {
           toast({
@@ -860,6 +928,10 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
         setDialerNumber('');
         setSelectedParticipant('');
     } catch (err: any) {
+       if (heldCustomerSid) {
+         await holdParticipant(sid, heldCustomerSid, false).catch(() => undefined);
+         setIsOnHold(false);
+       }
        toast({
          title: "Error",
          description: err?.response?.data?.msg || err?.message || "Failed to add participant.",
@@ -1076,7 +1148,9 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       <span className="hidden text-sm font-semibold tracking-wide sm:inline max-w-[160px] truncate">
         {pendingOutgoing
           ? `Waiting · ${pendingOutgoing.name}`
-          : displayCallerName || 'On call'}
+          : connectedColleague && customerIsOnHold
+            ? `Briefing · ${briefingName || connectedColleague.label || 'colleague'}`
+            : displayCallerName || 'On call'}
       </span>
       {pendingOutgoing ? (
         <span className="max-w-[140px] truncate text-xs font-medium text-emerald-50 sm:hidden">
@@ -1111,8 +1185,11 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
             ) : null}
             {pendingOutgoing ? (
               <div className="border-b bg-amber-50 px-4 py-2.5 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-50">
-                Waiting for <span className="font-medium">{pendingOutgoing.name}</span> to join.
-                Stay on the call until they answer.
+                Customer is on hold. Waiting for <span className="font-medium">{pendingOutgoing.name}</span> to answer.
+              </div>
+            ) : canMergeCustomerIn && connectedColleague ? (
+              <div className="border-b bg-amber-50 px-4 py-2.5 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-50">
+                <span className="font-medium">{briefingName || 'Your colleague'}</span> answered. The customer is still on hold. Press Merge when you are ready to bring them in.
               </div>
             ) : null}
             <div className="p-4 flex items-center justify-between gap-4">
@@ -1143,20 +1220,20 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                 <ActionButton icon={isMuted ? MicOff : Mic} label="Mute" onClick={toggleMute} isActive={isMuted} />
                 <ActionButton icon={isOnHold ? Play : Pause} label="Hold" onClick={toggleHold} isActive={isOnHold} />
                 {hasConsultCall ? (
-                  <>
-                    <ActionButton
-                      icon={ArrowLeftRight}
-                      label="Swap"
-                      onClick={handleConsultSwap}
-                      isActive={isConsultActionLoading}
-                    />
-                    <ActionButton
-                      icon={GitMerge}
-                      label="Merge"
-                      onClick={handleConsultMerge}
-                      isActive={isConsultActionLoading}
-                    />
-                  </>
+                  <ActionButton
+                    icon={ArrowLeftRight}
+                    label="Swap"
+                    onClick={handleConsultSwap}
+                    isActive={isConsultActionLoading}
+                  />
+                ) : null}
+                {canMergeCustomerIn ? (
+                  <ActionButton
+                    icon={GitMerge}
+                    label="Merge"
+                    onClick={handleConsultMerge}
+                    isActive={isConsultActionLoading}
+                  />
                 ) : null}
                 <Dialog open={isKeypadModalOpen} onOpenChange={setIsKeypadModalOpen}>
                     <DialogTrigger asChild>
@@ -1185,13 +1262,13 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                   }
                 }}>
                     <DialogTrigger asChild>
-                         <ActionButton icon={UserPlus} label="Add" />
+                         <ActionButton icon={UserPlus} label="Transfer" />
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Add Participant</DialogTitle>
+                            <DialogTitle>Transfer call</DialogTitle>
                             <DialogDescription>
-                              The other person must answer before you leave the call.
+                              The customer stays on hold while you talk to the other person. Press Merge when you want the customer to join. You stay on the call until you leave.
                             </DialogDescription>
                         </DialogHeader>
                         <Tabs defaultValue="internal">
@@ -1288,7 +1365,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                         </Tabs>
                          <Button onClick={handleAddParticipant} disabled={isAdding || (!selectedParticipant && !dialerNumber)}>
                             <UserPlus className="mr-2 h-4 w-4" />
-                            Add Participant
+                            {selectedParticipant ? 'Transfer' : 'Add Participant'}
                         </Button>
                     </DialogContent>
                 </Dialog>
@@ -1311,14 +1388,14 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                                 <div key={p.call_sid} className="flex items-center justify-between p-2 rounded-md border">
                                     <div className="flex flex-col min-w-0">
                                       <span className="truncate">{name}</span>
-                                      {p.is_agent ? (
+                                      {p.call_sid === agentCallSid ? (
                                         <span className="text-xs text-muted-foreground">You</span>
                                       ) : (
                                         <div className="mt-1">{renderParticipantStatusBadge(status)}</div>
                                       )}
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
-                                      {!p.is_agent && (status === 'ringing' || status === 'connecting') ? (
+                                      {p.call_sid !== agentCallSid && (status === 'ringing' || status === 'connecting') ? (
                                         <Button
                                           variant="outline"
                                           size="sm"
