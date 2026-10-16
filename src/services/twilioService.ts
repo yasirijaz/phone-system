@@ -38,10 +38,11 @@ export const removeParticipant = async (conferenceSid: string, callSid: string):
     return response.data;
 }
 
-export const leaveConference = async (conferenceSid: string, callSid: string): Promise<any> => {
+export const leaveConference = async (conferenceSid: string, callSid: string, options?: { handoff?: boolean }): Promise<any> => {
     const response = await axios.post('/api/twilio/leave-conference', {
         conference_sid: conferenceSid,
         call_sid: callSid,
+        handoff: Boolean(options?.handoff),
     });
     return response.data;
 };

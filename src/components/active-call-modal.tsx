@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useMemo, type PointerEvent } from 'react';
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, Users, Trash2, Delete, ChevronDown, ChevronUp, Phone, ArrowLeftRight, GitMerge, PhoneCall, X, Search } from "lucide-react";
+import { PhoneOff, Mic, MicOff, UserPlus, Pause, Play, Grip, Users, Trash2, Delete, ChevronDown, ChevronUp, Phone, ArrowLeftRight, GitMerge, PhoneCall, PhoneForwarded, X, Search } from "lucide-react";
 import type { Call } from '@twilio/voice-sdk';
 import type { User, Contact, DepartmentSettings, CompanySettings, Operator } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -18,7 +18,7 @@ import { cn, formatPhoneNumber } from '@/lib/utils';
 import { isPlaceholderCallerName, pickDisplayablePhoneNumber } from '@/lib/call-party-display';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
-import { allParticipant, removeParticipant, addParticipant, holdParticipant, initiateConsultCall, consultSwap, consultMerge, consultSwitch, consultEnsureAgent, type ConferenceParticipant } from '@/services/twilioService';
+import { allParticipant, removeParticipant, addParticipant, holdParticipant, initiateConsultCall, consultSwap, consultMerge, consultSwitch, consultEnsureAgent, leaveConference, type ConferenceParticipant } from '@/services/twilioService';
 import { getDepartmentSettings } from '@/services/departmentSettingsService';
 import { getCompanySettings } from '@/services/companySettingsService';
 import { getCallLogsBySid } from '@/services/callLogService';
@@ -121,7 +121,7 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const { toast } = useToast();
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
-  const [isAddParticipantModalOpen, setIsAddParticipantModalOpen] = useState(false);
+  const [participantDialog, setParticipantDialog] = useState<'add' | 'transfer' | null>(null);
   const [isKeypadModalOpen, setIsKeypadModalOpen] = useState(false);
   const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
   const [currentParticipants, setCurrentParticipants] = useState<any[]>([]);
@@ -140,7 +140,8 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
   const [isEndingCall, setIsEndingCall] = useState(false);
   const [pendingOutgoing, setPendingOutgoing] = useState<PendingOutgoingParticipant | null>(null);
-  const [briefingName, setBriefingName] = useState<string | null>(null);
+  const [pendingTransfer, setPendingTransfer] = useState<{ callSid: string; name: string; userId: number } | null>(null);
+  const transferLeaveStartedRef = useRef(false);
   const [callOwnerUserId, setCallOwnerUserId] = useState<number | null>(null);
   const effectiveConferenceSid = conferenceSid || verifiedConferenceSid;
   const agentCallSid = connection?.parameters?.CallSid ?? fallbackAgentCallSid ?? null;
@@ -217,12 +218,8 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
   const hasRingingParticipant = [...externalParticipants, ...otherAgents].some((participant) => isParticipantRinging(participant));
   const customerParticipant = externalParticipants.find((participant) => participant.call_sid === customerCallSid)
     ?? (externalParticipants.length === 1 ? externalParticipants[0] : undefined);
-  const customerIsOnHold = Boolean(customerParticipant?.hold) || (Boolean(briefingName) && isOnHold);
-  const connectedColleague = otherAgents.find(
-    (participant) => getParticipantConnectionStatus(participant) === 'connected'
-  );
-  const canMergeCustomerIn = hasConsultCall || (customerIsOnHold && Boolean(briefingName) && Boolean(connectedColleague));
-  const shouldPollParticipantsQuickly = hasRingingParticipant || Boolean(pendingOutgoing);
+  const canMergeCustomerIn = hasConsultCall;
+  const shouldPollParticipantsQuickly = hasRingingParticipant || Boolean(pendingOutgoing) || Boolean(pendingTransfer);
   const floatingToggleDragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -301,7 +298,8 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     setIsOnHold(false);
     setVerifiedConferenceSid(conferenceSid || null);
     setPendingOutgoing(null);
-    setBriefingName(null);
+    setPendingTransfer(null);
+    transferLeaveStartedRef.current = false;
     setDuration(0);
     setIsCollapsed(false);
     setCallOwnerUserId(null);
@@ -371,7 +369,8 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       setIsOnHold(false);
       setVerifiedConferenceSid(null);
       setPendingOutgoing(null);
-      setBriefingName(null);
+      setPendingTransfer(null);
+      transferLeaveStartedRef.current = false;
       setCallDepartmentId(null);
       setCallOwnerUserId(null);
     }
@@ -705,7 +704,6 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       }
       setIsOnHold(false);
       setConsultCallSid(null);
-      setBriefingName(null);
       await fetchParticipants({ silent: true });
       toast({ title: "Calls merged", description: "All callers are now connected." });
     } catch (error: unknown) {
@@ -782,7 +780,12 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       }
       if (pendingOutgoing?.callSid === callSid) {
         setPendingOutgoing(null);
-        setBriefingName(null);
+      }
+      if (pendingTransfer?.callSid === callSid) {
+        setPendingTransfer(null);
+        transferLeaveStartedRef.current = false;
+      }
+      if (consultCallSid === callSid) {
         const customerSid = resolveCustomerCallSid();
         if (customerSid) {
           await holdParticipant(sid, customerSid, false);
@@ -806,12 +809,19 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     }
   };
 
+  const closeParticipantDialog = () => {
+    setParticipantDialog(null);
+    setDialerNumber('');
+    setSelectedParticipant('');
+    setColleagueSearch('');
+  };
+
   const handleAddParticipant = async () => {
     if (!selectedParticipant && !dialerNumber) {
       toast({ title: "Error", description: "Please select a user or enter a number.", variant: 'destructive' });
       return;
     }
-    
+
     const myCallSid = resolveActionAgentCallSid();
     if (!myCallSid) {
       toast({ title: "Error", description: "Cannot add participant. Active call session not found.", variant: 'destructive' });
@@ -825,45 +835,20 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     }
 
     const twilioNumber = resolveTwilioNumber();
-
     if (!twilioNumber) {
       toast({ title: "Error", description: "Could not determine a valid Twilio number for this call.", variant: 'destructive' });
       return;
     }
 
     setIsAdding(true);
-    let heldCustomerSid: string | null = null;
     try {
         const phoneNumber = dialerNumber ? `+1${dialerNumber.replace(/\D/g, '')}` : undefined;
         const userId = selectedParticipant || undefined;
-
-        if (userId) {
-          const customerSid = resolveCustomerCallSid();
-          if (!customerSid) {
-            toast({
-              title: "Cannot transfer yet",
-              description: "The customer line is not ready to place on hold.",
-              variant: 'destructive',
-            });
-            return;
-          }
-          await holdParticipant(sid, customerSid, true);
-          heldCustomerSid = customerSid;
-          await consultEnsureAgent(sid);
-          setCustomerCallSid(customerSid);
-          setIsOnHold(true);
-        }
-
-        const response = userId
-          ? await addParticipant(sid, twilioNumber, userId, undefined, { transfer: true })
-          : await initiateConsultCall(sid, twilioNumber, phoneNumber as string);
+        const response = phoneNumber
+          ? await initiateConsultCall(sid, twilioNumber, phoneNumber)
+          : await addParticipant(sid, twilioNumber, userId, phoneNumber);
 
         if (response?.status === false) {
-          if (heldCustomerSid) {
-            await holdParticipant(sid, heldCustomerSid, false).catch(() => undefined);
-            setIsOnHold(false);
-            heldCustomerSid = null;
-          }
           toast({
             title: "Error",
             description: response?.msg || "Failed to add participant.",
@@ -910,10 +895,9 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
           });
         } else if (userId) {
           await fetchParticipants({ silent: true });
-          setBriefingName(outgoingName);
           toast({
-            title: "Customer is on hold",
-            description: `${outgoingName} is ringing. Talk with them first, then press Merge to bring the customer in.`,
+            title: "Calling colleague",
+            description: `${outgoingName} is ringing. They join this call when they answer.`,
           });
         } else if (phoneNumber) {
           toast({
@@ -924,14 +908,8 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
           return;
         }
 
-        setIsAddParticipantModalOpen(false);
-        setDialerNumber('');
-        setSelectedParticipant('');
+        closeParticipantDialog();
     } catch (err: any) {
-       if (heldCustomerSid) {
-         await holdParticipant(sid, heldCustomerSid, false).catch(() => undefined);
-         setIsOnHold(false);
-       }
        toast({
          title: "Error",
          description: err?.response?.data?.msg || err?.message || "Failed to add participant.",
@@ -940,7 +918,156 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
     } finally {
         setIsAdding(false);
     }
-  }
+  };
+
+  const handleStartTransfer = async () => {
+    if (!selectedParticipant) {
+      toast({ title: "Error", description: "Select a colleague to transfer to.", variant: 'destructive' });
+      return;
+    }
+
+    const myCallSid = resolveActionAgentCallSid();
+    if (!myCallSid) {
+      toast({ title: "Error", description: "Active call session not found.", variant: 'destructive' });
+      return;
+    }
+
+    const sid = await ensureConferenceSid();
+    if (!sid) {
+      toast({ title: "Error", description: "Conference session not ready yet.", variant: 'destructive' });
+      return;
+    }
+
+    const twilioNumber = resolveTwilioNumber();
+    if (!twilioNumber) {
+      toast({ title: "Error", description: "Could not determine a valid Twilio number for this call.", variant: 'destructive' });
+      return;
+    }
+
+    setIsAdding(true);
+    try {
+      const response = await addParticipant(sid, twilioNumber, selectedParticipant, undefined, { transfer: true });
+      if (response?.status === false) {
+        toast({
+          title: "Error",
+          description: response?.msg || "Failed to transfer the call.",
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const outgoingCallSid = response?.data?.call_sid as string | undefined;
+      const outgoingName = resolveOutgoingTargetName(selectedParticipant, undefined);
+      if (!outgoingCallSid) {
+        toast({
+          title: "Error",
+          description: "The transfer did not start.",
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (response?.data?.conference_sid) {
+        setVerifiedConferenceSid(response.data.conference_sid);
+        setConferenceSid(response.data.conference_sid);
+      }
+
+      transferLeaveStartedRef.current = false;
+      setPendingTransfer({
+        callSid: outgoingCallSid,
+        name: outgoingName,
+        userId: Number(selectedParticipant),
+      });
+      await fetchParticipants({ silent: true });
+      toast({
+        title: "Transferring",
+        description: `${outgoingName} is ringing. You leave after they answer, so the customer is not left alone.`,
+      });
+      closeParticipantDialog();
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err?.response?.data?.msg || err?.message || "Failed to transfer the call.",
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!pendingTransfer || !effectiveConferenceSid) {
+      return;
+    }
+
+    const myCallSid = resolveActionAgentCallSid();
+    const bySid = (currentParticipants as ConferenceParticipant[]).find(
+      (participant) => participant.call_sid === pendingTransfer.callSid
+    );
+    const byUser = (currentParticipants as ConferenceParticipant[]).find(
+      (participant) =>
+        participant.is_agent
+        && Number(participant.user_id) === pendingTransfer.userId
+        && participant.call_sid !== myCallSid
+    );
+    const answeredColleague = byUser && getParticipantConnectionStatus(byUser) === 'connected' ? byUser : null;
+    const colleague = answeredColleague ?? bySid;
+    if (!colleague) {
+      return;
+    }
+
+    const status = getParticipantConnectionStatus(colleague);
+    if (!answeredColleague && status === 'ended') {
+      const name = pendingTransfer.name;
+      setPendingTransfer(null);
+      transferLeaveStartedRef.current = false;
+      toast({
+        title: 'Transfer did not connect',
+        description: `${name} did not answer. You are still on the call.`,
+      });
+      return;
+    }
+
+    if (status !== 'connected' || transferLeaveStartedRef.current) {
+      return;
+    }
+
+    if (!myCallSid || myCallSid === colleague.call_sid) {
+      return;
+    }
+
+    transferLeaveStartedRef.current = true;
+    const conferenceSidToLeave = effectiveConferenceSid;
+
+    void (async () => {
+      try {
+        const customerSid = resolveCustomerCallSid();
+        if (customerSid && customerSid !== myCallSid) {
+          await holdParticipant(conferenceSidToLeave, customerSid, false).catch(() => undefined);
+          await consultEnsureAgent(conferenceSidToLeave);
+        }
+
+        const handoff = await leaveConference(conferenceSidToLeave, myCallSid, { handoff: true });
+        if (!handoff?.status) {
+          transferLeaveStartedRef.current = false;
+          return;
+        }
+
+        setPendingTransfer(null);
+        await onLeaveCall(conferenceSidToLeave, myCallSid);
+      } catch (error: any) {
+        transferLeaveStartedRef.current = false;
+        if (error?.response?.status === 409) {
+          return;
+        }
+        toast({
+          title: 'Still on the call',
+          description: 'The other agent answered, but leaving the call failed.',
+          variant: 'destructive',
+        });
+      }
+    })();
+  }, [pendingTransfer, currentParticipants, effectiveConferenceSid, onLeaveCall, toast]);
   
   const handleRemoveParticipant = async (callSid: string) => {
     const sid = await ensureConferenceSid();
@@ -1146,11 +1273,11 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
       </span>
       <Phone className="h-5 w-5 shrink-0 text-white" strokeWidth={2.25} />
       <span className="hidden text-sm font-semibold tracking-wide sm:inline max-w-[160px] truncate">
-        {pendingOutgoing
+        {pendingTransfer
+          ? `Transferring · ${pendingTransfer.name}`
+          : pendingOutgoing
           ? `Waiting · ${pendingOutgoing.name}`
-          : connectedColleague && customerIsOnHold
-            ? `Briefing · ${briefingName || connectedColleague.label || 'colleague'}`
-            : displayCallerName || 'On call'}
+          : displayCallerName || 'On call'}
       </span>
       {pendingOutgoing ? (
         <span className="max-w-[140px] truncate text-xs font-medium text-emerald-50 sm:hidden">
@@ -1183,13 +1310,13 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                 callLogId={windshieldCallLogId}
               />
             ) : null}
-            {pendingOutgoing ? (
+            {pendingTransfer ? (
               <div className="border-b bg-amber-50 px-4 py-2.5 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-50">
-                Customer is on hold. Waiting for <span className="font-medium">{pendingOutgoing.name}</span> to answer.
+                Transferring to <span className="font-medium">{pendingTransfer.name}</span>. You leave after they answer, so the customer is not left alone.
               </div>
-            ) : canMergeCustomerIn && connectedColleague ? (
+            ) : pendingOutgoing ? (
               <div className="border-b bg-amber-50 px-4 py-2.5 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-50">
-                <span className="font-medium">{briefingName || 'Your colleague'}</span> answered. The customer is still on hold. Press Merge when you are ready to bring them in.
+                Waiting for <span className="font-medium">{pendingOutgoing.name}</span> to join.
               </div>
             ) : null}
             <div className="p-4 flex items-center justify-between gap-4">
@@ -1253,120 +1380,209 @@ export default function ActiveCallBar({ isOpen, contactNumber, callerName, depar
                         </div>
                     </DialogContent>
                 </Dialog>
-                <Dialog open={isAddParticipantModalOpen} onOpenChange={(open) => {
-                  setIsAddParticipantModalOpen(open);
-                  if (!open) {
+                <ActionButton
+                  icon={UserPlus}
+                  label="Add"
+                  onClick={() => {
                     setSelectedParticipant('');
-                    setDialerNumber('');
                     setColleagueSearch('');
+                    setParticipantDialog('add');
+                  }}
+                />
+                <ActionButton
+                  icon={PhoneForwarded}
+                  label="Transfer"
+                  onClick={() => {
+                    setDialerNumber('');
+                    setParticipantDialog('transfer');
+                  }}
+                />
+                <Dialog open={participantDialog !== null} onOpenChange={(open) => {
+                  if (!open) {
+                    closeParticipantDialog();
                   }
                 }}>
-                    <DialogTrigger asChild>
-                         <ActionButton icon={UserPlus} label="Transfer" />
-                    </DialogTrigger>
                     <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Transfer call</DialogTitle>
-                            <DialogDescription>
-                              The customer stays on hold while you talk to the other person. Press Merge when you want the customer to join. You stay on the call until you leave.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <Tabs defaultValue="internal">
-                            <TabsList className="grid w-full grid-cols-2">
+                        {participantDialog === 'transfer' ? (
+                          <>
+                            <DialogHeader>
+                              <DialogTitle>Transfer call</DialogTitle>
+                              <DialogDescription>
+                                Choose a colleague. You stay on the call until they answer, then you leave. The customer stays with them.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="py-4 space-y-3">
+                              {loadingUsers ? (
+                                <p className="text-sm text-muted-foreground">Loading colleagues...</p>
+                              ) : availableColleaguesToAdd.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">
+                                  {colleagues.length === 0
+                                    ? 'No company users found.'
+                                    : 'No colleagues available to transfer to. Everyone else is already on this call.'}
+                                </p>
+                              ) : (
+                                <>
+                                  <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                      placeholder="Search by name or email..."
+                                      value={colleagueSearch}
+                                      onChange={(event) => setColleagueSearch(event.target.value)}
+                                      className="pl-9"
+                                    />
+                                  </div>
+                                  <ScrollArea className="h-56 rounded-md border">
+                                    <div className="divide-y">
+                                      {filteredColleaguesToAdd.length === 0 ? (
+                                        <p className="p-4 text-sm text-muted-foreground text-center">
+                                          No colleagues match your search.
+                                        </p>
+                                      ) : (
+                                        filteredColleaguesToAdd.map((colleague) => (
+                                          <button
+                                            key={colleague.id}
+                                            type="button"
+                                            onClick={() => setSelectedParticipant(String(colleague.id))}
+                                            className={cn(
+                                              'w-full flex items-center justify-between gap-3 p-3 text-left hover:bg-muted/50 transition-colors',
+                                              selectedParticipant === String(colleague.id) && 'bg-muted'
+                                            )}
+                                          >
+                                            <div className="min-w-0">
+                                              <p className="font-medium truncate">{colleague.name}</p>
+                                              <p className="text-xs text-muted-foreground truncate">{colleague.email}</p>
+                                            </div>
+                                            <div className="shrink-0">
+                                              {renderColleagueStatusBadges(colleague)}
+                                            </div>
+                                          </button>
+                                        ))
+                                      )}
+                                    </div>
+                                  </ScrollArea>
+                                </>
+                              )}
+                            </div>
+                            <Button onClick={handleStartTransfer} disabled={isAdding || !selectedParticipant}>
+                              <PhoneForwarded className="mr-2 h-4 w-4" />
+                              Transfer
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <DialogHeader>
+                              <DialogTitle>Add Participant</DialogTitle>
+                              <DialogDescription>
+                                Add a colleague or dial a number. They join this call when they answer.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <Tabs
+                              defaultValue="internal"
+                              onValueChange={(value) => {
+                                if (value === 'internal') {
+                                  setDialerNumber('');
+                                } else {
+                                  setSelectedParticipant('');
+                                }
+                              }}
+                            >
+                              <TabsList className="grid w-full grid-cols-2">
                                 <TabsTrigger value="internal">Internal User</TabsTrigger>
                                 <TabsTrigger value="external">Dial Number</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="internal" className="py-4 space-y-3">
-                               {loadingUsers ? (
-                                 <p className="text-sm text-muted-foreground">Loading colleagues...</p>
-                               ) : availableColleaguesToAdd.length === 0 ? (
-                                 <p className="text-sm text-muted-foreground">
-                                   {colleagues.length === 0
-                                     ? 'No company users found.'
-                                     : 'No colleagues available to add. Everyone else is already on this call.'}
-                                 </p>
-                               ) : (
-                                 <>
-                                   <div className="relative">
-                                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                     <Input
-                                       placeholder="Search by name or email..."
-                                       value={colleagueSearch}
-                                       onChange={(event) => setColleagueSearch(event.target.value)}
-                                       className="pl-9"
-                                     />
-                                   </div>
-                                   <ScrollArea className="h-56 rounded-md border">
-                                     <div className="divide-y">
-                                       {filteredColleaguesToAdd.length === 0 ? (
-                                         <p className="p-4 text-sm text-muted-foreground text-center">
-                                           No colleagues match your search.
-                                         </p>
-                                       ) : (
-                                         filteredColleaguesToAdd.map((colleague) => (
-                                           <button
-                                             key={colleague.id}
-                                             type="button"
-                                             onClick={() => setSelectedParticipant(String(colleague.id))}
-                                             className={cn(
-                                               'w-full flex items-center justify-between gap-3 p-3 text-left hover:bg-muted/50 transition-colors',
-                                               selectedParticipant === String(colleague.id) && 'bg-muted'
-                                             )}
-                                           >
-                                             <div className="min-w-0">
-                                               <p className="font-medium truncate">{colleague.name}</p>
-                                               <p className="text-xs text-muted-foreground truncate">{colleague.email}</p>
-                                             </div>
-                                             <div className="shrink-0">
-                                               {renderColleagueStatusBadges(colleague)}
-                                             </div>
-                                           </button>
-                                         ))
-                                       )}
-                                     </div>
-                                   </ScrollArea>
-                                 </>
-                               )}
-                            </TabsContent>
-                            <TabsContent value="external" className="py-4 space-y-4">
-                               <Select onValueChange={setDialerNumber} disabled={loadingUsers}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={loadingUsers ? 'Loading contacts...' : 'Select a contact'} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {companyContacts.map(contact => (
-                                            <SelectItem key={contact.id} value={contact.phone_no}>
-                                                {contact.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
+                              </TabsList>
+                              <TabsContent value="internal" className="py-4 space-y-3">
+                                {loadingUsers ? (
+                                  <p className="text-sm text-muted-foreground">Loading colleagues...</p>
+                                ) : availableColleaguesToAdd.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground">
+                                    {colleagues.length === 0
+                                      ? 'No company users found.'
+                                      : 'No colleagues available to add. Everyone else is already on this call.'}
+                                  </p>
+                                ) : (
+                                  <>
+                                    <div className="relative">
+                                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                      <Input
+                                        placeholder="Search by name or email..."
+                                        value={colleagueSearch}
+                                        onChange={(event) => setColleagueSearch(event.target.value)}
+                                        className="pl-9"
+                                      />
+                                    </div>
+                                    <ScrollArea className="h-56 rounded-md border">
+                                      <div className="divide-y">
+                                        {filteredColleaguesToAdd.length === 0 ? (
+                                          <p className="p-4 text-sm text-muted-foreground text-center">
+                                            No colleagues match your search.
+                                          </p>
+                                        ) : (
+                                          filteredColleaguesToAdd.map((colleague) => (
+                                            <button
+                                              key={colleague.id}
+                                              type="button"
+                                              onClick={() => setSelectedParticipant(String(colleague.id))}
+                                              className={cn(
+                                                'w-full flex items-center justify-between gap-3 p-3 text-left hover:bg-muted/50 transition-colors',
+                                                selectedParticipant === String(colleague.id) && 'bg-muted'
+                                              )}
+                                            >
+                                              <div className="min-w-0">
+                                                <p className="font-medium truncate">{colleague.name}</p>
+                                                <p className="text-xs text-muted-foreground truncate">{colleague.email}</p>
+                                              </div>
+                                              <div className="shrink-0">
+                                                {renderColleagueStatusBadges(colleague)}
+                                              </div>
+                                            </button>
+                                          ))
+                                        )}
+                                      </div>
+                                    </ScrollArea>
+                                  </>
+                                )}
+                              </TabsContent>
+                              <TabsContent value="external" className="py-4 space-y-4">
+                                <Select onValueChange={setDialerNumber} disabled={loadingUsers}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder={loadingUsers ? 'Loading contacts...' : 'Select a contact'} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {companyContacts.map(contact => (
+                                      <SelectItem key={contact.id} value={contact.phone_no}>
+                                        {contact.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
                                 </Select>
-                               <div className="relative">
-                                    <Input 
-                                        value={dialerNumber}
-                                        onChange={(e) => setDialerNumber(e.target.value)}
-                                        placeholder="Or enter number manually"
-                                        className="text-center text-lg pr-8"
-                                    />
-                                    {dialerNumber.length > 0 && (
-                                        <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={handleBackspace}>
-                                            <Delete className="h-4 w-4"/>
-                                        </Button>
-                                    )}
+                                <div className="relative">
+                                  <Input
+                                    value={dialerNumber}
+                                    onChange={(e) => setDialerNumber(e.target.value)}
+                                    placeholder="Or enter number manually"
+                                    className="text-center text-lg pr-8"
+                                  />
+                                  {dialerNumber.length > 0 && (
+                                    <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={handleBackspace}>
+                                      <Delete className="h-4 w-4"/>
+                                    </Button>
+                                  )}
                                 </div>
                                 <div className="grid grid-cols-3 gap-2">
-                                    {dialpadKeys.map(key => (
-                                        <Button key={key} variant="outline" className="h-14 text-xl" onClick={() => handleDigitClick(key)}>
-                                            {key}
-                                        </Button>
-                                    ))}
+                                  {dialpadKeys.map(key => (
+                                    <Button key={key} variant="outline" className="h-14 text-xl" onClick={() => handleDigitClick(key)}>
+                                      {key}
+                                    </Button>
+                                  ))}
                                 </div>
-                            </TabsContent>
-                        </Tabs>
-                         <Button onClick={handleAddParticipant} disabled={isAdding || (!selectedParticipant && !dialerNumber)}>
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            {selectedParticipant ? 'Transfer' : 'Add Participant'}
-                        </Button>
+                              </TabsContent>
+                            </Tabs>
+                            <Button onClick={handleAddParticipant} disabled={isAdding || (!selectedParticipant && !dialerNumber)}>
+                              <UserPlus className="mr-2 h-4 w-4" />
+                              Add Participant
+                            </Button>
+                          </>
+                        )}
                     </DialogContent>
                 </Dialog>
                 <Dialog open={isParticipantsModalOpen} onOpenChange={setIsParticipantsModalOpen}>
