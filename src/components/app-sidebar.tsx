@@ -11,7 +11,7 @@ import {
   SidebarGroupLabel,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
-import { LogOut, Phone, Building, Users, Settings, LayoutGrid, UserCog, Package, CreditCard, AppWindow, UploadCloud, Plug, Radio, FileSearch, Tags } from 'lucide-react';
+import { LogOut, Phone, Building, Users, Settings, LayoutGrid, UserCog, Package, CreditCard, AppWindow, UploadCloud, Plug, Radio, FileSearch, Tags, Bot, BarChart3 } from 'lucide-react';
 import { Button } from './ui/button';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -28,6 +28,7 @@ import {
   canAccessBilling,
   canAccessCompanySettings,
   canAccessCallAnalysis,
+  canAccessAiCalls,
   canAccessCallOutcomes,
   canAccessLiveIntel,
   canAccessDashboard,
@@ -53,6 +54,7 @@ export function AppSidebar() {
   const showDashboard = canAccessDashboard(user?.role_id);
   const showLiveIntel = canAccessLiveIntel(user?.role_id);
   const showCallAnalysis = canAccessCallAnalysis(user?.role_id);
+  const showAiCalls = canAccessAiCalls(user?.role_id);
   const showCallOutcomes = canAccessCallOutcomes(user?.role_id);
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : '?';
@@ -115,6 +117,26 @@ export function AppSidebar() {
                     <Link href="/call-analysis">
                       <FileSearch />
                       <span>Analysis</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {showAiCalls && !inElectron && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === '/ai-calls'} tooltip="AI Call Log">
+                    <Link href="/ai-calls">
+                      <Bot />
+                      <span>AI Call Log</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {showAiCalls && !inElectron && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith('/ai-calls/dashboard')} tooltip="AI Insights">
+                    <Link href="/ai-calls/dashboard">
+                      <BarChart3 />
+                      <span>AI Insights</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

@@ -95,6 +95,11 @@ export function canAccessCallAnalysis(roleId?: number | null): boolean {
   return isPlatformAdmin(roleId) || isCompanyAdmin(roleId);
 }
 
+/** AI Calls (ElevenLabs agent) — Admin, Company Admin or Manager. */
+export function canAccessAiCalls(roleId?: number | null): boolean {
+  return isPlatformAdmin(roleId) || isCompanyAdmin(roleId) || isManager(roleId);
+}
+
 /** Live Intelligence Center — Admin or Manager (users restricted). */
 export function canAccessLiveIntel(roleId?: number | null): boolean {
   return isPlatformAdmin(roleId) || isCompanyAdmin(roleId) || isManager(roleId);

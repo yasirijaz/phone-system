@@ -76,6 +76,9 @@ export default function ReservationModal({
 
   const callerName = savedContactName || reservation.task.attributes.contact_name || 'Unknown Caller';
   const departmentName = reservation.task.attributes.department_name || '';
+  const aiHandoff = reservation.task.attributes.ai_handoff as
+    | { customer_name?: string; vehicle?: string; glass?: string; reason?: string; summary?: string; appointment_id?: string }
+    | undefined;
   const onCall = Boolean(activeCallDisplay);
 
   if (isMinimized) {
@@ -94,6 +97,18 @@ export default function ReservationModal({
       aria-label="Incoming reservation"
       aria-live="assertive"
     >
+      {aiHandoff && (
+        <div className="mb-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 shadow-sm">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-violet-600">Transferred by AI agent</div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {aiHandoff.customer_name && <span><strong>Caller:</strong> {aiHandoff.customer_name}</span>}
+            {aiHandoff.vehicle && <span><strong>Vehicle:</strong> {aiHandoff.vehicle}</span>}
+            {aiHandoff.glass && <span><strong>Glass:</strong> {aiHandoff.glass}</span>}
+            {aiHandoff.reason && <span><strong>Reason:</strong> {aiHandoff.reason}</span>}
+          </div>
+          {aiHandoff.summary && <p className="mt-1 text-violet-800">{aiHandoff.summary}</p>}
+        </div>
+      )}
       <CallWaitingPanel
         activeCall={activeCallDisplay}
         incomingCall={{ callerName, callerNumber, departmentName }}
